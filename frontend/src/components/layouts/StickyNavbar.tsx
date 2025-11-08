@@ -39,17 +39,16 @@ export const StickyNavbar: React.FC = () => {
           const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/users/${userId}`, {
             headers: { Authorization: `Bearer ${jwt}` }
           });
-          const username = response.data.username;
-          
+          const username: string = response.data.username;
+
           const initial = username ? username.charAt(0).toUpperCase() : "U";
           setUserInitial(initial);
-
-          setUserAvatarUrl(`https://i.pravatar.cc?u=${encodeURIComponent(username || `user-${userId}`)}&background=random&color=fff&size=40&font-size=0.5&rounded=true`);
+          setUserAvatarUrl(`https://i.pravatar.cc?u=${encodeURIComponent(username || `user-${userId}`)}`);
 
         } catch (error) {
           console.error("Error fetching user data:", error);
           if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-            handleLogout(); 
+            handleLogout();
           } else {
             setUserInitial("U");
             setUserAvatarUrl(undefined);
@@ -63,31 +62,32 @@ export const StickyNavbar: React.FC = () => {
     };
 
     fetchUserData();
-  }, [navigate]); 
+  }, [navigate]);
 
-
-   useEffect(() => {
-    const syncLogout = (event: StorageEvent) => {
-      if (event.key === 'jwt' && !event.newValue) {
-        setIsLoggedIn(false);
-        setUserInitial("U");
-        setUserAvatarUrl(undefined);
-        if (window.location.pathname !== '/signin' && window.location.pathname !== '/signup') {
-          navigate('/signin');
+  useEffect(() => {
+    const syncAuth = (event: StorageEvent) => {
+      if (event.key === 'jwt') {
+        if (!event.newValue) {
+          setIsLoggedIn(false);
+          setUserInitial("U");
+          setUserAvatarUrl(undefined);
+          if (window.location.pathname !== '/signin' && window.location.pathname !== '/signup') {
+            navigate('/signin');
+          }
+        } else {
+          setIsLoggedIn(true);
         }
-      } else if (event.key === 'jwt' && event.newValue && !localStorage.getItem('jwt')) {
       }
     };
 
-    window.addEventListener('storage', syncLogout);
+    window.addEventListener('storage', syncAuth);
     return () => {
-      window.removeEventListener('storage', syncLogout);
+      window.removeEventListener('storage', syncAuth);
     };
   }, [navigate]);
 
-
   const handleHomeClick = () => {
-    window.location.href = '/';
+    navigate('/');
   };
 
   return (
@@ -113,9 +113,11 @@ export const StickyNavbar: React.FC = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>View Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center w-full">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>View Profile</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/create-blog" className="flex items-center w-full">
@@ -124,8 +126,8 @@ export const StickyNavbar: React.FC = () => {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={handleLogout} 
+                  <DropdownMenuItem
+                    onClick={handleLogout}
                     className='text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10'
                   >
                     <LogOut className="mr-2 h-4 w-4" />

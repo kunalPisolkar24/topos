@@ -5,7 +5,8 @@ import { Signup } from '@/components/auth';
 import { Signin } from '@/components/auth/';
 import Home from "@/components/pages/Home";
 import ViewBlogPage from '@/components/pages/ViewBlogPage';
-import CreateNewBlog from '@/components/pages/CreateNewBlog'; 
+import CreateNewBlog from '@/components/pages/CreateNewBlog';
+import UserProfile from '@/components/pages/UserProfile';
 
 export default function App() {
   return (
@@ -16,7 +17,8 @@ export default function App() {
           <Route path="/signin" element={<Signin />} />
           <Route path="/" element={<Home />} />
           <Route path="/blog/:id" element={<ViewBlogPage />} />
-          <Route path="/create-blog" element={<CreateNewBlog />} /> 
+          <Route path="/create-blog" element={<CreateNewBlog />} />
+          <Route path="/profile" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/signin" />} />
         </Routes>
       </Router>
