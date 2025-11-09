@@ -22,13 +22,13 @@ const app = new Hono<{
 
 app.use('*', cors({
   origin: '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST','PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use('*', rateLimitMiddleware);
 
-app.get('/ping', (c) => {
+app.get('/api/ping', (c) => {
   return c.json({
     status: 'ok',
     message: 'API Routes are working!',
