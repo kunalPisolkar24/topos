@@ -9,6 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "../../hooks/use-toast";
 import { StickyNavbar } from "../layouts";
 import { BlogCard } from "../blog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface UserProfileData {
   id: number;
@@ -33,7 +41,6 @@ interface FormattedBlogPost {
   publishedAt: Date;
 }
 
-// --- Dummy Data (as provided) ---
 const dummyUserProfile: UserProfileData = {
   id: 1,
   username: "Kunal Pisolkar",
@@ -44,28 +51,12 @@ const dummyUserProfile: UserProfileData = {
 };
 
 const dummyUserBlogs: FormattedBlogPost[] = [
-  {
-    id: 101,
-    title: "Getting Started with Hono.js",
-    snippet: "A comprehensive guide to building fast and lightweight web applications with Hono.js, the modern web framework for the edge.",
-    author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" },
-    tags: ["Hono.js", "Backend", "JavaScript"],
-    slug: "post-101",
-    imageUrl: "https://images.unsplash.com/photo-1550063873-ab792950096b?auto=format&fit=crop&w=600&q=80",
-    publishedAt: new Date("2025-10-28T10:00:00Z"),
-  },
-  {
-    id: 102,
-    title: "Mastering Prisma with PostgreSQL",
-    snippet: "Learn how to leverage Prisma's powerful ORM capabilities with a PostgreSQL database to build robust and scalable applications.",
-    author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" },
-    tags: ["Prisma", "PostgreSQL", "Database"],
-    slug: "post-102",
-    imageUrl: "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=600&q=80",
-    publishedAt: new Date("2025-10-15T14:30:00Z"),
-  },
+  { id: 101, title: "Getting Started with Hono.js", snippet: "A comprehensive guide to building fast and lightweight web applications with Hono.js...", author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" }, tags: ["Hono.js", "Backend", "JavaScript"], slug: "post-101", imageUrl: "https://images.unsplash.com/photo-1550063873-ab792950096b?auto=format&fit=crop&w=600&q=80", publishedAt: new Date("2025-10-28T10:00:00Z") },
+  { id: 102, title: "Mastering Prisma with PostgreSQL", snippet: "Learn how to leverage Prisma's powerful ORM capabilities with a PostgreSQL database...", author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" }, tags: ["Prisma", "PostgreSQL", "Database"], slug: "post-102", imageUrl: "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=600&q=80", publishedAt: new Date("2025-10-15T14:30:00Z") },
+  { id: 103, title: "Advanced React Patterns", snippet: "Exploring advanced React patterns like Render Props and Hooks to create reusable and clean components.", author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" }, tags: ["React", "Frontend", "Design Patterns"], slug: "post-103", imageUrl: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=600&q=80", publishedAt: new Date("2025-09-20T11:00:00Z") },
+  { id: 104, title: "Deploying to the Edge with Cloudflare", snippet: "A step-by-step guide on deploying your applications to Cloudflare Workers for optimal performance.", author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" }, tags: ["Cloudflare", "Deployment", "Edge Computing"], slug: "post-104", imageUrl: "https://images.unsplash.com/photo-1611117775522-5a268e647b19?auto=format&fit=crop&w=600&q=80", publishedAt: new Date("2025-09-05T09:45:00Z") },
+  { id: 105, title: "UI/UX Tips for Developers", snippet: "Practical UI/UX tips that every developer can apply to build more intuitive and user-friendly applications.", author: { name: "Kunal Pisolkar", avatarUrl: "https://i.pravatar.cc/48?u=kunalpisolkar" }, tags: ["UI", "UX", "Design"], slug: "post-105", imageUrl: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=600&q=80", publishedAt: new Date("2025-08-18T18:00:00Z") },
 ];
-// --- End of Dummy Data ---
 
 const UserProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -77,6 +68,8 @@ const UserProfile: React.FC = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({ username: "", bio: "" });
+  const [currentPage, setCurrentPage] = useState(1);
+  const postsPerPage = 3;
 
   useEffect(() => {
     const fetchUserProfile = () => {
@@ -86,7 +79,6 @@ const UserProfile: React.FC = () => {
         navigate("/signin");
         return;
       }
-      // Simulating API call
       setTimeout(() => {
         setUserProfile(dummyUserProfile);
         setUserBlogs(dummyUserBlogs);
@@ -109,14 +101,13 @@ const UserProfile: React.FC = () => {
       reader.readAsDataURL(event.target.files[0]);
     }
   };
-  
+
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSaveProfile = () => {
     setIsSaving(true);
-    // Simulating API call
     setTimeout(() => {
       setUserProfile((prev) => prev ? { ...prev, ...formData, avatar: avatarPreview || prev.avatar, bannerUrl: bannerPreview || prev.bannerUrl } : null);
       setIsEditingProfile(false);
@@ -133,8 +124,19 @@ const UserProfile: React.FC = () => {
       setBannerPreview(userProfile.bannerUrl);
     }
   };
-  
+
   const currentBanner = bannerPreview || userProfile?.bannerUrl;
+
+  const totalPages = Math.ceil(userBlogs.length / postsPerPage);
+  const indexOfLastPost = currentPage * postsPerPage;
+  const indexOfFirstPost = indexOfLastPost - postsPerPage;
+  const currentBlogs = userBlogs.slice(indexOfFirstPost, indexOfLastPost);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -161,16 +163,15 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-950">
       <StickyNavbar />
-      
-      {/* Banner Section */}
+
       <div className="relative w-full h-48 sm:h-64 md:h-80">
-        <img 
-          src={currentBanner} 
-          alt="Banner" 
+        <img
+          src={currentBanner}
+          alt="Banner"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
-        
+
         {isEditingProfile && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
             <label htmlFor="bannerUpload" className="group cursor-pointer flex flex-col items-center text-zinc-300 hover:text-white transition-colors">
@@ -186,8 +187,7 @@ const UserProfile: React.FC = () => {
 
       <main className="container mx-auto px-4 pb-16">
         <div className="max-w-5xl mx-auto -mt-16 sm:-mt-24 md:-mt-28">
-          
-          {/* Profile Card */}
+
           <Card className="bg-zinc-900/50 border-zinc-800 shadow-lg relative">
             <CardHeader className="flex flex-row justify-end p-4">
               {!isEditingProfile && (
@@ -199,8 +199,7 @@ const UserProfile: React.FC = () => {
             </CardHeader>
             <CardContent className="p-6 md:p-8 pt-0">
               <div className="flex flex-col items-center text-center">
-                
-                {/* Avatar */}
+
                 <div className="relative group">
                   <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-zinc-950 shadow-lg">
                     <AvatarImage src={avatarPreview || userProfile?.avatar} alt={userProfile?.username} />
@@ -262,17 +261,68 @@ const UserProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Blogs Section */}
           <div className="mt-12 md:mt-16">
             <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-6">
               Published Blogs
             </h2>
             {userBlogs.length > 0 ? (
-              <div className="grid grid-cols-1 gap-6">
-                {userBlogs.map((blog) => (
-                  <BlogCard key={blog.slug} {...blog} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-6">
+                  {currentBlogs.map((blog) => (
+                    <BlogCard key={blog.slug} {...blog} />
+                  ))}
+                </div>
+                {totalPages > 1 && (
+                  <div className="mt-10">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          {currentPage > 1 && (
+                            <PaginationPrevious
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePageChange(currentPage - 1);
+                              }}
+                              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                            />
+                          )}
+                        </PaginationItem>
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <PaginationItem key={i}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePageChange(i + 1);
+                              }}
+                              isActive={currentPage === i + 1}
+                              className={`hover:text-zinc-200 hover:bg-zinc-800 ${currentPage === i + 1
+                                  ? "text-zinc-100 bg-zinc-800 border-zinc-700"
+                                  : "text-zinc-400"
+                                }`}
+                            >
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          {currentPage < totalPages && (
+                            <PaginationNext
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePageChange(currentPage + 1);
+                              }}
+                              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                            />
+                          )}
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </>
             ) : (
               <Card className="bg-zinc-900/20 border-zinc-800">
                 <CardContent className="py-12 text-center">
