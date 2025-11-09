@@ -28,7 +28,7 @@ app.use('*', cors({
 
 app.use('*', rateLimitMiddleware);
 
-app.get('/ping', (c) => {
+app.get('/api/ping', (c) => {
   return c.json({
     status: 'ok',
     message: 'API Routes are working!',
