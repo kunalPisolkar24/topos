@@ -9,11 +9,16 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  username String @unique
-  email    String @unique
-  password String
-  posts    Post[]
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  name      String?
+  bio       String?
+  avatarUrl String?
+  bannerUrl String?
+  createdAt DateTime @default(now())
+  posts     Post[]
 }
 
 model Post {
@@ -21,7 +26,7 @@ model Post {
   title         String
   body          String
   imageUrl      String?
-  author        User      @relation(fields: [authorId], references: [id])
+  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId      Int
   tags          PostTag[]
   summary       String?
@@ -37,9 +42,9 @@ model Tag {
 }
 
 model PostTag {
-  post   Post @relation(fields: [postId], references: [id])
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId Int
-  tag    Tag  @relation(fields: [tagId], references: [id])
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId  Int
 
   @@id([postId, tagId])
