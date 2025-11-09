@@ -33,9 +33,7 @@ services:
       - app-network
 
   summary_api:
-    build:
-      context: ./summary-api
-      dockerfile: Dockerfile
+    image: kunalpisolkar/blog-app:distilbart-1.0
     ports:
       - "5000:5000"
     volumes:
