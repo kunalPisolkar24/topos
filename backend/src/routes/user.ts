@@ -10,9 +10,9 @@ import { signupSchema, signinSchema, userIdSchema } from '@kunalpisolkar24/bloga
 
 const updateProfileSchema = z.object({
   name: z.string().min(1, "Name cannot be empty").optional(),
-  bio: z.string().optional(),
-  avatarUrl: z.string().url("Invalid avatar URL").optional(),
-  bannerUrl: z.string().url("Invalid banner URL").optional(),
+  bio: z.string().nullable().optional(),
+  avatarUrl: z.string().url("Invalid avatar URL").nullable().optional(),
+  bannerUrl: z.string().url("Invalid banner URL").nullable().optional(),
 });
 
 export type UserHonoEnv = {
@@ -113,7 +113,7 @@ userRouter.post('/signin', async (c) => {
 
 userRouter.use('/users/*', authMiddleware);
 
-userRouter.put('/users/profile', async (c) => {
+userRouter.patch('/users/profile', async (c) => {
     const prisma = new PrismaClient({ datasourceUrl: c.env?.DATABASE_URL }).$extends(withAccelerate());
     const userId = c.get('user').id;
   
