@@ -194,24 +194,40 @@ const UserProfile: React.FC = () => {
   };
 
   const handleSaveProfile = async () => {
+    if (!userProfile) return;
     setIsSaving(true);
-    let avatarUrl = userProfile?.avatarUrl;
-    let bannerUrl = userProfile?.bannerUrl;
+
+    const updatePayload: { name?: string; bio?: string; avatarUrl?: string | null; bannerUrl?: string | null } = {};
+
+    if (formData.name !== userProfile.name) {
+      updatePayload.name = formData.name;
+    }
+    if (formData.bio !== userProfile.bio) {
+      updatePayload.bio = formData.bio;
+    }
 
     if (avatarFile) {
-      avatarUrl = await uploadToCloudinary(avatarFile);
-      if (!avatarUrl) { setIsSaving(false); return; }
-    }
-    if (bannerFile) {
-      bannerUrl = await uploadToCloudinary(bannerFile);
-      if (!bannerUrl) { setIsSaving(false); return; }
+      const newAvatarUrl = await uploadToCloudinary(avatarFile);
+      if (!newAvatarUrl) { setIsSaving(false); return; }
+      updatePayload.avatarUrl = newAvatarUrl;
     }
 
-    const payload = { ...formData, avatarUrl, bannerUrl };
+    if (bannerFile) {
+      const newBannerUrl = await uploadToCloudinary(bannerFile);
+      if (!newBannerUrl) { setIsSaving(false); return; }
+      updatePayload.bannerUrl = newBannerUrl;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      toast({ title: "No Changes", description: "You haven't made any changes." });
+      setIsSaving(false);
+      setIsEditingProfile(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem("jwt");
-      const response = await axios.put(`${import.meta.env.VITE_BACKEND_URL}/api/users/profile`, payload, {
+      const response = await axios.patch(`${import.meta.env.VITE_BACKEND_URL}/api/users/profile`, updatePayload, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUserProfile(response.data);
