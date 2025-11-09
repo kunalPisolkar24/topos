@@ -2,10 +2,18 @@ import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { Hono } from "hono";
 import { sign } from "hono/jwt";
+import { z } from "zod";
 
 import { StatusCode } from '../constants/status-code';
 import { authMiddleware } from '../middleware/auth';
 import { signupSchema, signinSchema, userIdSchema } from '@kunalpisolkar24/blogapp-common';
+
+const updateProfileSchema = z.object({
+  name: z.string().min(1, "Name cannot be empty").optional(),
+  bio: z.string().optional(),
+  avatarUrl: z.string().url("Invalid avatar URL").optional(),
+  bannerUrl: z.string().url("Invalid banner URL").optional(),
+});
 
 export type UserHonoEnv = {
   Bindings: {
@@ -51,6 +59,7 @@ userRouter.post('/signup', async (c) => {
         email: parsedBody.data.email,
         password: passwordHashHex,
         username: parsedBody.data.username,
+        name: parsedBody.data.username,
       },
     });
 
@@ -104,6 +113,84 @@ userRouter.post('/signin', async (c) => {
 
 userRouter.use('/users/*', authMiddleware);
 
+userRouter.put('/users/profile', async (c) => {
+    const prisma = new PrismaClient({ datasourceUrl: c.env?.DATABASE_URL }).$extends(withAccelerate());
+    const userId = c.get('user').id;
+  
+    try {
+      const body = await c.req.json();
+      const parsedBody = updateProfileSchema.safeParse(body);
+  
+      if (!parsedBody.success) {
+        return c.json({ error: parsedBody.error.errors }, StatusCode.BAD_REQUEST);
+      }
+  
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: parsedBody.data,
+        select: {
+            id: true,
+            username: true,
+            email: true,
+            name: true,
+            bio: true,
+            avatarUrl: true,
+            bannerUrl: true,
+            createdAt: true,
+        },
+      });
+  
+      return c.json(updatedUser, StatusCode.OK);
+    } catch (error) {
+      console.error(error);
+      return c.json({ error: 'Failed to update profile' }, StatusCode.INTERNAL_SERVER_ERROR);
+    } finally {
+      await prisma.$disconnect();
+    }
+});
+
+userRouter.get('/users/:id/posts', async (c) => {
+    const prisma = new PrismaClient({ datasourceUrl: c.env?.DATABASE_URL }).$extends(withAccelerate());
+    const authorId = parseInt(c.req.param('id'));
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '3');
+    const skip = (page - 1) * limit;
+
+    try {
+        const parsedParams = userIdSchema.safeParse({ id: authorId });
+        if (!parsedParams.success) {
+            return c.json({ error: parsedParams.error.errors }, StatusCode.BAD_REQUEST);
+        }
+
+        const [posts, totalPosts] = await Promise.all([
+            prisma.post.findMany({
+                where: { authorId: parsedParams.data.id },
+                skip,
+                take: limit,
+                include: {
+                    tags: { include: { tag: true } },
+                    author: { select: { id: true, username: true, email: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                cacheStrategy: { ttl: 60 },
+            }),
+            prisma.post.count({ 
+                where: { authorId: parsedParams.data.id },
+                cacheStrategy: { ttl: 60 } 
+            }),
+        ]);
+
+        const totalPages = Math.ceil(totalPosts / limit);
+        return c.json({ data: posts, totalPages, currentPage: page, totalPosts }, StatusCode.OK);
+
+    } catch (error) {
+        console.error(error);
+        return c.json({ error: 'Failed to get user posts' }, StatusCode.INTERNAL_SERVER_ERROR);
+    } finally {
+        await prisma.$disconnect();
+    }
+});
+
 userRouter.get('/users/:id', async (c) => {
   const prisma = new PrismaClient({ datasourceUrl: c.env?.DATABASE_URL }).$extends(withAccelerate());
   try {
@@ -116,7 +203,16 @@ userRouter.get('/users/:id', async (c) => {
 
     const user = await prisma.user.findUnique({
       where: { id: parsedParams.data.id },
-      select: { email: true, username: true },
+      select: { 
+        id: true,
+        email: true, 
+        username: true,
+        name: true,
+        bio: true,
+        avatarUrl: true,
+        bannerUrl: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -136,7 +232,7 @@ userRouter.get('/users', async (c) => {
   const prisma = new PrismaClient({ datasourceUrl: c.env?.DATABASE_URL }).$extends(withAccelerate());
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, username: true },
+      select: { id: true, email: true, username: true, name: true },
     });
 
     return c.json(users, StatusCode.OK);
