@@ -264,12 +264,16 @@ const UserProfile: React.FC = () => {
     return (
       <div className="min-h-screen bg-zinc-950">
         <StickyNavbar />
-        <div className="container mx-auto px-4 mt-[50px] py-8">
+        <div className="container mx-auto px-4 mt-[50px] pb-16">
           <Skeleton className="h-48 sm:h-64 w-full rounded-xl bg-zinc-800" />
-          <div className="max-w-4xl mx-auto -mt-20 px-4">
-            <Skeleton className="h-32 w-32 md:h-40 md:w-40 rounded-full border-4 border-zinc-950 bg-zinc-700" />
-            <Skeleton className="h-10 w-56 mt-6 rounded-lg bg-zinc-700" />
-            <Skeleton className="h-5 w-72 mt-3 rounded-lg bg-zinc-700" />
+          <div className="max-w-4xl mx-auto -mt-16 sm:-mt-20">
+            <div className="p-4 flex flex-col items-center sm:flex-row sm:items-end">
+              <Skeleton className="h-32 w-32 md:h-40 md:w-40 rounded-full border-4 border-zinc-950 bg-zinc-700 flex-shrink-0" />
+              <div className="w-full mt-4 sm:ml-6 sm:mt-0 text-center sm:text-left">
+                <Skeleton className="h-10 w-56 mx-auto sm:mx-0 rounded-lg bg-zinc-700" />
+                <Skeleton className="h-5 w-72 mt-4 mx-auto sm:mx-0 rounded-lg bg-zinc-700" />
+              </div>
+            </div>
           </div>
           <div className="max-w-4xl mx-auto space-y-6 mt-12">
             <Skeleton className="h-64 w-full rounded-xl bg-zinc-800" />
@@ -307,78 +311,82 @@ const UserProfile: React.FC = () => {
       </div>
 
       <main className="container mx-auto px-4 pb-16">
-        <div className="max-w-4xl mx-auto -mt-20">
-          <Card className="bg-zinc-900/50 border-zinc-800 shadow-lg backdrop-blur-sm overflow-visible">
-            <CardHeader className="flex flex-row justify-end p-4 pb-0">
-              {!isEditingProfile && (
-                <Button onClick={() => setIsEditingProfile(true)} variant="outline" size="sm" className="border-zinc-700 text-zinc-300">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Profile
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6">
-                <div className="relative group -mt-16 sm:-mt-24 flex-shrink-0">
-                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-zinc-900 shadow-lg">
-                    <AvatarImage src={avatarPreview || undefined} alt={userProfile?.name || userProfile?.username} />
-                    <AvatarFallback className="bg-zinc-800 text-zinc-300 text-4xl font-bold">
-                      {userProfile?.name?.charAt(0).toUpperCase() || userProfile?.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {isEditingProfile && (
-                    <label htmlFor="avatarUpload" className="absolute bottom-1 right-1 flex items-center justify-center h-10 w-10 bg-zinc-50 text-zinc-950 rounded-full cursor-pointer hover:scale-110 transition-transform shadow-md">
-                      <Camera className="h-5 w-5" />
-                      <input id="avatarUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, setAvatarFile, setAvatarPreview)} className="hidden" />
-                    </label>
+        <div className="max-w-4xl mx-auto">
+          <div className="relative -mt-16 sm:-mt-20">
+            <Card className="bg-zinc-900/50 border-zinc-800 shadow-lg backdrop-blur-sm">
+              <CardHeader className="flex flex-row justify-end p-4 pb-0">
+                {!isEditingProfile && (
+                  <Button onClick={() => setIsEditingProfile(true)} variant="outline" size="sm" className="border-zinc-700 text-zinc-300">
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Profile
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="flex flex-col items-center text-center sm:flex-row sm:items-end sm:text-left">
+                  <div className="relative group flex-shrink-0">
+                    <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-zinc-950 shadow-lg">
+                      <AvatarImage src={avatarPreview || undefined} alt={userProfile?.name || userProfile?.username} />
+                      <AvatarFallback className="bg-zinc-800 text-zinc-300 text-4xl font-bold">
+                        {userProfile?.name?.charAt(0).toUpperCase() || userProfile?.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isEditingProfile && (
+                      <label htmlFor="avatarUpload" className="absolute bottom-1 right-1 flex items-center justify-center h-10 w-10 bg-zinc-50 text-zinc-950 rounded-full cursor-pointer hover:scale-110 transition-transform shadow-md">
+                        <Camera className="h-5 w-5" />
+                        <input id="avatarUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, setAvatarFile, setAvatarPreview)} className="hidden" />
+                      </label>
+                    )}
+                  </div>
+
+                  {!isEditingProfile && (
+                    <div className="w-full mt-4 sm:ml-6">
+                      <div className="space-y-2">
+                        <h1 className="text-3xl md:text-4xl font-bold text-zinc-100">{userProfile?.name || userProfile?.username}</h1>
+                        <div className="flex items-center justify-center sm:justify-start gap-2 text-zinc-400">
+                          <Mail className="h-4 w-4" />
+                          <p>{userProfile?.email}</p>
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed max-w-2xl text-sm md:text-base pt-2">
+                          {userProfile?.bio || <span className="italic">No bio added yet.</span>}
+                        </p>
+                        <div className="flex items-center justify-center sm:justify-start flex-wrap gap-4 pt-2">
+                          <div className="flex items-center gap-2 text-sm text-zinc-300">
+                            <FileText className="h-4 w-4 text-zinc-400" />
+                            <b>{userBlogs.length}</b> Posts
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-zinc-300">
+                            <Calendar className="h-4 w-4 text-zinc-400" />
+                            Joined <b className="font-normal">{new Date(userProfile?.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <div className="w-full mt-4 sm:mt-0">
-                  {isEditingProfile ? (
-                    <div className="w-full text-left space-y-4">
-                      <div className="space-y-2">
-                        <label htmlFor="name" className="text-sm font-medium text-zinc-300">Display Name</label>
-                        <Input id="name" name="name" value={formData.name} onChange={handleFormChange} className="bg-zinc-800/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500" />
-                      </div>
-                      <div className="space-y-2">
-                        <label htmlFor="bio" className="text-sm font-medium text-zinc-300">Bio / About</label>
-                        <textarea id="bio" name="bio" value={formData.bio} onChange={handleFormChange} className="w-full min-h-[100px] px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-md text-zinc-100 placeholder:text-zinc-500" rows={3} />
-                      </div>
-                      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
-                        <Button onClick={handleCancel} variant="outline" className="border-zinc-700 text-zinc-300">Cancel</Button>
-                        <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-zinc-50 hover:bg-zinc-200 text-zinc-950">
-                          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          {isSaving ? "Saving..." : "Save Changes"}
-                        </Button>
-                      </div>
+                {isEditingProfile && (
+                  <div className="w-full text-left space-y-4 mt-8">
+                    <div className="space-y-2">
+                      <label htmlFor="name" className="text-sm font-medium text-zinc-300">Display Name</label>
+                      <Input id="name" name="name" value={formData.name} onChange={handleFormChange} className="bg-zinc-800/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500" />
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <h1 className="text-3xl md:text-4xl font-bold text-zinc-100">{userProfile?.name || userProfile?.username}</h1>
-                      <div className="flex items-center justify-center sm:justify-start gap-2 text-zinc-400">
-                        <Mail className="h-4 w-4" />
-                        <p>{userProfile?.email}</p>
-                      </div>
-                      <p className="text-zinc-400 leading-relaxed max-w-2xl text-sm md:text-base">
-                        {userProfile?.bio || <span className="italic">No bio added yet.</span>}
-                      </p>
-                      <div className="flex items-center justify-center sm:justify-start flex-wrap gap-4 pt-2">
-                        <div className="flex items-center gap-2 text-sm text-zinc-300">
-                          <FileText className="h-4 w-4 text-zinc-400" />
-                          <b>{userBlogs.length}</b> Posts
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-zinc-300">
-                          <Calendar className="h-4 w-4 text-zinc-400" />
-                          Joined <b className="font-normal">{new Date(userProfile?.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
-                        </div>
-                      </div>
+                    <div className="space-y-2">
+                      <label htmlFor="bio" className="text-sm font-medium text-zinc-300">Bio / About</label>
+                      <textarea id="bio" name="bio" value={formData.bio} onChange={handleFormChange} className="w-full min-h-[100px] px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-md text-zinc-100 placeholder:text-zinc-500" rows={3} />
                     </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                      <Button onClick={handleCancel} variant="outline" className="border-zinc-700 text-zinc-300">Cancel</Button>
+                      <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-zinc-50 hover:bg-zinc-200 text-zinc-950">
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSaving ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="mt-12 md:mt-16">
             <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-6">Published Blogs</h2>
