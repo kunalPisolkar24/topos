@@ -7,23 +7,34 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+interface UserData {
+    name: string | null;
+    username: string;
+    email: string;
+    avatarUrl: string | null;
+}
+
 export const StickyNavbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [userInitial, setUserInitial] = useState("U");
-  const [userAvatarUrl, setUserAvatarUrl] = useState<string | undefined>(undefined);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('jwt'));
+
+  const clearUserData = () => {
+    setUserData(null);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('jwt');
     setIsLoggedIn(false);
-    setUserInitial("U");
-    setUserAvatarUrl(undefined);
+    clearUserData();
     navigate('/signin');
   };
 
@@ -39,43 +50,35 @@ export const StickyNavbar: React.FC = () => {
           const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/users/${userId}`, {
             headers: { Authorization: `Bearer ${jwt}` }
           });
-          const username: string = response.data.username;
-
-          const initial = username ? username.charAt(0).toUpperCase() : "U";
-          setUserInitial(initial);
-          setUserAvatarUrl(`https://i.pravatar.cc?u=${encodeURIComponent(username || `user-${userId}`)}`);
+          setUserData(response.data);
 
         } catch (error) {
           console.error("Error fetching user data:", error);
           if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
             handleLogout();
-          } else {
-            setUserInitial("U");
-            setUserAvatarUrl(undefined);
           }
         }
       } else {
         setIsLoggedIn(false);
-        setUserInitial("U");
-        setUserAvatarUrl(undefined);
+        clearUserData();
       }
     };
 
     fetchUserData();
-  }, [navigate]);
+  }, [isLoggedIn, navigate]);
 
   useEffect(() => {
     const syncAuth = (event: StorageEvent) => {
       if (event.key === 'jwt') {
-        if (!event.newValue) {
+        const token = event.newValue;
+        if (token) {
+          setIsLoggedIn(true);
+        } else {
           setIsLoggedIn(false);
-          setUserInitial("U");
-          setUserAvatarUrl(undefined);
+          clearUserData();
           if (window.location.pathname !== '/signin' && window.location.pathname !== '/signup') {
             navigate('/signin');
           }
-        } else {
-          setIsLoggedIn(true);
         }
       }
     };
@@ -89,13 +92,16 @@ export const StickyNavbar: React.FC = () => {
   const handleHomeClick = () => {
     navigate('/');
   };
+  
+  const userInitial = userData?.name?.charAt(0).toUpperCase() || userData?.username?.charAt(0).toUpperCase() || "U";
+  const avatarSrc = userData?.avatarUrl || `https://i.pravatar.cc/48?u=${encodeURIComponent(userData?.username || 'default')}`;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 shadow">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 shadow-md backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-[50px] items-center">
           <div className="flex-shrink-0 flex items-center">
-            <button onClick={handleHomeClick} className="text-xl font-bold text-foreground">
+            <button onClick={handleHomeClick} className="text-xl font-bold text-zinc-100 hover:text-zinc-300 transition-colors">
               <span className="hidden sm:inline">blogApp</span>
               <span className="sm:hidden">bA</span>
             </button>
@@ -107,28 +113,47 @@ export const StickyNavbar: React.FC = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      {userAvatarUrl && <AvatarImage src={userAvatarUrl} alt={userInitial} />}
-                      <AvatarFallback>{userInitial}</AvatarFallback>
+                      {userData && <AvatarImage src={avatarSrc} alt={userData.name || userData.username} />}
+                      <AvatarFallback className="bg-zinc-800 text-zinc-300">{userInitial}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile" className="flex items-center w-full">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>View Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/create-blog" className="flex items-center w-full">
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>Create a Blog</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                <DropdownMenuContent className="w-64 border-zinc-800 bg-zinc-950 text-zinc-100" align="end" forceMount>
+                    {userData && (
+                        <>
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex items-center gap-3 p-2">
+                                    <Avatar className="h-10 w-10">
+                                        <AvatarImage src={avatarSrc} alt={userData.name || userData.username} />
+                                        <AvatarFallback className="bg-zinc-800 text-zinc-300">{userInitial}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col space-y-1 overflow-hidden">
+                                        <p className="text-sm font-medium leading-none truncate">{userData.name || userData.username}</p>
+                                        <p className="text-xs leading-none text-zinc-400 truncate">{userData.email}</p>
+                                    </div>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-zinc-800" />
+                        </>
+                    )}
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-zinc-100">
+                        <Link to="/profile" className="flex items-center w-full">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Account</span>
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-zinc-100">
+                        <Link to="/create-blog" className="flex items-center w-full">
+                        <Plus className="mr-2 h-4 w-4" />
+                        <span>Create a Blog</span>
+                        </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator className="bg-zinc-800"/>
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className='text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10'
+                    className='cursor-pointer text-red-500 focus:bg-red-900/40 focus:text-red-400'
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
