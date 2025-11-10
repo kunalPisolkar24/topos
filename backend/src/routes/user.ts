@@ -26,6 +26,7 @@ export type UserHonoEnv = {
     RAILWAY_WAKEUP_SECRET: string;
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
+    ELASTICSEARCH_URL: string;
   };
   Variables: {
     user: {

@@ -28,6 +28,7 @@ const internalPostIdSchema = z.object({
 export type HonoEnv = {
   Bindings: {
     DATABASE_URL: string;
+    DATABASE_URL_MIGRATE: string;
     JWT_SECRET: string;
     UPSTASH_REDIS_REST_URL: string;
     UPSTASH_REDIS_REST_TOKEN: string;
@@ -35,6 +36,7 @@ export type HonoEnv = {
     RAILWAY_WAKEUP_SECRET: string;
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
+    ELASTICSEARCH_URL: string;
   };
   Variables: {
     user: {
