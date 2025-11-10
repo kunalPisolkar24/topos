@@ -12,7 +12,7 @@ interface BlogCardProps {
   snippet: string;
   author: {
     name: string;
-    avatarUrl: string;
+    avatarUrl: string | null; 
   };
   tags: string[];
   slug: string;
@@ -66,7 +66,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
               onError={(e) =>
                 (e.currentTarget.src =
                   "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80")
-              } // Fallback image
+              }
             />
           </div>
 
@@ -104,7 +104,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8 border border-zinc-700">
                   <AvatarImage
-                    src={author.avatarUrl || "/placeholder.svg"}
+                    src={author.avatarUrl || undefined} // Updated to handle null
                     alt={author.name}
                   />
                   <AvatarFallback className="bg-zinc-800 text-zinc-300">

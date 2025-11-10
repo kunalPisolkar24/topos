@@ -25,6 +25,7 @@ interface Author {
   id: number;
   username: string;
   email: string;
+  avatarUrl: string | null;
 }
 
 interface BlogPost {
@@ -44,7 +45,7 @@ interface FormattedBlogPost {
   snippet: string;
   author: {
     name: string;
-    avatarUrl: string;
+    avatarUrl: string | null;
   };
   tags: string[];
   slug: string;
@@ -94,9 +95,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
           (plainTextBody.length > 150 ? "..." : ""),
         author: {
           name: post.author.username,
-          avatarUrl: `https://i.pravatar.cc/48?u=${encodeURIComponent(
-            post.author.username
-          )}`,
+          avatarUrl: post.author.avatarUrl, // Use the avatarUrl from the API
         },
         tags: post.tags.map((tagItem) => tagItem.tag.name),
         slug: `post-${post.id}`,
@@ -113,9 +112,8 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
       const params = `?page=${currentPage}&limit=${itemsPerPage}`;
 
       if (filterTag) {
-        url = `${
-          import.meta.env.VITE_BACKEND_URL
-        }/api/tags/getPost/${encodeURIComponent(filterTag)}${params}`;
+        url = `${import.meta.env.VITE_BACKEND_URL
+          }/api/tags/getPost/${encodeURIComponent(filterTag)}${params}`;
       } else {
         url = `${import.meta.env.VITE_BACKEND_URL}/api/posts${params}`;
       }
@@ -213,11 +211,10 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     handlePageChange(i + 1);
                   }}
                   isActive={currentPage === i + 1}
-                  className={`hover:text-zinc-200 hover:bg-zinc-800 ${
-                    currentPage === i + 1
+                  className={`hover:text-zinc-200 hover:bg-zinc-800 ${currentPage === i + 1
                       ? "text-zinc-100 bg-zinc-800 border-zinc-700"
                       : "text-zinc-400"
-                  }`}
+                    }`}
                 >
                   {i + 1}
                 </PaginationLink>
