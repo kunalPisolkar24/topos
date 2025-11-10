@@ -3,7 +3,7 @@
 import type React from "react";
 import { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {ViewBlogPageSkeleton} from "@/components/skeletons";
+import { ViewBlogPageSkeleton } from "@/components/skeletons";
 import { toast } from "../../hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,7 +22,7 @@ import {
   UploadCloud,
   Clock,
   Sparkles,
-  AlertCircle,
+  AlertCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -67,6 +67,9 @@ interface AuthorData {
   id: number;
   username: string;
   email: string;
+  name: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
 }
 
 interface Blog {
@@ -107,9 +110,8 @@ const ViewBlogPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${
-    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-  }/image/upload`;
+  const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    }/image/upload`;
   const CLOUDINARY_UPLOAD_PRESET = import.meta.env
     .VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -259,26 +261,14 @@ const ViewBlogPage: React.FC = () => {
       const jwt = localStorage.getItem("jwt");
       if (!jwt) throw new Error("No token found");
 
-      const blogData: InternalUpdatePostSchemaType = {
-        title: editTitle === blog.title ? undefined : editTitle,
-        body: editContent === blog.body ? undefined : editContent,
-        tags:
-          JSON.stringify(editTags) ===
-          JSON.stringify(blog.tags.map((t) => t.tag.name))
-            ? undefined
-            : editTags,
-        imageUrl:
-          finalCardImageUrl === blog.imageUrl ? undefined : finalCardImageUrl,
-      };
+      const blogData: Partial<InternalUpdatePostSchemaType> = {};
 
-      const updatePayload: Partial<InternalUpdatePostSchemaType> = {};
-      if (blogData.title !== undefined) updatePayload.title = blogData.title;
-      if (blogData.body !== undefined) updatePayload.body = blogData.body;
-      if (blogData.tags !== undefined) updatePayload.tags = blogData.tags;
-      if (blogData.imageUrl !== undefined)
-        updatePayload.imageUrl = blogData.imageUrl;
+      if (editTitle !== blog.title) blogData.title = editTitle;
+      if (editContent !== blog.body) blogData.body = editContent;
+      if (JSON.stringify(editTags) !== JSON.stringify(blog.tags.map(t => t.tag.name))) blogData.tags = editTags;
+      if (finalCardImageUrl !== blog.imageUrl) blogData.imageUrl = finalCardImageUrl;
 
-      if (Object.keys(updatePayload).length === 0) {
+      if (Object.keys(blogData).length === 0) {
         toast({
           title: "No Changes",
           description: "No changes were made to the blog post.",
@@ -287,7 +277,7 @@ const ViewBlogPage: React.FC = () => {
         return;
       }
 
-      const parsedData = internalUpdatePostSchema.parse(updatePayload);
+      const parsedData = internalUpdatePostSchema.parse(blogData);
 
       await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`,
@@ -422,22 +412,9 @@ const ViewBlogPage: React.FC = () => {
   );
 
   const formats = [
-    "header",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "list",
-    "bullet",
-    "indent",
-    "align",
-    "link",
-    "image",
-    "video",
-    "blockquote",
-    "code-block",
-    "color",
-    "background",
+    "header", "bold", "italic", "underline", "strike", "list", "bullet",
+    "indent", "align", "link", "image", "video", "blockquote", "code-block",
+    "color", "background",
   ];
 
   if (isLoading) return <ViewBlogPageSkeleton />;
@@ -452,24 +429,15 @@ const ViewBlogPage: React.FC = () => {
       </div>
     );
 
-  const authorAvatarUrl = `https://i.pravatar.cc/128?u=${encodeURIComponent(
-    blog.author.username
-  )}`;
-
   const cleanBlogBody = DOMPurify.sanitize(blog.body, {
     ADD_TAGS: ["iframe"],
     ADD_ATTR: [
-      "allow",
-      "allowfullscreen",
-      "frameborder",
-      "scrolling",
-      "src",
-      "width",
-      "height",
-      "title",
-      "loading", // Common for lazy-loading iframes
+      "allow", "allowfullscreen", "frameborder", "scrolling", "src",
+      "width", "height", "title", "loading",
     ],
   });
+
+  const authorInitial = blog.author.name?.charAt(0).toUpperCase() || blog.author.username.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-zinc-950/20">
@@ -493,10 +461,7 @@ const ViewBlogPage: React.FC = () => {
                 className="space-y-8 bg-zinc-900/20 border border-zinc-800 p-6 rounded-xl shadow-lg"
               >
                 <div>
-                  <label
-                    htmlFor="editBlogTitle"
-                    className="block text-lg font-medium text-zinc-300 mb-2"
-                  >
+                  <label htmlFor="editBlogTitle" className="block text-lg font-medium text-zinc-300 mb-2">
                     Edit Title
                   </label>
                   <Input
@@ -511,11 +476,8 @@ const ViewBlogPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="editCardImageUpload"
-                    className="block text-lg font-medium text-zinc-300 mb-2"
-                  >
-                    Blog Card Image (Recommended: 1920x1080)
+                  <label htmlFor="editCardImageUpload" className="block text-lg font-medium text-zinc-300 mb-2">
+                    Blog Card Image
                   </label>
                   <div
                     className="mt-1 flex justify-center items-center px-6 pt-5 pb-6 border-2 border-dashed border-zinc-700 rounded-xl cursor-pointer h-60 bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
@@ -524,20 +486,16 @@ const ViewBlogPage: React.FC = () => {
                     <div className="space-y-1 text-center">
                       {editCardImagePreview ? (
                         <img
-                          src={editCardImagePreview || "/placeholder.svg"}
+                          src={editCardImagePreview}
                           alt="Card preview"
                           className="mx-auto h-40 object-contain rounded-md"
                         />
                       ) : (
                         <UploadCloud className="mx-auto h-10 w-10 text-zinc-400" />
                       )}
-                      <div className="flex text-sm text-zinc-400">
+                      <div className="text-sm text-zinc-400">
                         <span className="relative rounded-md font-medium text-zinc-300 hover:text-zinc-100">
-                          {editCardImage
-                            ? "Change image"
-                            : editCardImageUrl
-                            ? "Change image"
-                            : "Upload an image"}
+                          {editCardImage ? "Change image" : editCardImageUrl ? "Change image" : "Upload an image"}
                         </span>
                         <input
                           id="editCardImageUpload"
@@ -560,30 +518,17 @@ const ViewBlogPage: React.FC = () => {
                     </div>
                   </div>
                   {isUploadingCardImage && (
-                    <p className="text-sm text-zinc-300 mt-2">
-                      Uploading card image...
-                    </p>
+                    <p className="text-sm text-zinc-300 mt-2">Uploading card image...</p>
                   )}
                   {editCardImageUrl && !editCardImage && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-red-400 hover:text-red-300 mt-1 p-0 h-auto"
-                      onClick={() => {
-                        setEditCardImageUrl(null);
-                        setEditCardImagePreview(null);
-                      }}
-                    >
+                    <Button variant="link" size="sm" className="text-red-400 hover:text-red-300 mt-1 p-0 h-auto" onClick={() => { setEditCardImageUrl(null); setEditCardImagePreview(null); }}>
                       Remove current card image
                     </Button>
                   )}
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="editBlogContent"
-                    className="block text-lg font-medium text-zinc-300 mb-2"
-                  >
+                  <label htmlFor="editBlogContent" className="block text-lg font-medium text-zinc-300 mb-2">
                     Edit Content
                   </label>
                   <div className="blog-content-editor-wrapper rounded-md">
@@ -602,23 +547,12 @@ const ViewBlogPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold mb-2 text-zinc-300">
-                    Edit Tags
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-2 text-zinc-300">Edit Tags</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {editTags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="secondary"
-                        className="px-3 py-1 bg-zinc-800 text-zinc-300 border-zinc-700"
-                      >
+                      <Badge key={tag} variant="secondary" className="px-3 py-1 bg-zinc-800 text-zinc-300 border-zinc-700">
                         {tag}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEditTag(tag)}
-                          className="ml-2 text-xs hover:text-red-400"
-                          aria-label={`Remove ${tag} tag`}
-                        >
+                        <button type="button" onClick={() => handleRemoveEditTag(tag)} className="ml-2 text-xs hover:text-red-400" aria-label={`Remove ${tag} tag`}>
                           <X size={12} />
                         </button>
                       </Badge>
@@ -626,22 +560,14 @@ const ViewBlogPage: React.FC = () => {
                   </div>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-zinc-700 text-zinc-300"
-                      >
+                      <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300">
                         Add Tag
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="bg-zinc-950 border-zinc-800">
                       <DialogHeader>
-                        <DialogTitle className="text-zinc-100">
-                          Add Tag
-                        </DialogTitle>
-                        <DialogDescription className="text-zinc-400">
-                          Enter the tag name.
-                        </DialogDescription>
+                        <DialogTitle className="text-zinc-100">Add Tag</DialogTitle>
+                        <DialogDescription className="text-zinc-400">Enter the tag name.</DialogDescription>
                       </DialogHeader>
                       <Input
                         placeholder="Enter tag name"
@@ -656,28 +582,17 @@ const ViewBlogPage: React.FC = () => {
                         }}
                       />
                       <DialogFooter>
-                        <Button type="button" onClick={handleAddEditTag}>
-                          Add
-                        </Button>
+                        <Button type="button" onClick={handleAddEditTag}>Add</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </div>
 
                 <div className="flex justify-end space-x-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    className="border-zinc-700 text-zinc-300"
-                  >
+                  <Button type="button" variant="outline" onClick={handleCancelEdit} className="border-zinc-700 text-zinc-300">
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={isUploadingCardImage}
-                    className="bg-zinc-300 hover:bg-zinc-400"
-                  >
+                  <Button type="submit" disabled={isUploadingCardImage} className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200">
                     Save Changes
                   </Button>
                 </div>
@@ -692,20 +607,15 @@ const ViewBlogPage: React.FC = () => {
                   <span>
                     Published on{" "}
                     {new Date(blog.createdAt).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
+                      year: "numeric", month: "long", day: "numeric",
                     })}
                   </span>
                   {blog.createdAt !== blog.updatedAt && (
                     <span>
                       (Updated on{" "}
                       {new Date(blog.updatedAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                      )
+                        year: "numeric", month: "long", day: "numeric",
+                      })})
                     </span>
                   )}
                 </div>
@@ -715,28 +625,16 @@ const ViewBlogPage: React.FC = () => {
                 />
                 <div className="flex flex-wrap gap-2 mb-8">
                   {blog.tags.map((tagItem) => (
-                    <Badge
-                      key={tagItem.tag.id}
-                      variant="secondary"
-                      className="bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/tag/${tagItem.tag.name}`)}
-                    >
+                    <Badge key={tagItem.tag.id} variant="secondary" className="bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer" onClick={() => navigate(`/tag/${tagItem.tag.name}`)}>
                       {tagItem.tag.name}
                     </Badge>
                   ))}
                 </div>
 
                 <div className="mt-8 pt-3 border-t border-zinc-800">
-                  <AlertDialog
-                    open={isSummaryDialogOpen}
-                    onOpenChange={setIsSummaryDialogOpen}
-                  >
+                  <AlertDialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
                     <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full sm:w-auto bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-all duration-200"
-                        onClick={() => setIsSummaryDialogOpen(true)}
-                      >
+                      <Button variant="outline" className="w-full sm:w-auto bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-all duration-200" onClick={() => setIsSummaryDialogOpen(true)}>
                         <Sparkles size={16} className="mr-2" />
                         View AI Summary
                       </Button>
@@ -750,11 +648,7 @@ const ViewBlogPage: React.FC = () => {
                       </AlertDialogHeader>
                       <div className="pb-2">
                         {(() => {
-                          if (
-                            blog.summary &&
-                            (blog.summaryStatus === "COMPLETED" ||
-                              (!blog.summaryStatus && blog.summary))
-                          ) {
+                          if (blog.summary && (blog.summaryStatus === "COMPLETED" || (!blog.summaryStatus && blog.summary))) {
                             return (
                               <div className="max-h-[60vh] overflow-y-auto py-2 my-2 scrollbar-thin scrollbar-thumb-zinc-600 scrollbar-track-zinc-800 pr-3 -mr-1">
                                 <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
@@ -774,9 +668,7 @@ const ViewBlogPage: React.FC = () => {
                                       Summary in Progress
                                     </AlertDialogDescription>
                                     <p className="text-sm text-amber-300/80 mt-1">
-                                      The AI summary for this blog post is
-                                      currently being generated. Please check
-                                      back in a few moments.
+                                      The AI summary is being generated. Please check back in a few moments.
                                     </p>
                                   </div>
                                 </div>
@@ -792,8 +684,7 @@ const ViewBlogPage: React.FC = () => {
                                       Summary Unavailable
                                     </AlertDialogDescription>
                                     <p className="text-sm text-zinc-400 mt-1">
-                                      The AI summary for this blog post is not
-                                      available at this time.
+                                      The AI summary for this post is not available.
                                     </p>
                                   </div>
                                 </div>
@@ -803,10 +694,7 @@ const ViewBlogPage: React.FC = () => {
                         })()}
                       </div>
                       <AlertDialogFooter className="px-6 py-4 border-t border-zinc-800">
-                        <AlertDialogCancel
-                          onClick={() => setIsSummaryDialogOpen(false)}
-                          className="w-full sm:w-auto bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"
-                        >
+                        <AlertDialogCancel onClick={() => setIsSummaryDialogOpen(false)} className="w-full sm:w-auto bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700">
                           Close
                         </AlertDialogCancel>
                       </AlertDialogFooter>
@@ -819,69 +707,42 @@ const ViewBlogPage: React.FC = () => {
 
           <aside className="w-full lg:w-1/3 lg:max-w-xs xl:max-w-sm">
             <Card className="sticky top-20 shadow-lg bg-zinc-900/20 border-zinc-800">
-              <CardHeader className="text-center border-b border-zinc-800">
-                <Avatar className="w-24 h-24 mx-auto mb-4 border-2 border-zinc-700">
-                  <AvatarImage
-                    src={authorAvatarUrl || "/placeholder.svg"}
-                    alt={blog.author.username}
-                  />
-                  <AvatarFallback className="text-4xl bg-zinc-800 text-zinc-300">
-                    {blog.author.username.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <CardTitle className="text-xl mb-1 text-zinc-100">
-                  {blog.author.username}
-                </CardTitle>
+              <CardHeader className="text-center">
+                <Link to={isAuthor ? "/profile" : `/user/${blog.author.id}`} className="group inline-block">
+                  <Avatar className="w-24 h-24 mx-auto mb-4 border-2 border-zinc-700 group-hover:border-zinc-500 transition-colors">
+                    <AvatarImage src={blog.author.avatarUrl || undefined} alt={blog.author.name || blog.author.username} />
+                    <AvatarFallback className="text-4xl bg-zinc-800 text-zinc-300">{authorInitial}</AvatarFallback>
+                  </Avatar>
+                </Link>
+                <CardTitle className="text-xl mb-1 text-zinc-100">{blog.author.name || blog.author.username}</CardTitle>
                 <p className="text-sm text-zinc-400">{blog.author.email}</p>
               </CardHeader>
-              <CardContent className="pt-6">
-                <h3 className="font-semibold mb-2 text-zinc-200">
-                  About Author
-                </h3>
+              <CardContent className="pt-6 border-t border-zinc-800">
+                <h3 className="font-semibold mb-2 text-zinc-200">About Author</h3>
                 <p className="text-sm text-zinc-400 mb-6">
-                  A passionate writer and tech enthusiast sharing insights on
-                  various topics.
+                  {blog.author.bio || <span className="italic">No bio provided.</span>}
                 </p>
                 {isAuthor && !isEditing && (
                   <div className="flex flex-col space-y-3">
-                    <Button
-                      variant="outline"
-                      onClick={handleEdit}
-                      className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                    >
+                    <Button variant="outline" onClick={handleEdit} className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800">
                       <Edit3 size={16} className="mr-2" /> Update Blog
                     </Button>
-                    <AlertDialog
-                      open={isDeleteDialogOpen}
-                      onOpenChange={setIsDeleteDialogOpen}
-                    >
+                    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                       <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          className="w-full bg-red-900 hover:bg-red-800"
-                        >
+                        <Button variant="destructive" className="w-full bg-red-900 hover:bg-red-800">
                           <Trash2 size={16} className="mr-2" /> Delete Blog
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-zinc-900 border-zinc-800">
                         <AlertDialogHeader>
-                          <AlertDialogTitle className="text-zinc-100">
-                            Are you absolutely sure?
-                          </AlertDialogTitle>
+                          <AlertDialogTitle className="text-zinc-100">Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription className="text-zinc-400">
-                            This action cannot be undone. This will permanently
-                            delete your blog post and remove its data from our
-                            servers.
+                            This will permanently delete your blog post. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300">
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={confirmDelete}
-                            className="bg-red-900 hover:bg-red-800 text-white"
-                          >
+                          <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300">Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={confirmDelete} className="bg-red-900 hover:bg-red-800 text-white">
                             Continue
                           </AlertDialogAction>
                         </AlertDialogFooter>
