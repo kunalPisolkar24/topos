@@ -101,6 +101,7 @@ tagRouter.get("/getPost/:tag", async (c) => {
               id: true,
               username: true,
               email: true,
+              avatarUrl: true,
             },
           },
         },
