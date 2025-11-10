@@ -168,7 +168,7 @@ postRouter.get("/", async (c) => {
         take: limit,
         include: {
           tags: { include: { tag: true } },
-          author: { select: { id: true, username: true, email: true } },
+          author: { select: { id: true, username: true, email: true, avatarUrl: true } },
         },
         orderBy: { createdAt: "desc" },
         cacheStrategy: { ttl: 60 },
