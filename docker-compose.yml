@@ -15,7 +15,9 @@ services:
       - /app/node_modules
     networks:
       - app-network
-  
+    depends_on:
+      - elasticsearch
+
   frontend:
     build:
       context: ./frontend
@@ -54,6 +56,24 @@ services:
     networks:
       - app-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch-dev
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  esdata:
+    driver: local
