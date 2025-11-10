@@ -16,6 +16,8 @@ RAILWAY_WAKEUP_SECRET="e"
 UPSTASH_RATELIMIT_REDIS_REST_URL="f"
 UPSTASH_RATELIMIT_REDIS_REST_TOKEN="g"
 
+ELASTICSEARCH_URL="http://elasticsearch:9200"
+
 # [[kv_namespaces]]
 # binding = "MY_KV_NAMESPACE"
 # id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
