@@ -15,10 +15,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 interface UserData {
-    name: string | null;
-    username: string;
-    email: string;
-    avatarUrl: string | null;
+  name: string | null;
+  username: string;
+  email: string;
+  avatarUrl: string | null;
 }
 
 export const StickyNavbar: React.FC = () => {
@@ -92,9 +92,8 @@ export const StickyNavbar: React.FC = () => {
   const handleHomeClick = () => {
     navigate('/');
   };
-  
+
   const userInitial = userData?.name?.charAt(0).toUpperCase() || userData?.username?.charAt(0).toUpperCase() || "U";
-  const avatarSrc = userData?.avatarUrl || `https://i.pravatar.cc/48?u=${encodeURIComponent(userData?.username || 'default')}`;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 shadow-md backdrop-blur-sm">
@@ -113,44 +112,44 @@ export const StickyNavbar: React.FC = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      {userData && <AvatarImage src={avatarSrc} alt={userData.name || userData.username} />}
+                      <AvatarImage src={userData?.avatarUrl || undefined} alt={userData?.name || userData?.username} />
                       <AvatarFallback className="bg-zinc-800 text-zinc-300">{userInitial}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64 border-zinc-800 bg-zinc-950 text-zinc-100" align="end" forceMount>
-                    {userData && (
-                        <>
-                            <DropdownMenuLabel className="font-normal">
-                                <div className="flex items-center gap-3 p-2">
-                                    <Avatar className="h-10 w-10">
-                                        <AvatarImage src={avatarSrc} alt={userData.name || userData.username} />
-                                        <AvatarFallback className="bg-zinc-800 text-zinc-300">{userInitial}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col space-y-1 overflow-hidden">
-                                        <p className="text-sm font-medium leading-none truncate">{userData.name || userData.username}</p>
-                                        <p className="text-xs leading-none text-zinc-400 truncate">{userData.email}</p>
-                                    </div>
-                                </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-zinc-800" />
-                        </>
-                    )}
+                  {userData && (
+                    <>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex items-center gap-3 p-2">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={userData.avatarUrl || undefined} alt={userData.name || userData.username} />
+                            <AvatarFallback className="bg-zinc-800 text-zinc-300">{userInitial}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col space-y-1 overflow-hidden">
+                            <p className="text-sm font-medium leading-none truncate">{userData.name || userData.username}</p>
+                            <p className="text-xs leading-none text-zinc-400 truncate">{userData.email}</p>
+                          </div>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-zinc-800" />
+                    </>
+                  )}
                   <DropdownMenuGroup>
                     <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-zinc-100">
-                        <Link to="/profile" className="flex items-center w-full">
+                      <Link to="/profile" className="flex items-center w-full">
                         <User className="mr-2 h-4 w-4" />
                         <span>Account</span>
-                        </Link>
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-zinc-100">
-                        <Link to="/create-blog" className="flex items-center w-full">
+                      <Link to="/create-blog" className="flex items-center w-full">
                         <Plus className="mr-2 h-4 w-4" />
                         <span>Create a Blog</span>
-                        </Link>
+                      </Link>
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
-                  <DropdownMenuSeparator className="bg-zinc-800"/>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
                   <DropdownMenuItem
                     onClick={handleLogout}
                     className='cursor-pointer text-red-500 focus:bg-red-900/40 focus:text-red-400'
