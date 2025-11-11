@@ -1,23 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { StickyNavbar } from "../layouts";
-import { BlogList } from "../blog";
-import { SearchBar } from "../blog";
-
+import { BlogList } from "../blog/BlogList";
+import { SearchBar } from "../blog/SearchBar";
 import { ErrorBoundary } from "../utils/";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 const Home: React.FC = () => {
-  const navigate = useNavigate();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  useEffect(() => {
-    const jwt = localStorage.getItem("jwt");
-    if (!jwt) {
-      navigate("/signin");
-    }
-  }, [navigate]);
-
-  const handleTagSelect = (tag: string) => {
+  const handleTagSelect = (tag: string | null) => {
     setSelectedTag(tag);
   };
 
@@ -25,12 +18,25 @@ const Home: React.FC = () => {
     <div className="min-h-screen bg-zinc-900/20">
       <StickyNavbar />
 
-      <main className=" mx-auto md:pt-4 pt-8">
+      <main className="mx-auto md:pt-4 pt-8">
         <ErrorBoundary>
-          <SearchBar onTagSelect={handleTagSelect} />
+          <SearchBar onTagSelect={handleTagSelect} currentFilterTag={selectedTag} />
         </ErrorBoundary>
+
+        {selectedTag && (
+          <div className="container mx-auto px-4 max-w-7xl flex items-center justify-center mt-6">
+            <div className="flex items-center gap-2 bg-zinc-800/50 border border-zinc-700 text-zinc-200 pl-3 pr-1 py-1 rounded-full text-sm">
+              <span>Filtering by:</span>
+              <Badge variant="secondary" className="bg-zinc-700 text-zinc-200">{selectedTag}</Badge>
+              <Button onClick={() => handleTagSelect(null)} size="icon" variant="ghost" className="h-6 w-6 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         <ErrorBoundary>
-          <BlogList filterTag={selectedTag || ""} />
+          <BlogList filterTag={selectedTag || undefined} />
         </ErrorBoundary>
       </main>
     </div>
