@@ -7,6 +7,7 @@ import Home from "@/components/pages/Home";
 import ViewBlogPage from '@/components/pages/ViewBlogPage';
 import CreateNewBlog from '@/components/pages/CreateNewBlog';
 import UserProfile from '@/components/pages/UserProfile';
+import SearchResultsPage from '@/components/pages/SearchResultsPage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/create-blog" element={<CreateNewBlog />} />
           <Route path="/profile" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/signin" />} />
+          <Route path="/search" element={<SearchResultsPage />} />
         </Routes>
       </Router>
       <Toaster />
