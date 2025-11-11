@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { StatusCode } from "../constants/status-code";
 import { authMiddleware } from "../middleware/auth";
+import { syncPostToIndex, deletePostFromIndex } from '../services/elasticsearch';
 
 const internalCreatePostSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -28,6 +29,7 @@ const internalPostIdSchema = z.object({
 export type HonoEnv = {
   Bindings: {
     DATABASE_URL: string;
+    DATABASE_URL_MIGRATE: string;
     JWT_SECRET: string;
     UPSTASH_REDIS_REST_URL: string;
     UPSTASH_REDIS_REST_TOKEN: string;
@@ -35,6 +37,7 @@ export type HonoEnv = {
     RAILWAY_WAKEUP_SECRET: string;
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
+    ELASTICSEARCH_URL: string;
   };
   Variables: {
     user: {
@@ -54,20 +57,7 @@ async function triggerConsumerWakeup(
   const wakeupUrl = c.env.RAILWAY_CONSUMER_WAKEUP_URL;
   const wakeupSecret = c.env.RAILWAY_WAKEUP_SECRET;
 
-  console.log(
-    `[PRODUCER - ${operationDetails}] Preparing wakeup call for postId ${postId}.`
-  );
-
-  if (!wakeupUrl) {
-    console.error(
-      `[PRODUCER - ${operationDetails}] CRITICAL: RAILWAY_CONSUMER_WAKEUP_URL is undefined or empty. Cannot send wakeup for postId ${postId}.`
-    );
-    return;
-  }
-  if (!wakeupSecret) {
-    console.error(
-      `[PRODUCER - ${operationDetails}] CRITICAL: RAILWAY_WAKEUP_SECRET is undefined or empty. Cannot send wakeup for postId ${postId} as secret is required.`
-    );
+  if (!wakeupUrl || !wakeupSecret) {
     return;
   }
 
@@ -76,81 +66,21 @@ async function triggerConsumerWakeup(
     "Content-Type": "application/json",
   };
 
-  console.log(
-    `[PRODUCER - ${operationDetails}] Attempting to send wakeup POST request to: ${wakeupUrl} for postId ${postId}. Headers:`,
-    JSON.stringify(headers)
-  );
-
   const wakeupPromise = fetch(wakeupUrl, {
     method: "POST",
     headers: headers,
   })
     .then(async (response) => {
-      let responseBodyText = "Could not read response body.";
-      try {
-        responseBodyText = await response.text();
-      } catch (textError) {
-        console.error(
-          `[PRODUCER - ${operationDetails}] Error reading response body for postId ${postId}:`,
-          textError
-        );
-      }
-
-      console.log(
-        `[PRODUCER - ${operationDetails}] Wakeup call for postId ${postId} completed. Status: ${response.status}, StatusText: ${response.statusText}.`
-      );
-      console.log(
-        `[PRODUCER - ${operationDetails}] Wakeup Response Body: ${responseBodyText}`
-      );
-
       if (!response.ok) {
-        console.error(
-          `[PRODUCER - ${operationDetails}] Wakeup call for postId ${postId} to ${wakeupUrl} FAILED with HTTP Status ${response.status}. Response: ${responseBodyText}`
-        );
-      } else {
-        console.log(
-          `[PRODUCER - ${operationDetails}] Wakeup call for postId ${postId} to ${wakeupUrl} SUCCEEDED.`
-        );
+        console.error(`Wakeup call for postId ${postId} to ${wakeupUrl} FAILED with HTTP Status ${response.status}.`);
       }
     })
     .catch((error) => {
-      console.error(
-        `[PRODUCER - ${operationDetails}] CRITICAL NETWORK/FETCH ERROR during wakeup call for postId ${postId} to ${wakeupUrl}:`
-      );
-      if (error instanceof Error) {
-        console.error(`  Error Name: ${error.name}`);
-        console.error(`  Error Message: ${error.message}`);
-        if (error.stack) {
-          console.error(`  Error Stack: ${error.stack}`);
-        }
-        // @ts-ignore
-        if (error.cause) {
-          // @ts-ignore
-          console.error(
-            `  Error Cause: ${JSON.stringify(
-              error.cause,
-              Object.getOwnPropertyNames(error.cause)
-            )}`
-          );
-        }
-      } else {
-        console.error(
-          "  Caught a non-Error object during fetch operation:",
-          error
-        );
-      }
+        console.error(`CRITICAL NETWORK/FETCH ERROR during wakeup call for postId ${postId} to ${wakeupUrl}:`, error);
     });
 
   if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
     c.executionCtx.waitUntil(wakeupPromise);
-    console.log(
-      `[PRODUCER - ${operationDetails}] c.executionCtx.waitUntil() scheduled for wakeup fetch of postId ${postId}.`
-    );
-  } else {
-    console.warn(
-      `[PRODUCER - ${operationDetails}] c.executionCtx.waitUntil() not available or not a function. Wakeup fetch for postId ${postId} might not complete if worker instance terminates prematurely. Current execution context:`,
-      c.executionCtx
-    );
   }
 }
 
@@ -181,7 +111,6 @@ postRouter.get("/", async (c) => {
       StatusCode.OK
     );
   } catch (error: any) {
-    console.error("Error fetching posts:", error.message, error);
     return c.json(
       { error: "Failed to get posts" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -212,7 +141,6 @@ postRouter.get("/:id", async (c) => {
     if (!post) return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
     return c.json(post, StatusCode.OK);
   } catch (error: any) {
-    console.error("Error fetching post by ID:", error.message, error);
     return c.json(
       { error: "Failed to get post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -254,33 +182,33 @@ postRouter.post("/", authMiddleware, async (c) => {
       },
       include: {
         tags: { include: { tag: true } },
-        author: { select: { id: true, username: true, email: true } },
+        author: { select: { id: true, username: true, email: true, name: true } },
       },
     });
 
     try {
+      await syncPostToIndex(c.env.ELASTICSEARCH_URL, {
+          postId: newPost.id,
+          title: newPost.title,
+          body: newPost.body,
+          authorName: newPost.author.name || 'Unknown',
+          imageUrl: newPost.imageUrl,
+          createdAt: newPost.createdAt
+      });
+    } catch (esError) {
+        console.error(`[POST /] Failed to sync new post ${newPost.id} to Elasticsearch:`, esError);
+    }
+
+    try {
       const jobPayload = { postId: newPost.id, text: newPost.body, attempt: 1 };
-      const stringifiedPayload = JSON.stringify(jobPayload);
-      console.log(`[PRODUCER - Create] Job Payload Object:`, jobPayload);
-      console.log(
-        `[PRODUCER - Create] Stringified Payload for Redis:`,
-        stringifiedPayload
-      );
-      await redis.lpush(SUMMARIZATION_QUEUE_KEY, stringifiedPayload);
-      console.log(`[PRODUCER - Create] Job enqueued for postId: ${newPost.id}`);
+      await redis.lpush(SUMMARIZATION_QUEUE_KEY, JSON.stringify(jobPayload));
       triggerConsumerWakeup(c, "Create", newPost.id);
     } catch (queueError: any) {
-      console.error(
-        `[PRODUCER - Create] Failed to enqueue job for postId ${newPost.id}. Error: ${queueError.message}`,
-        queueError
-      );
+      console.error(`Failed to enqueue job for postId ${newPost.id}. Error: ${queueError.message}`, queueError);
     }
+
     return c.json(newPost, StatusCode.CREATED);
   } catch (error: any) {
-    console.error(
-      `[PRODUCER - Create] Outer error creating post. Error: ${error.message}`,
-      error
-    );
     return c.json(
       { error: "Failed to create post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -335,33 +263,14 @@ postRouter.put("/:id", authMiddleware, async (c) => {
       })
     );
 
-    const updateData: {
-      title?: string;
-      body?: string;
-      imageUrl?: string | null;
-      summary?: string | null;
-      summaryStatus?: string;
-      tags?: { create: any[] };
-    } = {};
-
-    if (parsedBody.data.title !== undefined)
-      updateData.title = parsedBody.data.title;
-    if (parsedBody.data.body !== undefined)
-      updateData.body = parsedBody.data.body;
-    if (parsedBody.data.imageUrl !== undefined)
-      updateData.imageUrl = parsedBody.data.imageUrl;
-    if (parsedBody.data.tags !== undefined)
-      updateData.tags = { create: tagsToConnectOrCreate };
-
-    if (Object.keys(updateData).length === 0 && !parsedBody.data.tags) {
-      return c.json({ message: "No fields to update" }, StatusCode.BAD_REQUEST);
-    }
+    const updateData: any = {};
+    if (parsedBody.data.title !== undefined) updateData.title = parsedBody.data.title;
+    if (parsedBody.data.body !== undefined) updateData.body = parsedBody.data.body;
+    if (parsedBody.data.imageUrl !== undefined) updateData.imageUrl = parsedBody.data.imageUrl;
+    if (parsedBody.data.tags !== undefined) updateData.tags = { create: tagsToConnectOrCreate };
 
     let triggerSummarization = false;
-    if (
-      parsedBody.data.body !== undefined ||
-      parsedBody.data.title !== undefined
-    ) {
+    if (parsedBody.data.body !== undefined || parsedBody.data.title !== undefined) {
       updateData.summary = null;
       updateData.summaryStatus = "PENDING";
       triggerSummarization = true;
@@ -372,29 +281,33 @@ postRouter.put("/:id", authMiddleware, async (c) => {
       data: updateData,
     });
 
+    const updatedPostForIndex = await prisma.post.findUnique({
+        where: { id: parsedParams.data.id },
+        include: { author: { select: { name: true } } }
+    });
+
+    if (updatedPostForIndex) {
+        try {
+            await syncPostToIndex(c.env.ELASTICSEARCH_URL, {
+                postId: updatedPostForIndex.id,
+                title: updatedPostForIndex.title,
+                body: updatedPostForIndex.body,
+                authorName: updatedPostForIndex.author.name || 'Unknown',
+                imageUrl: updatedPostForIndex.imageUrl,
+                createdAt: updatedPostForIndex.createdAt
+            });
+        } catch (esError) {
+            console.error(`[PUT /:id] Failed to sync updated post ${parsedParams.data.id} to Elasticsearch:`, esError);
+        }
+    }
+
     if (triggerSummarization) {
       try {
-        const jobPayload = {
-          postId: updatedPost.id,
-          text: updatedPost.body,
-          attempt: 1,
-        };
-        const stringifiedPayload = JSON.stringify(jobPayload);
-        console.log(`[PRODUCER - Update] Job Payload Object:`, jobPayload);
-        console.log(
-          `[PRODUCER - Update] Stringified Payload for Redis:`,
-          stringifiedPayload
-        );
-        await redis.lpush(SUMMARIZATION_QUEUE_KEY, stringifiedPayload);
-        console.log(
-          `[PRODUCER - Update] Job enqueued for updated postId: ${updatedPost.id}`
-        );
+        const jobPayload = { postId: updatedPost.id, text: updatedPost.body, attempt: 1 };
+        await redis.lpush(SUMMARIZATION_QUEUE_KEY, JSON.stringify(jobPayload));
         triggerConsumerWakeup(c, "Update", updatedPost.id);
       } catch (queueError: any) {
-        console.error(
-          `[PRODUCER - Update] Failed to enqueue job for updated postId ${updatedPost.id}. Error: ${queueError.message}`,
-          queueError
-        );
+        console.error(`Failed to enqueue job for updated postId ${updatedPost.id}. Error: ${queueError.message}`, queueError);
       }
     }
 
@@ -407,10 +320,6 @@ postRouter.put("/:id", authMiddleware, async (c) => {
     });
     return c.json(finalUpdatedPost, StatusCode.OK);
   } catch (error: any) {
-    console.error(
-      `[PRODUCER - Update] Outer error updating post. Error: ${error.message}`,
-      error
-    );
     return c.json(
       { error: "Failed to update post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -438,6 +347,12 @@ postRouter.delete("/:id", authMiddleware, async (c) => {
       return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
     if (postToDelete.authorId !== userId)
       return c.json({ error: "Unauthorized" }, StatusCode.UNAUTHORIZED);
+    
+    try {
+        await deletePostFromIndex(c.env.ELASTICSEARCH_URL, parsedParams.data.id);
+    } catch (esError) {
+        console.error(`[DELETE /:id] Failed to delete post ${parsedParams.data.id} from Elasticsearch:`, esError);
+    }
 
     await prisma.postTag.deleteMany({
       where: { postId: parsedParams.data.id },
@@ -445,7 +360,6 @@ postRouter.delete("/:id", authMiddleware, async (c) => {
     await prisma.post.delete({ where: { id: parsedParams.data.id } });
     return c.json({ message: "Post deleted successfully" }, StatusCode.OK);
   } catch (error: any) {
-    console.error("Error deleting post:", error.message, error);
     return c.json(
       { error: "Failed to delete post" },
       StatusCode.INTERNAL_SERVER_ERROR

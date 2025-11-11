@@ -5,6 +5,7 @@ import { userRouter } from './routes/user';
 import { postRouter } from './routes/posts';
 import { tagRouter } from './routes/tags';
 import { rateLimitMiddleware } from './middleware/rate-limit';
+import { searchRouter } from './routes/search';
 
 const app = new Hono<{
   Bindings: {
@@ -16,7 +17,8 @@ const app = new Hono<{
     RAILWAY_CONSUMER_WAKEUP_URL: string,
     RAILWAY_WAKEUP_SECRET: string,
     UPSTASH_RATELIMIT_REDIS_REST_URL: string,
-    UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string
+    UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string,
+    ELASTICSEARCH_URL: string,
   };
 }>();
 
@@ -39,5 +41,6 @@ app.get('/api/ping', (c) => {
 app.route("/api", userRouter);
 app.route("/api/posts", postRouter);
 app.route("/api/tags", tagRouter);
+app.route("/api/search", searchRouter);
 
 export default app;
