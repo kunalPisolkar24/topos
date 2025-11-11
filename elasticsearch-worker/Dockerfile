@@ -1,3 +1,14 @@
+FROM node:18-alpine AS builder
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN npm run build
+
 FROM node:18-alpine
 
 WORKDIR /usr/src/app
@@ -5,9 +16,9 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY . .
+COPY --from=builder /usr/src/app/dist ./dist
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 EXPOSE 8002
 
 CMD ["npm", "start"]
