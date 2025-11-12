@@ -157,6 +157,20 @@ services:
     networks:
       - app-network
 
+  kafka-rest-proxy:
+    image: confluentinc/cp-kafka-rest:7.4.0
+    ports:
+      - "8082:8082"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_REST_HOST_NAME: kafka-rest-proxy
+      KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka:29092'
+      KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
