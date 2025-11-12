@@ -12,4 +12,4 @@ export const LIGHTNING_AI_AUTH_TOKEN = process.env.LIGHTNING_AI_AUTH_TOKEN;
 export const SUMMARIZE_TIMEOUT_MS = 4 * 60 * 1000;
 
 export const API_CALLBACK_URL = process.env.API_CALLBACK_URL || 'http://backend:8787';
-export const API_CALLBACK_SECRET = process.env.API_CALLBACK_SECRET;
+export const API_CALLBACK_SECRET = process.env.API_CALLBACK_SECRET || 'my_secret_pass_1';

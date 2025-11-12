@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { Kafka, EachMessagePayload } from 'kafkajs';
 import fetch from 'node-fetch';
 import { callSummarizeService } from './services/mlService.js';
-import { KAFKA_BROKER, POSTS_TOPIC, PORT, API_CALLBACK_URL } from './config.js';
+import { KAFKA_BROKER, POSTS_TOPIC, PORT, API_CALLBACK_URL, API_CALLBACK_SECRET } from './config.js';
 
 interface PostEventPayload {
     postId: number;
@@ -55,6 +55,7 @@ async function updatePostWithSummary(postId: number, summary: string): Promise<v
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Internal-Secret': API_CALLBACK_SECRET || '',
             },
             body: JSON.stringify({ summary }),
         });
