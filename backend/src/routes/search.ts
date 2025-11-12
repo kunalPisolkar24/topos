@@ -13,6 +13,8 @@ export type SearchHonoEnv = {
     RAILWAY_WAKEUP_SECRET: string;
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
+    KAFKA_REST_PROXY_URL: string;
+    API_CALLBACK_SECRET: string;
   };
 };
 
