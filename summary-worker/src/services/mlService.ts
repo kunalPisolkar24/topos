@@ -1,44 +1,9 @@
 import fetch, { RequestInit, HeadersInit } from 'node-fetch';
-import {
-    LIGHTNING_AI_URL,
-    LIGHTNING_AI_AUTH_TOKEN,
-    HEALTH_CHECK_TIMEOUT_MS,
-    SUMMARIZE_TIMEOUT_MS
-} from '../config';
+import { LIGHTNING_AI_URL, LIGHTNING_AI_AUTH_TOKEN, SUMMARIZE_TIMEOUT_MS } from '../config.js';
 
-export async function pingLightningAIHealth(): Promise<boolean> {
-    if (!LIGHTNING_AI_URL || !LIGHTNING_AI_AUTH_TOKEN) {
-        console.error("ML service URL or Auth Token not configured for health check.");
-        return false;
-    }
-    console.log('Pinging ML service health...');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Authorization': LIGHTNING_AI_AUTH_TOKEN
-    };
-
-    try {
-      const response = await fetch(`${LIGHTNING_AI_URL}/health`, {
-        method: 'GET',
-        headers: headers,
-        signal: controller.signal
-      } as RequestInit);
-      clearTimeout(timeoutId);
-      const isOk = response.ok;
-      console.log(`ML service healthy: ${isOk}`);
-      return isOk;
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        console.error('Error pinging ML service: Request timed out.');
-      } else {
-        console.error('Error pinging ML service:', error.message);
-      }
-      return false;
-    }
+interface SummarizeResult {
+    summary?: string;
+    error?: string;
 }
 
 export async function callSummarizeService(text: string): Promise<string | null> {
@@ -60,7 +25,7 @@ export async function callSummarizeService(text: string): Promise<string | null>
             method: 'POST',
             headers: headers,
             body: JSON.stringify({ text }),
-            signal: controller.signal
+            signal: controller.signal as any
         } as RequestInit);
         clearTimeout(timeoutId);
 
@@ -68,8 +33,9 @@ export async function callSummarizeService(text: string): Promise<string | null>
             const errText = await response.text();
             throw new Error(`Summarizer service error: ${response.status} - ${errText}`);
         }
-        const result = await response.json() as { summary?: string, error?: string };
+        const result = await response.json() as SummarizeResult;
         if (result.summary) {
+            console.log("Successfully received summary from ML service.");
             return result.summary;
         } else {
             throw new Error(result.error || "No summary in ML response");
