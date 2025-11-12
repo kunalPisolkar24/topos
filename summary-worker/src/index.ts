@@ -81,11 +81,11 @@ app.listen(PORT, () => {
     console.log(`Health check server listening on port ${PORT}`);
 });
 
-// runConsumer().catch(e => {
-//     console.error('[summary-worker] FATAL ERROR:', e);
-//     isConsumerReady = false;
-//     process.exit(1);
-// });
+runConsumer().catch(e => {
+    console.error('[summary-worker] FATAL ERROR:', e);
+    isConsumerReady = false;
+    process.exit(1);
+});
 
 const signalTraps: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 signalTraps.forEach(type => {
