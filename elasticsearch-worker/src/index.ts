@@ -56,12 +56,12 @@ app.listen(PORT, () => {
     console.log(`Health check server listening on port ${PORT}`);
 });
 
-// // --- Start the consumer ---
-// runConsumer().catch(e => {
-//     console.error('[elasticsearch-worker] FATAL ERROR:', e);
-//     isConsumerReady = false;
-//     process.exit(1);
-// });
+// --- Start the consumer ---
+runConsumer().catch(e => {
+    console.error('[elasticsearch-worker] FATAL ERROR:', e);
+    isConsumerReady = false;
+    process.exit(1);
+});
 
 // --- Graceful Shutdown ---
 const errorTypes: string[] = ['unhandledRejection', 'uncaughtException'];
