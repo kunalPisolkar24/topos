@@ -1,12 +1,11 @@
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
-import { Context, Hono } from "hono";
-import { Redis } from "@upstash/redis/cloudflare";
+import { Hono, Context } from "hono";
 import { z } from "zod";
 
 import { StatusCode } from "../constants/status-code";
 import { authMiddleware } from "../middleware/auth";
-import { syncPostToIndex, deletePostFromIndex } from '../services/elasticsearch';
+import { producePostEvent } from '../services/kafka';
 
 const internalCreatePostSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -38,6 +37,7 @@ export type HonoEnv = {
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
     ELASTICSEARCH_URL: string;
+    KAFKA_REST_PROXY_URL: string;
   };
   Variables: {
     user: {
@@ -47,44 +47,8 @@ export type HonoEnv = {
 };
 
 export const postRouter = new Hono<HonoEnv>();
-const SUMMARIZATION_QUEUE_KEY = "summarization_jobs_v1";
 
-async function triggerConsumerWakeup(
-  c: Context<HonoEnv>,
-  operationDetails: string,
-  postId: number
-) {
-  const wakeupUrl = c.env.RAILWAY_CONSUMER_WAKEUP_URL;
-  const wakeupSecret = c.env.RAILWAY_WAKEUP_SECRET;
-
-  if (!wakeupUrl || !wakeupSecret) {
-    return;
-  }
-
-  const headers: HeadersInit = {
-    "X-Wakeup-Secret": wakeupSecret,
-    "Content-Type": "application/json",
-  };
-
-  const wakeupPromise = fetch(wakeupUrl, {
-    method: "POST",
-    headers: headers,
-  })
-    .then(async (response) => {
-      if (!response.ok) {
-        console.error(`Wakeup call for postId ${postId} to ${wakeupUrl} FAILED with HTTP Status ${response.status}.`);
-      }
-    })
-    .catch((error) => {
-        console.error(`CRITICAL NETWORK/FETCH ERROR during wakeup call for postId ${postId} to ${wakeupUrl}:`, error);
-    });
-
-  if (c.executionCtx && typeof c.executionCtx.waitUntil === "function") {
-    c.executionCtx.waitUntil(wakeupPromise);
-  }
-}
-
-postRouter.get("/", async (c) => {
+postRouter.get("/", async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -118,7 +82,7 @@ postRouter.get("/", async (c) => {
   }
 });
 
-postRouter.get("/:id", async (c) => {
+postRouter.get("/:id", async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -148,11 +112,10 @@ postRouter.get("/:id", async (c) => {
   }
 });
 
-postRouter.post("/", authMiddleware, async (c) => {
+postRouter.post("/", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
-  const redis = Redis.fromEnv(c.env);
 
   try {
     const body = await c.req.json();
@@ -187,24 +150,9 @@ postRouter.post("/", authMiddleware, async (c) => {
     });
 
     try {
-      await syncPostToIndex(c.env.ELASTICSEARCH_URL, {
-          postId: newPost.id,
-          title: newPost.title,
-          body: newPost.body,
-          authorName: newPost.author.name || 'Unknown',
-          imageUrl: newPost.imageUrl,
-          createdAt: newPost.createdAt
-      });
-    } catch (esError) {
-        console.error(`[POST /] Failed to sync new post ${newPost.id} to Elasticsearch:`, esError);
-    }
-
-    try {
-      const jobPayload = { postId: newPost.id, text: newPost.body, attempt: 1 };
-      await redis.lpush(SUMMARIZATION_QUEUE_KEY, JSON.stringify(jobPayload));
-      triggerConsumerWakeup(c, "Create", newPost.id);
-    } catch (queueError: any) {
-      console.error(`Failed to enqueue job for postId ${newPost.id}. Error: ${queueError.message}`, queueError);
+      await producePostEvent(c.env, newPost, 'create');
+    } catch (kafkaError) {
+      console.error(`Failed to produce Kafka event for new post ${newPost.id}:`, kafkaError);
     }
 
     return c.json(newPost, StatusCode.CREATED);
@@ -216,11 +164,10 @@ postRouter.post("/", authMiddleware, async (c) => {
   }
 });
 
-postRouter.put("/:id", authMiddleware, async (c) => {
+postRouter.put("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
-  const redis = Redis.fromEnv(c.env);
   try {
     const postId = parseInt(c.req.param("id"));
     const body = await c.req.json();
@@ -269,46 +216,23 @@ postRouter.put("/:id", authMiddleware, async (c) => {
     if (parsedBody.data.imageUrl !== undefined) updateData.imageUrl = parsedBody.data.imageUrl;
     if (parsedBody.data.tags !== undefined) updateData.tags = { create: tagsToConnectOrCreate };
 
-    let triggerSummarization = false;
     if (parsedBody.data.body !== undefined || parsedBody.data.title !== undefined) {
       updateData.summary = null;
       updateData.summaryStatus = "PENDING";
-      triggerSummarization = true;
     }
 
     const updatedPost = await prisma.post.update({
       where: { id: parsedParams.data.id },
       data: updateData,
-    });
-
-    const updatedPostForIndex = await prisma.post.findUnique({
-        where: { id: parsedParams.data.id },
-        include: { author: { select: { name: true } } }
-    });
-
-    if (updatedPostForIndex) {
-        try {
-            await syncPostToIndex(c.env.ELASTICSEARCH_URL, {
-                postId: updatedPostForIndex.id,
-                title: updatedPostForIndex.title,
-                body: updatedPostForIndex.body,
-                authorName: updatedPostForIndex.author.name || 'Unknown',
-                imageUrl: updatedPostForIndex.imageUrl,
-                createdAt: updatedPostForIndex.createdAt
-            });
-        } catch (esError) {
-            console.error(`[PUT /:id] Failed to sync updated post ${parsedParams.data.id} to Elasticsearch:`, esError);
-        }
-    }
-
-    if (triggerSummarization) {
-      try {
-        const jobPayload = { postId: updatedPost.id, text: updatedPost.body, attempt: 1 };
-        await redis.lpush(SUMMARIZATION_QUEUE_KEY, JSON.stringify(jobPayload));
-        triggerConsumerWakeup(c, "Update", updatedPost.id);
-      } catch (queueError: any) {
-        console.error(`Failed to enqueue job for updated postId ${updatedPost.id}. Error: ${queueError.message}`, queueError);
+      include: {
+        author: { select: { name: true } }
       }
+    });
+
+    try {
+        await producePostEvent(c.env, updatedPost, 'update');
+    } catch (kafkaError) {
+        console.error(`Failed to produce Kafka event for updated post ${updatedPost.id}:`, kafkaError);
     }
 
     const finalUpdatedPost = await prisma.post.findUnique({
@@ -327,7 +251,7 @@ postRouter.put("/:id", authMiddleware, async (c) => {
   }
 });
 
-postRouter.delete("/:id", authMiddleware, async (c) => {
+postRouter.delete("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -349,9 +273,9 @@ postRouter.delete("/:id", authMiddleware, async (c) => {
       return c.json({ error: "Unauthorized" }, StatusCode.UNAUTHORIZED);
     
     try {
-        await deletePostFromIndex(c.env.ELASTICSEARCH_URL, parsedParams.data.id);
-    } catch (esError) {
-        console.error(`[DELETE /:id] Failed to delete post ${parsedParams.data.id} from Elasticsearch:`, esError);
+        await producePostEvent(c.env, { id: parsedParams.data.id }, 'delete');
+    } catch (kafkaError) {
+        console.error(`Failed to produce Kafka delete event for post ${parsedParams.data.id}:`, kafkaError);
     }
 
     await prisma.postTag.deleteMany({
