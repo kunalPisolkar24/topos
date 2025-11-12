@@ -25,6 +25,10 @@ const internalPostIdSchema = z.object({
   id: z.number().int().positive("Post ID must be a positive integer"),
 });
 
+const internalSummaryUpdateSchema = z.object({
+  summary: z.string().min(1, "Summary cannot be empty"),
+});
+
 export type HonoEnv = {
   Bindings: {
     DATABASE_URL: string;
@@ -38,6 +42,7 @@ export type HonoEnv = {
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
     ELASTICSEARCH_URL: string;
     KAFKA_REST_PROXY_URL: string;
+    API_CALLBACK_SECRET: string;
   };
   Variables: {
     user: {
@@ -111,6 +116,56 @@ postRouter.get("/:id", async (c: Context<HonoEnv>) => {
     );
   }
 });
+
+postRouter.patch("/:id/summary", async (c: Context<HonoEnv>) => {
+  const receivedSecret = c.req.header('X-Internal-Secret');
+  const expectedSecret = c.env.API_CALLBACK_SECRET;
+
+  if (!expectedSecret || receivedSecret !== expectedSecret) {
+    console.log("We got", receivedSecret, "and expected", expectedSecret);
+    return c.json({ error: 'Unauthorized' }, StatusCode.UNAUTHORIZED);
+  }
+
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env?.DATABASE_URL,
+  }).$extends(withAccelerate());
+
+  try {
+    const postId = parseInt(c.req.param("id"));
+    const parsedParams = internalPostIdSchema.safeParse({ id: postId });
+    if (!parsedParams.success) {
+      return c.json({ error: parsedParams.error.errors }, StatusCode.BAD_REQUEST);
+    }
+
+    const body = await c.req.json();
+    const parsedBody = internalSummaryUpdateSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return c.json({ error: parsedBody.error.errors }, StatusCode.BAD_REQUEST);
+    }
+
+    const updatedPost = await prisma.post.update({
+      where: { id: parsedParams.data.id },
+      data: {
+        summary: parsedBody.data.summary,
+        summaryStatus: 'COMPLETED',
+      },
+    });
+
+    console.log(`Successfully updated summary for postId: ${updatedPost.id}`);
+    return c.json(updatedPost, StatusCode.OK);
+
+  } catch (error: any) {
+    console.error("Failed to update post with summary:", error);
+    if ((error as any).code === 'P2025') {
+      return c.json({ error: 'Post not found' }, StatusCode.NOT_FOUND);
+    }
+    return c.json(
+      { error: "Failed to update post with summary" },
+      StatusCode.INTERNAL_SERVER_ERROR
+    );
+  }
+});
+
 
 postRouter.post("/", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
@@ -230,9 +285,9 @@ postRouter.put("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
     });
 
     try {
-        await producePostEvent(c.env, updatedPost, 'update');
+      await producePostEvent(c.env, updatedPost, 'update');
     } catch (kafkaError) {
-        console.error(`Failed to produce Kafka event for updated post ${updatedPost.id}:`, kafkaError);
+      console.error(`Failed to produce Kafka event for updated post ${updatedPost.id}:`, kafkaError);
     }
 
     const finalUpdatedPost = await prisma.post.findUnique({
@@ -271,11 +326,11 @@ postRouter.delete("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
       return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
     if (postToDelete.authorId !== userId)
       return c.json({ error: "Unauthorized" }, StatusCode.UNAUTHORIZED);
-    
+
     try {
-        await producePostEvent(c.env, { id: parsedParams.data.id }, 'delete');
+      await producePostEvent(c.env, { id: parsedParams.data.id }, 'delete');
     } catch (kafkaError) {
-        console.error(`Failed to produce Kafka delete event for post ${parsedParams.data.id}:`, kafkaError);
+      console.error(`Failed to produce Kafka delete event for post ${parsedParams.data.id}:`, kafkaError);
     }
 
     await prisma.postTag.deleteMany({
