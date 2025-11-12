@@ -27,6 +27,8 @@ export type UserHonoEnv = {
     UPSTASH_RATELIMIT_REDIS_REST_URL: string;
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
     ELASTICSEARCH_URL: string;
+    KAFKA_REST_PROXY_URL: string;
+    API_CALLBACK_SECRET: string;
   };
   Variables: {
     user: {
