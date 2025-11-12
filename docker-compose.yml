@@ -16,7 +16,8 @@ services:
     networks:
       - app-network
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8787/api/ping"]
       interval: 30s
@@ -62,8 +63,10 @@ services:
     networks:
       - app-network
     depends_on:
-      - kafka
-      - backend
+      kafka:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
       interval: 30s
@@ -84,8 +87,10 @@ services:
     networks:
       - app-network
     depends_on:
-      - kafka
-      - elasticsearch
+      elasticsearch:
+        condition: service_started
+      kafka:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:9200/health"]
       interval: 30s
