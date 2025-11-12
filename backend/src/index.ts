@@ -19,13 +19,15 @@ const app = new Hono<{
     UPSTASH_RATELIMIT_REDIS_REST_URL: string,
     UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string,
     ELASTICSEARCH_URL: string,
+    KAFKA_REST_PROXY_URL: string;
+    API_CALLBACK_SECRET: string;
   };
 }>();
 
 app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST','PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Internal-Secret'],
 }));
 
 app.use('*', rateLimitMiddleware);
