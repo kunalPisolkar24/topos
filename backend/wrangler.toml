@@ -17,6 +17,8 @@ UPSTASH_RATELIMIT_REDIS_REST_URL="f"
 UPSTASH_RATELIMIT_REDIS_REST_TOKEN="g"
 
 ELASTICSEARCH_URL="http://elasticsearch:9200"
+KAFKA_REST_PROXY_URL="http://kafka-rest-proxy:8082"
+API_CALLBACK_SECRET="my_secret_pass_1"
 
 # [[kv_namespaces]]
 # binding = "MY_KV_NAMESPACE"
