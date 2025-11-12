@@ -24,7 +24,12 @@ const runConsumer = async (): Promise<void> => {
                 console.warn("Received message with no key, skipping.");
                 return;
             }
-            const postId = parseInt(message.key.toString(), 10);
+
+            const postId = parseInt(JSON.parse(message.key.toString()), 10);
+            if (isNaN(postId)) {
+                console.error("Failed to parse postId from message key:", message.key.toString());
+                return;
+            }
 
             try {
                 if (message.value) {
