@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const KAFKA_BROKER = process.env.KAFKA_BROKER || 'kafka:9092';
+export const KAFKA_BROKER = process.env.KAFKA_BROKER || 'kafka:29092';
 export const POSTS_TOPIC = 'posts';
 export const PORT = parseInt(process.env.PORT || '8001', 10);
 
