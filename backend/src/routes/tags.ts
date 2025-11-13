@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
-import { Hono } from "hono";
+import { Hono, Context } from "hono";
 import { StatusCode } from "../constants/status-code";
+import { logger } from '../logger';
 
 export type TagHonoEnv = {
   Bindings: {
@@ -22,7 +23,7 @@ export type TagHonoEnv = {
 
 export const tagRouter = new Hono<TagHonoEnv>();
 
-tagRouter.get("/", async (c) => {
+tagRouter.get("/", async (c: Context<TagHonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -38,6 +39,7 @@ tagRouter.get("/", async (c) => {
     };
 
     if (searchQuery && searchQuery.trim() !== "") {
+      logger.info('Searching for tags.', { query: searchQuery });
       tags = await prisma.tag.findMany({
         where: {
           name: {
@@ -52,6 +54,7 @@ tagRouter.get("/", async (c) => {
         ...cacheOptions,
       });
     } else {
+      logger.info('Fetching default tags.');
       tags = await prisma.tag.findMany({
         take: limitParam,
         orderBy: {
@@ -61,8 +64,8 @@ tagRouter.get("/", async (c) => {
       });
     }
     return c.json(tags, StatusCode.OK);
-  } catch (error) {
-    console.error("Failed to get tags:", error);
+  } catch (error: any) {
+    logger.error('Failed to get tags.', { query: searchQuery, error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to get tags" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -70,7 +73,7 @@ tagRouter.get("/", async (c) => {
   }
 });
 
-tagRouter.get("/getPost/:tag", async (c) => {
+tagRouter.get("/getPost/:tag", async (c: Context<TagHonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -80,6 +83,7 @@ tagRouter.get("/getPost/:tag", async (c) => {
   const skip = (page - 1) * limit;
 
   try {
+    logger.info('Fetching posts for tag.', { tagName, page, limit });
     const [posts, totalPosts] = await Promise.all([
       prisma.post.findMany({
         where: {
@@ -138,8 +142,8 @@ tagRouter.get("/getPost/:tag", async (c) => {
       },
       StatusCode.OK
     );
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+    logger.error('Failed to get posts for tag.', { tagName, page, limit, error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to get posts for the given tag" },
       StatusCode.INTERNAL_SERVER_ERROR

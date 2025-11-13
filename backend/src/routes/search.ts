@@ -1,5 +1,6 @@
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { StatusCode } from '../constants/status-code';
+import { logger } from '../logger';
 
 export type SearchHonoEnv = {
   Bindings: {
@@ -20,10 +21,11 @@ export type SearchHonoEnv = {
 
 export const searchRouter = new Hono<SearchHonoEnv>();
 
-searchRouter.get('/health', async (c) => {
+searchRouter.get('/health', async (c: Context<SearchHonoEnv>) => {
   const esUrl = c.env.ELASTICSEARCH_URL;
 
   if (!esUrl) {
+    logger.error('Elasticsearch service URL is not configured.');
     return c.json({ error: 'Elasticsearch service URL is not configured.' }, StatusCode.INTERNAL_SERVER_ERROR);
   }
 
@@ -44,7 +46,7 @@ searchRouter.get('/health', async (c) => {
     }, StatusCode.OK);
 
   } catch (error: any) {
-    console.error("Failed to connect to Elasticsearch:", error);
+    logger.error('Failed to connect to Elasticsearch.', { error: { message: error.message } });
     return c.json({
       status: 'error',
       message: 'Failed to connect to Elasticsearch. Please ensure the service is running and accessible.',
@@ -53,7 +55,7 @@ searchRouter.get('/health', async (c) => {
   }
 });
 
-searchRouter.get('/', async (c) => {
+searchRouter.get('/', async (c: Context<SearchHonoEnv>) => {
   const esUrl = c.env.ELASTICSEARCH_URL;
   const query = c.req.query('q');
 
@@ -81,6 +83,8 @@ searchRouter.get('/', async (c) => {
     },
     _source: ["postId", "title", "imageUrl", "authorName", "createdAt"]
   };
+
+  logger.info('Performing search.', { query, page: safePage, limit: safeLimit });
 
   try {
     const res = await fetch(`${esUrl}/posts/_search`, {
@@ -110,7 +114,7 @@ searchRouter.get('/', async (c) => {
     }, StatusCode.OK);
 
   } catch (error: any) {
-    console.error("Failed to perform search:", error);
+    logger.error('Failed to perform search.', { query, error: { message: error.message } });
     return c.json({ error: "Search operation failed." }, StatusCode.INTERNAL_SERVER_ERROR);
   }
 });

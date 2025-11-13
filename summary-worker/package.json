@@ -26,6 +26,7 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "kafkajs": "^2.2.4",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "pino": "^10.1.0"
   }
 }
