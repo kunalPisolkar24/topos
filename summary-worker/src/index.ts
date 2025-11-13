@@ -1,8 +1,11 @@
 import express, { Request, Response } from 'express';
 import { Kafka, EachMessagePayload } from 'kafkajs';
 import fetch from 'node-fetch';
+import pino from 'pino';
 import { callSummarizeService } from './services/mlService.js';
 import { KAFKA_BROKER, POSTS_TOPIC, PORT, API_CALLBACK_URL, API_CALLBACK_SECRET } from './config.js';
+
+const logger = pino({ level: 'info' });
 
 interface PostEventPayload {
     postId: number;
@@ -21,35 +24,37 @@ const runConsumer = async (): Promise<void> => {
     await consumer.connect();
     await consumer.subscribe({ topic: POSTS_TOPIC, fromBeginning: true });
     isConsumerReady = true;
-    console.log("Summary worker connected to Kafka, subscribed to:", POSTS_TOPIC);
+    logger.info({ topic: POSTS_TOPIC }, "Summary worker connected to Kafka and subscribed.");
 
     await consumer.run({
         eachMessage: async ({ message }: EachMessagePayload): Promise<void> => {
             if (!message.value) {
-                console.log(`Ignoring delete event for key: ${message.key}`);
+                logger.warn({ key: message.key?.toString() }, "Ignoring event with no message value.");
                 return;
             }
 
+            let postId: number | null = null;
             try {
-                const { postId, body }: PostEventPayload = JSON.parse(message.value.toString());
-                console.log(`Received job for postId: ${postId}`);
+                const payload: PostEventPayload = JSON.parse(message.value.toString());
+                postId = payload.postId;
+                logger.info({ postId }, "Received summarization job.");
 
-                const summary = await callSummarizeService(body);
+                const summary = await callSummarizeService(payload.body);
 
                 if (summary) {
                     await updatePostWithSummary(postId, summary);
                 } else {
-                    console.error(`Summarization failed for postId: ${postId}. Job will not be retried automatically.`);
+                    logger.error({ postId }, "Summarization failed. The ML service returned no summary. Job will not be retried.");
                 }
             } catch (err: any) {
-                console.error("Error processing message:", err);
+                logger.error({ postId, error: { message: err.message, stack: err.stack } }, "Error processing Kafka message.");
             }
         },
     });
 };
 
 async function updatePostWithSummary(postId: number, summary: string): Promise<void> {
-    console.log(`Sending summary back to API for postId: ${postId}`);
+    logger.info({ postId }, "Sending summary back to API for processing.");
     try {
         const response = await fetch(`${API_CALLBACK_URL}/api/posts/${postId}/summary`, {
             method: 'PATCH',
@@ -64,26 +69,34 @@ async function updatePostWithSummary(postId: number, summary: string): Promise<v
             const errorBody = await response.text();
             throw new Error(`API callback failed with status ${response.status}: ${errorBody}`);
         }
-        console.log(`Successfully updated summary for postId: ${postId} via API callback.`);
-    } catch (error) {
-        console.error(`Failed to call back API for postId ${postId}:`, error);
+        logger.info({ postId }, "Successfully updated summary via API callback.");
+    } catch (error: any) {
+        logger.error({ postId, error: { message: error.message } }, `Failed to call back API for post summary update.`);
     }
 }
 
 const app = express();
 app.get('/health', (req: Request, res: Response) => {
-    res.status(isConsumerReady ? 200 : 503).json({
+    const healthStatus = {
         status: isConsumerReady ? 'OK' : 'UNAVAILABLE',
-        message: isConsumerReady ? 'Worker is running.' : 'Worker is not connected to Kafka yet.'
-    });
+        message: isConsumerReady ? 'Worker is running and connected to Kafka.' : 'Worker is not connected to Kafka yet.'
+    };
+
+    if (isConsumerReady) {
+        logger.info("Health check requested: status OK.");
+    } else {
+        logger.warn("Health check requested: status UNAVAILABLE.");
+    }
+
+    res.status(isConsumerReady ? 200 : 503).json(healthStatus);
 });
 
 app.listen(PORT, () => {
-    console.log(`Health check server listening on port ${PORT}`);
+    logger.info({ port: PORT }, `Health check server listening on port.`);
 });
 
 runConsumer().catch(e => {
-    console.error('[summary-worker] FATAL ERROR:', e);
+    logger.fatal({ error: { message: e.message, stack: e.stack } }, "[summary-worker] FATAL ERROR during consumer execution.");
     isConsumerReady = false;
     process.exit(1);
 });
@@ -91,9 +104,12 @@ runConsumer().catch(e => {
 const signalTraps: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 signalTraps.forEach(type => {
     process.once(type, async () => {
+        logger.info({ signal: type }, `Received signal. Disconnecting consumer...`);
         try {
-            console.log(`Received ${type} signal. Disconnecting consumer...`);
             await consumer.disconnect();
+            logger.info({ signal: type }, `Consumer disconnected gracefully.`);
+        } catch (err: any) {
+            logger.error({ signal: type, error: { message: err.message } }, `Error during consumer disconnection.`);
         } finally {
             process.kill(process.pid, type);
         }
