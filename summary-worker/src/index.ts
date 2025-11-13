@@ -39,7 +39,7 @@ const runConsumer = async (): Promise<void> => {
                 postId = payload.postId;
                 logger.info({ postId }, "Received summarization job.");
 
-                const summary = await callSummarizeService(payload.body);
+                const summary = await callSummarizeService(payload.body, logger);
 
                 if (summary) {
                     await updatePostWithSummary(postId, summary);
