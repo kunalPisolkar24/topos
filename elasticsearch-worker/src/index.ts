@@ -1,8 +1,10 @@
 import express, { Request, Response } from 'express';
 import { Kafka, EachMessagePayload } from 'kafkajs';
+import pino from 'pino';
 import { syncPostToIndex, deletePostFromIndex, PostDocument } from './elasticsearch-helper.js';
 import { KAFKA_BROKER, POSTS_TOPIC, ELASTICSEARCH_URL, PORT } from './config.js';
 
+const logger = pino({ level: 'info' });
 let isConsumerReady = false;
 
 const kafka = new Kafka({
@@ -16,81 +18,74 @@ const runConsumer = async (): Promise<void> => {
     await consumer.connect();
     await consumer.subscribe({ topic: POSTS_TOPIC, fromBeginning: true });
     isConsumerReady = true;
-    console.log("Elasticsearch worker connected to Kafka and subscribed to topic:", POSTS_TOPIC);
+    logger.info({ topic: POSTS_TOPIC }, "Elasticsearch worker connected to Kafka and subscribed.");
 
     await consumer.run({
-        eachMessage: async ({ topic, partition, message }: EachMessagePayload): Promise<void> => {
+        eachMessage: async ({ message }: EachMessagePayload): Promise<void> => {
             if (!message.key) {
-                console.warn("Received message with no key, skipping.");
+                logger.warn("Received message with no key, skipping.");
                 return;
             }
 
-            const postId = parseInt(JSON.parse(message.key.toString()), 10);
-            if (isNaN(postId)) {
-                console.error("Failed to parse postId from message key:", message.key.toString());
-                return;
-            }
-
+            let postId: number | null = null;
             try {
+                const postIdStr = message.key.toString();
+                postId = parseInt(JSON.parse(postIdStr), 10);
+                if (isNaN(postId)) {
+                    logger.error({ key: postIdStr }, "Failed to parse postId from message key.");
+                    return;
+                }
+
                 if (message.value) {
                     const postData: PostDocument = JSON.parse(message.value.toString());
-                    console.log(`Received sync event for postId: ${postId}`);
-                    await syncPostToIndex(ELASTICSEARCH_URL, postData);
+                    logger.info({ postId }, "Received sync event for Elasticsearch.");
+                    await syncPostToIndex(ELASTICSEARCH_URL, postData, logger);
                 } else {
-                    console.log(`Received delete event for postId: ${postId}`);
-                    await deletePostFromIndex(ELASTICSEARCH_URL, postId);
+                    logger.info({ postId }, "Received delete event for Elasticsearch.");
+                    await deletePostFromIndex(ELASTICSEARCH_URL, postId, logger);
                 }
-            } catch (err) {
-                console.error(`Error processing message for postId ${postId}:`, err);
+            } catch (err: any) {
+                logger.error({ postId, error: { message: err.message, stack: err.stack } }, "Error processing message for Elasticsearch sync.");
             }
         },
     });
 };
 
 const app = express();
-
 app.get('/health', (req: Request, res: Response) => {
+    const healthStatus = {
+        status: isConsumerReady ? 'OK' : 'UNAVAILABLE',
+        message: isConsumerReady ? 'Worker is running and consumer is connected.' : 'Worker is not connected to Kafka yet.'
+    };
+
     if (isConsumerReady) {
-        res.status(200).json({ status: 'OK', message: 'Worker is running and consumer is connected.' });
+        logger.info("Health check requested: status OK.");
     } else {
-        res.status(503).json({ status: 'UNAVAILABLE', message: 'Worker is starting, consumer not yet ready.' });
+        logger.warn("Health check requested: status UNAVAILABLE.");
     }
+
+    res.status(isConsumerReady ? 200 : 503).json(healthStatus);
 });
 
 app.listen(PORT, () => {
-    console.log(`Health check server listening on port ${PORT}`);
+    logger.info({ port: PORT }, `Health check server listening on port.`);
 });
 
-// --- Start the consumer ---
 runConsumer().catch(e => {
-    console.error('[elasticsearch-worker] FATAL ERROR:', e);
+    logger.fatal({ error: { message: e.message, stack: e.stack } }, "[elasticsearch-worker] FATAL ERROR during consumer execution.");
     isConsumerReady = false;
     process.exit(1);
 });
 
-// --- Graceful Shutdown ---
-const errorTypes: string[] = ['unhandledRejection', 'uncaughtException'];
-const signalTraps: string[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
-
-errorTypes.forEach(type => {
-    process.on(type, async (e: Error) => {
-        try {
-            console.log(`process.on ${type}`);
-            console.error(e);
-            await consumer.disconnect();
-            process.exit(0);
-        } catch (_) {
-            process.exit(1);
-        }
-    });
-});
-
+const signalTraps: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 signalTraps.forEach(type => {
     process.once(type, async () => {
+        logger.info({ signal: type }, `Received signal. Disconnecting consumer...`);
         try {
-            console.log(`Received ${type} signal. Disconnecting consumer...`);
             await consumer.disconnect();
-            console.log('Consumer disconnected gracefully.');
+            logger.info({ signal: type }, `Consumer disconnected gracefully.`);
+        } catch (err: any) {
+            logger.error({ signal: type, error: { message: err.message } }, `Error during consumer disconnection.`);
         } finally {
             process.kill(process.pid, type);
         }

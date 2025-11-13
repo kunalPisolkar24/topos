@@ -1,4 +1,5 @@
 import fetch, { RequestInit, HeadersInit } from 'node-fetch';
+import pino from 'pino';
 import { LIGHTNING_AI_URL, LIGHTNING_AI_AUTH_TOKEN, SUMMARIZE_TIMEOUT_MS } from '../config.js';
 
 interface SummarizeResult {
@@ -6,12 +7,13 @@ interface SummarizeResult {
     error?: string;
 }
 
-export async function callSummarizeService(text: string): Promise<string | null> {
+export async function callSummarizeService(text: string, logger: pino.Logger): Promise<string | null> {
     if (!LIGHTNING_AI_URL || !LIGHTNING_AI_AUTH_TOKEN) {
-        console.error("ML service URL or Auth Token not configured for summarize call.");
+        logger.error("ML service URL or Auth Token not configured for summarize call.");
         return null;
     }
-    console.log("Calling ML service /summarize endpoint...");
+
+    logger.info("Calling ML service /summarize endpoint...");
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SUMMARIZE_TIMEOUT_MS);
 
@@ -33,19 +35,22 @@ export async function callSummarizeService(text: string): Promise<string | null>
             const errText = await response.text();
             throw new Error(`Summarizer service error: ${response.status} - ${errText}`);
         }
+
         const result = await response.json() as SummarizeResult;
         if (result.summary) {
-            console.log("Successfully received summary from ML service.");
+            logger.info("Successfully received summary from ML service.");
             return result.summary;
         } else {
             throw new Error(result.error || "No summary in ML response");
         }
     } catch (error: any) {
         clearTimeout(timeoutId);
+        const errorDetails = { error: { name: error.name, message: error.message } };
+
         if (error.name === 'AbortError') {
-            console.error('Error calling ML /summarize: Request timed out.');
+            logger.error(errorDetails, 'Error calling ML /summarize: Request timed out.');
         } else {
-            console.error(`Error calling ML /summarize: ${error.message}`);
+            logger.error(errorDetails, 'Error calling ML /summarize.');
         }
         return null;
     }
