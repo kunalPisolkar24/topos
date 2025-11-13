@@ -18,6 +18,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      logstash:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8787/api/ping"]
       interval: 30s
@@ -68,6 +70,8 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+      logstash:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
       interval: 30s
@@ -95,6 +99,8 @@ services:
         condition: service_started
       backend:
         condition: service_healthy
+      logstash:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
       interval: 30s
@@ -115,6 +121,46 @@ services:
       - esdata:/usr/share/elasticsearch/data
     networks:
       - app-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana-dev
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - app-network
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash-dev
+    ports:
+      - "5044:5044"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline/
+    networks:
+      - app-network
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: filebeat-dev
+    user: root
+    group_add:
+      - '991' # stat -c '%g' /var/run/docker.sock to get docker group
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-network
+    depends_on:
+      logstash:
+        condition: service_started
 
   kafka:
     image: 'apache/kafka:3.7.0'
