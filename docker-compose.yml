@@ -26,6 +26,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    labels:
+      - co.elastic.logs/enabled=true
 
   frontend:
     build:
@@ -78,6 +80,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    labels:
+      - co.elastic.logs/enabled=true
 
   elasticsearch_worker:
     build:
@@ -107,6 +111,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    labels:
+      - co.elastic.logs/enabled=true
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
