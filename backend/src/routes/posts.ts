@@ -6,6 +6,7 @@ import { z } from "zod";
 import { StatusCode } from "../constants/status-code";
 import { authMiddleware } from "../middleware/auth";
 import { producePostEvent } from '../services/kafka';
+import { logger } from '../logger';
 
 const internalCreatePostSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -80,6 +81,7 @@ postRouter.get("/", async (c: Context<HonoEnv>) => {
       StatusCode.OK
     );
   } catch (error: any) {
+    logger.error('Failed to get posts.', { error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to get posts" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -94,11 +96,13 @@ postRouter.get("/:id", async (c: Context<HonoEnv>) => {
   try {
     const postId = parseInt(c.req.param("id"));
     const parsedParams = internalPostIdSchema.safeParse({ id: postId });
-    if (!parsedParams.success)
+    if (!parsedParams.success) {
+      logger.warn('Failed to get post due to invalid ID.', { postId, errors: parsedParams.error.errors });
       return c.json(
         { error: parsedParams.error.errors },
         StatusCode.BAD_REQUEST
       );
+    }
     const post = await prisma.post.findUnique({
       where: { id: parsedParams.data.id },
       include: {
@@ -107,9 +111,13 @@ postRouter.get("/:id", async (c: Context<HonoEnv>) => {
       },
       cacheStrategy: { ttl: 60 },
     });
-    if (!post) return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
+    if (!post) {
+      logger.warn('Post not found.', { postId: parsedParams.data.id });
+      return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
+    }
     return c.json(post, StatusCode.OK);
   } catch (error: any) {
+    logger.error('Failed to get post.', { postId: c.req.param("id"), error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to get post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -122,7 +130,7 @@ postRouter.patch("/:id/summary", async (c: Context<HonoEnv>) => {
   const expectedSecret = c.env.API_CALLBACK_SECRET;
 
   if (!expectedSecret || receivedSecret !== expectedSecret) {
-    console.log("We got", receivedSecret, "and expected", expectedSecret);
+    logger.warn('Unauthorized summary update attempt.', { receivedSecret: receivedSecret ? 'present' : 'missing' });
     return c.json({ error: 'Unauthorized' }, StatusCode.UNAUTHORIZED);
   }
 
@@ -130,16 +138,18 @@ postRouter.patch("/:id/summary", async (c: Context<HonoEnv>) => {
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
 
+  const postId = parseInt(c.req.param("id"));
   try {
-    const postId = parseInt(c.req.param("id"));
     const parsedParams = internalPostIdSchema.safeParse({ id: postId });
     if (!parsedParams.success) {
+      logger.warn('Summary update failed due to invalid post ID.', { postId, errors: parsedParams.error.errors });
       return c.json({ error: parsedParams.error.errors }, StatusCode.BAD_REQUEST);
     }
 
     const body = await c.req.json();
     const parsedBody = internalSummaryUpdateSchema.safeParse(body);
     if (!parsedBody.success) {
+      logger.warn('Summary update failed due to invalid body.', { postId, errors: parsedBody.error.errors });
       return c.json({ error: parsedBody.error.errors }, StatusCode.BAD_REQUEST);
     }
 
@@ -151,14 +161,15 @@ postRouter.patch("/:id/summary", async (c: Context<HonoEnv>) => {
       },
     });
 
-    console.log(`Successfully updated summary for postId: ${updatedPost.id}`);
+    logger.info('Successfully updated summary for post.', { postId: updatedPost.id });
     return c.json(updatedPost, StatusCode.OK);
 
   } catch (error: any) {
-    console.error("Failed to update post with summary:", error);
     if ((error as any).code === 'P2025') {
+      logger.warn('Attempted to update summary for a non-existent post.', { postId });
       return c.json({ error: 'Post not found' }, StatusCode.NOT_FOUND);
     }
+    logger.error('Failed to update post with summary.', { postId, error: { message: error.message, code: (error as any).code, stack: error.stack } });
     return c.json(
       { error: "Failed to update post with summary" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -172,13 +183,14 @@ postRouter.post("/", authMiddleware, async (c: Context<HonoEnv>) => {
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
 
+  const userId = c.get("user").id;
   try {
     const body = await c.req.json();
     const parsedBody = internalCreatePostSchema.safeParse(body);
     if (!parsedBody.success) {
+      logger.warn('Post creation failed due to validation error.', { userId, errors: parsedBody.error.errors });
       return c.json({ error: parsedBody.error.errors }, StatusCode.BAD_REQUEST);
     }
-    const userId = c.get("user").id;
 
     const newPost = await prisma.post.create({
       data: {
@@ -206,12 +218,14 @@ postRouter.post("/", authMiddleware, async (c: Context<HonoEnv>) => {
 
     try {
       await producePostEvent(c.env, newPost, 'create');
-    } catch (kafkaError) {
-      console.error(`Failed to produce Kafka event for new post ${newPost.id}:`, kafkaError);
+    } catch (kafkaError: any) {
+      logger.error('Failed to produce Kafka event for new post.', { postId: newPost.id, error: { message: kafkaError.message } });
     }
 
+    logger.info('Post created successfully.', { postId: newPost.id, authorId: userId });
     return c.json(newPost, StatusCode.CREATED);
   } catch (error: any) {
+    logger.error('Failed to create post.', { userId, error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to create post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -223,30 +237,38 @@ postRouter.put("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
+
+  const postId = parseInt(c.req.param("id"));
+  const userId = c.get("user").id;
   try {
-    const postId = parseInt(c.req.param("id"));
-    const body = await c.req.json();
     const parsedParams = internalPostIdSchema.safeParse({ id: postId });
-    if (!parsedParams.success)
+    if (!parsedParams.success) {
+      logger.warn('Post update failed due to invalid ID.', { postId, userId, errors: parsedParams.error.errors });
       return c.json(
         { error: parsedParams.error.errors },
         StatusCode.BAD_REQUEST
       );
+    }
 
+    const body = await c.req.json();
     const parsedBody = internalUpdatePostSchema.safeParse(body);
-    if (!parsedBody.success)
+    if (!parsedBody.success) {
+      logger.warn('Post update failed due to validation error.', { postId, userId, errors: parsedBody.error.errors });
       return c.json({ error: parsedBody.error.errors }, StatusCode.BAD_REQUEST);
-
-    const userId = c.get("user").id;
+    }
 
     const postToUpdate = await prisma.post.findUnique({
       where: { id: parsedParams.data.id },
       select: { authorId: true },
     });
-    if (!postToUpdate)
+    if (!postToUpdate) {
+      logger.warn('Post to update not found.', { postId, userId });
       return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
-    if (postToUpdate.authorId !== userId)
+    }
+    if (postToUpdate.authorId !== userId) {
+      logger.warn('Unauthorized attempt to update post.', { postId, userId, authorId: postToUpdate.authorId });
       return c.json({ error: "Unauthorized" }, StatusCode.UNAUTHORIZED);
+    }
 
     if (parsedBody.data.tags) {
       await prisma.postTag.deleteMany({
@@ -286,8 +308,8 @@ postRouter.put("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
 
     try {
       await producePostEvent(c.env, updatedPost, 'update');
-    } catch (kafkaError) {
-      console.error(`Failed to produce Kafka event for updated post ${updatedPost.id}:`, kafkaError);
+    } catch (kafkaError: any) {
+      logger.error('Failed to produce Kafka event for updated post.', { postId: updatedPost.id, error: { message: kafkaError.message } });
     }
 
     const finalUpdatedPost = await prisma.post.findUnique({
@@ -297,8 +319,11 @@ postRouter.put("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
         author: { select: { id: true, username: true, email: true } },
       },
     });
+
+    logger.info('Post updated successfully.', { postId: finalUpdatedPost?.id, userId });
     return c.json(finalUpdatedPost, StatusCode.OK);
   } catch (error: any) {
+    logger.error('Failed to update post.', { postId, userId, error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to update post" },
       StatusCode.INTERNAL_SERVER_ERROR
@@ -310,35 +335,46 @@ postRouter.delete("/:id", authMiddleware, async (c: Context<HonoEnv>) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
+
+  const postId = parseInt(c.req.param("id"));
+  const userId = c.get("user").id;
   try {
-    const postId = parseInt(c.req.param("id"));
     const parsedParams = internalPostIdSchema.safeParse({ id: postId });
-    if (!parsedParams.success)
+    if (!parsedParams.success) {
+      logger.warn('Post deletion failed due to invalid ID.', { postId, userId, errors: parsedParams.error.errors });
       return c.json(
         { error: parsedParams.error.errors },
         StatusCode.BAD_REQUEST
       );
-    const userId = c.get("user").id;
+    }
+
     const postToDelete = await prisma.post.findUnique({
       where: { id: parsedParams.data.id },
     });
-    if (!postToDelete)
+    if (!postToDelete) {
+      logger.warn('Post to delete not found.', { postId, userId });
       return c.json({ error: "Post not found" }, StatusCode.NOT_FOUND);
-    if (postToDelete.authorId !== userId)
+    }
+    if (postToDelete.authorId !== userId) {
+      logger.warn('Unauthorized attempt to delete post.', { postId, userId, authorId: postToDelete.authorId });
       return c.json({ error: "Unauthorized" }, StatusCode.UNAUTHORIZED);
+    }
 
     try {
       await producePostEvent(c.env, { id: parsedParams.data.id }, 'delete');
-    } catch (kafkaError) {
-      console.error(`Failed to produce Kafka delete event for post ${parsedParams.data.id}:`, kafkaError);
+    } catch (kafkaError: any) {
+      logger.error('Failed to produce Kafka delete event for post.', { postId, error: { message: kafkaError.message } });
     }
 
     await prisma.postTag.deleteMany({
       where: { postId: parsedParams.data.id },
     });
     await prisma.post.delete({ where: { id: parsedParams.data.id } });
+
+    logger.info('Post deleted successfully.', { postId, userId });
     return c.json({ message: "Post deleted successfully" }, StatusCode.OK);
   } catch (error: any) {
+    logger.error('Failed to delete post.', { postId, userId, error: { message: error.message, stack: error.stack } });
     return c.json(
       { error: "Failed to delete post" },
       StatusCode.INTERNAL_SERVER_ERROR
