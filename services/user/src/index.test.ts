@@ -1,4 +1,4 @@
-import app from '../src/index';
+import app from './index';
 import { describe, it, expect, vi } from 'vitest';
 
 interface PingResponseBody {
