@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { Redis } from '@upstash/redis';
 import { StatusCode } from '../constants/status-code';
 import { env } from '../config/env';
+import { logger } from '../lib/logger';
 
 const RATELIMIT_WINDOW_MS = 60000;
 const RATELIMIT_MAX_REQUESTS = 20;
@@ -10,6 +11,7 @@ let redisInstance: Redis | null = null;
 
 function getRedisClient(): Redis | null {
     if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+        logger.warn('Redis credentials missing, rate limiting disabled');
         return null;
     }
 
@@ -48,12 +50,13 @@ export const rateLimitMiddleware = async (c: Context, next: Next) => {
         }
 
         if (currentRequests > RATELIMIT_MAX_REQUESTS) {
+            logger.warn({ msg: 'Rate limit exceeded', ip });
             return c.json({
                 error: 'Too many login/signup attempts. Please try again later.'
             }, StatusCode.RATELIMIT);
         }
     } catch (error) {
-        // Fail open 
+        logger.error({ msg: 'Rate limit redis error', error });
     }
 
     await next();
