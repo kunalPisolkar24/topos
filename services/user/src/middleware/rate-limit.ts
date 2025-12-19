@@ -5,7 +5,7 @@ import { env } from '../config/env';
 import { logger } from '../lib/logger';
 
 const RATELIMIT_WINDOW_MS = 60000;
-const RATELIMIT_MAX_REQUESTS = 20;
+const RATELIMIT_MAX_REQUESTS = 50;
 
 let redisInstance: Redis | null = null;
 
