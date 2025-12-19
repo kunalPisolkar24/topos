@@ -1,48 +1,68 @@
+import './config/env';
+import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-
-import { userRouter } from './routes/user';
-import { postRouter } from './routes/posts';
-import { tagRouter } from './routes/tags';
+import { ApolloServer, HeaderMap } from '@apollo/server';
+import { buildSubgraphSchema } from '@apollo/subgraph';
+import { typeDefs } from './graphql/schema';
+import { resolvers } from './graphql/resolvers';
+import { createContext } from './context';
+import { env } from './config/env';
 import { rateLimitMiddleware } from './middleware/rate-limit';
-import { searchRouter } from './routes/search';
 
-const app = new Hono<{
-  Bindings: {
-    DATABASE_URL: string,
-    JWT_SECRET: string,
-    DATABASE_URL_MIGRATE: string,
-    UPSTASH_REDIS_REST_URL: string,
-    UPSTASH_REDIS_REST_TOKEN: string,
-    RAILWAY_CONSUMER_WAKEUP_URL: string,
-    RAILWAY_WAKEUP_SECRET: string,
-    UPSTASH_RATELIMIT_REDIS_REST_URL: string,
-    UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string,
-    ELASTICSEARCH_URL: string,
-    KAFKA_REST_PROXY_URL: string;
-    API_CALLBACK_SECRET: string;
-  };
-}>();
+async function startServer() {
+    const app = new Hono();
 
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST','PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Internal-Secret'],
-}));
+    app.use('*', rateLimitMiddleware);
 
-app.use('*', rateLimitMiddleware);
+    const server = new ApolloServer({
+        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+    });
 
-app.get('/api/ping', (c) => {
-  return c.json({
-    status: 'ok',
-    message: 'API Routes are working!',
-    timestamp: new Date().toISOString(),
-  });
+    await server.start();
+
+    app.use('/graphql', async (c) => {
+        const httpHeaders = new HeaderMap();
+        c.req.raw.headers.forEach((value, key) => {
+            httpHeaders.set(key, value);
+        });
+
+        const httpGraphQLRequest = {
+            method: c.req.method,
+            headers: httpHeaders,
+            search: new URL(c.req.url).search ?? '',
+            body: await c.req.json().catch(() => ({})),
+        };
+
+        const response = await server.executeHTTPGraphQLRequest({
+            httpGraphQLRequest,
+            context: () => createContext(c),
+        });
+
+        const responseHeaders: Record<string, string> = {};
+        for (const [key, value] of response.headers) {
+            responseHeaders[key] = value;
+        }
+
+        return new Response(
+            response.body.kind === 'complete' ? response.body.string : '',
+            {
+                status: response.status || 200,
+                headers: responseHeaders,
+            }
+        );
+    });
+
+    app.get('/health', (c) => c.text('User Service OK'));
+
+    console.log(`🚀 User Service running on port ${env.PORT}`);
+
+    serve({
+        fetch: app.fetch,
+        port: parseInt(env.PORT),
+    });
+}
+
+startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
 });
-
-app.route("/api", userRouter);
-app.route("/api/posts", postRouter);
-app.route("/api/tags", tagRouter);
-app.route("/api/search", searchRouter);
-
-export default app;
