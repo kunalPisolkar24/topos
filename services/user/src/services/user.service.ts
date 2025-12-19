@@ -1,14 +1,16 @@
-import prisma from '../lib/prisma';
+import { PrismaClient } from '@prisma/client';
 import { PasswordUtils } from '../utils/password';
 import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput } from '../types';
 import { logger } from '../lib/logger';
 
 export class UserService {
+    constructor(private readonly prisma: PrismaClient) { }
+
     async signup(data: SignupInput) {
         logger.debug({ msg: 'Attempting signup', email: data.email });
 
-        const existingUser = await prisma.user.findFirst({
+        const existingUser = await this.prisma.user.findFirst({
             where: {
                 OR: [{ email: data.email }, { username: data.username }],
             },
@@ -21,7 +23,7 @@ export class UserService {
 
         const hashedPassword = await PasswordUtils.hash(data.password);
 
-        const user = await prisma.user.create({
+        const user = await this.prisma.user.create({
             data: {
                 email: data.email,
                 username: data.username,
@@ -46,7 +48,7 @@ export class UserService {
     async signin(data: SigninInput) {
         logger.debug({ msg: 'Attempting signin', email: data.email });
 
-        const user = await prisma.user.findUnique({
+        const user = await this.prisma.user.findUnique({
             where: { email: data.email },
         });
 
@@ -75,7 +77,7 @@ export class UserService {
     }
 
     async findById(id: number) {
-        const user = await prisma.user.findUnique({
+        const user = await this.prisma.user.findUnique({
             where: { id },
         });
 
