@@ -44,6 +44,8 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma Client
+        env:
+          DATABASE_URL_MIGRATE: "postgresql://dummy:dummy@localhost:5432/dummy"
         run: npx prisma generate
 
       - name: Run Tests
