@@ -1,8 +1,9 @@
 import { UserService } from '../services/user.service';
 import { GraphQLContext } from '../context';
 import { signupSchema, signinSchema } from '../types';
+import prisma from '../lib/prisma';
 
-const userService = new UserService();
+const userService = new UserService(prisma);
 
 export const resolvers = {
     Query: {
