@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import { logger } from '../lib/logger';
 
 export interface UserPayload {
     id: number;
@@ -13,7 +14,8 @@ export class JwtUtils {
     static verify(token: string): UserPayload | null {
         try {
             return jwt.verify(token, env.JWT_SECRET) as UserPayload;
-        } catch {
+        } catch (error) {
+            logger.debug({ msg: 'JWT Verification failed', error });
             return null;
         }
     }
