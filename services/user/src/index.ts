@@ -8,14 +8,25 @@ import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
 import { env } from './config/env';
 import { rateLimitMiddleware } from './middleware/rate-limit';
+import { requestLogger } from './middleware/request-logger';
+import { logger } from './lib/logger';
 
 async function startServer() {
     const app = new Hono();
 
+    app.use('*', requestLogger);
     app.use('*', rateLimitMiddleware);
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+        formatError: (formattedError, error) => {
+            logger.error({
+                msg: 'GraphQL Error',
+                error: formattedError,
+                originalError: error
+            });
+            return formattedError;
+        },
     });
 
     await server.start();
@@ -54,7 +65,7 @@ async function startServer() {
 
     app.get('/health', (c) => c.text('User Service OK'));
 
-    console.log(`🚀 User Service running on port ${env.PORT}`);
+    logger.info(`🚀 User Service running on port ${env.PORT}`);
 
     serve({
         fetch: app.fetch,
@@ -63,6 +74,6 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-    console.error('Failed to start server:', err);
+    logger.fatal({ msg: 'Failed to start server', err });
     process.exit(1);
 });
