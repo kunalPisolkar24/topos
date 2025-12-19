@@ -2,9 +2,12 @@ import prisma from '../lib/prisma';
 import { PasswordUtils } from '../utils/password';
 import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput } from '../types';
+import { logger } from '../lib/logger';
 
 export class UserService {
     async signup(data: SignupInput) {
+        logger.debug({ msg: 'Attempting signup', email: data.email });
+
         const existingUser = await prisma.user.findFirst({
             where: {
                 OR: [{ email: data.email }, { username: data.username }],
@@ -12,6 +15,7 @@ export class UserService {
         });
 
         if (existingUser) {
+            logger.warn({ msg: 'Signup failed: User exists', email: data.email });
             throw new Error('User already exists');
         }
 
@@ -28,6 +32,8 @@ export class UserService {
 
         const token = JwtUtils.sign({ id: user.id });
 
+        logger.info({ msg: 'User signed up successfully', userId: user.id });
+
         return {
             user: {
                 ...user,
@@ -38,20 +44,26 @@ export class UserService {
     }
 
     async signin(data: SigninInput) {
+        logger.debug({ msg: 'Attempting signin', email: data.email });
+
         const user = await prisma.user.findUnique({
             where: { email: data.email },
         });
 
         if (!user) {
+            logger.warn({ msg: 'Signin failed: User not found', email: data.email });
             throw new Error('Invalid credentials');
         }
 
         const isValid = await PasswordUtils.compare(data.password, user.password);
         if (!isValid) {
+            logger.warn({ msg: 'Signin failed: Invalid password', userId: user.id });
             throw new Error('Invalid credentials');
         }
 
         const token = JwtUtils.sign({ id: user.id });
+
+        logger.info({ msg: 'User signed in successfully', userId: user.id });
 
         return {
             user: {
@@ -67,7 +79,10 @@ export class UserService {
             where: { id },
         });
 
-        if (!user) return null;
+        if (!user) {
+            logger.debug({ msg: 'User not found by ID', userId: id });
+            return null;
+        }
 
         return {
             ...user,
