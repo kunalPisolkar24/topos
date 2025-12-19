@@ -1,28 +1,40 @@
 {
-  "name": "blogapp",
+  "name": "user-service",
+  "version": "1.0.0",
+  "description": "User Service",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "wrangler dev --ip 0.0.0.0",
-    "deploy": "wrangler deploy --minify src/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
-    "sync-es": "tsx src/scripts/sync-es.ts"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
   "dependencies": {
-    "@kunalpisolkar24/blogapp-common": "^1.0.0",
-    "@prisma/client": "^6.7.0",
-    "@prisma/extension-accelerate": "^1.3.0",
-    "@upstash/redis": "^1.34.9",
-    "hono": "^4.5.4"
+    "@apollo/server": "^5.2.0",
+    "@apollo/subgraph": "^2.12.2",
+    "@hono/node-server": "^1.19.7",
+    "@prisma/client": "^7.2.0",
+    "@prisma/extension-accelerate": "^2.0.2",
+    "@upstash/redis": "^1.35.8",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.3",
+    "graphql": "^16.12.0",
+    "graphql-tag": "^2.12.6",
+    "hono": "^4.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.8.34",
-    "@cloudflare/workers-types": "^4.20240529.0",
-    "@types/node": "^24.10.1",
-    "@vitest/coverage-istanbul": "^3.1.4",
-    "prisma": "^6.7.0",
-    "tsx": "^4.20.6",
-    "vitest": "~3.1.4",
-    "wrangler": "^4.46.0"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.0.3",
+    "prisma": "^7.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
