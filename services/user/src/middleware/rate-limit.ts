@@ -1,35 +1,44 @@
-import { Next, Context } from 'hono';
-import { Redis } from '@upstash/redis/cloudflare';
+import { Context, Next } from 'hono';
+import { Redis } from '@upstash/redis';
 import { StatusCode } from '../constants/status-code';
+import { env } from '../config/env';
 
 const RATELIMIT_WINDOW_MS = 60000;
-const RATELIMIT_MAX_REQUESTS = 150;
+const RATELIMIT_MAX_REQUESTS = 20;
 
-type RateLimitEnv = {
-    Bindings: {
-        UPSTASH_RATELIMIT_REDIS_REST_URL: string;
-        UPSTASH_RATELIMIT_REDIS_REST_TOKEN: string;
+let redisInstance: Redis | null = null;
+
+function getRedisClient(): Redis | null {
+    if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+        return null;
     }
+
+    if (!redisInstance) {
+        redisInstance = new Redis({
+            url: env.UPSTASH_REDIS_REST_URL,
+            token: env.UPSTASH_REDIS_REST_TOKEN,
+        });
+    }
+
+    return redisInstance;
 }
 
-let redis: Redis | null = null;
+export const rateLimitMiddleware = async (c: Context, next: Next) => {
+    const redis = getRedisClient();
 
-export const rateLimitMiddleware = async (c: Context<RateLimitEnv>, next: Next) => {
-    if (!c.env.UPSTASH_RATELIMIT_REDIS_REST_URL || !c.env.UPSTASH_RATELIMIT_REDIS_REST_TOKEN) {
-        console.error("Rate limit Redis URL or Token not configured. Skipping rate limit.");
+    if (!redis) {
         await next();
         return;
     }
 
-    if (!redis) {
-        redis = new Redis({
-            url: c.env.UPSTASH_RATELIMIT_REDIS_REST_URL,
-            token: c.env.UPSTASH_RATELIMIT_REDIS_REST_TOKEN,
-        });
-    }
+    const forwardedFor = c.req.header('x-forwarded-for');
+    const cfIp = c.req.header('cf-connecting-ip');
 
-    const ip = c.req.header('cf-connecting-ip') || 'unknown-ip';
-    const key = `rate_limit:${ip}`;
+    const ip = forwardedFor
+        ? forwardedFor.split(',')[0].trim()
+        : (cfIp || 'unknown-ip');
+
+    const key = `rate_limit:user_service:${ip}`;
 
     try {
         const currentRequests = await redis.incr(key);
@@ -39,10 +48,12 @@ export const rateLimitMiddleware = async (c: Context<RateLimitEnv>, next: Next) 
         }
 
         if (currentRequests > RATELIMIT_MAX_REQUESTS) {
-            return c.json({ error: 'Too many requests' }, StatusCode.RATELIMIT);
+            return c.json({
+                error: 'Too many login/signup attempts. Please try again later.'
+            }, StatusCode.RATELIMIT);
         }
     } catch (error) {
-        console.error("Rate limit Redis error:", error);
+        // Fail open 
     }
 
     await next();
