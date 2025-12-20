@@ -1,28 +1,51 @@
-# GraphQL schema example
-#
-# https://gqlgen.com/getting-started/
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@provides", "@external"])
 
-type Todo {
+type Post @key(fields: "id") {
   id: ID!
-  text: String!
-  done: Boolean!
-  user: User!
+  title: String!
+  body: String!
+  slug: String!
+  imageUrl: String
+  author: User! @provides(fields: "username")
+  tags: [Tag!]!
+  createdAt: String!
+  updatedAt: String!
 }
 
-type User {
+type Tag {
   id: ID!
   name: String!
 }
 
-type Query {
-  todos: [Todo!]!
+extend type User @key(fields: "id") {
+  id: ID! @external
+  username: String @external
+  posts: [Post!]!
 }
 
-input NewTodo {
-  text: String!
-  userId: String!
+type Query {
+  posts(page: Int, limit: Int): [Post!]!
+  post(id: ID!): Post
+  tags: [Tag!]!
 }
 
 type Mutation {
-  createTodo(input: NewTodo!): Todo!
+  createPost(input: CreatePostInput!): Post!
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+  deletePost(id: ID!): Boolean!
+}
+
+input CreatePostInput {
+  title: String!
+  body: String!
+  tags: [String!]
+  imageUrl: String
+}
+
+input UpdatePostInput {
+  title: String
+  body: String
+  tags: [String!]
+  imageUrl: String
 }
