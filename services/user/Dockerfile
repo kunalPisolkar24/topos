@@ -8,7 +8,7 @@ COPY . .
 
 RUN npm install
 
-RUN npx prisma generate
+RUN DATABASE_URL_MIGRATE="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 RUN npm run build
 
