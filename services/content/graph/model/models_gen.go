@@ -2,25 +2,49 @@
 
 package model
 
+type CreatePostInput struct {
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Tags     []string `json:"tags,omitempty"`
+	ImageURL *string  `json:"imageUrl,omitempty"`
+}
+
 type Mutation struct {
 }
 
-type NewTodo struct {
-	Text   string `json:"text"`
-	UserID string `json:"userId"`
+type Post struct {
+	ID        string  `json:"id"`
+	Title     string  `json:"title"`
+	Body      string  `json:"body"`
+	Slug      string  `json:"slug"`
+	ImageURL  *string `json:"imageUrl,omitempty"`
+	Author    *User   `json:"author"`
+	Tags      []*Tag  `json:"tags"`
+	CreatedAt string  `json:"createdAt"`
+	UpdatedAt string  `json:"updatedAt"`
 }
+
+func (Post) IsEntity() {}
 
 type Query struct {
 }
 
-type Todo struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-	Done bool   `json:"done"`
-	User *User  `json:"user"`
-}
-
-type User struct {
+type Tag struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
+
+type UpdatePostInput struct {
+	Title    *string  `json:"title,omitempty"`
+	Body     *string  `json:"body,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	ImageURL *string  `json:"imageUrl,omitempty"`
+}
+
+type User struct {
+	ID       string  `json:"id"`
+	Username *string `json:"username,omitempty"`
+	Posts    []*Post `json:"posts"`
+}
+
+func (User) IsEntity() {}
