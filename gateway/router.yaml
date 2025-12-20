@@ -1,0 +1,30 @@
+cors:
+  origins:
+    - "http://localhost:3000"
+    - "https://studio.apollographql.com"
+  allow_credentials: true
+  allow_headers:
+    - "Content-Type"
+    - "Authorization"
+    - "X-Internal-Secret"
+  allow_methods:
+    - "GET"
+    - "POST"
+    - "OPTIONS"
+
+supergraph:
+  listen: 0.0.0.0:4000
+  introspection: true
+
+health_check:
+  path: /health
+  listen: 0.0.0.0:8088
+
+include_subgraph_errors:
+  all: true 
+
+telemetry:
+  metrics:
+    prometheus:
+      enabled: true
+      listen: 0.0.0.0:8088
