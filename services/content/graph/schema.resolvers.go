@@ -163,6 +163,29 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*model.Tag, error) {
 	return tags, nil
 }
 
+func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Post, error) {
+	domainPosts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var posts []*model.Post
+	for _, dp := range domainPosts {
+		posts = append(posts, &model.Post{
+			ID:        dp.ID,
+			Title:     dp.Title,
+			Body:      dp.Body,
+			Slug:      dp.Slug,
+			ImageURL:  dp.ImageUrl,
+			Tags:      mapTags(dp.Tags),
+			CreatedAt: dp.CreatedAt.String(),
+			UpdatedAt: dp.UpdatedAt.String(),
+			Author:    &model.User{ID: dp.AuthorID},
+		})
+	}
+	return posts, nil
+}
+
 func mapTags(tagNames []string) []*model.Tag {
 	var tags []*model.Tag
 	for _, name := range tagNames {
@@ -173,6 +196,8 @@ func mapTags(tagNames []string) []*model.Tag {
 
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 func (r *Resolver) Query() QueryResolver       { return &queryResolver{r} }
+func (r *Resolver) User() UserResolver         { return &userResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }
