@@ -13,6 +13,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
@@ -48,7 +49,9 @@ func main() {
 		},
 	}))
 
-	http.Handle("/query", srv)
+	authHandler := middleware.AuthMiddleware(cfg)(srv)
+
+	http.Handle("/query", authHandler)
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
