@@ -25,3 +25,9 @@ telemetry:
       prometheus:
         enabled: true
         listen: 0.0.0.0:8088
+
+headers:
+  all:
+    request:
+      - propagate:
+          named: "Authorization"
