@@ -38,27 +38,48 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 		return nil, err
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"title":     post.Title,
-			"body":      post.Body,
-			"tags":      post.Tags,
-			"imageUrl":  post.ImageUrl,
-			"updatedAt": post.UpdatedAt,
-		},
+	updateFields := bson.M{
+		"updatedAt": post.UpdatedAt,
 	}
 
+	if post.Title != "" {
+		updateFields["title"] = post.Title
+	}
+	if post.Body != "" {
+		updateFields["body"] = post.Body
+	}
+	if post.Tags != nil {
+		updateFields["tags"] = post.Tags
+	}
+	if post.ImageUrl != nil {
+		updateFields["imageUrl"] = post.ImageUrl
+	}
 	if post.Slug != "" {
-		update["$set"].(bson.M)["slug"] = post.Slug
+		updateFields["slug"] = post.Slug
 	}
 
-	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)
+	if post.SummaryStatus != "" {
+		updateFields["summaryStatus"] = post.SummaryStatus
+
+		if post.SummaryStatus == "PENDING" {
+			updateFields["summary"] = ""
+		}
+	} else if post.Summary != "" {
+		updateFields["summary"] = post.Summary
+	}
+
+	update := bson.M{
+		"$set": updateFields,
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updatedPost domain.Post
+	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
 	if err != nil {
 		return nil, err
 	}
 
-	post.ID = id
-	return post, nil
+	return &updatedPost, nil
 }
 
 func (r *mongoPostRepo) Delete(ctx context.Context, id string) error {
