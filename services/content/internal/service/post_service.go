@@ -28,14 +28,16 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 	}
 
 	post := &domain.Post{
-		Title:     title,
-		Body:      body,
-		Slug:      slug,
-		AuthorID:  authorID,
-		Tags:      tags,
-		ImageUrl:  imageUrl,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Title:         title,
+		Body:          body,
+		Slug:          slug,
+		AuthorID:      authorID,
+		Tags:          tags,
+		ImageUrl:      imageUrl,
+		Summary:       "",
+		SummaryStatus: "PENDING",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	return s.postRepo.Create(ctx, post)
@@ -46,12 +48,16 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		UpdatedAt: time.Now(),
 	}
 
+	contentChanged := false
+
 	if title != nil {
 		post.Title = *title
 		post.Slug = generateSlug(*title)
+		contentChanged = true
 	}
 	if body != nil {
 		post.Body = *body
+		contentChanged = true
 	}
 	if imageUrl != nil {
 		post.ImageUrl = imageUrl
@@ -61,6 +67,10 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		for _, tagName := range tags {
 			_, _ = s.tagRepo.CreateOrFind(ctx, tagName)
 		}
+	}
+
+	if contentChanged {
+		post.SummaryStatus = "PENDING"
 	}
 
 	return s.postRepo.Update(ctx, id, post)
