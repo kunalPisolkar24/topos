@@ -30,17 +30,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 		return nil, err
 	}
 
-	return &model.Post{
-		ID:        domainPost.ID,
-		Title:     domainPost.Title,
-		Body:      domainPost.Body,
-		Slug:      domainPost.Slug,
-		ImageURL:  domainPost.ImageUrl,
-		Tags:      mapTags(domainPost.Tags),
-		CreatedAt: domainPost.CreatedAt.String(),
-		UpdatedAt: domainPost.UpdatedAt.String(),
-		Author:    &model.User{ID: userID},
-	}, nil
+	return mapDomainPostToModel(domainPost), nil
 }
 
 // UpdatePost is the resolver for the updatePost field.
@@ -69,17 +59,7 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 		return nil, err
 	}
 
-	return &model.Post{
-		ID:        domainPost.ID,
-		Title:     domainPost.Title,
-		Body:      domainPost.Body,
-		Slug:      domainPost.Slug,
-		ImageURL:  domainPost.ImageUrl,
-		Tags:      mapTags(domainPost.Tags),
-		CreatedAt: domainPost.CreatedAt.String(),
-		UpdatedAt: domainPost.UpdatedAt.String(),
-		Author:    &model.User{ID: domainPost.AuthorID},
-	}, nil
+	return mapDomainPostToModel(domainPost), nil
 }
 
 // DeletePost is the resolver for the deletePost field.
@@ -123,17 +103,7 @@ func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) ([]*mo
 
 	var posts []*model.Post
 	for _, dp := range domainPosts {
-		posts = append(posts, &model.Post{
-			ID:        dp.ID,
-			Title:     dp.Title,
-			Body:      dp.Body,
-			Slug:      dp.Slug,
-			ImageURL:  dp.ImageUrl,
-			Tags:      mapTags(dp.Tags),
-			CreatedAt: dp.CreatedAt.String(),
-			UpdatedAt: dp.UpdatedAt.String(),
-			Author:    &model.User{ID: dp.AuthorID},
-		})
+		posts = append(posts, mapDomainPostToModel(dp))
 	}
 	return posts, nil
 }
@@ -144,17 +114,7 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 	if err != nil {
 		return nil, err
 	}
-	return &model.Post{
-		ID:        dp.ID,
-		Title:     dp.Title,
-		Body:      dp.Body,
-		Slug:      dp.Slug,
-		ImageURL:  dp.ImageUrl,
-		Tags:      mapTags(dp.Tags),
-		CreatedAt: dp.CreatedAt.String(),
-		UpdatedAt: dp.UpdatedAt.String(),
-		Author:    &model.User{ID: dp.AuthorID},
-	}, nil
+	return mapDomainPostToModel(dp), nil
 }
 
 // Tags is the resolver for the tags field.
@@ -183,17 +143,7 @@ func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Pos
 
 	var posts []*model.Post
 	for _, dp := range domainPosts {
-		posts = append(posts, &model.Post{
-			ID:        dp.ID,
-			Title:     dp.Title,
-			Body:      dp.Body,
-			Slug:      dp.Slug,
-			ImageURL:  dp.ImageUrl,
-			Tags:      mapTags(dp.Tags),
-			CreatedAt: dp.CreatedAt.String(),
-			UpdatedAt: dp.UpdatedAt.String(),
-			Author:    &model.User{ID: dp.AuthorID},
-		})
+		posts = append(posts, mapDomainPostToModel(dp))
 	}
 	return posts, nil
 }
