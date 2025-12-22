@@ -1,12 +1,20 @@
 extend schema
   @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@provides", "@external"])
 
+enum SummaryStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 type Post @key(fields: "id") {
   id: ID!
   title: String!
   body: String!
   slug: String!
   imageUrl: String
+  summary: String
+  summaryStatus: SummaryStatus
   author: User!
   tags: [Tag!]!
   createdAt: String!
