@@ -92,6 +92,10 @@ func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string) ([]
 	return s.postRepo.FindByAuthor(ctx, authorID)
 }
 
+func (s *PostService) GetPostsByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
+	return s.postRepo.FindByTag(ctx, tag, page, limit)
+}
+
 func generateSlug(title string) string {
 	return strings.ToLower(strings.ReplaceAll(title, " ", "-")) + "-" + time.Now().Format("20060102150405")
 }
