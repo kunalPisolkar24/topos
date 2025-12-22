@@ -35,6 +35,7 @@ type Query {
   posts(page: Int, limit: Int): [Post!]!
   post(id: ID!): Post
   tags: [Tag!]!
+  postsByTag(tag: String!, page: Int, limit: Int): [Post!]!
 }
 
 type Mutation {
