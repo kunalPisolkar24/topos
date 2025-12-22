@@ -7,8 +7,8 @@ ENV PATH="/root/.rover/bin:${PATH}"
 
 WORKDIR /app
 
-COPY ./services/user/schema.graphql ./subgraphs/user.graphql
-COPY ./services/content/graph/schema.graphql ./subgraphs/content.graphql
+COPY ./services/user/src/graphql/schema.graphql ./subgraphs/user.graphql
+COPY ./services/content/graph/schema.graphqls ./subgraphs/content.graphql
 COPY ./gateway/supergraph.yaml ./supergraph.yaml
 
 RUN rover supergraph compose --config ./supergraph.yaml > supergraph.graphql
