@@ -6,15 +6,17 @@ import (
 )
 
 type Post struct {
-	ID        string    `bson:"_id,omitempty"`
-	Title     string    `bson:"title"`
-	Body      string    `bson:"body"`
-	Slug      string    `bson:"slug"`
-	ImageUrl  *string   `bson:"imageUrl"`
-	AuthorID  string    `bson:"authorId"`
-	Tags      []string  `bson:"tags"`
-	CreatedAt time.Time `bson:"createdAt"`
-	UpdatedAt time.Time `bson:"updatedAt"`
+	ID            string    `bson:"_id,omitempty"`
+	Title         string    `bson:"title"`
+	Body          string    `bson:"body"`
+	Slug          string    `bson:"slug"`
+	ImageUrl      *string   `bson:"imageUrl"`
+	AuthorID      string    `bson:"authorId"`
+	Tags          []string  `bson:"tags"`
+	Summary       string    `bson:"summary"`
+	SummaryStatus string    `bson:"summaryStatus"`
+	CreatedAt     time.Time `bson:"createdAt"`
+	UpdatedAt     time.Time `bson:"updatedAt"`
 }
 
 type PostRepository interface {
