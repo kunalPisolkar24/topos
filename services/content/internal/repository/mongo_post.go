@@ -135,3 +135,20 @@ func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string) ([]*d
 	}
 	return posts, nil
 }
+
+func (r *mongoPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
+	skip := (page - 1) * limit
+	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
+
+	cursor, err := r.collection.Find(ctx, bson.M{"tags": tag}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []*domain.Post
+	if err = cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
