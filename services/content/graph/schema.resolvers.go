@@ -134,6 +134,29 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*model.Tag, error) {
 	return tags, nil
 }
 
+// PostsByTag is the resolver for the postsByTag field.
+func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, limit *int) ([]*model.Post, error) {
+	p := 1
+	if page != nil {
+		p = *page
+	}
+	l := 10
+	if limit != nil {
+		l = *limit
+	}
+
+	domainPosts, err := r.PostService.GetPostsByTag(ctx, tag, p, l)
+	if err != nil {
+		return nil, err
+	}
+
+	var posts []*model.Post
+	for _, dp := range domainPosts {
+		posts = append(posts, mapDomainPostToModel(dp))
+	}
+	return posts, nil
+}
+
 // Posts is the resolver for the posts field.
 func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Post, error) {
 	domainPosts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID)
