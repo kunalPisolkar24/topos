@@ -7,10 +7,6 @@ cors:
     - "Content-Type"
     - "Authorization"
     - "X-Internal-Secret"
-  allow_methods:
-    - "GET"
-    - "POST"
-    - "OPTIONS"
 
 supergraph:
   listen: 0.0.0.0:4000
@@ -24,7 +20,8 @@ include_subgraph_errors:
   all: true 
 
 telemetry:
-  metrics:
-    prometheus:
-      enabled: true
-      listen: 0.0.0.0:8088
+  exporters:
+    metrics:
+      prometheus:
+        enabled: true
+        listen: 0.0.0.0:8088
