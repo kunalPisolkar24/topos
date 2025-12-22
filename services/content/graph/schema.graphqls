@@ -7,7 +7,7 @@ type Post @key(fields: "id") {
   body: String!
   slug: String!
   imageUrl: String
-  author: User! @provides(fields: "username")
+  author: User!
   tags: [Tag!]!
   createdAt: String!
   updatedAt: String!
@@ -20,7 +20,6 @@ type Tag {
 
 extend type User @key(fields: "id") {
   id: ID! @external
-  username: String! @external
   posts: [Post!]!
 }
 
