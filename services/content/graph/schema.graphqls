@@ -20,7 +20,7 @@ type Tag {
 
 extend type User @key(fields: "id") {
   id: ID! @external
-  username: String @external
+  username: String! @external
   posts: [Post!]!
 }
 
