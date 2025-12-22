@@ -2,6 +2,13 @@
 
 package model
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 type CreatePostInput struct {
 	Title    string   `json:"title"`
 	Body     string   `json:"body"`
@@ -13,15 +20,17 @@ type Mutation struct {
 }
 
 type Post struct {
-	ID        string  `json:"id"`
-	Title     string  `json:"title"`
-	Body      string  `json:"body"`
-	Slug      string  `json:"slug"`
-	ImageURL  *string `json:"imageUrl,omitempty"`
-	Author    *User   `json:"author"`
-	Tags      []*Tag  `json:"tags"`
-	CreatedAt string  `json:"createdAt"`
-	UpdatedAt string  `json:"updatedAt"`
+	ID            string         `json:"id"`
+	Title         string         `json:"title"`
+	Body          string         `json:"body"`
+	Slug          string         `json:"slug"`
+	ImageURL      *string        `json:"imageUrl,omitempty"`
+	Summary       *string        `json:"summary,omitempty"`
+	SummaryStatus *SummaryStatus `json:"summaryStatus,omitempty"`
+	Author        *User          `json:"author"`
+	Tags          []*Tag         `json:"tags"`
+	CreatedAt     string         `json:"createdAt"`
+	UpdatedAt     string         `json:"updatedAt"`
 }
 
 func (Post) IsEntity() {}
@@ -42,9 +51,65 @@ type UpdatePostInput struct {
 }
 
 type User struct {
-	ID       string  `json:"id"`
-	Username string  `json:"username"`
-	Posts    []*Post `json:"posts"`
+	ID    string  `json:"id"`
+	Posts []*Post `json:"posts"`
 }
 
 func (User) IsEntity() {}
+
+type SummaryStatus string
+
+const (
+	SummaryStatusPending   SummaryStatus = "PENDING"
+	SummaryStatusCompleted SummaryStatus = "COMPLETED"
+	SummaryStatusFailed    SummaryStatus = "FAILED"
+)
+
+var AllSummaryStatus = []SummaryStatus{
+	SummaryStatusPending,
+	SummaryStatusCompleted,
+	SummaryStatusFailed,
+}
+
+func (e SummaryStatus) IsValid() bool {
+	switch e {
+	case SummaryStatusPending, SummaryStatusCompleted, SummaryStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e SummaryStatus) String() string {
+	return string(e)
+}
+
+func (e *SummaryStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SummaryStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SummaryStatus", str)
+	}
+	return nil
+}
+
+func (e SummaryStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SummaryStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SummaryStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}

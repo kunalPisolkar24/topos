@@ -62,15 +62,17 @@ type ComplexityRoot struct {
 	}
 
 	Post struct {
-		Author    func(childComplexity int) int
-		Body      func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		ImageURL  func(childComplexity int) int
-		Slug      func(childComplexity int) int
-		Tags      func(childComplexity int) int
-		Title     func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
+		Author        func(childComplexity int) int
+		Body          func(childComplexity int) int
+		CreatedAt     func(childComplexity int) int
+		ID            func(childComplexity int) int
+		ImageURL      func(childComplexity int) int
+		Slug          func(childComplexity int) int
+		Summary       func(childComplexity int) int
+		SummaryStatus func(childComplexity int) int
+		Tags          func(childComplexity int) int
+		Title         func(childComplexity int) int
+		UpdatedAt     func(childComplexity int) int
 	}
 
 	Query struct {
@@ -87,9 +89,8 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		ID       func(childComplexity int) int
-		Posts    func(childComplexity int) int
-		Username func(childComplexity int) int
+		ID    func(childComplexity int) int
+		Posts func(childComplexity int) int
 	}
 
 	_Service struct {
@@ -227,6 +228,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Post.Slug(childComplexity), true
+	case "Post.summary":
+		if e.complexity.Post.Summary == nil {
+			break
+		}
+
+		return e.complexity.Post.Summary(childComplexity), true
+	case "Post.summaryStatus":
+		if e.complexity.Post.SummaryStatus == nil {
+			break
+		}
+
+		return e.complexity.Post.SummaryStatus(childComplexity), true
 	case "Post.tags":
 		if e.complexity.Post.Tags == nil {
 			break
@@ -317,12 +330,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Posts(childComplexity), true
-	case "User.username":
-		if e.complexity.User.Username == nil {
-			break
-		}
-
-		return e.complexity.User.Username(childComplexity), true
 
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
@@ -723,6 +730,10 @@ func (ec *executionContext) fieldContext_Entity_findPostByID(ctx context.Context
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -776,8 +787,6 @@ func (ec *executionContext) fieldContext_Entity_findUserByID(ctx context.Context
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_User_id(ctx, field)
-			case "username":
-				return ec.fieldContext_User_username(ctx, field)
 			case "posts":
 				return ec.fieldContext_User_posts(ctx, field)
 			}
@@ -833,6 +842,10 @@ func (ec *executionContext) fieldContext_Mutation_createPost(ctx context.Context
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -894,6 +907,10 @@ func (ec *executionContext) fieldContext_Mutation_updatePost(ctx context.Context
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -1106,6 +1123,64 @@ func (ec *executionContext) fieldContext_Post_imageUrl(_ context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_summary(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Post_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Post_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Post_summaryStatus(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Post_summaryStatus,
+		func(ctx context.Context) (any, error) {
+			return obj.SummaryStatus, nil
+		},
+		nil,
+		ec.marshalOSummaryStatus2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐSummaryStatus,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Post_summaryStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SummaryStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Post_author(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1132,8 +1207,6 @@ func (ec *executionContext) fieldContext_Post_author(_ context.Context, field gr
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_User_id(ctx, field)
-			case "username":
-				return ec.fieldContext_User_username(ctx, field)
 			case "posts":
 				return ec.fieldContext_User_posts(ctx, field)
 			}
@@ -1271,6 +1344,10 @@ func (ec *executionContext) fieldContext_Query_posts(ctx context.Context, field 
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -1332,6 +1409,10 @@ func (ec *executionContext) fieldContext_Query_post(ctx context.Context, field g
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -1662,35 +1743,6 @@ func (ec *executionContext) fieldContext_User_id(_ context.Context, field graphq
 	return fc, nil
 }
 
-func (ec *executionContext) _User_username(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_User_username,
-		func(ctx context.Context) (any, error) {
-			return obj.Username, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_User_username(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "User",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _User_posts(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1725,6 +1777,10 @@ func (ec *executionContext) fieldContext_User_posts(_ context.Context, field gra
 				return ec.fieldContext_Post_slug(ctx, field)
 			case "imageUrl":
 				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
 			case "author":
 				return ec.fieldContext_Post_author(ctx, field)
 			case "tags":
@@ -3528,6 +3584,10 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "imageUrl":
 			out.Values[i] = ec._Post_imageUrl(ctx, field, obj)
+		case "summary":
+			out.Values[i] = ec._Post_summary(ctx, field, obj)
+		case "summaryStatus":
+			out.Values[i] = ec._Post_summaryStatus(ctx, field, obj)
 		case "author":
 			out.Values[i] = ec._Post_author(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3785,11 +3845,6 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = graphql.MarshalString("User")
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "username":
-			out.Values[i] = ec._User_username(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -5041,6 +5096,22 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOSummaryStatus2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐSummaryStatus(ctx context.Context, v any) (*model.SummaryStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.SummaryStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOSummaryStatus2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐSummaryStatus(ctx context.Context, sel ast.SelectionSet, v *model.SummaryStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) marshalO_Entity2githubᚗcomᚋ99designsᚋgqlgenᚋpluginᚋfederationᚋfedruntimeᚐEntity(ctx context.Context, sel ast.SelectionSet, v fedruntime.Entity) graphql.Marshaler {
