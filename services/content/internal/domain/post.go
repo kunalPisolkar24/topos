@@ -26,4 +26,5 @@ type PostRepository interface {
 	FindAll(ctx context.Context, page, limit int) ([]*Post, error)
 	FindByID(ctx context.Context, id string) (*Post, error)
 	FindByAuthor(ctx context.Context, authorID string) ([]*Post, error)
+	FindByTag(ctx context.Context, tag string, page, limit int) ([]*Post, error)
 }
