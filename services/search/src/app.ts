@@ -5,12 +5,14 @@ import { ElasticsearchRepository } from './infrastructure/elasticsearch/elastics
 import { KafkaDlqProducer } from './infrastructure/kafka/dlq.producer.js';
 import { KafkaConsumer } from './infrastructure/kafka/kafka.consumer.js';
 import { SearchService } from './services/search.service.js';
+import { KafkaHandler } from './handlers/kafka.handler.js';
 
 export class App {
     private logger: PinoLogger;
     private dlqProducer: KafkaDlqProducer;
     private consumer: KafkaConsumer;
     private searchService: SearchService;
+    private kafkaHandler: KafkaHandler;
 
     constructor() {
         this.logger = new PinoLogger();
@@ -26,6 +28,7 @@ export class App {
         const esRepo = new ElasticsearchRepository(this.logger);
 
         this.searchService = new SearchService(esRepo, this.dlqProducer, this.logger);
+        this.kafkaHandler = new KafkaHandler(this.searchService);
     }
 
     async start(): Promise<void> {
@@ -34,8 +37,8 @@ export class App {
         await this.dlqProducer.connect();
         await this.consumer.connect();
 
-        await this.consumer.start(async (key: any, value: any) => {
-            await this.searchService.processEvent(key, value);
+        await this.consumer.start(async (key, value) => {
+            await this.kafkaHandler.handle(key, value);
         });
 
         this.setupGracefulShutdown();
