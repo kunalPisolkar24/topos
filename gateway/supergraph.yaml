@@ -1,4 +1,4 @@
-federation_version: =2.0
+federation_version: 2
 
 subgraphs:
   user:
