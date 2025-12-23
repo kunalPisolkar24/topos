@@ -13,6 +13,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
@@ -34,12 +35,19 @@ func main() {
 		}
 	}()
 
+	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
+	defer func() {
+		if err := kafkaProducer.Close(); err != nil {
+			logger.Error("Failed to close Kafka producer", "error", err)
+		}
+	}()
+
 	database := mongoClient.Database(cfg.DbName)
 
 	postRepo := repository.NewMongoPostRepository(database)
 	tagRepo := repository.NewMongoTagRepository(database)
 
-	postService := service.NewPostService(postRepo, tagRepo)
+	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer)
 	tagService := service.NewTagService(tagRepo)
 
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
