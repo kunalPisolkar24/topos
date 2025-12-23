@@ -1,0 +1,59 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@provides", "@external"])
+
+enum SummaryStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+type Post @key(fields: "id") {
+  id: ID!
+  title: String!
+  body: String!
+  slug: String!
+  imageUrl: String
+  summary: String
+  summaryStatus: SummaryStatus
+  author: User!
+  tags: [Tag!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+}
+
+extend type User @key(fields: "id") {
+  id: ID! @external
+  posts: [Post!]!
+}
+
+type Query {
+  posts(page: Int, limit: Int): [Post!]!
+  post(id: ID!): Post
+  tags: [Tag!]!
+  postsByTag(tag: String!, page: Int, limit: Int): [Post!]!
+}
+
+type Mutation {
+  createPost(input: CreatePostInput!): Post!
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+  deletePost(id: ID!): Boolean!
+}
+
+input CreatePostInput {
+  title: String!
+  body: String!
+  tags: [String!]
+  imageUrl: String
+}
+
+input UpdatePostInput {
+  title: String
+  body: String
+  tags: [String!]
+  imageUrl: String
+}
