@@ -3,36 +3,42 @@ import { IElasticsearchRepository } from '../../core/interfaces/repository.inter
 import { PostDocument } from '../../core/entities/post.entity.js';
 import { config } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
+import { withRetry } from '../../utils/retry.util.js';
+import { InfrastructureError } from '../../core/errors/app.error.js';
 
 export class ElasticsearchRepository implements IElasticsearchRepository {
-  constructor(private readonly logger: ILogger) {}
+  constructor(private readonly logger: ILogger) { }
 
   async upsert(document: PostDocument): Promise<void> {
-    const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${document.postId}`;
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(document),
-    });
+    await withRetry(async () => {
+      const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${document.postId}`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Elasticsearch Upsert Failed: ${response.status} ${errorText}`);
-    }
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(document),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new InfrastructureError(`Elasticsearch Upsert Failed: ${response.status} ${errorText}`);
+      }
+    }, this.logger);
   }
 
   async delete(id: string): Promise<void> {
-    const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${id}`;
-    
-    const response = await fetch(url, {
-      method: 'DELETE',
-    });
+    await withRetry(async () => {
+      const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${id}`;
 
-    if (!response.ok && response.status !== 404) {
-      const errorText = await response.text();
-      throw new Error(`Elasticsearch Delete Failed: ${response.status} ${errorText}`);
-    }
+      const response = await fetch(url, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok && response.status !== 404) {
+        const errorText = await response.text();
+        throw new InfrastructureError(`Elasticsearch Delete Failed: ${response.status} ${errorText}`);
+      }
+    }, this.logger);
   }
 
   async checkHealth(): Promise<boolean> {
