@@ -9,14 +9,16 @@ import (
 )
 
 type PostService struct {
-	postRepo domain.PostRepository
-	tagRepo  domain.TagRepository
+	postRepo      domain.PostRepository
+	tagRepo       domain.TagRepository
+	eventProducer domain.EventProducer
 }
 
-func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository) *PostService {
+func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventProducer) *PostService {
 	return &PostService{
-		postRepo: postRepo,
-		tagRepo:  tagRepo,
+		postRepo:      postRepo,
+		tagRepo:       tagRepo,
+		eventProducer: eventProducer,
 	}
 }
 
@@ -40,7 +42,14 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		UpdatedAt:     time.Now(),
 	}
 
-	return s.postRepo.Create(ctx, post)
+	createdPost, err := s.postRepo.Create(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = s.eventProducer.PublishPostCreated(ctx, createdPost)
+
+	return createdPost, nil
 }
 
 func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *string, tags []string, imageUrl *string) (*domain.Post, error) {
@@ -73,11 +82,25 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		post.SummaryStatus = "PENDING"
 	}
 
-	return s.postRepo.Update(ctx, id, post)
+	updatedPost, err := s.postRepo.Update(ctx, id, post)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = s.eventProducer.PublishPostUpdated(ctx, updatedPost)
+
+	return updatedPost, nil
 }
 
 func (s *PostService) DeletePost(ctx context.Context, id string) error {
-	return s.postRepo.Delete(ctx, id)
+	err := s.postRepo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	_ = s.eventProducer.PublishPostDeleted(ctx, id)
+
+	return nil
 }
 
 func (s *PostService) GetPosts(ctx context.Context, page, limit int) ([]*domain.Post, error) {
