@@ -1,0 +1,17 @@
+name: microservices-app
+version: '3.8'
+
+include:
+  - path: shared/kafka.yaml
+  - path: shared/logging.yaml
+  - path: shared/search-db.yaml
+  - path: ../../gateway/compose.yaml
+  - path: ../../frontend/compose.yaml
+  - path: ../../services/user/compose.yaml
+  - path: ../../services/content/compose.yaml
+  - path: ../../services/summary/compose.yaml
+  - path: ../../services/search/compose.yaml
+
+networks:
+  app-network:
+    driver: bridge
