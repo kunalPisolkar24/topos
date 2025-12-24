@@ -1,8 +1,8 @@
 services:
   gateway:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: gateway/Dockerfile
     container_name: gateway
     restart: unless-stopped
     ports:
