@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { IElasticsearchRepository } from '../../core/interfaces/repository.interface.js';
-import { PostDocument } from '../../core/entities/post.entity.js';
+import { PostDocument, SearchResult } from '../../core/entities/post.entity.js';
 import { config } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { withRetry } from '../../utils/retry.util.js';
@@ -39,6 +39,42 @@ export class ElasticsearchRepository implements IElasticsearchRepository {
         throw new InfrastructureError(`Elasticsearch Delete Failed: ${response.status} ${errorText}`);
       }
     }, this.logger);
+  }
+
+  async search(query: string, page: number, limit: number): Promise<SearchResult> {
+    const from = (page - 1) * limit;
+    const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_search`;
+
+    const searchBody = {
+      from,
+      size: limit,
+      query: {
+        multi_match: {
+          query,
+          fields: ['title^3', 'summary^2', 'body', 'authorName'],
+          fuzziness: 'AUTO'
+        }
+      }
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(searchBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      this.logger.error('Elasticsearch Search Failed', { status: response.status, error: errorText });
+      throw new InfrastructureError(`Elasticsearch Search Failed: ${response.status}`);
+    }
+
+    const result = await response.json() as any;
+
+    const hits = result.hits.hits.map((h: any) => h._source as PostDocument);
+    const total = result.hits.total.value;
+
+    return { hits, total };
   }
 
   async checkHealth(): Promise<boolean> {
