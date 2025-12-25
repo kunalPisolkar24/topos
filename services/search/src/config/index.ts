@@ -5,14 +5,20 @@ dotenv.config();
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().default('8002').transform((val) => parseInt(val, 10)),
+  PORT: z.string().default('4003').transform((val) => parseInt(val, 10)),
+  API_PORT: z.string().default('4003').transform((val) => parseInt(val, 10)),
+  
   KAFKA_BROKER: z.string().min(1),
   KAFKA_CLIENT_ID: z.string().default('elasticsearch-worker'),
   KAFKA_GROUP_ID: z.string().default('elasticsearch-workers-group'),
   TOPIC_POSTS: z.string().default('posts'),
   TOPIC_DLQ: z.string().default('posts.dlq'),
+  
   ELASTICSEARCH_URL: z.string().url(),
   ELASTICSEARCH_INDEX: z.string().default('posts'),
+  
+  REDIS_HOST: z.string().default('redis'),
+  REDIS_PORT: z.string().default('6379').transform((val) => parseInt(val, 10)),
 });
 
 const parsed = configSchema.safeParse(process.env);
