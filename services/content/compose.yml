@@ -1,0 +1,20 @@
+services:
+  content-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-service
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+    labels:
+      - co.elastic.logs/enabled=true

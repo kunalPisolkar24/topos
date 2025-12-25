@@ -1,0 +1,27 @@
+services:
+  search-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: search-worker
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    environment:
+      ELASTICSEARCH_HOST: http://es-search-store:9200
+    depends_on:
+      kafka:
+        condition: service_healthy
+      es-search-store:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+    labels:
+      - co.elastic.logs/enabled=true
