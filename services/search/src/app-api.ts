@@ -1,5 +1,6 @@
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
+import { buildSubgraphSchema } from '@apollo/subgraph';
 import { typeDefs } from './api/graphql/schema.js';
 import { resolvers } from './api/graphql/resolvers.js';
 import { PinoLogger } from './infrastructure/logger/pino.logger.js';
@@ -23,8 +24,7 @@ const start = async () => {
 	const searchService = new SearchService(esRepo, cache, logger);
 
 	const server = new ApolloServer({
-		typeDefs,
-		resolvers,
+		schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
 	});
 
 	const { url } = await startStandaloneServer(server, {
