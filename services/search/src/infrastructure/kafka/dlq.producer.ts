@@ -1,4 +1,4 @@
-import { Kafka, Producer } from 'kafkajs';
+import { Kafka, Producer, Partitioners } from 'kafkajs';
 import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
 import { DlqMessage } from '../../core/entities/dlq-message.entity.js';
 import { config } from '../../config/index.js';
@@ -8,7 +8,9 @@ export class KafkaDlqProducer implements IDlqProducer {
   private producer: Producer;
 
   constructor(kafka: Kafka, private readonly logger: ILogger) {
-    this.producer = kafka.producer();
+    this.producer = kafka.producer({
+      createPartitioner: Partitioners.LegacyPartitioner,
+    });
   }
 
   async connect(): Promise<void> {
