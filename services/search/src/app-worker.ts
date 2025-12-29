@@ -6,6 +6,7 @@ import { KafkaDlqProducer } from './infrastructure/kafka/dlq.producer.js';
 import { KafkaConsumer } from './infrastructure/kafka/kafka.consumer.js';
 import { IngestService } from './worker/services/ingest.service.js';
 import { KafkaHandler } from './worker/handlers/kafka.handler.js';
+import { withRetry } from './utils/retry.util.js';
 
 const start = async () => {
 	const logger = new PinoLogger();
@@ -14,6 +15,10 @@ const start = async () => {
 	const kafka = new Kafka({
 		clientId: config.KAFKA_CLIENT_ID,
 		brokers: [config.KAFKA_BROKER],
+		retry: {
+			initialRetryTime: 1000,
+			retries: 10,
+		},
 	});
 
 	const dlqProducer = new KafkaDlqProducer(kafka, logger);
@@ -23,13 +28,17 @@ const start = async () => {
 	const ingestService = new IngestService(esRepo, dlqProducer, logger);
 	const kafkaHandler = new KafkaHandler(ingestService);
 
-	try {
+	const bootstrap = async () => {
 		await dlqProducer.connect();
 		await consumer.connect();
 
 		await consumer.start(async (key, value) => {
 			await kafkaHandler.handle(key, value);
 		});
+	};
+
+	try {
+		await withRetry(bootstrap, logger, { retries: 15, delay: 3000, factor: 1 });
 
 		const shutdown = async () => {
 			logger.info('Shutting down...');
@@ -42,7 +51,7 @@ const start = async () => {
 		process.on('SIGTERM', shutdown);
 
 	} catch (err) {
-		logger.error('Fatal Error', { err });
+		logger.error('Fatal Error after retries', { err });
 		process.exit(1);
 	}
 };
