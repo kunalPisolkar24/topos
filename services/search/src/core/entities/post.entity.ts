@@ -5,4 +5,11 @@ export interface PostDocument {
   authorName: string;
   imageUrl: string | null;
   createdAt: string; 
+  slug?: string;
+  summary?: string;
+}
+
+export interface SearchResult {
+  hits: PostDocument[];
+  total: number;
 }

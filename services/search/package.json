@@ -7,14 +7,22 @@
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/server.js",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/server.ts"
+    "start:api": "node dist/app-api.js",
+    "start:worker": "node dist/app-worker.js",
+    "dev:api": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-api.ts",
+    "dev:worker": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-worker.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@apollo/server": "^5.2.0",
+    "@apollo/subgraph": "^2.12.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "graphql": "^16.12.0",
+    "graphql-tag": "^2.12.6",
+    "ioredis": "^5.8.2",
     "kafkajs": "^2.2.4",
     "node-fetch": "^3.3.2",
     "pino": "^10.1.0",
