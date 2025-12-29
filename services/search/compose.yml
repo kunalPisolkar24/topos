@@ -1,26 +1,64 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: search-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  search-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: search-api
+    command: npm run start:api
+    ports:
+      - "4003:4003"
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=search-redis
+      - REDIS_PORT=6379
+      - ELASTICSEARCH_URL=http://es-search-store:9200
+      - PORT=4003
+    depends_on:
+      redis:
+        condition: service_healthy
+      es-search-store:
+        condition: service_healthy
+    networks:
+      - app-network
+    labels:
+      - co.elastic.logs/enabled=true
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--header", "Apollo-Require-Preflight: true", "http://localhost:4003?query=%7B__typename%7D"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   search-worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: search-worker
-    restart: unless-stopped
-    ports:
-      - "8002:8002"
+    command: npm run start:worker
     env_file:
       - .env
     environment:
-      ELASTICSEARCH_HOST: http://es-search-store:9200
+      - KAFKA_BROKER=kafka:29092
+      - ELASTICSEARCH_URL=http://es-search-store:9200
     depends_on:
       kafka:
         condition: service_healthy
       es-search-store:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - app-network
     labels:

@@ -1,11 +1,11 @@
-import { IElasticsearchRepository } from '../core/interfaces/repository.interface.js';
-import { IDlqProducer } from '../core/interfaces/message-broker.interface.js';
-import { ILogger } from '../core/interfaces/logger.interface.js';
-import { PostDocument } from '../core/entities/post.entity.js';
-import { config } from '../config/index.js';
-import { ParseError } from '../core/errors/app.error.js';
+import { IElasticsearchRepository } from '../../core/interfaces/repository.interface.js';
+import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
+import { ILogger } from '../../core/interfaces/logger.interface.js';
+import { PostDocument } from '../../core/entities/post.entity.js';
+import { config } from '../../config/index.js';
+import { ParseError } from '../../core/errors/app.error.js';
 
-export class SearchService {
+export class IngestService {
   constructor(
     private readonly esRepository: IElasticsearchRepository,
     private readonly dlqProducer: IDlqProducer,
