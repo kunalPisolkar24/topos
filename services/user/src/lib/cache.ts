@@ -5,6 +5,8 @@ import { KeyvAdapter } from '@apollo/utils.keyvadapter';
 import { env } from '../config/env';
 import { logger } from './logger';
 
+export let serviceCache: Keyv | undefined;
+
 export class CacheFactory {
     static createCache() {
         if (env.REDIS_SENTINELS) {
@@ -26,15 +28,18 @@ export class CacheFactory {
                 logger.error({ msg: 'Redis Client Error', err });
             });
 
-            return new KeyvAdapter(new Keyv({ store: new KeyvRedis(redisClient as any) }));
+            serviceCache = new Keyv({ store: new KeyvRedis(redisClient as any) });
+            return new KeyvAdapter(serviceCache);
         }
 
         if (env.REDIS_URL) {
             logger.info('Initializing Redis in Standard Mode');
-            return new KeyvAdapter(new Keyv({ store: new KeyvRedis(env.REDIS_URL) }));
+            serviceCache = new Keyv({ store: new KeyvRedis(env.REDIS_URL) });
+            return new KeyvAdapter(serviceCache);
         }
 
         logger.warn('No Redis configuration found. Using In-Memory cache');
+        serviceCache = new Keyv();
         return undefined;
     }
 }
