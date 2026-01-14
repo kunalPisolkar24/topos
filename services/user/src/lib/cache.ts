@@ -5,7 +5,7 @@ import { KeyvAdapter } from '@apollo/utils.keyvadapter';
 import { env } from '../config/env';
 import { logger } from './logger';
 
-export let serviceCache: Keyv | undefined;
+export let serviceCache: Keyv;
 
 export class CacheFactory {
     static createCache() {
@@ -13,7 +13,7 @@ export class CacheFactory {
             logger.info('Initializing Redis in Sentinel Mode');
             
             const sentinels = env.REDIS_SENTINELS.split(',').map(s => {
-                const [host, port] = s.split(':');
+                const [host, port] = s.trim().split(':');
                 return { host, port: parseInt(port) };
             });
 
