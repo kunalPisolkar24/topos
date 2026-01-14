@@ -1,12 +1,11 @@
-import bcrypt from 'bcryptjs';
+import argon2 from 'argon2';
 
 export class PasswordUtils {
     static async hash(password: string): Promise<string> {
-        const salt = await bcrypt.genSalt(10);
-        return bcrypt.hash(password, salt);
+        return argon2.hash(password);
     }
 
     static async compare(plain: string, hashed: string): Promise<boolean> {
-        return bcrypt.compare(plain, hashed);
+        return argon2.verify(hashed, plain);
     }
 }

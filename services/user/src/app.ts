@@ -1,21 +1,39 @@
 import { Hono } from 'hono';
 import { ApolloServer, HeaderMap } from '@apollo/server';
 import { buildSubgraphSchema } from '@apollo/subgraph';
+import { ApolloServerPluginCacheControl } from '@apollo/server/plugin/cacheControl';
 import { typeDefs } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
-import { rateLimitMiddleware } from './middleware/rate-limit';
 import { requestLogger } from './middleware/request-logger';
+import { metricsMiddleware } from './middleware/metrics';
 import { logger } from './lib/logger';
+import { CacheFactory, serviceCache } from './lib/cache';
+import { metrics } from './lib/metrics';
+import prisma from './lib/prisma';
+import { UserService } from './services/user.service';
+import { CachedUserService } from './services/user.service.cached';
 
 export async function createApp() {
     const app = new Hono();
 
     app.use('*', requestLogger);
-    app.use('*', rateLimitMiddleware);
+    app.use('*', metricsMiddleware);
+
+    const cacheBackend = CacheFactory.createCache();
+
+    const baseUserService = new UserService(prisma);
+    
+    const userService = serviceCache 
+        ? new CachedUserService(baseUserService, serviceCache)
+        : baseUserService;
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+        cache: cacheBackend,
+        plugins: [
+            ApolloServerPluginCacheControl({ defaultMaxAge: 0 }),
+        ],
         formatError: (formattedError, error) => {
             logger.error({
                 msg: 'GraphQL Error',
@@ -43,7 +61,7 @@ export async function createApp() {
 
         const response = await server.executeHTTPGraphQLRequest({
             httpGraphQLRequest,
-            context: () => createContext(c),
+            context: () => createContext(c, userService),
         });
 
         const responseHeaders: Record<string, string> = {};
@@ -58,6 +76,11 @@ export async function createApp() {
                 headers: responseHeaders,
             }
         );
+    });
+
+    app.get('/metrics', async (c) => {
+        c.header('Content-Type', metrics.register.contentType);
+        return c.body(await metrics.register.metrics());
     });
 
     app.get('/health', (c) => c.text('User Service OK'));
