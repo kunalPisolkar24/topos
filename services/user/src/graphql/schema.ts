@@ -32,8 +32,8 @@ export const typeDefs = gql`
 
   type Query {
     me: User @cacheControl(maxAge: 0)
-    user(id: ID!): User @cacheControl(maxAge: 60, scope: PUBLIC)
-    users: [User!]! @cacheControl(maxAge: 60, scope: PUBLIC)
+    user(id: ID!): User @cacheControl(maxAge: 60, scope: PRIVATE)
+    users(limit: Int = 10, cursor: ID): [User!]! @cacheControl(maxAge: 60, scope: PUBLIC)
   }
 
   type Mutation {
