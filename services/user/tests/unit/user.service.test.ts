@@ -9,7 +9,7 @@ describe('UserService Unit Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        userService = new UserService(prismaMock);
+        userService = new UserService(prismaMock as any);
     });
 
     describe('signup', () => {
@@ -25,7 +25,6 @@ describe('UserService Unit Tests', () => {
             const now = new Date();
 
             prismaMock.user.findFirst.mockResolvedValue(null);
-
             vi.spyOn(PasswordUtils, 'hash').mockResolvedValue(hashedPassword);
 
             prismaMock.user.create.mockResolvedValue({
@@ -47,6 +46,7 @@ describe('UserService Unit Tests', () => {
                     OR: [{ email: signupInput.email }, { username: signupInput.username }],
                 },
             });
+
             expect(prismaMock.user.create).toHaveBeenCalledWith({
                 data: {
                     email: signupInput.email,
@@ -55,6 +55,7 @@ describe('UserService Unit Tests', () => {
                     name: signupInput.username,
                 },
             });
+
             expect(result.token).toBeDefined();
             expect(result.user.email).toBe(signupInput.email);
             expect(result.user.createdAt).toBe(now.toISOString());
@@ -77,12 +78,11 @@ describe('UserService Unit Tests', () => {
     describe('signin', () => {
         it('should return token and user for valid credentials', async () => {
             const password = faker.internet.password();
-            const hashedPassword = 'hashed_password_mock';
             const userMock = {
                 id: faker.number.int(),
                 email: faker.internet.email(),
                 username: faker.internet.username(),
-                password: hashedPassword,
+                password: 'hashed_password',
                 createdAt: new Date(),
             } as any;
 
