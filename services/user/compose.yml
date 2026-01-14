@@ -9,6 +9,18 @@ services:
       - "4001:4001"
     env_file:
       - .env
+    environment:
+      - REDIS_MASTER_NAME=mymaster
+      - REDIS_SENTINELS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+    depends_on:
+      postgres:
+        condition: service_started
+      redis-sentinel-1:
+        condition: service_started
+      redis-sentinel-2:
+        condition: service_started
+      redis-sentinel-3:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:4001/health"]
       interval: 30s
@@ -18,3 +30,114 @@ services:
       - app-network
     labels:
       - co.elastic.logs/enabled=true
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: user-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-user_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis-master
+    restart: unless-stopped
+    command: redis-server --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    volumes:
+      - redis_master_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: redis-replica
+    restart: unless-stopped
+    command: redis-server --replicaof redis-master 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    volumes:
+      - redis_replica_data:/data
+    depends_on:
+      - redis-master
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: redis-sentinel-1
+    restart: unless-stopped
+    command: >
+      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis-master
+    ports:
+      - "26379:26379"
+    networks:
+      - app-network
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: redis-sentinel-2
+    restart: unless-stopped
+    command: >
+      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis-master
+    networks:
+      - app-network
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: redis-sentinel-3
+    restart: unless-stopped
+    command: >
+      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis-master
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_master_data:
+  redis_replica_data:
