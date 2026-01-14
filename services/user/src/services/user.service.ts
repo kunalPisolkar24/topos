@@ -1,7 +1,7 @@
 import { PrismaClient } from '../generated/prisma/client';
 import { PasswordUtils } from '../utils/password';
 import { JwtUtils } from '../utils/jwt';
-import { SignupInput, SigninInput } from '../types';
+import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { logger } from '../lib/logger';
 
 export class UserService {
@@ -94,5 +94,43 @@ export class UserService {
 
     async getMe(id: number) {
         return this.findById(id);
+    }
+
+    async findAll() {
+        const users = await this.prisma.user.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
+
+        return users.map(user => ({
+            ...user,
+            createdAt: user.createdAt.toISOString()
+        }));
+    }
+
+    async updateProfile(userId: number, data: UpdateProfileInput) {
+        logger.debug({ msg: 'Attempting profile update', userId });
+
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            logger.warn({ msg: 'Update failed: User not found', userId });
+            throw new Error('User not found');
+        }
+
+        const updatedUser = await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: data.name,
+                bio: data.bio,
+                avatarUrl: data.avatarUrl,
+                bannerUrl: data.bannerUrl,
+            },
+        });
+
+        logger.info({ msg: 'Profile updated successfully', userId });
+
+        return {
+            ...updatedUser,
+            createdAt: updatedUser.createdAt.toISOString(),
+        };
     }
 }
