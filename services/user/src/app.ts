@@ -4,7 +4,6 @@ import { buildSubgraphSchema } from '@apollo/subgraph';
 import { typeDefs } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
-import { rateLimitMiddleware } from './middleware/rate-limit';
 import { requestLogger } from './middleware/request-logger';
 import { logger } from './lib/logger';
 
@@ -12,7 +11,6 @@ export async function createApp() {
     const app = new Hono();
 
     app.use('*', requestLogger);
-    app.use('*', rateLimitMiddleware);
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
