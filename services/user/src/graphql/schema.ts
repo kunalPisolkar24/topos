@@ -22,10 +22,17 @@ export const typeDefs = gql`
   type Query {
     me: User
     user(id: ID!): User
+    users: [User!]!
   }
 
   type Mutation {
     signup(email: String!, username: String!, password: String!): AuthPayload!
     signin(email: String!, password: String!): AuthPayload!
+    updateProfile(
+        name: String
+        bio: String
+        avatarUrl: String
+        bannerUrl: String
+    ): User!
   }
 `;
