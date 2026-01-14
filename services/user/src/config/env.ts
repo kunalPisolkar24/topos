@@ -10,6 +10,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   DATABASE_URL_MIGRATE: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  REDIS_URL: z.string().optional(),
+  REDIS_MASTER_NAME: z.string().default('mymaster'),
+  REDIS_SENTINELS: z.string().optional(),
+  REDIS_PASSWORD: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
