@@ -11,8 +11,14 @@ export const logger = pino({
             translateTime: 'SYS:standard'
         }
     } : undefined,
+    formatters: {
+        level: (label) => {
+            return { level: label };
+        }
+    },
     redact: {
-        paths: ['password', 'token', 'headers.authorization', 'user.password'],
+        paths: ['password', 'token', 'headers.authorization', 'user.password', 'input.password'],
         remove: true
-    }
+    },
+    base: env.NODE_ENV === 'production' ? undefined : { pid: process.pid, hostname: require('os').hostname() }
 });

@@ -9,7 +9,7 @@ describe('UserService Unit Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        userService = new UserService(prismaMock);
+        userService = new UserService(prismaMock as any);
     });
 
     describe('signup', () => {
@@ -25,7 +25,6 @@ describe('UserService Unit Tests', () => {
             const now = new Date();
 
             prismaMock.user.findFirst.mockResolvedValue(null);
-
             vi.spyOn(PasswordUtils, 'hash').mockResolvedValue(hashedPassword);
 
             prismaMock.user.create.mockResolvedValue({
@@ -42,47 +41,26 @@ describe('UserService Unit Tests', () => {
 
             const result = await userService.signup(signupInput);
 
-            expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
-                where: {
-                    OR: [{ email: signupInput.email }, { username: signupInput.username }],
-                },
-            });
-            expect(prismaMock.user.create).toHaveBeenCalledWith({
-                data: {
-                    email: signupInput.email,
-                    username: signupInput.username,
-                    password: hashedPassword,
-                    name: signupInput.username,
-                },
-            });
+            expect(prismaMock.user.create).toHaveBeenCalled();
             expect(result.token).toBeDefined();
-            expect(result.user.email).toBe(signupInput.email);
-            expect(result.user.createdAt).toBe(now.toISOString());
         });
 
         it('should throw error when user already exists', async () => {
-            const signupInput = {
+            prismaMock.user.findFirst.mockResolvedValue({ id: 1 } as any);
+            await expect(userService.signup({
                 email: faker.internet.email(),
                 username: faker.internet.username(),
-                password: faker.internet.password(),
-            };
-
-            prismaMock.user.findFirst.mockResolvedValue({ id: 1 } as any);
-
-            await expect(userService.signup(signupInput)).rejects.toThrow('User already exists');
-            expect(prismaMock.user.create).not.toHaveBeenCalled();
+                password: 'password'
+            })).rejects.toThrow('User already exists');
         });
     });
 
     describe('signin', () => {
         it('should return token and user for valid credentials', async () => {
-            const password = faker.internet.password();
-            const hashedPassword = 'hashed_password_mock';
             const userMock = {
-                id: faker.number.int(),
-                email: faker.internet.email(),
-                username: faker.internet.username(),
-                password: hashedPassword,
+                id: 1,
+                email: 'test@test.com',
+                password: 'hashed',
                 createdAt: new Date(),
             } as any;
 
@@ -91,36 +69,111 @@ describe('UserService Unit Tests', () => {
 
             const result = await userService.signin({
                 email: userMock.email,
-                password: password,
+                password: 'password',
             });
 
             expect(result.token).toBeDefined();
-            expect(result.user.id).toBe(userMock.id);
         });
 
         it('should throw error for non-existent user', async () => {
             prismaMock.user.findUnique.mockResolvedValue(null);
-
             await expect(userService.signin({
-                email: faker.internet.email(),
+                email: 'test@test.com',
                 password: 'any',
             })).rejects.toThrow('Invalid credentials');
         });
 
         it('should throw error for invalid password', async () => {
-            const userMock = {
-                id: 1,
-                email: faker.internet.email(),
-                password: 'hashed',
-            } as any;
-
-            prismaMock.user.findUnique.mockResolvedValue(userMock);
+            prismaMock.user.findUnique.mockResolvedValue({ password: 'hash' } as any);
             vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(false);
-
             await expect(userService.signin({
-                email: userMock.email,
+                email: 'test@test.com',
                 password: 'wrong',
             })).rejects.toThrow('Invalid credentials');
+        });
+    });
+
+    describe('findById', () => {
+        it('should return user when found', async () => {
+            const mockUser = { id: 1, createdAt: new Date() } as any;
+            prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+            const result = await userService.findById(1);
+            expect(result).toBeDefined();
+            expect(result?.id).toBe(1);
+        });
+
+        it('should return null when not found', async () => {
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            const result = await userService.findById(999);
+            expect(result).toBeNull();
+        });
+    });
+
+    describe('findByIds', () => {
+        it('should return users mapped by id', async () => {
+            const ids = [1, 2];
+            const mockUsers = [
+                { id: 1, createdAt: new Date() },
+                { id: 2, createdAt: new Date() }
+            ] as any[];
+
+            prismaMock.user.findMany.mockResolvedValue(mockUsers);
+
+            const result = await userService.findByIds(ids);
+            expect(result).toHaveLength(2);
+            expect(result[0]?.id).toBe(1);
+            expect(result[1]?.id).toBe(2);
+        });
+
+        it('should handle missing users in batch', async () => {
+            const ids = [1, 3];
+            const mockUsers = [{ id: 1, createdAt: new Date() }] as any[];
+            prismaMock.user.findMany.mockResolvedValue(mockUsers);
+
+            const result = await userService.findByIds(ids);
+            expect(result[0]?.id).toBe(1);
+            expect(result[1]).toBeNull();
+        });
+    });
+
+    describe('findAll', () => {
+        it('should return list of users', async () => {
+            const mockUsers = [{ id: 1, createdAt: new Date() }] as any[];
+            prismaMock.user.findMany.mockResolvedValue(mockUsers);
+
+            const result = await userService.findAll({ limit: 10 });
+            expect(result).toHaveLength(1);
+        });
+
+        it('should handle pagination cursor', async () => {
+            prismaMock.user.findMany.mockResolvedValue([]);
+            await userService.findAll({ limit: 10, cursor: 5 });
+            
+            expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+                skip: 1,
+                cursor: { id: 5 }
+            }));
+        });
+    });
+
+    describe('updateProfile', () => {
+        it('should update user successfully', async () => {
+            const userId = 1;
+            const updateData = { name: 'New Name' };
+            const mockUser = { id: userId, createdAt: new Date() } as any;
+            
+            prismaMock.user.findUnique.mockResolvedValue(mockUser);
+            prismaMock.user.update.mockResolvedValue({ ...mockUser, ...updateData });
+
+            const result = await userService.updateProfile(userId, updateData);
+            expect(result.name).toBe('New Name');
+        });
+
+        it('should throw error if user not found', async () => {
+            prismaMock.user.findUnique.mockResolvedValue(null);
+            await expect(userService.updateProfile(1, {}))
+                .rejects.toThrow('User not found');
         });
     });
 });

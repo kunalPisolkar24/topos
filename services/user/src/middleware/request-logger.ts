@@ -5,8 +5,8 @@ export const requestLogger = async (c: Context, next: Next) => {
     const start = Date.now();
     const { method, url } = c.req;
     const userAgent = c.req.header('user-agent');
-    const requestId = crypto.randomUUID();
-
+    
+    const requestId = c.req.header('x-request-id') || crypto.randomUUID();
     c.set('requestId', requestId);
 
     logger.info({
