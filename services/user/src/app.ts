@@ -7,7 +7,10 @@ import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
 import { requestLogger } from './middleware/request-logger';
 import { logger } from './lib/logger';
-import { CacheFactory } from './lib/cache';
+import { CacheFactory, serviceCache } from './lib/cache';
+import prisma from './lib/prisma';
+import { UserService } from './services/user.service';
+import { CachedUserService } from './services/user.service.cached';
 
 export async function createApp() {
     const app = new Hono();
@@ -15,6 +18,12 @@ export async function createApp() {
     app.use('*', requestLogger);
 
     const cacheBackend = CacheFactory.createCache();
+
+    const baseUserService = new UserService(prisma);
+    
+    const userService = serviceCache 
+        ? new CachedUserService(baseUserService, serviceCache)
+        : baseUserService;
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
@@ -49,7 +58,7 @@ export async function createApp() {
 
         const response = await server.executeHTTPGraphQLRequest({
             httpGraphQLRequest,
-            context: () => createContext(c),
+            context: () => createContext(c, userService),
         });
 
         const responseHeaders: Record<string, string> = {};
