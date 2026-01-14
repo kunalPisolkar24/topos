@@ -24,7 +24,7 @@
     "@prisma/client": "^7.2.0",
     "@prisma/extension-accelerate": "^2.0.2",
     "@upstash/redis": "^1.35.8",
-    "bcryptjs": "^3.0.3",
+    "argon2": "^0.44.0",
     "dotenv": "^17.2.3",
     "graphql": "^16.12.0",
     "graphql-tag": "^2.12.6",
@@ -35,7 +35,6 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
-    "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.0.3",
     "@vitest/coverage-v8": "^4.0.16",
