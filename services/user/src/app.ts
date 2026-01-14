@@ -1,19 +1,27 @@
 import { Hono } from 'hono';
 import { ApolloServer, HeaderMap } from '@apollo/server';
 import { buildSubgraphSchema } from '@apollo/subgraph';
+import { ApolloServerPluginCacheControl } from '@apollo/server/plugin/cacheControl';
 import { typeDefs } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
 import { requestLogger } from './middleware/request-logger';
 import { logger } from './lib/logger';
+import { CacheFactory } from './lib/cache';
 
 export async function createApp() {
     const app = new Hono();
 
     app.use('*', requestLogger);
 
+    const cacheBackend = CacheFactory.createCache();
+
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+        cache: cacheBackend,
+        plugins: [
+            ApolloServerPluginCacheControl({ defaultMaxAge: 0 }),
+        ],
         formatError: (formattedError, error) => {
             logger.error({
                 msg: 'GraphQL Error',
