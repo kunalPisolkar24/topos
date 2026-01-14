@@ -20,7 +20,9 @@
   "dependencies": {
     "@apollo/server": "^5.2.0",
     "@apollo/subgraph": "^2.12.2",
+    "@apollo/utils.keyvadapter": "^4.0.1",
     "@hono/node-server": "^1.19.7",
+    "@keyv/redis": "^5.1.5",
     "@prisma/client": "^7.2.0",
     "@prisma/extension-accelerate": "^2.0.2",
     "argon2": "^0.44.0",
@@ -28,7 +30,9 @@
     "graphql": "^16.12.0",
     "graphql-tag": "^2.12.6",
     "hono": "^4.11.1",
+    "ioredis": "^5.9.1",
     "jsonwebtoken": "^9.0.3",
+    "keyv": "^5.5.5",
     "pino": "^10.1.0",
     "zod": "^4.2.1"
   },
