@@ -3,6 +3,17 @@ import gql from 'graphql-tag';
 export const typeDefs = gql`
   extend schema @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
 
+  enum CacheControlScope {
+    PUBLIC
+    PRIVATE
+  }
+
+  directive @cacheControl(
+    maxAge: Int
+    scope: CacheControlScope
+    inheritMaxAge: Boolean
+  ) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
   type User @key(fields: "id") {
     id: ID!
     username: String!
@@ -20,9 +31,9 @@ export const typeDefs = gql`
   }
 
   type Query {
-    me: User
-    user(id: ID!): User
-    users: [User!]!
+    me: User @cacheControl(maxAge: 0)
+    user(id: ID!): User @cacheControl(maxAge: 60, scope: PUBLIC)
+    users: [User!]! @cacheControl(maxAge: 60, scope: PUBLIC)
   }
 
   type Mutation {
