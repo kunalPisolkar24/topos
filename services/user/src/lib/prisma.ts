@@ -1,13 +1,20 @@
 import { PrismaClient } from '../generated/prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
-import { env } from '../config/env';
+import { PrismaPg } from '@prisma/adapter-pg'
+import { readReplicas } from '@prisma/extension-read-replicas'
+import { Pool } from 'pg'
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const mainAdapter = new PrismaPg(
+  new Pool({ connectionString: process.env.DATABASE_URL_MIGRATE }),
+)
 
-const prisma = globalForPrisma.prisma || new PrismaClient({
-    accelerateUrl: env.DATABASE_URL,
-}).$extends(withAccelerate());
+const replicaAdapter = new PrismaPg(
+  new Pool({ connectionString: process.env.DATABASE_URL_REPLICA }),
+)
 
-if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma as unknown as PrismaClient;
+const replicaClient = new PrismaClient({ adapter: replicaAdapter })
 
-export default prisma;
+const prisma = new PrismaClient({ adapter: mainAdapter }).$extends(
+  readReplicas({
+    replicas: [replicaClient],
+  }),
+)
