@@ -3,6 +3,7 @@ import { PasswordUtils } from '../utils/password';
 import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { logger } from '../lib/logger';
+import { serviceCache } from '../lib/cache';
 
 export class UserService {
     constructor(private readonly prisma: PrismaClient) { }
@@ -77,6 +78,16 @@ export class UserService {
     }
 
     async findById(id: number) {
+        const cacheKey = `user:${id}`;
+
+        if (serviceCache) {
+            const cached = await serviceCache.get(cacheKey);
+            if (cached) {
+                logger.debug({ msg: 'Cache Hit', key: cacheKey });
+                return cached;
+            }
+        }
+
         const user = await this.prisma.user.findUnique({
             where: { id },
         });
@@ -86,10 +97,16 @@ export class UserService {
             return null;
         }
 
-        return {
+        const result = {
             ...user,
             createdAt: user.createdAt.toISOString(),
         };
+
+        if (serviceCache) {
+            await serviceCache.set(cacheKey, result, 3600000);
+        }
+
+        return result;
     }
 
     async getMe(id: number) {
@@ -125,6 +142,12 @@ export class UserService {
                 bannerUrl: data.bannerUrl,
             },
         });
+
+        if (serviceCache) {
+            const cacheKey = `user:${userId}`;
+            await serviceCache.delete(cacheKey);
+            logger.debug({ msg: 'Cache invalidated', key: cacheKey });
+        }
 
         logger.info({ msg: 'Profile updated successfully', userId });
 
