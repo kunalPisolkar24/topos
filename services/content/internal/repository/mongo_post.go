@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type mongoPostRepo struct {
@@ -78,6 +79,7 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	}
 
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
 	var updatedPost domain.Post
 	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
 	if err != nil {
@@ -110,7 +112,11 @@ func (r *mongoPostRepo) findWithPagination(ctx context.Context, filter bson.M, p
 		return nil, err
 	}
 
-	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
+	opts := options.Find().
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"createdAt": -1})
+
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
@@ -145,8 +151,13 @@ func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, 
 		return nil, errors.New("invalid id format")
 	}
 
+	coll, err := r.collection.Clone(options.Collection().SetReadPreference(readpref.Primary()))
+	if err != nil {
+		return nil, err
+	}
+
 	var post domain.Post
-	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
+	err = coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
 	if err != nil {
 		return nil, err
 	}
