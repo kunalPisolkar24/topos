@@ -111,8 +111,8 @@ func (s *PostService) GetPost(ctx context.Context, id string) (*domain.Post, err
 	return s.postRepo.FindByID(ctx, id)
 }
 
-func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string) ([]*domain.Post, error) {
-	return s.postRepo.FindByAuthor(ctx, authorID)
+func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string, page, limit int) ([]*domain.Post, error) {
+	return s.postRepo.FindByAuthor(ctx, authorID, page, limit)
 }
 
 func (s *PostService) GetPostsByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
