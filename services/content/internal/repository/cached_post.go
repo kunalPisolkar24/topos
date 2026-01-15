@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -38,7 +39,9 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	}
 
 	key := fmt.Sprintf("post:%s", id)
-	_ = r.redis.Del(ctx, key).Err()
+	if err := r.redis.Del(ctx, key).Err(); err == nil {
+		monitoring.RecordCacheDel()
+	}
 
 	return updatedPost, nil
 }
@@ -50,7 +53,9 @@ func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
 	}
 
 	key := fmt.Sprintf("post:%s", id)
-	_ = r.redis.Del(ctx, key).Err()
+	if err := r.redis.Del(ctx, key).Err(); err == nil {
+		monitoring.RecordCacheDel()
+	}
 
 	return nil
 }
@@ -60,10 +65,13 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
+		monitoring.RecordCacheHit()
 		var post domain.Post
 		if jsonErr := json.Unmarshal([]byte(val), &post); jsonErr == nil {
 			return &post, nil
 		}
+	} else if err == redis.Nil {
+		monitoring.RecordCacheMiss()
 	}
 
 	post, err := r.fallback.FindByID(ctx, id)
@@ -72,7 +80,9 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 	}
 
 	if data, marshalErr := json.Marshal(post); marshalErr == nil {
-		_ = r.redis.Set(ctx, key, data, entityTTL).Err()
+		if err := r.redis.Set(ctx, key, data, entityTTL).Err(); err == nil {
+			monitoring.RecordCacheSet()
+		}
 	}
 
 	return post, nil
@@ -102,10 +112,13 @@ func (r *cachedPostRepo) FindByTag(ctx context.Context, tag string, page, limit 
 func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn func() (*domain.PaginatedPosts, error)) (*domain.PaginatedPosts, error) {
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
+		monitoring.RecordCacheHit()
 		var pp domain.PaginatedPosts
 		if jsonErr := json.Unmarshal([]byte(val), &pp); jsonErr == nil {
 			return &pp, nil
 		}
+	} else if err == redis.Nil {
+		monitoring.RecordCacheMiss()
 	}
 
 	pp, err := fetchFn()
@@ -114,7 +127,9 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 	}
 
 	if data, marshalErr := json.Marshal(pp); marshalErr == nil {
-		_ = r.redis.Set(ctx, key, data, listTTL).Err()
+		if err := r.redis.Set(ctx, key, data, listTTL).Err(); err == nil {
+			monitoring.RecordCacheSet()
+		}
 	}
 
 	return pp, nil
