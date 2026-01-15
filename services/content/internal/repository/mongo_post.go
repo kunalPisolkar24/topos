@@ -3,12 +3,14 @@ package repository
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type mongoPostRepo struct {
@@ -60,7 +62,6 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 
 	if post.SummaryStatus != "" {
 		updateFields["summaryStatus"] = post.SummaryStatus
-
 		if post.SummaryStatus == "PENDING" {
 			updateFields["summary"] = ""
 		}
@@ -68,11 +69,17 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 		updateFields["summary"] = post.Summary
 	}
 
+	if post.Title != "" || post.Body != "" {
+		updateFields["summary"] = ""
+		updateFields["summaryStatus"] = "PENDING"
+	}
+
 	update := bson.M{
 		"$set": updateFields,
 	}
 
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
 	var updatedPost domain.Post
 	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
 	if err != nil {
@@ -91,21 +98,51 @@ func (r *mongoPostRepo) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) ([]*domain.Post, error) {
+func (r *mongoPostRepo) findWithPagination(ctx context.Context, filter bson.M, page, limit int) (*domain.PaginatedPosts, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 	skip := (page - 1) * limit
-	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
 
-	cursor, err := r.collection.Find(ctx, bson.M{}, opts)
+	totalCount, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := options.Find().
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"createdAt": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var posts []*domain.Post
+	posts := make([]*domain.Post, 0)
 	if err = cursor.All(ctx, &posts); err != nil {
 		return nil, err
 	}
-	return posts, nil
+
+	totalPages := 0
+	if limit > 0 {
+		totalPages = int(math.Ceil(float64(totalCount) / float64(limit)))
+	}
+
+	return &domain.PaginatedPosts{
+		Posts:      posts,
+		TotalPages: totalPages,
+		TotalPosts: totalCount,
+		Page:       page,
+	}, nil
+}
+
+func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
+	return r.findWithPagination(ctx, bson.M{}, page, limit)
 }
 
 func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
@@ -114,41 +151,23 @@ func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, 
 		return nil, errors.New("invalid id format")
 	}
 
+	coll, err := r.collection.Clone(options.Collection().SetReadPreference(readpref.Primary()))
+	if err != nil {
+		return nil, err
+	}
+
 	var post domain.Post
-	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
+	err = coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
 	if err != nil {
 		return nil, err
 	}
 	return &post, nil
 }
 
-func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string) ([]*domain.Post, error) {
-	cursor, err := r.collection.Find(ctx, bson.M{"authorId": authorID})
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var posts []*domain.Post
-	if err = cursor.All(ctx, &posts); err != nil {
-		return nil, err
-	}
-	return posts, nil
+func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
+	return r.findWithPagination(ctx, bson.M{"authorId": authorID}, page, limit)
 }
 
-func (r *mongoPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
-	skip := (page - 1) * limit
-	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
-
-	cursor, err := r.collection.Find(ctx, bson.M{"tags": tag}, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var posts []*domain.Post
-	if err = cursor.All(ctx, &posts); err != nil {
-		return nil, err
-	}
-	return posts, nil
+func (r *mongoPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
+	return r.findWithPagination(ctx, bson.M{"tags": tag}, page, limit)
 }

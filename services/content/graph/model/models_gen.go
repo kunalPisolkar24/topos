@@ -19,6 +19,13 @@ type CreatePostInput struct {
 type Mutation struct {
 }
 
+type PaginatedPosts struct {
+	Posts       []*Post `json:"posts"`
+	TotalPages  int     `json:"totalPages"`
+	CurrentPage int     `json:"currentPage"`
+	TotalPosts  int     `json:"totalPosts"`
+}
+
 type Post struct {
 	ID            string         `json:"id"`
 	Title         string         `json:"title"`
@@ -51,8 +58,8 @@ type UpdatePostInput struct {
 }
 
 type User struct {
-	ID    string  `json:"id"`
-	Posts []*Post `json:"posts"`
+	ID    string          `json:"id"`
+	Posts *PaginatedPosts `json:"posts"`
 }
 
 func (User) IsEntity() {}
