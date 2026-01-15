@@ -33,13 +33,38 @@ func (r *mongoTagRepo) CreateOrFind(ctx context.Context, name string) (*domain.T
 }
 
 func (r *mongoTagRepo) FindAll(ctx context.Context) ([]*domain.Tag, error) {
-	cursor, err := r.collection.Find(ctx, bson.M{})
+	opts := options.Find().SetSort(bson.M{"name": 1})
+	cursor, err := r.collection.Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var tags []*domain.Tag
+	tags := make([]*domain.Tag, 0)
+	if err = cursor.All(ctx, &tags); err != nil {
+		return nil, err
+	}
+	return tags, nil
+}
+
+func (r *mongoTagRepo) Search(ctx context.Context, query string, limit int) ([]*domain.Tag, error) {
+	filter := bson.M{}
+	if query != "" {
+		filter = bson.M{"name": bson.M{"$regex": query, "$options": "i"}}
+	}
+
+	if limit < 1 {
+		limit = 10
+	}
+
+	opts := options.Find().SetLimit(int64(limit)).SetSort(bson.M{"name": 1})
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	tags := make([]*domain.Tag, 0)
 	if err = cursor.All(ctx, &tags); err != nil {
 		return nil, err
 	}
