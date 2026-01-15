@@ -26,16 +26,23 @@ type Tag {
   name: String!
 }
 
+type PaginatedPosts {
+  posts: [Post!]!
+  totalPages: Int!
+  currentPage: Int!
+  totalPosts: Int!
+}
+
 extend type User @key(fields: "id") {
   id: ID! @external
-  posts(page: Int, limit: Int): [Post!]!
+  posts(page: Int, limit: Int): PaginatedPosts!
 }
 
 type Query {
-  posts(page: Int, limit: Int): [Post!]!
+  posts(page: Int, limit: Int): PaginatedPosts!
   post(id: ID!): Post
-  tags: [Tag!]!
-  postsByTag(tag: String!, page: Int, limit: Int): [Post!]!
+  tags(query: String, limit: Int): [Tag!]!
+  postsByTag(tag: String!, page: Int, limit: Int): PaginatedPosts!
 }
 
 type Mutation {
