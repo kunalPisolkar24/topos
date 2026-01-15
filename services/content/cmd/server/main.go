@@ -19,6 +19,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -71,10 +72,12 @@ func main() {
 		},
 	}))
 
-	authHandler := middleware.AuthMiddleware(cfg)(srv)
+	authMiddleware := middleware.AuthMiddleware(cfg)
+	metricsMiddleware := middleware.MetricsMiddleware
 
-	http.Handle("/query", authHandler)
+	http.Handle("/query", metricsMiddleware(authMiddleware(srv)))
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := redisClient.Ping(r.Context()).Err(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
