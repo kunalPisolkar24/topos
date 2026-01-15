@@ -28,7 +28,7 @@ type Tag {
 
 extend type User @key(fields: "id") {
   id: ID! @external
-  posts: [Post!]!
+  posts(page: Int, limit: Int): [Post!]!
 }
 
 type Query {
