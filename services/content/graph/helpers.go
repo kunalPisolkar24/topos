@@ -36,3 +36,17 @@ func mapDomainPostToModel(dp *domain.Post) *model.Post {
 		Author:        &model.User{ID: dp.AuthorID},
 	}
 }
+
+func mapDomainPaginatedToModel(pp *domain.PaginatedPosts) *model.PaginatedPosts {
+	var posts []*model.Post
+	for _, dp := range pp.Posts {
+		posts = append(posts, mapDomainPostToModel(dp))
+	}
+
+	return &model.PaginatedPosts{
+		Posts:       posts,
+		TotalPages:  pp.TotalPages,
+		TotalPosts:  int(pp.TotalPosts),
+		CurrentPage: pp.Page,
+	}
+}
