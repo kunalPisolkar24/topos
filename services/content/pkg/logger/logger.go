@@ -8,7 +8,16 @@ import (
 var Log *slog.Logger
 
 func Init() {
-	Log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				a.Key = "timestamp"
+			}
+			return a
+		},
+	})
+	Log = slog.New(handler)
 }
 
 func Info(msg string, args ...any) {
@@ -17,4 +26,8 @@ func Info(msg string, args ...any) {
 
 func Error(msg string, args ...any) {
 	Log.Error(msg, args...)
+}
+
+func Warn(msg string, args ...any) {
+	Log.Warn(msg, args...)
 }
