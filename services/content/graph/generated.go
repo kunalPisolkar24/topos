@@ -91,7 +91,7 @@ type ComplexityRoot struct {
 
 	User struct {
 		ID    func(childComplexity int) int
-		Posts func(childComplexity int) int
+		Posts func(childComplexity int, page *int, limit *int) int
 	}
 
 	_Service struct {
@@ -115,7 +115,7 @@ type QueryResolver interface {
 	PostsByTag(ctx context.Context, tag string, page *int, limit *int) ([]*model.Post, error)
 }
 type UserResolver interface {
-	Posts(ctx context.Context, obj *model.User) ([]*model.Post, error)
+	Posts(ctx context.Context, obj *model.User, page *int, limit *int) ([]*model.Post, error)
 }
 
 type executableSchema struct {
@@ -342,7 +342,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			break
 		}
 
-		return e.complexity.User.Posts(childComplexity), true
+		args, err := ec.field_User_posts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.User.Posts(childComplexity, args["page"].(*int), args["limit"].(*int)), true
 
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
@@ -662,6 +667,22 @@ func (ec *executionContext) field_Query_postsByTag_args(ctx context.Context, raw
 }
 
 func (ec *executionContext) field_Query_posts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "page", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_User_posts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "page", ec.unmarshalOInt2ᚖint)
@@ -1849,7 +1870,8 @@ func (ec *executionContext) _User_posts(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_User_posts,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Posts(ctx, obj)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.User().Posts(ctx, obj, fc.Args["page"].(*int), fc.Args["limit"].(*int))
 		},
 		nil,
 		ec.marshalNPost2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPostᚄ,
@@ -1858,7 +1880,7 @@ func (ec *executionContext) _User_posts(ctx context.Context, field graphql.Colle
 	)
 }
 
-func (ec *executionContext) fieldContext_User_posts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_User_posts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -1891,6 +1913,17 @@ func (ec *executionContext) fieldContext_User_posts(_ context.Context, field gra
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_User_posts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }

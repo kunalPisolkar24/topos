@@ -158,8 +158,17 @@ func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, l
 }
 
 // Posts is the resolver for the posts field.
-func (r *userResolver) Posts(ctx context.Context, obj *model.User) ([]*model.Post, error) {
-	domainPosts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID)
+func (r *userResolver) Posts(ctx context.Context, obj *model.User, page *int, limit *int) ([]*model.Post, error) {
+	p := 1
+	if page != nil {
+		p = *page
+	}
+	l := 10
+	if limit != nil {
+		l = *limit
+	}
+
+	domainPosts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID, p, l)
 	if err != nil {
 		return nil, err
 	}
