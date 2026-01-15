@@ -92,6 +92,12 @@ func (r *mongoPostRepo) Delete(ctx context.Context, id string) error {
 }
 
 func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) ([]*domain.Post, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 	skip := (page - 1) * limit
 	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
 
@@ -101,7 +107,7 @@ func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) ([]*domain
 	}
 	defer cursor.Close(ctx)
 
-	var posts []*domain.Post
+	posts := make([]*domain.Post, 0)
 	if err = cursor.All(ctx, &posts); err != nil {
 		return nil, err
 	}
@@ -122,14 +128,23 @@ func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, 
 	return &post, nil
 }
 
-func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string) ([]*domain.Post, error) {
-	cursor, err := r.collection.Find(ctx, bson.M{"authorId": authorID})
+func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string, page, limit int) ([]*domain.Post, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	skip := (page - 1) * limit
+	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
+
+	cursor, err := r.collection.Find(ctx, bson.M{"authorId": authorID}, opts)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var posts []*domain.Post
+	posts := make([]*domain.Post, 0)
 	if err = cursor.All(ctx, &posts); err != nil {
 		return nil, err
 	}
@@ -137,6 +152,12 @@ func (r *mongoPostRepo) FindByAuthor(ctx context.Context, authorID string) ([]*d
 }
 
 func (r *mongoPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 	skip := (page - 1) * limit
 	opts := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit)).SetSort(bson.M{"createdAt": -1})
 
@@ -146,7 +167,7 @@ func (r *mongoPostRepo) FindByTag(ctx context.Context, tag string, page, limit i
 	}
 	defer cursor.Close(ctx)
 
-	var posts []*domain.Post
+	posts := make([]*domain.Post, 0)
 	if err = cursor.All(ctx, &posts); err != nil {
 		return nil, err
 	}
