@@ -22,7 +22,10 @@ func NewMongoTagRepository(db *mongo.Database) domain.TagRepository {
 func (r *mongoTagRepo) CreateOrFind(ctx context.Context, name string) (*domain.Tag, error) {
 	filter := bson.M{"name": name}
 	update := bson.M{"$setOnInsert": bson.M{"name": name}}
-	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
+	
+	opts := options.FindOneAndUpdate().
+		SetUpsert(true).
+		SetReturnDocument(options.After)
 
 	var tag domain.Tag
 	err := r.collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&tag)
@@ -34,6 +37,7 @@ func (r *mongoTagRepo) CreateOrFind(ctx context.Context, name string) (*domain.T
 
 func (r *mongoTagRepo) FindAll(ctx context.Context) ([]*domain.Tag, error) {
 	opts := options.Find().SetSort(bson.M{"name": 1})
+	
 	cursor, err := r.collection.Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -57,7 +61,10 @@ func (r *mongoTagRepo) Search(ctx context.Context, query string, limit int) ([]*
 		limit = 10
 	}
 
-	opts := options.Find().SetLimit(int64(limit)).SetSort(bson.M{"name": 1})
+	opts := options.Find().
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"name": 1})
+
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
