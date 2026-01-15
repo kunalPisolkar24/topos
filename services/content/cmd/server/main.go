@@ -13,11 +13,13 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -35,6 +37,17 @@ func main() {
 		}
 	}()
 
+	redisClient, err := cache.NewRedisClient(cfg.RedisMasterName, cfg.RedisAddrs)
+	if err != nil {
+		logger.Error("Failed to connect to Redis Sentinel", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err = redisClient.Close(); err != nil {
+			logger.Error("Failed to close Redis client", "error", err)
+		}
+	}()
+
 	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
 	defer func() {
 		if err := kafkaProducer.Close(); err != nil {
@@ -44,7 +57,9 @@ func main() {
 
 	database := mongoClient.Database(cfg.DbName)
 
-	postRepo := repository.NewMongoPostRepository(database)
+	var postRepo = repository.NewMongoPostRepository(database)
+	postRepo = repository.NewCachedPostRepository(postRepo, redisClient)
+
 	tagRepo := repository.NewMongoTagRepository(database)
 
 	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer)
@@ -57,11 +72,17 @@ func main() {
 		},
 	}))
 
-	authHandler := middleware.AuthMiddleware(cfg)(srv)
+	authMiddleware := middleware.AuthMiddleware(cfg)
+	metricsMiddleware := middleware.MetricsMiddleware
 
-	http.Handle("/query", authHandler)
+	http.Handle("/query", metricsMiddleware(authMiddleware(srv)))
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := redisClient.Ping(r.Context()).Err(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Content Service OK"))
 	}))

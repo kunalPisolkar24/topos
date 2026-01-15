@@ -57,16 +57,12 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		UpdatedAt: time.Now(),
 	}
 
-	contentChanged := false
-
 	if title != nil {
 		post.Title = *title
 		post.Slug = generateSlug(*title)
-		contentChanged = true
 	}
 	if body != nil {
 		post.Body = *body
-		contentChanged = true
 	}
 	if imageUrl != nil {
 		post.ImageUrl = imageUrl
@@ -76,10 +72,6 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		for _, tagName := range tags {
 			_, _ = s.tagRepo.CreateOrFind(ctx, tagName)
 		}
-	}
-
-	if contentChanged {
-		post.SummaryStatus = "PENDING"
 	}
 
 	updatedPost, err := s.postRepo.Update(ctx, id, post)
@@ -103,7 +95,7 @@ func (s *PostService) DeletePost(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *PostService) GetPosts(ctx context.Context, page, limit int) ([]*domain.Post, error) {
+func (s *PostService) GetPosts(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
 	return s.postRepo.FindAll(ctx, page, limit)
 }
 
@@ -111,11 +103,11 @@ func (s *PostService) GetPost(ctx context.Context, id string) (*domain.Post, err
 	return s.postRepo.FindByID(ctx, id)
 }
 
-func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string) ([]*domain.Post, error) {
-	return s.postRepo.FindByAuthor(ctx, authorID)
+func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
+	return s.postRepo.FindByAuthor(ctx, authorID, page, limit)
 }
 
-func (s *PostService) GetPostsByTag(ctx context.Context, tag string, page, limit int) ([]*domain.Post, error) {
+func (s *PostService) GetPostsByTag(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
 	return s.postRepo.FindByTag(ctx, tag, page, limit)
 }
 

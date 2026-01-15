@@ -16,5 +16,117 @@ services:
       retries: 3
     networks:
       - app-network
-    labels:
-      - co.elastic.logs/enabled=true
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+      redis-sentinel-1:
+        condition: service_started
+
+  mongo1:
+    image: mongo:7.0
+    container_name: mongo1
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo1_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo1:27017'},{_id:1,host:'mongo2:27017'},{_id:2,host:'mongo3:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  mongo2:
+    image: mongo:7.0
+    container_name: mongo2
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - mongo2_data:/data/db
+    networks:
+      - app-network
+
+  mongo3:
+    image: mongo:7.0
+    container_name: mongo3
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - mongo3_data:/data/db
+    networks:
+      - app-network
+
+  redis-master:
+    image: redis:7.0
+    container_name: redis-master
+    command: redis-server --appendonly yes
+    networks:
+      - app-network
+
+  redis-replica:
+    image: redis:7.0
+    container_name: redis-replica
+    command: redis-server --replicaof redis-master 6379
+    depends_on:
+      - redis-master
+    networks:
+      - app-network
+
+  redis-sentinel-1:
+    image: bitnami/redis-sentinel:7.0
+    container_name: redis-sentinel-1
+    environment:
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_MASTER_SET=mymaster
+      - REDIS_SENTINEL_QUORUM=2
+    depends_on:
+      - redis-master
+      - redis-replica
+    ports:
+      - "26379:26379"
+    networks:
+      - app-network
+
+  redis-sentinel-2:
+    image: bitnami/redis-sentinel:7.0
+    container_name: redis-sentinel-2
+    environment:
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_MASTER_SET=mymaster
+      - REDIS_SENTINEL_QUORUM=2
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - app-network
+
+  redis-sentinel-3:
+    image: bitnami/redis-sentinel:7.0
+    container_name: redis-sentinel-3
+    environment:
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_MASTER_SET=mymaster
+      - REDIS_SENTINEL_QUORUM=2
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:

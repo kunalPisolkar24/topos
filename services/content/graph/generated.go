@@ -61,6 +61,13 @@ type ComplexityRoot struct {
 		UpdatePost func(childComplexity int, id string, input model.UpdatePostInput) int
 	}
 
+	PaginatedPosts struct {
+		CurrentPage func(childComplexity int) int
+		Posts       func(childComplexity int) int
+		TotalPages  func(childComplexity int) int
+		TotalPosts  func(childComplexity int) int
+	}
+
 	Post struct {
 		Author        func(childComplexity int) int
 		Body          func(childComplexity int) int
@@ -79,7 +86,7 @@ type ComplexityRoot struct {
 		Post               func(childComplexity int, id string) int
 		Posts              func(childComplexity int, page *int, limit *int) int
 		PostsByTag         func(childComplexity int, tag string, page *int, limit *int) int
-		Tags               func(childComplexity int) int
+		Tags               func(childComplexity int, query *string, limit *int) int
 		__resolve__service func(childComplexity int) int
 		__resolve_entities func(childComplexity int, representations []map[string]any) int
 	}
@@ -91,7 +98,7 @@ type ComplexityRoot struct {
 
 	User struct {
 		ID    func(childComplexity int) int
-		Posts func(childComplexity int) int
+		Posts func(childComplexity int, page *int, limit *int) int
 	}
 
 	_Service struct {
@@ -109,13 +116,13 @@ type MutationResolver interface {
 	DeletePost(ctx context.Context, id string) (bool, error)
 }
 type QueryResolver interface {
-	Posts(ctx context.Context, page *int, limit *int) ([]*model.Post, error)
+	Posts(ctx context.Context, page *int, limit *int) (*model.PaginatedPosts, error)
 	Post(ctx context.Context, id string) (*model.Post, error)
-	Tags(ctx context.Context) ([]*model.Tag, error)
-	PostsByTag(ctx context.Context, tag string, page *int, limit *int) ([]*model.Post, error)
+	Tags(ctx context.Context, query *string, limit *int) ([]*model.Tag, error)
+	PostsByTag(ctx context.Context, tag string, page *int, limit *int) (*model.PaginatedPosts, error)
 }
 type UserResolver interface {
-	Posts(ctx context.Context, obj *model.User) ([]*model.Post, error)
+	Posts(ctx context.Context, obj *model.User, page *int, limit *int) (*model.PaginatedPosts, error)
 }
 
 type executableSchema struct {
@@ -193,6 +200,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdatePost(childComplexity, args["id"].(string), args["input"].(model.UpdatePostInput)), true
+
+	case "PaginatedPosts.currentPage":
+		if e.complexity.PaginatedPosts.CurrentPage == nil {
+			break
+		}
+
+		return e.complexity.PaginatedPosts.CurrentPage(childComplexity), true
+	case "PaginatedPosts.posts":
+		if e.complexity.PaginatedPosts.Posts == nil {
+			break
+		}
+
+		return e.complexity.PaginatedPosts.Posts(childComplexity), true
+	case "PaginatedPosts.totalPages":
+		if e.complexity.PaginatedPosts.TotalPages == nil {
+			break
+		}
+
+		return e.complexity.PaginatedPosts.TotalPages(childComplexity), true
+	case "PaginatedPosts.totalPosts":
+		if e.complexity.PaginatedPosts.TotalPosts == nil {
+			break
+		}
+
+		return e.complexity.PaginatedPosts.TotalPosts(childComplexity), true
 
 	case "Post.author":
 		if e.complexity.Post.Author == nil {
@@ -299,7 +331,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			break
 		}
 
-		return e.complexity.Query.Tags(childComplexity), true
+		args, err := ec.field_Query_tags_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Tags(childComplexity, args["query"].(*string), args["limit"].(*int)), true
 	case "Query._service":
 		if e.complexity.Query.__resolve__service == nil {
 			break
@@ -342,7 +379,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			break
 		}
 
-		return e.complexity.User.Posts(childComplexity), true
+		args, err := ec.field_User_posts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.User.Posts(childComplexity, args["page"].(*int), args["limit"].(*int)), true
 
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
@@ -662,6 +704,38 @@ func (ec *executionContext) field_Query_postsByTag_args(ctx context.Context, raw
 }
 
 func (ec *executionContext) field_Query_posts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "page", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_tags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "query", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["query"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_User_posts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "page", ec.unmarshalOInt2ᚖint)
@@ -1012,6 +1086,146 @@ func (ec *executionContext) fieldContext_Mutation_deletePost(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _PaginatedPosts_posts(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedPosts) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PaginatedPosts_posts,
+		func(ctx context.Context) (any, error) {
+			return obj.Posts, nil
+		},
+		nil,
+		ec.marshalNPost2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPostᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PaginatedPosts_posts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedPosts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Post_title(ctx, field)
+			case "body":
+				return ec.fieldContext_Post_body(ctx, field)
+			case "slug":
+				return ec.fieldContext_Post_slug(ctx, field)
+			case "imageUrl":
+				return ec.fieldContext_Post_imageUrl(ctx, field)
+			case "summary":
+				return ec.fieldContext_Post_summary(ctx, field)
+			case "summaryStatus":
+				return ec.fieldContext_Post_summaryStatus(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "tags":
+				return ec.fieldContext_Post_tags(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Post_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Post_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedPosts_totalPages(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedPosts) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PaginatedPosts_totalPages,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPages, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PaginatedPosts_totalPages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedPosts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedPosts_currentPage(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedPosts) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PaginatedPosts_currentPage,
+		func(ctx context.Context) (any, error) {
+			return obj.CurrentPage, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PaginatedPosts_currentPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedPosts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedPosts_totalPosts(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedPosts) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PaginatedPosts_totalPosts,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPosts, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PaginatedPosts_totalPosts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedPosts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Post_id(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1354,7 +1568,7 @@ func (ec *executionContext) _Query_posts(ctx context.Context, field graphql.Coll
 			return ec.resolvers.Query().Posts(ctx, fc.Args["page"].(*int), fc.Args["limit"].(*int))
 		},
 		nil,
-		ec.marshalNPost2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPostᚄ,
+		ec.marshalNPaginatedPosts2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPaginatedPosts,
 		true,
 		true,
 	)
@@ -1368,30 +1582,16 @@ func (ec *executionContext) fieldContext_Query_posts(ctx context.Context, field 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Post_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Post_title(ctx, field)
-			case "body":
-				return ec.fieldContext_Post_body(ctx, field)
-			case "slug":
-				return ec.fieldContext_Post_slug(ctx, field)
-			case "imageUrl":
-				return ec.fieldContext_Post_imageUrl(ctx, field)
-			case "summary":
-				return ec.fieldContext_Post_summary(ctx, field)
-			case "summaryStatus":
-				return ec.fieldContext_Post_summaryStatus(ctx, field)
-			case "author":
-				return ec.fieldContext_Post_author(ctx, field)
-			case "tags":
-				return ec.fieldContext_Post_tags(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Post_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Post_updatedAt(ctx, field)
+			case "posts":
+				return ec.fieldContext_PaginatedPosts_posts(ctx, field)
+			case "totalPages":
+				return ec.fieldContext_PaginatedPosts_totalPages(ctx, field)
+			case "currentPage":
+				return ec.fieldContext_PaginatedPosts_currentPage(ctx, field)
+			case "totalPosts":
+				return ec.fieldContext_PaginatedPosts_totalPosts(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type PaginatedPosts", field.Name)
 		},
 	}
 	defer func() {
@@ -1480,7 +1680,8 @@ func (ec *executionContext) _Query_tags(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_Query_tags,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().Tags(ctx)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().Tags(ctx, fc.Args["query"].(*string), fc.Args["limit"].(*int))
 		},
 		nil,
 		ec.marshalNTag2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐTagᚄ,
@@ -1489,7 +1690,7 @@ func (ec *executionContext) _Query_tags(ctx context.Context, field graphql.Colle
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_tags(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -1505,6 +1706,17 @@ func (ec *executionContext) fieldContext_Query_tags(_ context.Context, field gra
 			return nil, fmt.Errorf("no field named %q was found under type Tag", field.Name)
 		},
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_tags_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
 	return fc, nil
 }
 
@@ -1519,7 +1731,7 @@ func (ec *executionContext) _Query_postsByTag(ctx context.Context, field graphql
 			return ec.resolvers.Query().PostsByTag(ctx, fc.Args["tag"].(string), fc.Args["page"].(*int), fc.Args["limit"].(*int))
 		},
 		nil,
-		ec.marshalNPost2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPostᚄ,
+		ec.marshalNPaginatedPosts2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPaginatedPosts,
 		true,
 		true,
 	)
@@ -1533,30 +1745,16 @@ func (ec *executionContext) fieldContext_Query_postsByTag(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Post_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Post_title(ctx, field)
-			case "body":
-				return ec.fieldContext_Post_body(ctx, field)
-			case "slug":
-				return ec.fieldContext_Post_slug(ctx, field)
-			case "imageUrl":
-				return ec.fieldContext_Post_imageUrl(ctx, field)
-			case "summary":
-				return ec.fieldContext_Post_summary(ctx, field)
-			case "summaryStatus":
-				return ec.fieldContext_Post_summaryStatus(ctx, field)
-			case "author":
-				return ec.fieldContext_Post_author(ctx, field)
-			case "tags":
-				return ec.fieldContext_Post_tags(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Post_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Post_updatedAt(ctx, field)
+			case "posts":
+				return ec.fieldContext_PaginatedPosts_posts(ctx, field)
+			case "totalPages":
+				return ec.fieldContext_PaginatedPosts_totalPages(ctx, field)
+			case "currentPage":
+				return ec.fieldContext_PaginatedPosts_currentPage(ctx, field)
+			case "totalPosts":
+				return ec.fieldContext_PaginatedPosts_totalPosts(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type PaginatedPosts", field.Name)
 		},
 	}
 	defer func() {
@@ -1849,16 +2047,17 @@ func (ec *executionContext) _User_posts(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_User_posts,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Posts(ctx, obj)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.User().Posts(ctx, obj, fc.Args["page"].(*int), fc.Args["limit"].(*int))
 		},
 		nil,
-		ec.marshalNPost2ᚕᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPostᚄ,
+		ec.marshalNPaginatedPosts2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPaginatedPosts,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_User_posts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_User_posts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -1866,31 +2065,28 @@ func (ec *executionContext) fieldContext_User_posts(_ context.Context, field gra
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Post_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Post_title(ctx, field)
-			case "body":
-				return ec.fieldContext_Post_body(ctx, field)
-			case "slug":
-				return ec.fieldContext_Post_slug(ctx, field)
-			case "imageUrl":
-				return ec.fieldContext_Post_imageUrl(ctx, field)
-			case "summary":
-				return ec.fieldContext_Post_summary(ctx, field)
-			case "summaryStatus":
-				return ec.fieldContext_Post_summaryStatus(ctx, field)
-			case "author":
-				return ec.fieldContext_Post_author(ctx, field)
-			case "tags":
-				return ec.fieldContext_Post_tags(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Post_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Post_updatedAt(ctx, field)
+			case "posts":
+				return ec.fieldContext_PaginatedPosts_posts(ctx, field)
+			case "totalPages":
+				return ec.fieldContext_PaginatedPosts_totalPages(ctx, field)
+			case "currentPage":
+				return ec.fieldContext_PaginatedPosts_currentPage(ctx, field)
+			case "totalPosts":
+				return ec.fieldContext_PaginatedPosts_totalPosts(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type PaginatedPosts", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_User_posts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -3650,6 +3846,60 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
+var paginatedPostsImplementors = []string{"PaginatedPosts"}
+
+func (ec *executionContext) _PaginatedPosts(ctx context.Context, sel ast.SelectionSet, obj *model.PaginatedPosts) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, paginatedPostsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PaginatedPosts")
+		case "posts":
+			out.Values[i] = ec._PaginatedPosts_posts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPages":
+			out.Values[i] = ec._PaginatedPosts_totalPages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "currentPage":
+			out.Values[i] = ec._PaginatedPosts_currentPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPosts":
+			out.Values[i] = ec._PaginatedPosts_totalPosts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var postImplementors = []string{"Post", "_Entity"}
 
 func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj *model.Post) graphql.Marshaler {
@@ -4450,6 +4700,36 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) marshalNPaginatedPosts2githubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPaginatedPosts(ctx context.Context, sel ast.SelectionSet, v model.PaginatedPosts) graphql.Marshaler {
+	return ec._PaginatedPosts(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPaginatedPosts2ᚖgithubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPaginatedPosts(ctx context.Context, sel ast.SelectionSet, v *model.PaginatedPosts) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PaginatedPosts(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPost2githubᚗcomᚋkunalPisolkar24ᚋblogappᚋservicesᚋcontentᚋgraphᚋmodelᚐPost(ctx context.Context, sel ast.SelectionSet, v model.Post) graphql.Marshaler {
