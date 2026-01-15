@@ -86,7 +86,7 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 }
 
 // Posts is the resolver for the posts field.
-func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) ([]*model.Post, error) {
+func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) (*model.PaginatedPosts, error) {
 	p := 1
 	if page != nil {
 		p = *page
@@ -96,16 +96,12 @@ func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) ([]*mo
 		l = *limit
 	}
 
-	domainPosts, err := r.PostService.GetPosts(ctx, p, l)
+	domainPaginated, err := r.PostService.GetPosts(ctx, p, l)
 	if err != nil {
 		return nil, err
 	}
 
-	var posts []*model.Post
-	for _, dp := range domainPosts {
-		posts = append(posts, mapDomainPostToModel(dp))
-	}
-	return posts, nil
+	return mapDomainPaginatedToModel(domainPaginated), nil
 }
 
 // Post is the resolver for the post field.
@@ -118,8 +114,13 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 }
 
 // Tags is the resolver for the tags field.
-func (r *queryResolver) Tags(ctx context.Context) ([]*model.Tag, error) {
-	domainTags, err := r.TagService.GetTags(ctx)
+func (r *queryResolver) Tags(ctx context.Context, query *string, limit *int) ([]*model.Tag, error) {
+	l := 0
+	if limit != nil {
+		l = *limit
+	}
+
+	domainTags, err := r.TagService.GetTags(ctx, query, l)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*model.Tag, error) {
 }
 
 // PostsByTag is the resolver for the postsByTag field.
-func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, limit *int) ([]*model.Post, error) {
+func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, limit *int) (*model.PaginatedPosts, error) {
 	p := 1
 	if page != nil {
 		p = *page
@@ -145,20 +146,16 @@ func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, l
 		l = *limit
 	}
 
-	domainPosts, err := r.PostService.GetPostsByTag(ctx, tag, p, l)
+	domainPaginated, err := r.PostService.GetPostsByTag(ctx, tag, p, l)
 	if err != nil {
 		return nil, err
 	}
 
-	var posts []*model.Post
-	for _, dp := range domainPosts {
-		posts = append(posts, mapDomainPostToModel(dp))
-	}
-	return posts, nil
+	return mapDomainPaginatedToModel(domainPaginated), nil
 }
 
 // Posts is the resolver for the posts field.
-func (r *userResolver) Posts(ctx context.Context, obj *model.User, page *int, limit *int) ([]*model.Post, error) {
+func (r *userResolver) Posts(ctx context.Context, obj *model.User, page *int, limit *int) (*model.PaginatedPosts, error) {
 	p := 1
 	if page != nil {
 		p = *page
@@ -168,16 +165,12 @@ func (r *userResolver) Posts(ctx context.Context, obj *model.User, page *int, li
 		l = *limit
 	}
 
-	domainPosts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID, p, l)
+	domainPaginated, err := r.PostService.GetPostsByAuthor(ctx, obj.ID, p, l)
 	if err != nil {
 		return nil, err
 	}
 
-	var posts []*model.Post
-	for _, dp := range domainPosts {
-		posts = append(posts, mapDomainPostToModel(dp))
-	}
-	return posts, nil
+	return mapDomainPaginatedToModel(domainPaginated), nil
 }
 
 // Mutation returns MutationResolver implementation.
