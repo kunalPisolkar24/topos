@@ -17,6 +17,7 @@ services:
       - .env
     environment:
       - PORT=4003
+      - NODE_ENV=production
       - REDIS_SENTINEL_HOSTS=search-redis-sentinel-1:26379,search-redis-sentinel-2:26379,search-redis-sentinel-3:26379
       - REDIS_MASTER_NAME=searchmaster
       - ELASTICSEARCH_URL=http://es01:9200
@@ -28,10 +29,6 @@ services:
       search-redis-sentinel-3:
         condition: service_healthy
       es01:
-        condition: service_healthy
-      es02:
-        condition: service_healthy
-      es03:
         condition: service_healthy
     networks:
       - app-network
@@ -45,14 +42,15 @@ services:
     env_file:
       - .env
     environment:
+      - NODE_ENV=production
       - KAFKA_BROKER=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - KAFKA_GROUP_ID=search-workers-group
+      - KAFKA_CLIENT_ID=search-worker-1
       - ELASTICSEARCH_URL=http://es01:9200
+      - REDIS_SENTINEL_HOSTS=search-redis-sentinel-1:26379,search-redis-sentinel-2:26379,search-redis-sentinel-3:26379
+      - REDIS_MASTER_NAME=searchmaster
     depends_on:
       es01:
-        condition: service_healthy
-      es02:
-        condition: service_healthy
-      es03:
         condition: service_healthy
     networks:
       - app-network
