@@ -3,7 +3,6 @@ name: microservices-app
 include:
   - path: shared/kafka.yml
   # - path: shared/logging.yml
-  - path: shared/search-db.yml
   # - path: ../../gateway/compose.yml
   # - path: ../../frontend/compose.yml
   # - path: ../../services/user/compose.yml
