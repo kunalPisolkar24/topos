@@ -1,21 +1,13 @@
-services:
-  redis:
-    image: redis:7-alpine
-    container_name: search-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+include:
+  - path: services/search/infra/search-db.yml
+    env_file: .env
+  - path: services/search/infra/search-cache.yml
+    env_file: .env
 
+services:
   search-api:
     build:
-      context: .
+      context: ./services/search
       dockerfile: Dockerfile
     container_name: search-api
     command: npm run start:api
@@ -24,42 +16,47 @@ services:
     env_file:
       - .env
     environment:
-      - REDIS_HOST=search-redis
-      - REDIS_PORT=6379
-      - ELASTICSEARCH_URL=http://es-search-store:9200
       - PORT=4003
+      - REDIS_SENTINEL_HOSTS=search-redis-sentinel-1:26379,search-redis-sentinel-2:26379,search-redis-sentinel-3:26379
+      - REDIS_MASTER_NAME=searchmaster
+      - ELASTICSEARCH_URL=http://es01:9200
     depends_on:
-      redis:
+      search-redis-sentinel-1:
         condition: service_healthy
-      es-search-store:
+      search-redis-sentinel-2:
+        condition: service_healthy
+      search-redis-sentinel-3:
+        condition: service_healthy
+      es01:
+        condition: service_healthy
+      es02:
+        condition: service_healthy
+      es03:
         condition: service_healthy
     networks:
       - app-network
-    labels:
-      - co.elastic.logs/enabled=true
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--header", "Apollo-Require-Preflight: true", "http://localhost:4003?query=%7B__typename%7D"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   search-worker:
     build:
-      context: .
+      context: ./services/search
       dockerfile: Dockerfile
     container_name: search-worker
     command: npm run start:worker
     env_file:
       - .env
     environment:
-      - KAFKA_BROKER=kafka:29092
-      - ELASTICSEARCH_URL=http://es-search-store:9200
+      - KAFKA_BROKER=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - ELASTICSEARCH_URL=http://es01:9200
     depends_on:
-      kafka:
+      es01:
         condition: service_healthy
-      es-search-store:
+      es02:
+        condition: service_healthy
+      es03:
         condition: service_healthy
     networks:
       - app-network
-    labels:
-      - co.elastic.logs/enabled=true
+
+networks:
+  app-network:
+    external: true
