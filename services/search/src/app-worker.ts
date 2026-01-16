@@ -5,18 +5,17 @@ import { ElasticsearchRepository } from './infrastructure/elasticsearch/elastics
 import { KafkaDlqProducer } from './infrastructure/kafka/dlq.producer.js';
 import { KafkaConsumer } from './infrastructure/kafka/kafka.consumer.js';
 import { IngestService } from './worker/services/ingest.service.js';
-import { KafkaHandler } from './worker/handlers/kafka.handler.js';
 import { withRetry } from './utils/retry.util.js';
 
 const start = async () => {
 	const logger = new PinoLogger();
-	logger.info('Starting Search Worker...');
+	logger.info('Starting Search Worker');
 
 	const kafka = new Kafka({
 		clientId: config.KAFKA_CLIENT_ID,
-		brokers: [config.KAFKA_BROKER],
+		brokers: config.KAFKA_BROKER.split(','),
 		retry: {
-			initialRetryTime: 1000,
+			initialRetryTime: 500,
 			retries: 10,
 		},
 	});
@@ -26,19 +25,18 @@ const start = async () => {
 	const esRepo = new ElasticsearchRepository(logger);
 
 	const ingestService = new IngestService(esRepo, dlqProducer, logger);
-	const kafkaHandler = new KafkaHandler(ingestService);
 
 	const bootstrap = async () => {
 		await dlqProducer.connect();
 		await consumer.connect();
 
-		await consumer.start(async (key, value) => {
-			await kafkaHandler.handle(key, value);
+		await consumer.startBatch(async (batchPayload) => {
+			await ingestService.processBatch(batchPayload);
 		});
 	};
 
 	try {
-		await withRetry(bootstrap, logger, { retries: 15, delay: 3000, factor: 1 });
+		await withRetry(bootstrap, logger, { retries: 10, delay: 2000 });
 
 		const shutdown = async () => {
 			logger.info('Shutting down...');
@@ -51,7 +49,7 @@ const start = async () => {
 		process.on('SIGTERM', shutdown);
 
 	} catch (err) {
-		logger.error('Fatal Error after retries', { err });
+		logger.error('Fatal Worker Error', { err });
 		process.exit(1);
 	}
 };
