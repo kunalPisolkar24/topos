@@ -7,9 +7,14 @@ import (
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain/mocks"
+	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func init() {
+	logger.Init()
+}
 
 func TestPostService_CreatePost(t *testing.T) {
 	type args struct {
@@ -69,7 +74,6 @@ func TestPostService_CreatePost(t *testing.T) {
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
 				pr.On("Create", mock.Anything, mock.Anything).Return(&domain.Post{ID: "post1"}, nil)
-				// Even if publish fails, service returns success (as per current implementation)
 				ep.On("PublishPostCreated", mock.Anything, mock.Anything).Return(errors.New("kafka error"))
 			},
 			expectedError: false,
