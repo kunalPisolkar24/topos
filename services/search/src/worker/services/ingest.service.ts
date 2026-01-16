@@ -1,60 +1,74 @@
-import { IElasticsearchRepository } from '../../core/interfaces/repository.interface.js';
+import { EachBatchPayload } from 'kafkajs';
+import { ISearchIndexer } from '../../core/interfaces/repository.interface.js';
 import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { PostDocument } from '../../core/entities/post.entity.js';
 import { config } from '../../config/index.js';
-import { ParseError } from '../../core/errors/app.error.js';
 
 export class IngestService {
   constructor(
-    private readonly esRepository: IElasticsearchRepository,
+    private readonly indexer: ISearchIndexer,
     private readonly dlqProducer: IDlqProducer,
     private readonly logger: ILogger
   ) { }
 
-  async processEvent(key: string | null, value: Buffer | null): Promise<void> {
-    const rawKey = key || 'unknown';
+  async processBatch(payload: EachBatchPayload): Promise<void> {
+    const { batch, resolveOffset, heartbeat, commitOffsetsIfNecessary } = payload;
+    
+    const docsToUpsert: PostDocument[] = [];
+    const idsToDelete: string[] = [];
 
-    try {
-      if (!value) {
-        if (!key) {
-          this.logger.warn('Received null value and null key. Skipping.');
-          return;
-        }
-        await this.handleDelete(key);
-        return;
+    for (const message of batch.messages) {
+      if (!message.value) {
+        if (message.key) idsToDelete.push(message.key.toString());
+        continue;
       }
 
-      await this.handleUpsert(key, value);
-    } catch (error: any) {
-      this.logger.error('Error processing event', { key: rawKey, error: error.message });
+      try {
+        const rawString = message.value.toString();
+        const eventData = JSON.parse(rawString);
+        
+        const doc: PostDocument = {
+            postId: eventData.postId || eventData.id,
+            title: eventData.title,
+            body: eventData.body,
+            summary: eventData.summary,
+            slug: eventData.slug,
+            authorName: eventData.authorName || 'Unknown',
+            imageUrl: eventData.imageUrl,
+            createdAt: eventData.createdAt
+        };
 
-      await this.dlqProducer.publish({
-        originalTopic: config.TOPIC_POSTS,
-        failedAt: new Date().toISOString(),
-        error: error.message,
-        key: rawKey,
-        payload: value ? value.toString() : null,
-      });
-    }
-  }
+        docsToUpsert.push(doc);
 
-  private async handleUpsert(key: string | null, value: Buffer): Promise<void> {
-    try {
-      const rawData = value.toString();
-      const post: PostDocument = JSON.parse(rawData);
-      await this.esRepository.upsert(post);
-      this.logger.info('Document synced to Elasticsearch', { postId: post.postId });
-    } catch (error: any) {
-      if (error instanceof SyntaxError) {
-        throw new ParseError(`Failed to parse JSON: ${error.message}`);
+      } catch (err: any) {
+        this.logger.error('Message Processing Error - Sending to DLQ', { error: err.message });
+        await this.dlqProducer.publish({
+            originalTopic: batch.topic,
+            failedAt: new Date().toISOString(),
+            error: err.message,
+            key: message.key?.toString(),
+            payload: message.value.toString()
+        });
       }
-      throw error;
     }
-  }
 
-  private async handleDelete(key: string): Promise<void> {
-    await this.esRepository.delete(key);
-    this.logger.info('Document deleted from Elasticsearch', { postId: key });
+    if (docsToUpsert.length > 0) {
+        await this.indexer.bulkUpsert(docsToUpsert);
+    }
+    if (idsToDelete.length > 0) {
+        await this.indexer.bulkDelete(idsToDelete);
+    }
+
+    const lastMsg = batch.messages[batch.messages.length - 1];
+    resolveOffset(lastMsg.offset);
+    await commitOffsetsIfNecessary();
+    await heartbeat();
+    
+    this.logger.info('Batch Processed', { 
+        upserted: docsToUpsert.length, 
+        deleted: idsToDelete.length, 
+        partition: batch.partition 
+    });
   }
 }
