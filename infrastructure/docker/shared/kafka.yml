@@ -88,6 +88,26 @@ services:
     volumes:
       - kafka_3_data:/var/lib/kafka/data
 
+  init-kafka:
+    image: apache/kafka:3.7.0
+    container_name: init-kafka
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --list
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic posts --replication-factor 3 --partitions 6
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --list
+      "
+    networks:
+      - app-network
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui

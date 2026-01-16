@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 )
 
 type PostService struct {
@@ -47,7 +48,9 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		return nil, err
 	}
 
-	_ = s.eventProducer.PublishPostCreated(ctx, createdPost)
+	if err := s.eventProducer.PublishPostCreated(ctx, createdPost); err != nil {
+		logger.Error("Failed to publish PostCreated event", "error", err, "postID", createdPost.ID)
+	}
 
 	return createdPost, nil
 }
@@ -79,7 +82,9 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		return nil, err
 	}
 
-	_ = s.eventProducer.PublishPostUpdated(ctx, updatedPost)
+	if err := s.eventProducer.PublishPostUpdated(ctx, updatedPost); err != nil {
+		logger.Error("Failed to publish PostUpdated event", "error", err, "postID", updatedPost.ID)
+	}
 
 	return updatedPost, nil
 }
@@ -90,7 +95,9 @@ func (s *PostService) DeletePost(ctx context.Context, id string) error {
 		return err
 	}
 
-	_ = s.eventProducer.PublishPostDeleted(ctx, id)
+	if err := s.eventProducer.PublishPostDeleted(ctx, id); err != nil {
+		logger.Error("Failed to publish PostDeleted event", "error", err, "postID", id)
+	}
 
 	return nil
 }
