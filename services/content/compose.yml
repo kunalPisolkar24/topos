@@ -7,8 +7,15 @@ services:
     restart: unless-stopped
     ports:
       - "4002:4002"
-    env_file:
-      - .env
+    environment:
+      - PORT=4002
+      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+      - DB_NAME=blog_content
+      - JWT_SECRET=my_secret_pass
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - KAFKA_TOPIC=posts
+      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_MASTER_NAME=mymaster
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
       interval: 30s

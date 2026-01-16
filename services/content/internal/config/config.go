@@ -29,7 +29,7 @@ func LoadConfig() *Config {
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:          getEnv("DB_NAME", "blog_content"),
 		JwtSecret:       getEnv("JWT_SECRET", "secret"),
-		KafkaBrokers:    []string{getEnv("KAFKA_BROKERS", "kafka:29092")},
+		KafkaBrokers:    strings.Split(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092"), ","),
 		KafkaTopic:      getEnv("KAFKA_TOPIC", "posts"),
 		RedisAddrs:      strings.Split(getEnv("REDIS_ADDRS", "localhost:26379"), ","),
 		RedisMasterName: getEnv("REDIS_MASTER_NAME", "mymaster"),
