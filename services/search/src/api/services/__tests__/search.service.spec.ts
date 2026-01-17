@@ -5,6 +5,24 @@ import { ISearchReader } from '../../../core/interfaces/repository.interface.js'
 import { ICacheService } from '../../../core/interfaces/cache.interface.js';
 import { ILogger } from '../../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../../core/interfaces/metrics.interface.js';
+import { PostDocument, SearchResult } from '../../../core/entities/post.entity.js';
+
+const createMockPostDocument = (overrides: Partial<PostDocument> = {}): PostDocument => ({
+  postId: '1',
+  title: 'Test Post',
+  body: 'Test body content',
+  imageUrl: null,
+  createdAt: new Date().toISOString(),
+  ...overrides
+});
+
+const createMockSearchResult = (
+  hits: PostDocument[] = [],
+  total?: number
+): SearchResult => ({
+  hits,
+  total: total ?? hits.length
+});
 
 describe('SearchService', () => {
   let searchService: SearchService;
@@ -23,7 +41,8 @@ describe('SearchService', () => {
 
   describe('searchPosts', () => {
     it('should return cached results on cache hit', async () => {
-      const cachedData = { hits: [{ postId: '1', title: 'Test' }], total: 1 };
+      const mockPost = createMockPostDocument({ postId: '1', title: 'Test' });
+      const cachedData = createMockSearchResult([mockPost], 1);
       cache.get.mockResolvedValue(JSON.stringify(cachedData));
 
       const result = await searchService.searchPosts('test', 1, 10);
@@ -34,7 +53,8 @@ describe('SearchService', () => {
     });
 
     it('should search and cache on cache miss', async () => {
-      const searchResult = { hits: [{ postId: '1', title: 'Test' }], total: 1 };
+      const mockPost = createMockPostDocument({ postId: '1', title: 'Test' });
+      const searchResult = createMockSearchResult([mockPost], 1);
       cache.get.mockResolvedValue(null);
       searchReader.search.mockResolvedValue(searchResult);
 
@@ -52,7 +72,7 @@ describe('SearchService', () => {
 
     it('should generate correct cache key', async () => {
       cache.get.mockResolvedValue(null);
-      searchReader.search.mockResolvedValue({ hits: [], total: 0 });
+      searchReader.search.mockResolvedValue(createMockSearchResult());
 
       await searchService.searchPosts('Test Query', 2, 20);
 
@@ -60,7 +80,7 @@ describe('SearchService', () => {
     });
 
     it('should handle cache read failure gracefully', async () => {
-      const searchResult = { hits: [], total: 0 };
+      const searchResult = createMockSearchResult();
       cache.get.mockRejectedValue(new Error('Redis Error'));
       searchReader.search.mockResolvedValue(searchResult);
 
@@ -71,7 +91,7 @@ describe('SearchService', () => {
     });
 
     it('should handle cache write failure gracefully', async () => {
-      const searchResult = { hits: [], total: 0 };
+      const searchResult = createMockSearchResult();
       cache.get.mockResolvedValue(null);
       searchReader.search.mockResolvedValue(searchResult);
       cache.set.mockRejectedValue(new Error('Redis Error'));
@@ -94,7 +114,7 @@ describe('SearchService', () => {
 
     it('should record latency for successful search', async () => {
       cache.get.mockResolvedValue(null);
-      searchReader.search.mockResolvedValue({ hits: [], total: 0 });
+      searchReader.search.mockResolvedValue(createMockSearchResult());
 
       await searchService.searchPosts('test', 1, 10);
 
@@ -102,7 +122,7 @@ describe('SearchService', () => {
     });
 
     it('should record latency for cache hit', async () => {
-      cache.get.mockResolvedValue(JSON.stringify({ hits: [], total: 0 }));
+      cache.get.mockResolvedValue(JSON.stringify(createMockSearchResult()));
 
       await searchService.searchPosts('test', 1, 10);
 
