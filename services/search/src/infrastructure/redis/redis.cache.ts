@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis';
+import { Redis, RedisOptions } from 'ioredis';
 import { config } from '../../config/index.js';
 import { ICacheService } from '../../core/interfaces/cache.interface.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
@@ -7,14 +7,19 @@ export class RedisCache implements ICacheService {
   private client: Redis;
 
   constructor(private readonly logger: ILogger) {
-    this.client = new Redis({
-      host: config.REDIS_HOST,
-      port: config.REDIS_PORT,
-      lazyConnect: true,
-      retryStrategy: (times: number) => {
-        return Math.min(times * 50, 2000);
-      },
+    const sentinels = config.REDIS_SENTINEL_HOSTS.split(',').map(pair => {
+      const [host, port] = pair.split(':');
+      return { host, port: parseInt(port, 10) };
     });
+
+    const redisConfig: RedisOptions = {
+      sentinels: sentinels,
+      name: config.REDIS_MASTER_NAME,
+      retryStrategy: (times) => Math.min(times * 50, 2000),
+      enableOfflineQueue: false,
+    };
+
+    this.client = new Redis(redisConfig);
 
     this.client.on('error', (err: Error) => {
       this.logger.error('Redis Client Error', { error: err.message });
@@ -22,13 +27,12 @@ export class RedisCache implements ICacheService {
   }
 
   async connect(): Promise<void> {
-    try {
-      await this.client.connect();
-      this.logger.info('Redis Connected');
-    } catch (error: any) {
-      this.logger.error('Failed to connect to Redis', { error: error.message });
-      throw error;
-    }
+    if (this.client.status === 'ready') return;
+    await new Promise<void>((resolve, reject) => {
+        this.client.once('ready', () => resolve());
+        this.client.once('error', (e) => reject(e));
+    });
+    this.logger.info('Redis Connected');
   }
 
   async disconnect(): Promise<void> {

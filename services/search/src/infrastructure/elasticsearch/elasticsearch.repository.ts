@@ -1,88 +1,118 @@
-import fetch from 'node-fetch';
-import { IElasticsearchRepository } from '../../core/interfaces/repository.interface.js';
+import { Client } from '@elastic/elasticsearch';
+import { ISearchReader, ISearchIndexer } from '../../core/interfaces/repository.interface.js';
 import { PostDocument, SearchResult } from '../../core/entities/post.entity.js';
 import { config } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
-import { withRetry } from '../../utils/retry.util.js';
+import { IMetricsService } from '../../core/interfaces/metrics.interface.js';
 import { InfrastructureError } from '../../core/errors/app.error.js';
 
-export class ElasticsearchRepository implements IElasticsearchRepository {
-  constructor(private readonly logger: ILogger) { }
+export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
+  private client: Client;
 
-  async upsert(document: PostDocument): Promise<void> {
-    await withRetry(async () => {
-      const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${document.postId}`;
-
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(document),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new InfrastructureError(`Elasticsearch Upsert Failed: ${response.status} ${errorText}`);
-      }
-    }, this.logger);
+  constructor(
+    private readonly logger: ILogger,
+    private readonly metrics: IMetricsService
+  ) {
+    this.client = new Client({ 
+      node: config.ELASTICSEARCH_URL,
+      tls: { rejectUnauthorized: false }
+    });
   }
 
-  async delete(id: string): Promise<void> {
-    await withRetry(async () => {
-      const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_doc/${id}`;
+  async bulkUpsert(documents: PostDocument[]): Promise<void> {
+    if (documents.length === 0) return;
+    const start = performance.now();
 
-      const response = await fetch(url, {
-        method: 'DELETE',
-      });
+    const operations = documents.flatMap(doc => [
+      { index: { _index: config.ELASTICSEARCH_INDEX, _id: doc.postId } },
+      doc
+    ]);
 
-      if (!response.ok && response.status !== 404) {
-        const errorText = await response.text();
-        throw new InfrastructureError(`Elasticsearch Delete Failed: ${response.status} ${errorText}`);
+    try {
+      const result = await this.client.bulk({ operations });
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('bulk_upsert', 'success', duration);
+
+      if (result.errors) {
+        const erroredDocuments: any[] = [];
+        result.items.forEach((action: any, i) => {
+          const operation = Object.keys(action)[0];
+          if (action[operation].error) {
+            erroredDocuments.push({
+              status: action[operation].status,
+              error: action[operation].error,
+              docId: documents[i].postId
+            });
+          }
+        });
+        this.logger.error('Partial Bulk Upsert Failure', { errors: erroredDocuments });
       }
-    }, this.logger);
+    } catch (err: any) {
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('bulk_upsert', 'error', duration);
+      this.logger.error('Elasticsearch Bulk Upsert Critical Fail', { error: err.message });
+      throw new InfrastructureError(err.message);
+    }
+  }
+
+  async bulkDelete(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const start = performance.now();
+
+    const operations = ids.flatMap(id => [
+      { delete: { _index: config.ELASTICSEARCH_INDEX, _id: id } }
+    ]);
+
+    try {
+      await this.client.bulk({ operations });
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('bulk_delete', 'success', duration);
+    } catch (err: any) {
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('bulk_delete', 'error', duration);
+      throw new InfrastructureError(err.message);
+    }
   }
 
   async search(query: string, page: number, limit: number): Promise<SearchResult> {
     const from = (page - 1) * limit;
-    const url = `${config.ELASTICSEARCH_URL}/${config.ELASTICSEARCH_INDEX}/_search`;
-
-    const searchBody = {
-      from,
-      size: limit,
-      query: {
-        multi_match: {
-          query,
-          fields: ['title^3', 'summary^2', 'body', 'authorName'],
-          fuzziness: 'AUTO'
+    const start = performance.now();
+    
+    try {
+      const result = await this.client.search({
+        index: config.ELASTICSEARCH_INDEX,
+        from,
+        size: limit,
+        query: {
+          multi_match: {
+            query,
+            fields: ['title^3', 'summary^2', 'body'],
+            fuzziness: 'AUTO'
+          }
         }
-      }
-    };
+      });
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(searchBody),
-    });
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('search', 'success', duration);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error('Elasticsearch Search Failed', { status: response.status, error: errorText });
-      throw new InfrastructureError(`Elasticsearch Search Failed: ${response.status}`);
+      const hits = result.hits.hits.map((h: any) => h._source as PostDocument);
+      const totalVal = result.hits.total; 
+      const total = typeof totalVal === 'number' ? totalVal : (totalVal?.value || 0);
+
+      return { hits, total };
+    } catch (err: any) {
+      const duration = (performance.now() - start) / 1000;
+      this.metrics.recordEsOperation('search', 'error', duration);
+      this.logger.error('Search Query Failed', { error: err.message });
+      throw new InfrastructureError(err.message);
     }
-
-    const result = await response.json() as any;
-
-    const hits = result.hits.hits.map((h: any) => h._source as PostDocument);
-    const total = result.hits.total.value;
-
-    return { hits, total };
   }
 
   async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetch(config.ELASTICSEARCH_URL);
-      return response.ok;
-    } catch (error) {
-      this.logger.error('Elasticsearch health check failed', { error });
+      const health = await this.client.cluster.health();
+      return health.status !== 'red';
+    } catch {
       return false;
     }
   }

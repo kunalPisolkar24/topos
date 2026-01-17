@@ -9,7 +9,8 @@ export const resolvers = {
 	Query: {
 		searchPosts: async (_: any, args: { query: string; page: number; limit: number }, context: Context) => {
 			const { query, page, limit } = args;
-			return context.searchService.searchPosts(query, page, limit);
+			const safeLimit = Math.min(limit, 50);
+			return context.searchService.searchPosts(query, page, safeLimit);
 		},
 	},
 	Post: {
@@ -17,7 +18,7 @@ export const resolvers = {
 		title: (root: PostDocument) => root.title,
 		summary: (root: PostDocument) => root.summary || root.body.substring(0, 150),
 		slug: (root: PostDocument) => root.slug,
-		authorName: (root: PostDocument) => root.authorName,
+		imageUrl: (root: PostDocument) => root.imageUrl,
 		createdAt: (root: PostDocument) => root.createdAt,
 	},
 };
