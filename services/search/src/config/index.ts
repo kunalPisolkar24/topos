@@ -6,6 +6,7 @@ dotenv.config();
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   API_PORT: z.string().default('4003').transform((val) => parseInt(val, 10)),
+  WORKER_METRICS_PORT: z.string().default('7091').transform((val) => parseInt(val, 10)),
   
   KAFKA_BROKER: z.string().min(1),
   KAFKA_CLIENT_ID: z.string().default('search-service'),
