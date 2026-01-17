@@ -16,7 +16,6 @@ const start = async () => {
 	logger.info('Starting Search Worker');
 
 	const metricsApp = express();
-	const METRICS_PORT = 7091;
 	
 	metricsApp.get('/metrics', async (_req, res) => {
 		try {
@@ -27,8 +26,8 @@ const start = async () => {
 		}
 	});
 
-	metricsApp.listen(METRICS_PORT, () => {
-		logger.info(`📊 Worker Metrics ready at http://localhost:${METRICS_PORT}/metrics`);
+	metricsApp.listen(config.WORKER_METRICS_PORT, () => {
+		logger.info(`📊 Worker Metrics ready at http://localhost:${config.WORKER_METRICS_PORT}/metrics`);
 	});
 
 	const kafka = new Kafka({

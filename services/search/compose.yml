@@ -1,9 +1,3 @@
-include:
-  - path: services/search/infra/search-db.yml
-    env_file: .env
-  - path: services/search/infra/search-cache.yml
-    env_file: .env
-
 services:
   search-api:
     build:
@@ -39,10 +33,13 @@ services:
       dockerfile: Dockerfile
     container_name: search-worker
     command: npm run start:worker
+    ports:
+      - "7091:7091"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - WORKER_METRICS_PORT=7091
       - KAFKA_BROKER=kafka-1:9092,kafka-2:9092,kafka-3:9092
       - KAFKA_GROUP_ID=search-workers-group
       - KAFKA_CLIENT_ID=search-worker-1
@@ -54,7 +51,3 @@ services:
         condition: service_healthy
     networks:
       - app-network
-
-networks:
-  app-network:
-    external: true
