@@ -1,9 +1,19 @@
 import { EachBatchPayload } from 'kafkajs';
+import { z } from 'zod';
 import { ISearchIndexer } from '../../core/interfaces/repository.interface.js';
 import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { PostDocument } from '../../core/entities/post.entity.js';
-import { config } from '../../config/index.js';
+
+const PostEventSchema = z.object({
+  PostID: z.string(),
+  Title: z.string(),
+  Body: z.string(),
+  ImageURL: z.string().nullable().optional(),
+  CreatedAt: z.string(),
+  slug: z.string().optional(),
+  summary: z.string().optional()
+});
 
 export class IngestService {
   constructor(
@@ -28,15 +38,22 @@ export class IngestService {
         const rawString = message.value.toString();
         const eventData = JSON.parse(rawString);
         
+        const parsed = PostEventSchema.safeParse(eventData);
+
+        if (!parsed.success) {
+            throw new Error(`Validation failed: ${parsed.error.message}`);
+        }
+
+        const data = parsed.data;
+
         const doc: PostDocument = {
-            postId: eventData.postId || eventData.id,
-            title: eventData.title,
-            body: eventData.body,
-            summary: eventData.summary,
-            slug: eventData.slug,
-            authorName: eventData.authorName || 'Unknown',
-            imageUrl: eventData.imageUrl,
-            createdAt: eventData.createdAt
+            postId: data.PostID,
+            title: data.Title,
+            body: data.Body,
+            summary: data.summary,
+            slug: data.slug,
+            imageUrl: data.ImageURL || null,
+            createdAt: data.CreatedAt
         };
 
         docsToUpsert.push(doc);
@@ -48,7 +65,7 @@ export class IngestService {
             failedAt: new Date().toISOString(),
             error: err.message,
             key: message.key?.toString(),
-            payload: message.value.toString()
+            payload: message.value?.toString()
         });
       }
     }
