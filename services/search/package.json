@@ -5,12 +5,14 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/server.js",
     "start:api": "node dist/app-api.js",
     "start:worker": "node dist/app-worker.js",
     "dev:api": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-api.ts",
-    "dev:worker": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-worker.ts"
+    "dev:worker": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-worker.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -35,9 +37,12 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.0",
+    "@vitest/coverage-v8": "^4.0.17",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17",
+    "vitest-mock-extended": "^3.1.0"
   },
   "type": "module"
 }
