@@ -8,8 +8,8 @@ export const typeDefs = gql`
     title: String
     summary: String
     slug: String
-    authorName: String
     createdAt: String
+    imageUrl: String
   }
 
   type SearchResult @shareable {
