@@ -13,14 +13,15 @@ class TextCleaner:
 
     @staticmethod
     def extract_json_block(text: str) -> str:
-        pattern = r"```json\s*(\{.*\}|\[.*\])\s*```"
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        patterns = [
+            r"```json\s*(\{.*\}|\[.*\])\s*```",
+            r"```\s*(\{.*\}|\[.*\])\s*```",
+            r"(\{.*\}|\[.*\])"
+        ]
         
-        fallback_pattern = r"(\{.*\}|\[.*\])"
-        match = re.search(fallback_pattern, text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                return match.group(1).strip()
             
-        return text
+        return text.strip()
