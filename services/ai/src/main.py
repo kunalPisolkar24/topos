@@ -2,18 +2,21 @@ import asyncio
 import logging
 import grpc
 import httpx
+from prometheus_client import start_http_server
 from src.config.settings import settings
 from src.api.handlers import AIHandler
 from src.generated import ai_service_pb2_grpc
 from src.infrastructure.llm.lightning_client import LightningClient
+from src.infrastructure.logging.config import setup_logging
+from src.infrastructure.monitoring.interceptors import PrometheusInterceptor
 from src.usecases.content_logic import ContentLogic
 
 async def serve():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    setup_logging()
     logger = logging.getLogger("Main")
+
+    start_http_server(settings.METRICS_PORT)
+    logger.info(f"Prometheus metrics exposed on port {settings.METRICS_PORT}")
 
     http_client = httpx.AsyncClient(
         timeout=settings.TIMEOUT_SECONDS,
@@ -25,7 +28,9 @@ async def serve():
         content_logic = ContentLogic(llm_provider)
         handler = AIHandler(content_logic)
 
-        server = grpc.aio.server()
+        interceptors = [PrometheusInterceptor()]
+        server = grpc.aio.server(interceptors=interceptors)
+        
         ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
         
         listen_addr = f"[::]:{settings.PORT}"
@@ -35,7 +40,7 @@ async def serve():
         await server.start()
         await server.wait_for_termination()
         
-    except Exception as e:
+    except Exception:
         logger.exception("Server crashed")
         raise
     finally:
