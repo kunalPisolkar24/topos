@@ -4,7 +4,7 @@ from typing import List
 from src.core.interfaces.llm_provider import LLMProvider
 from src.utils.text_cleaner import TextCleaner
 from src.core.domain.models import GeneratedPost
-from src.core.exceptions import DataParsingError
+from src.core.exceptions import DataParsingError, AIServiceException
 
 class ContentLogic:
     def __init__(self, llm_provider: LLMProvider):
@@ -17,7 +17,10 @@ class ContentLogic:
         if not clean_text:
             return ""
         
-        prompt = "Summarize the following text in 3 concise sentences."
+        prompt = (
+            "You are a concise editor. Summarize the provided text in exactly 3 clear sentences. "
+            "Focus on the main idea and key takeaways."
+        )
         return await self.llm.generate_completion(prompt, clean_text)
 
     async def generate_tags(self, title: str, body: str) -> List[str]:
@@ -25,8 +28,9 @@ class ContentLogic:
         content = f"Title: {title}\nBody: {clean_body[:3000]}"
         
         prompt = (
-            "Analyze the content and extract 5-7 relevant SEO tags. "
-            "Output strictly a JSON array of strings. Example: [\"tech\", \"code\"]."
+            "You are an SEO specialist. Analyze the content and extract 5-7 highly relevant, high-traffic keywords or tags. "
+            "Return ONLY a raw JSON array of strings. Example: [\"technology\", \"innovation\"]. "
+            "Do not include any explanation or markdown formatting."
         )
         
         raw_response = await self.llm.generate_completion(prompt, content)
@@ -41,10 +45,27 @@ class ContentLogic:
             self.logger.error(f"Failed to parse tags JSON: {json_str}")
             raise DataParsingError("AI returned invalid tag format")
 
-    async def generate_post(self, user_prompt: str) -> GeneratedPost:
+    async def generate_post(self, user_topic: str) -> GeneratedPost:
         system_prompt = (
-            "You are a professional tech blogger. Write a blog post based on the prompt. "
-            "Return strict JSON with keys: 'title', 'body' (Markdown), 'summary', 'tags' (array)."
+            "You are an expert, versatile content creator capable of writing high-quality, engaging blog posts on any topic (Tech, Lifestyle, Health, Business, etc.). "
+            "Your goal is to produce a structured, professional article formatted for a rich-text editor (React Quill).\n\n"
+            "STRICT OUTPUT RULES:\n"
+            "1. Return ONLY a valid JSON object. No markdown formatting (```json) surrounding the response.\n"
+            "2. The JSON must contain exactly these keys: 'title', 'body', 'summary', 'tags'.\n"
+            "3. 'body': Must be a raw HTML string. Use <h2> for section headers, <p> for paragraphs, <ul>/<li> for lists, and <strong> for emphasis. "
+            "Do NOT use Markdown syntax (e.g., ##, **) in the body. Do NOT include <html>, <head>, or <body> tags.\n"
+            "4. 'tags': An array of 5-7 relevant strings.\n"
+            "5. Ensure all double quotes inside the HTML content are properly escaped to maintain valid JSON syntax."
+        )
+
+        user_prompt = (
+            f"Write a comprehensive blog post about: '{user_topic}'.\n"
+            "Structure:\n"
+            "- Catchy, SEO-optimized Title.\n"
+            "- Engaging Introduction.\n"
+            "- 3-4 Detailed Subsections (use <h2>).\n"
+            "- Conclusion.\n"
+            "Ensure the tone is professional yet accessible."
         )
         
         raw_response = await self.llm.generate_completion(system_prompt, user_prompt)
@@ -52,12 +73,24 @@ class ContentLogic:
         
         try:
             data = json.loads(json_str)
+            
+            required_keys = {"title", "body", "summary", "tags"}
+            if not required_keys.issubset(data.keys()):
+                raise ValueError(f"Missing keys: {required_keys - data.keys()}")
+
             return GeneratedPost(
-                title=data.get("title", "Untitled"),
-                body=data.get("body", ""),
-                summary=data.get("summary", ""),
-                tags=data.get("tags", [])
+                title=str(data.get("title", "Untitled")),
+                body=str(data.get("body", "")),
+                summary=str(data.get("summary", "")),
+                tags=[str(t) for t in data.get("tags", [])]
             )
-        except (json.JSONDecodeError, ValueError):
-            self.logger.error(f"Failed to parse post JSON: {json_str}")
-            raise DataParsingError("AI returned invalid post format")
+
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON Decode Error in Post Generation: {e}. Raw Content: {raw_response[:500]}...")
+            raise DataParsingError("AI generated invalid JSON structure.")
+        except ValueError as e:
+            self.logger.error(f"Validation Error in Post Generation: {e}")
+            raise DataParsingError("AI response missing required fields.")
+        except Exception as e:
+            self.logger.error(f"Unexpected error in Post Generation: {e}")
+            raise AIServiceException("An unexpected error occurred during post generation.")
