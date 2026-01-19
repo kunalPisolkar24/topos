@@ -16,7 +16,7 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             return ai_service_pb2.ContentResponse(summary=summary)
         except asyncio.CancelledError:
             self.logger.warning("GenerateSummary request cancelled by client")
-            context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+            await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
         except LLMProviderError as e:
             self.logger.error(f"Summary generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
@@ -30,7 +30,7 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             return ai_service_pb2.TagsResponse(tags=tags)
         except asyncio.CancelledError:
             self.logger.warning("GenerateTags request cancelled by client")
-            context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+            await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
         except DataParsingError as e:
             self.logger.warning(f"Tags parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
@@ -52,7 +52,7 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             )
         except asyncio.CancelledError:
             self.logger.warning("GeneratePost request cancelled by client")
-            context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+            await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
         except DataParsingError as e:
             self.logger.warning(f"Post parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
