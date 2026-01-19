@@ -27,10 +27,7 @@ async def test_generate_completion_success(client):
 
 @pytest.mark.asyncio
 async def test_generate_completion_cancelled():
-    # Use standard mocking instead of respx for CancelledError
-    # as respx is designed for HTTP responses, not task cancellation flow.
     mock_http = MagicMock(spec=httpx.AsyncClient)
-    # When post is called, immediately raise CancelledError
     mock_http.post = AsyncMock(side_effect=asyncio.CancelledError())
     
     client = LightningClient(mock_http)
@@ -41,7 +38,6 @@ async def test_generate_completion_cancelled():
 @pytest.mark.asyncio
 @respx.mock
 async def test_generate_completion_retry_logic(client):
-    # We expect 3 calls: 500 -> 500 -> 200
     route = respx.post(settings.LIGHTNING_AI_URL).mock(
         side_effect=[
             httpx.Response(500),
@@ -57,7 +53,6 @@ async def test_generate_completion_retry_logic(client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_generate_completion_api_error(client):
-    # Returns 401 immediately
     respx.post(settings.LIGHTNING_AI_URL).mock(return_value=httpx.Response(401))
 
     with pytest.raises(LLMProviderError) as exc:
