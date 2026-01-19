@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+.env
+.coverage
+htmlcov
+.pytest_cache
+.vscode
+.idea
+*.log
+src/generated
