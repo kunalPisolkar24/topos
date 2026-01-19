@@ -1,8 +1,10 @@
 import json
 import logging
 from typing import List
+from pydantic import ValidationError
 from src.core.interfaces.llm_provider import LLMProvider
 from src.utils.text_cleaner import TextCleaner
+from src.utils.sanitizer import Sanitizer
 from src.usecases.prompts import Prompts
 from src.core.domain.models import GeneratedPost
 from src.core.exceptions import DataParsingError, AIServiceException
@@ -34,7 +36,7 @@ class ContentLogic:
             raise ValueError("Response is not a list")
         except (json.JSONDecodeError, ValueError) as e:
             self.logger.error(f"Tag parsing failed: {e}. Raw: {json_str}")
-            raise DataParsingError("AI returned invalid tag format")
+            raise DataParsingError("AI returned invalid tag format") from e
 
     async def generate_post(self, user_topic: str) -> GeneratedPost:
         user_prompt = Prompts.get_post_user_prompt(user_topic)
@@ -43,25 +45,15 @@ class ContentLogic:
         json_str = self.cleaner.extract_json_block(raw_response)
         
         try:
-            data = json.loads(json_str)
+            post = GeneratedPost.model_validate_json(json_str)
             
-            required_keys = {"title", "body", "summary", "tags"}
-            if not required_keys.issubset(data.keys()):
-                raise ValueError(f"Missing keys: {required_keys - data.keys()}")
+            post.body = Sanitizer.clean_post_html(post.body)
+            
+            return post
 
-            return GeneratedPost(
-                title=str(data.get("title", "Untitled")),
-                body=str(data.get("body", "")),
-                summary=str(data.get("summary", "")),
-                tags=[str(t) for t in data.get("tags", []) if isinstance(t, str)]
-            )
-
-        except json.JSONDecodeError as e:
-            self.logger.error(f"JSON Decode Error: {e}. Raw: {raw_response[:200]}...")
-            raise DataParsingError("AI generated invalid JSON structure.")
-        except ValueError as e:
-            self.logger.error(f"Validation Error: {e}")
-            raise DataParsingError("AI response missing required fields.")
+        except ValidationError as e:
+            self.logger.error(f"Schema Validation Failed: {e.json()}")
+            raise DataParsingError("AI response failed schema validation") from e
         except Exception as e:
             self.logger.exception("Unexpected error during post generation")
-            raise AIServiceException("An unexpected error occurred during post generation.")
+            raise AIServiceException("An unexpected error occurred during post generation") from e
