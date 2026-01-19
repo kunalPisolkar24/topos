@@ -30,5 +30,14 @@ lint:
 	$(PIP) install flake8
 	$(VENV)/bin/flake8 src
 
-test:
+test-coverage:
 	$(PYTHON) -m pytest tests -v --cov=src --cov-report=term-missing --asyncio-mode=auto
+
+test:
+	$(PYTHON) -m pytest tests -v \
+		--cov=src \
+		--cov-report=term-missing \
+		--cov-fail-under=80 \
+		--cov-ignore=src/generated \
+		--cov-ignore=src/main.py \
+		--asyncio-mode=auto
