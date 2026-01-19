@@ -22,10 +22,13 @@ clean:
 	rm -rf src/generated
 	rm -rf $(VENV)
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+	rm -f .coverage
+	rm -rf htmlcov
+	rm -rf .pytest_cache
 
 lint:
 	$(PIP) install flake8
 	$(VENV)/bin/flake8 src
 
 test:
-	$(PYTHON) -m pytest tests
+	$(PYTHON) -m pytest tests -v --cov=src --cov-report=term-missing --asyncio-mode=auto
