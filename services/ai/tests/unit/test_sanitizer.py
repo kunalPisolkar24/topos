@@ -8,10 +8,6 @@ def test_sanitizer_allows_safe_tags():
 def test_sanitizer_removes_scripts():
     html = '<script>alert("hack")</script><p>Content</p>'
     cleaned = Sanitizer.clean_post_html(html)
-    
-    # Check that the SCRIPT TAG is gone. 
-    # Bleach strips the tag, leaving the text 'alert("hack")'. 
-    # This renders as harmless text, so XSS is prevented.
     assert '<script>' not in cleaned
     assert '<p>Content</p>' in cleaned
 
