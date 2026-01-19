@@ -1,6 +1,7 @@
 import httpx
 import logging
 import time
+import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from src.config.settings import settings
 from src.core.interfaces.llm_provider import LLMProvider
@@ -44,22 +45,26 @@ class LightningClient(LLMProvider):
             response.raise_for_status()
             data = response.json()
             return data['choices'][0]['message']['content']
-            
+
+        except asyncio.CancelledError:
+            self.logger.warning("LLM request cancelled by client")
+            raise
+
         except httpx.HTTPStatusError as e:
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="http_status").inc()
-            self.logger.error(f"Provider returned status {e.response.status_code}: {e.response.text}", extra={"status_code": e.response.status_code})
-            raise LLMProviderError(f"Provider returned {e.response.status_code}")
-            
+            self.logger.error(f"Provider returned status {e.response.status_code}", extra={"status_code": e.response.status_code})
+            raise LLMProviderError(f"Provider returned {e.response.status_code}") from e
+
         except httpx.RequestError as e:
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="network").inc()
             self.logger.error(f"Network error communicating with provider: {str(e)}")
-            raise LLMProviderError("Failed to communicate with AI provider")
-            
+            raise LLMProviderError("Failed to communicate with AI provider") from e
+
         except (KeyError, IndexError) as e:
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="parsing").inc()
             self.logger.error(f"Unexpected response structure: {str(e)}")
-            raise LLMProviderError("Invalid response format from provider")
-            
+            raise LLMProviderError("Invalid response format from provider") from e
+
         finally:
             duration = time.perf_counter() - start_time
             LLM_PROVIDER_LATENCY.labels(provider="lightning", endpoint="chat/completions").observe(duration)
