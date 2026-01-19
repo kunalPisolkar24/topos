@@ -22,8 +22,23 @@ class LightningClient(LLMProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError))
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+        reraise=True
     )
+    
+    async def _make_request(self, payload: dict) -> dict:
+        """
+        Internal method to execute the HTTP request with retry logic.
+        Retries ONLY occur on network errors or bad HTTP status codes.
+        """
+        response = await self.client.post(
+            self.url,
+            headers=self.headers,
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
     async def generate_completion(self, system_prompt: str, user_content: str) -> str:
         payload = {
             "model": self.model,
@@ -37,13 +52,7 @@ class LightningClient(LLMProvider):
 
         start_time = time.perf_counter()
         try:
-            response = await self.client.post(
-                self.url,
-                headers=self.headers,
-                json=payload
-            )
-            response.raise_for_status()
-            data = response.json()
+            data = await self._make_request(payload)
             return data['choices'][0]['message']['content']
 
         except asyncio.CancelledError:
@@ -60,7 +69,7 @@ class LightningClient(LLMProvider):
             self.logger.error(f"Network error communicating with provider: {str(e)}")
             raise LLMProviderError("Failed to communicate with AI provider") from e
 
-        except (KeyError, IndexError) as e:
+        except (KeyError, IndexError, TypeError) as e:
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="parsing").inc()
             self.logger.error(f"Unexpected response structure: {str(e)}")
             raise LLMProviderError("Invalid response format from provider") from e
