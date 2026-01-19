@@ -1,0 +1,27 @@
+services:
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-service
+    environment:
+      - LIGHTNING_AI_API_KEY=${LIGHTNING_AI_API_KEY}
+      - PORT=50051
+      - METRICS_PORT=9090
+      - LOG_LEVEL=INFO
+      - LIGHTNING_MODEL=lightning-ai/gpt-oss-20b
+      - TIMEOUT_SECONDS=60
+    ports:
+      - "50051:50051"
+      - "9090:9090"
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    restart: unless-stopped
