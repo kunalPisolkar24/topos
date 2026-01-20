@@ -89,6 +89,10 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 	return updatedPost, nil
 }
 
+func (s *PostService) SetPostSummary(ctx context.Context, id, summary, status string) error {
+	return s.postRepo.UpdateSummary(ctx, id, summary, status)
+}
+
 func (s *PostService) DeletePost(ctx context.Context, id string) error {
 	err := s.postRepo.Delete(ctx, id)
 	if err != nil {
