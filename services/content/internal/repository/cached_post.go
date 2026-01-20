@@ -39,14 +39,17 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	if err != nil {
 		return nil, err
 	}
-
-	key := fmt.Sprintf("post:%s", id)
-	r.sf.Forget(key)
-	if err := r.redis.Del(ctx, key).Err(); err == nil {
-		monitoring.RecordCacheDel()
-	}
-
+	r.invalidate(ctx, id)
 	return updatedPost, nil
+}
+
+func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+	err := r.fallback.UpdateSummary(ctx, id, summary, status)
+	if err != nil {
+		return err
+	}
+	r.invalidate(ctx, id)
+	return nil
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
@@ -54,13 +57,7 @@ func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-
-	key := fmt.Sprintf("post:%s", id)
-	r.sf.Forget(key)
-	if err := r.redis.Del(ctx, key).Err(); err == nil {
-		monitoring.RecordCacheDel()
-	}
-
+	r.invalidate(ctx, id)
 	return nil
 }
 
@@ -153,4 +150,12 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 	}
 
 	return v.(*domain.PaginatedPosts), nil
+}
+
+func (r *cachedPostRepo) invalidate(ctx context.Context, id string) {
+	key := fmt.Sprintf("post:%s", id)
+	r.sf.Forget(key)
+	if err := r.redis.Del(ctx, key).Err(); err == nil {
+		monitoring.RecordCacheDel()
+	}
 }
