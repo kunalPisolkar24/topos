@@ -85,6 +85,41 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 	return true, nil
 }
 
+// GenerateTags is the resolver for the generateTags field.
+func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body string) ([]string, error) {
+	userID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	tags, err := r.PostService.GenerateTags(ctx, title, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return tags, nil
+}
+
+// GeneratePostContent is the resolver for the generatePostContent field.
+func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt string) (*model.GeneratedPost, error) {
+	userID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	generated, err := r.PostService.GeneratePostContent(ctx, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.GeneratedPost{
+		Title:   generated.Title,
+		Body:    generated.Body,
+		Summary: generated.Summary,
+		Tags:    generated.Tags,
+	}, nil
+}
+
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) (*model.PaginatedPosts, error) {
 	p := 1
