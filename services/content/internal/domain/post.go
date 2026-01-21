@@ -36,7 +36,3 @@ type PostRepository interface {
 	FindByAuthor(ctx context.Context, authorID string, page, limit int) (*PaginatedPosts, error)
 	FindByTag(ctx context.Context, tag string, page, limit int) (*PaginatedPosts, error)
 }
-
-type AIService interface {
-	GenerateSummary(ctx context.Context, content string) (string, error)
-}
