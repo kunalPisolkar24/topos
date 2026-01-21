@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AIService_GenerateSummary_FullMethodName = "/ai.AIService/GenerateSummary"
+	AIService_GenerateTags_FullMethodName    = "/ai.AIService/GenerateTags"
+	AIService_GeneratePost_FullMethodName    = "/ai.AIService/GeneratePost"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -27,6 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AIServiceClient interface {
 	GenerateSummary(ctx context.Context, in *ContentRequest, opts ...grpc.CallOption) (*ContentResponse, error)
+	GenerateTags(ctx context.Context, in *ContextRequest, opts ...grpc.CallOption) (*TagsResponse, error)
+	GeneratePost(ctx context.Context, in *PostGenerationRequest, opts ...grpc.CallOption) (*PostGenerationResponse, error)
 }
 
 type aIServiceClient struct {
@@ -47,11 +51,33 @@ func (c *aIServiceClient) GenerateSummary(ctx context.Context, in *ContentReques
 	return out, nil
 }
 
+func (c *aIServiceClient) GenerateTags(ctx context.Context, in *ContextRequest, opts ...grpc.CallOption) (*TagsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TagsResponse)
+	err := c.cc.Invoke(ctx, AIService_GenerateTags_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) GeneratePost(ctx context.Context, in *PostGenerationRequest, opts ...grpc.CallOption) (*PostGenerationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PostGenerationResponse)
+	err := c.cc.Invoke(ctx, AIService_GeneratePost_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AIServiceServer is the server API for AIService service.
 // All implementations must embed UnimplementedAIServiceServer
 // for forward compatibility.
 type AIServiceServer interface {
 	GenerateSummary(context.Context, *ContentRequest) (*ContentResponse, error)
+	GenerateTags(context.Context, *ContextRequest) (*TagsResponse, error)
+	GeneratePost(context.Context, *PostGenerationRequest) (*PostGenerationResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
 }
 
@@ -64,6 +90,12 @@ type UnimplementedAIServiceServer struct{}
 
 func (UnimplementedAIServiceServer) GenerateSummary(context.Context, *ContentRequest) (*ContentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateSummary not implemented")
+}
+func (UnimplementedAIServiceServer) GenerateTags(context.Context, *ContextRequest) (*TagsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateTags not implemented")
+}
+func (UnimplementedAIServiceServer) GeneratePost(context.Context, *PostGenerationRequest) (*PostGenerationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GeneratePost not implemented")
 }
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
 func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
@@ -104,6 +136,42 @@ func _AIService_GenerateSummary_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_GenerateTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GenerateTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GenerateTags_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GenerateTags(ctx, req.(*ContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_GeneratePost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostGenerationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GeneratePost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GeneratePost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GeneratePost(ctx, req.(*PostGenerationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +182,14 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateSummary",
 			Handler:    _AIService_GenerateSummary_Handler,
+		},
+		{
+			MethodName: "GenerateTags",
+			Handler:    _AIService_GenerateTags_Handler,
+		},
+		{
+			MethodName: "GeneratePost",
+			Handler:    _AIService_GeneratePost_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
