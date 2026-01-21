@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
@@ -14,6 +16,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -60,9 +63,26 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go w.Start(ctx)
+	metricsServer := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: nil,
+	}
 
-	logger.Info("Content Worker started")
+	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Worker OK"))
+	}))
+
+	go func() {
+		logger.Info("Starting Worker Metrics Server", "port", cfg.Port)
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("Metrics server failed", "error", err)
+			cancel()
+		}
+	}()
+
+	go w.Start(ctx)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -70,4 +90,13 @@ func main() {
 
 	logger.Info("Shutting down worker...")
 	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Metrics server forced to shutdown", "error", err)
+	}
+
+	logger.Info("Worker exited properly")
 }
