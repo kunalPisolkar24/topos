@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/segmentio/kafka-go"
@@ -35,7 +37,7 @@ func NewWorker(brokers []string, topic string, postService *service.PostService,
 }
 
 func (w *Worker) Start(ctx context.Context) {
-	logger.Info("Starting Kafka Consumer Worker...")
+	logger.Info("Starting Kafka Consumer Worker")
 
 	for {
 		select {
@@ -53,7 +55,11 @@ func (w *Worker) Start(ctx context.Context) {
 			}
 
 			if err := w.processMessage(ctx, m); err != nil {
-				logger.Error("Failed to process message", "error", err)
+				logger.Error("Failed to process message",
+					"error", err,
+					"offset", m.Offset,
+					"partition", m.Partition,
+				)
 			} else {
 				if err := w.reader.CommitMessages(ctx, m); err != nil {
 					logger.Error("Failed to commit message", "error", err)
@@ -64,34 +70,51 @@ func (w *Worker) Start(ctx context.Context) {
 }
 
 func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
+	start := time.Now()
+	status := monitoring.StatusOk
+	
+	defer func() {
+		duration := time.Since(start).Seconds()
+		monitoring.WorkerJobDuration.WithLabelValues(monitoring.JobGenerate).Observe(duration)
+		monitoring.WorkerJobsProcessed.WithLabelValues(monitoring.JobGenerate, status).Inc()
+	}()
+
 	if len(m.Value) == 0 {
+		status = monitoring.StatusSkip
 		return nil
 	}
 
 	var event domain.PostEventPayload
 	if err := json.Unmarshal(m.Value, &event); err != nil {
+		status = monitoring.StatusErr
 		return fmt.Errorf("unmarshal error: %w", err)
 	}
 
+	logger.Info("Processing message", "postID", event.PostID)
+
 	post, err := w.postService.GetPost(ctx, event.PostID)
 	if err != nil {
+		status = monitoring.StatusErr
 		return fmt.Errorf("failed to fetch post: %w", err)
 	}
 
 	if post.SummaryStatus == "COMPLETED" && post.Summary != "" {
+		status = monitoring.StatusSkip
 		return nil
 	}
 
 	cleanBody := stripHtml(post.Body)
 	summary, err := w.aiService.GenerateSummary(ctx, cleanBody)
 	if err != nil {
+		status = monitoring.StatusErr
 		if updateErr := w.postService.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
-			logger.Error("Failed to set summary status to FAILED", "error", updateErr)
+			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("ai generation error: %w", err)
 	}
 
 	if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+		status = monitoring.StatusErr
 		return fmt.Errorf("failed to update post summary: %w", err)
 	}
 
@@ -104,5 +127,5 @@ func (w *Worker) Close() error {
 }
 
 func stripHtml(input string) string {
-	return input 
+	return input
 }
