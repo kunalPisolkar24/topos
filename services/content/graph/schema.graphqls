@@ -33,6 +33,13 @@ type PaginatedPosts {
   totalPosts: Int!
 }
 
+type GeneratedPost {
+  title: String!
+  body: String!
+  summary: String!
+  tags: [String!]!
+}
+
 extend type User @key(fields: "id") {
   id: ID! @external
   posts(page: Int, limit: Int): PaginatedPosts!
@@ -49,6 +56,8 @@ type Mutation {
   createPost(input: CreatePostInput!): Post!
   updatePost(id: ID!, input: UpdatePostInput!): Post!
   deletePost(id: ID!): Boolean!
+  generateTags(title: String!, body: String!): [String!]!
+  generatePostContent(prompt: String!): GeneratedPost!
 }
 
 input CreatePostInput {
