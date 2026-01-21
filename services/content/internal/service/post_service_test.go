@@ -97,12 +97,13 @@ func TestPostService_CreatePost(t *testing.T) {
 			pr := new(mocks.PostRepository)
 			tr := new(mocks.TagRepository)
 			ep := new(mocks.EventProducer)
+			ai := new(mocks.AIService)
 
 			if tt.setupMocks != nil {
 				tt.setupMocks(pr, tr, ep)
 			}
 
-			s := NewPostService(pr, tr, ep)
+			s := NewPostService(pr, tr, ep, ai)
 			got, err := s.CreatePost(context.Background(), tt.args.title, tt.args.body, tt.args.authorID, tt.args.tags, tt.args.imageUrl)
 
 			if tt.expectedError {
@@ -191,10 +192,11 @@ func TestPostService_UpdatePost(t *testing.T) {
 			pr := new(mocks.PostRepository)
 			tr := new(mocks.TagRepository)
 			ep := new(mocks.EventProducer)
+			ai := new(mocks.AIService)
 
 			tt.setupMocks(pr, tr, ep)
 
-			s := NewPostService(pr, tr, ep)
+			s := NewPostService(pr, tr, ep, ai)
 			_, err := s.UpdatePost(context.Background(), tt.args.id, tt.args.title, tt.args.body, tt.args.tags, tt.args.imageUrl)
 
 			if tt.expectedError {
@@ -235,8 +237,9 @@ func TestPostService_DeletePost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := new(mocks.PostRepository)
 			ep := new(mocks.EventProducer)
+			ai := new(mocks.AIService)
 			tt.setupMocks(pr, ep)
-			s := NewPostService(pr, nil, ep)
+			s := NewPostService(pr, nil, ep, ai)
 			err := s.DeletePost(context.Background(), id)
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -274,8 +277,9 @@ func TestPostService_GetPost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
 			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil)
+			s := NewPostService(pr, nil, nil, ai)
 			_, err := s.GetPost(context.Background(), tt.id)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -310,8 +314,9 @@ func TestPostService_GetPosts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
 			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil)
+			s := NewPostService(pr, nil, nil, ai)
 			_, err := s.GetPosts(context.Background(), 1, 10)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -349,8 +354,9 @@ func TestPostService_GetPostsByAuthor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
 			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil)
+			s := NewPostService(pr, nil, nil, ai)
 			_, err := s.GetPostsByAuthor(context.Background(), tt.authorID, 1, 10)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -388,8 +394,9 @@ func TestPostService_GetPostsByTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
 			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil)
+			s := NewPostService(pr, nil, nil, ai)
 			_, err := s.GetPostsByTag(context.Background(), tt.tag, 1, 10)
 			if tt.wantErr {
 				assert.Error(t, err)
