@@ -6,6 +6,8 @@ option go_package = "github.com/kunalPisolkar24/blogapp/services/content/proto/a
 
 service AIService {
   rpc GenerateSummary (ContentRequest) returns (ContentResponse);
+  rpc GenerateTags (ContextRequest) returns (TagsResponse);
+  rpc GeneratePost (PostGenerationRequest) returns (PostGenerationResponse);
 }
 
 message ContentRequest {
@@ -14,4 +16,24 @@ message ContentRequest {
 
 message ContentResponse {
   string summary = 1;
+}
+
+message ContextRequest {
+  string title = 1;
+  string body = 2;
+}
+
+message TagsResponse {
+  repeated string tags = 1;
+}
+
+message PostGenerationRequest {
+  string prompt = 1;
+}
+
+message PostGenerationResponse {
+  string title = 1;
+  string body = 2;
+  string summary = 3;
+  repeated string tags = 4;
 }
