@@ -13,13 +13,15 @@ type PostService struct {
 	postRepo      domain.PostRepository
 	tagRepo       domain.TagRepository
 	eventProducer domain.EventProducer
+	aiService     domain.AIService
 }
 
-func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventProducer) *PostService {
+func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventProducer, aiService domain.AIService) *PostService {
 	return &PostService{
 		postRepo:      postRepo,
 		tagRepo:       tagRepo,
 		eventProducer: eventProducer,
+		aiService:     aiService,
 	}
 }
 
@@ -48,8 +50,10 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		return nil, err
 	}
 
-	if err := s.eventProducer.PublishPostCreated(ctx, createdPost); err != nil {
-		logger.Error("Failed to publish PostCreated event", "error", err, "postID", createdPost.ID)
+	if s.eventProducer != nil {
+		if err := s.eventProducer.PublishPostCreated(ctx, createdPost); err != nil {
+			logger.Error("Failed to publish PostCreated event", "error", err, "postID", createdPost.ID)
+		}
 	}
 
 	return createdPost, nil
@@ -82,8 +86,10 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 		return nil, err
 	}
 
-	if err := s.eventProducer.PublishPostUpdated(ctx, updatedPost); err != nil {
-		logger.Error("Failed to publish PostUpdated event", "error", err, "postID", updatedPost.ID)
+	if s.eventProducer != nil {
+		if err := s.eventProducer.PublishPostUpdated(ctx, updatedPost); err != nil {
+			logger.Error("Failed to publish PostUpdated event", "error", err, "postID", updatedPost.ID)
+		}
 	}
 
 	return updatedPost, nil
@@ -99,8 +105,10 @@ func (s *PostService) DeletePost(ctx context.Context, id string) error {
 		return err
 	}
 
-	if err := s.eventProducer.PublishPostDeleted(ctx, id); err != nil {
-		logger.Error("Failed to publish PostDeleted event", "error", err, "postID", id)
+	if s.eventProducer != nil {
+		if err := s.eventProducer.PublishPostDeleted(ctx, id); err != nil {
+			logger.Error("Failed to publish PostDeleted event", "error", err, "postID", id)
+		}
 	}
 
 	return nil
@@ -120,6 +128,14 @@ func (s *PostService) GetPostsByAuthor(ctx context.Context, authorID string, pag
 
 func (s *PostService) GetPostsByTag(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
 	return s.postRepo.FindByTag(ctx, tag, page, limit)
+}
+
+func (s *PostService) GenerateTags(ctx context.Context, title, body string) ([]string, error) {
+	return s.aiService.GenerateTags(ctx, title, body)
+}
+
+func (s *PostService) GeneratePostContent(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+	return s.aiService.GeneratePost(ctx, prompt)
 }
 
 func generateSlug(title string) string {
