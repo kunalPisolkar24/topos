@@ -13,6 +13,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
@@ -55,6 +56,12 @@ func main() {
 		}
 	}()
 
+	aiClient, err := ai.NewAIClient(cfg.AIServiceURL)
+	if err != nil {
+		logger.Error("Failed to connect to AI Service", "error", err)
+		os.Exit(1)
+	}
+
 	database := mongoClient.Database(cfg.DbName)
 
 	var postRepo = repository.NewMongoPostRepository(database)
@@ -62,7 +69,7 @@ func main() {
 
 	tagRepo := repository.NewMongoTagRepository(database)
 
-	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer)
+	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer, aiClient)
 	tagService := service.NewTagService(tagRepo)
 
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{

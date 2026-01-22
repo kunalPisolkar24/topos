@@ -16,6 +16,13 @@ type CreatePostInput struct {
 	ImageURL *string  `json:"imageUrl,omitempty"`
 }
 
+type GeneratedPost struct {
+	Title   string   `json:"title"`
+	Body    string   `json:"body"`
+	Summary string   `json:"summary"`
+	Tags    []string `json:"tags"`
+}
+
 type Mutation struct {
 }
 

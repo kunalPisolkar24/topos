@@ -60,15 +60,6 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 		updateFields["slug"] = post.Slug
 	}
 
-	if post.SummaryStatus != "" {
-		updateFields["summaryStatus"] = post.SummaryStatus
-		if post.SummaryStatus == "PENDING" {
-			updateFields["summary"] = ""
-		}
-	} else if post.Summary != "" {
-		updateFields["summary"] = post.Summary
-	}
-
 	if post.Title != "" || post.Body != "" {
 		updateFields["summary"] = ""
 		updateFields["summaryStatus"] = "PENDING"
@@ -87,6 +78,23 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	}
 
 	return &updatedPost, nil
+}
+
+func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"summary":       summary,
+			"summaryStatus": status,
+		},
+	}
+
+	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": oid}, update)
+	return err
 }
 
 func (r *mongoPostRepo) Delete(ctx context.Context, id string) error {

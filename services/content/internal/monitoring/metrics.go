@@ -22,13 +22,28 @@ var (
 		Help:    "Duration of database operations.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"operation"})
+
+	WorkerJobDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "worker_job_processing_duration_seconds",
+		Help:    "Time taken to process a worker job",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"job_type"})
+
+	WorkerJobsProcessed = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "worker_jobs_processed_total",
+		Help: "Total number of worker jobs processed",
+	}, []string{"job_type", "status"})
 )
 
 const (
-	CacheHit  = "hit"
-	CacheMiss = "miss"
-	CacheSet  = "set"
-	CacheDel  = "del"
+	CacheHit    = "hit"
+	CacheMiss   = "miss"
+	CacheSet    = "set"
+	CacheDel    = "del"
+	StatusOk    = "success"
+	StatusErr   = "error"
+	StatusSkip  = "skipped"
+	JobGenerate = "generate_summary"
 )
 
 func RecordCacheHit() {

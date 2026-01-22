@@ -31,6 +31,38 @@ services:
       redis-sentinel-1:
         condition: service_started
 
+  content-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-worker
+    restart: unless-stopped
+    command: ["./content-worker"]
+    ports:
+      - "4003:4002"
+    environment:
+      - PORT=4002
+      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+      - DB_NAME=blog_content
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - KAFKA_TOPIC=posts
+      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_MASTER_NAME=mymaster
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+      redis-sentinel-1:
+        condition: service_started
+
   mongo1:
     image: mongo:7.0
     container_name: mongo1
