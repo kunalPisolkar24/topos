@@ -17,6 +17,7 @@ type Config struct {
 	KafkaTopic      string
 	RedisAddrs      []string
 	RedisMasterName string
+	AIServiceURL    string
 }
 
 func LoadConfig() *Config {
@@ -33,6 +34,7 @@ func LoadConfig() *Config {
 		KafkaTopic:      getEnv("KAFKA_TOPIC", "posts"),
 		RedisAddrs:      strings.Split(getEnv("REDIS_ADDRS", "localhost:26379"), ","),
 		RedisMasterName: getEnv("REDIS_MASTER_NAME", "mymaster"),
+		AIServiceURL:    getEnv("AI_SERVICE_URL", "localhost:50051"),
 	}
 }
 

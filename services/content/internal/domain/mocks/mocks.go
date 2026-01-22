@@ -27,6 +27,11 @@ func (m *PostRepository) Update(ctx context.Context, id string, post *domain.Pos
 	return args.Get(0).(*domain.Post), args.Error(1)
 }
 
+func (m *PostRepository) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+	args := m.Called(ctx, id, summary, status)
+	return args.Error(0)
+}
+
 func (m *PostRepository) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
@@ -114,4 +119,29 @@ func (m *EventProducer) PublishPostDeleted(ctx context.Context, id string) error
 func (m *EventProducer) Close() error {
 	args := m.Called()
 	return args.Error(0)
+}
+
+type AIService struct {
+	mock.Mock
+}
+
+func (m *AIService) GenerateSummary(ctx context.Context, content string) (string, error) {
+	args := m.Called(ctx, content)
+	return args.String(0), args.Error(1)
+}
+
+func (m *AIService) GenerateTags(ctx context.Context, title, body string) ([]string, error) {
+	args := m.Called(ctx, title, body)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *AIService) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+	args := m.Called(ctx, prompt)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.GeneratedPost), args.Error(1)
 }
