@@ -1,10 +1,10 @@
 services:
   es-logging:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: es-logging
+    container_name: ${LOGGING_ES_CONTAINER}
     restart: unless-stopped
     ports:
-      - "9200:9200"
+      - "${LOGGING_ES_EXT_PORT}:${LOGGING_ES_INT_PORT}"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -12,7 +12,7 @@ services:
     volumes:
       - es_logging_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -s http://localhost:${LOGGING_ES_INT_PORT} >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -21,26 +21,26 @@ services:
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.0
-    container_name: logstash
+    container_name: ${LOGGING_LOGSTASH_CONTAINER}
     restart: unless-stopped
     ports:
-      - "5044:5044"
+      - "${LOGGING_LOGSTASH_EXT_PORT}:${LOGGING_LOGSTASH_INT_PORT}"
     volumes:
-      - ../logging/logstash/pipeline:/usr/share/logstash/pipeline/
+      - ../../logging/logstash/pipeline:/usr/share/logstash/pipeline/
     networks:
       - app-network
     depends_on:
       es-logging:
         condition: service_healthy
 
-  kibana:
+  kibana-logging:
     image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: kibana
+    container_name: ${LOGGING_KIBANA_CONTAINER}
     restart: unless-stopped
     ports:
-      - "5601:5601"
+      - "${LOGGING_KIBANA_EXT_PORT}:${LOGGING_KIBANA_INT_PORT}"
     environment:
-      - ELASTICSEARCH_HOSTS=http://es-logging:9200
+      - ELASTICSEARCH_HOSTS=http://${LOGGING_ES_CONTAINER}:${LOGGING_ES_INT_PORT}
     networks:
       - app-network
     depends_on:
@@ -49,11 +49,11 @@ services:
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.11.0
-    container_name: filebeat
+    container_name: ${LOGGING_FILEBEAT_CONTAINER}
     user: root
     restart: unless-stopped
     volumes:
-      - ../logging/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ../../logging/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -61,6 +61,10 @@ services:
     depends_on:
       logstash:
         condition: service_started
+
+networks:
+  app-network:
+    name: ${APP_NETWORK}
 
 volumes:
   es_logging_data:
