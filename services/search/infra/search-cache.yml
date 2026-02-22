@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-redis-common: &redis-common
   image: bitnami/redis:7.2
   restart: always
@@ -44,17 +42,17 @@ x-sentinel-common: &sentinel-common
 services:
   search-redis-master:
     <<: *redis-common
-    container_name: search-redis-master
+    container_name: ${SEARCH_REDIS_MASTER_CONTAINER}
     environment:
       - REDIS_REPLICATION_MODE=master
       - ALLOW_EMPTY_PASSWORD=yes
 
   search-redis-replica-1:
     <<: *redis-common
-    container_name: search-redis-replica-1
+    container_name: ${SEARCH_REDIS_REPLICA_1_CONTAINER}
     environment:
       - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=search-redis-master
+      - REDIS_MASTER_HOST=${SEARCH_REDIS_MASTER_CONTAINER}
       - ALLOW_EMPTY_PASSWORD=yes
     depends_on:
       search-redis-master:
@@ -62,10 +60,10 @@ services:
 
   search-redis-replica-2:
     <<: *redis-common
-    container_name: search-redis-replica-2
+    container_name: ${SEARCH_REDIS_REPLICA_2_CONTAINER}
     environment:
       - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=search-redis-master
+      - REDIS_MASTER_HOST=${SEARCH_REDIS_MASTER_CONTAINER}
       - ALLOW_EMPTY_PASSWORD=yes
     depends_on:
       search-redis-master:
@@ -73,34 +71,34 @@ services:
 
   search-redis-sentinel-1:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-1
+    container_name: ${SEARCH_REDIS_SENTINEL_1_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
+      - REDIS_MASTER_HOST=${SEARCH_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
+      - REDIS_MASTER_SET=${SEARCH_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
 
   search-redis-sentinel-2:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-2
+    container_name: ${SEARCH_REDIS_SENTINEL_2_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
+      - REDIS_MASTER_HOST=${SEARCH_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
+      - REDIS_MASTER_SET=${SEARCH_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
 
   search-redis-sentinel-3:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-3
+    container_name: ${SEARCH_REDIS_SENTINEL_3_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
+      - REDIS_MASTER_HOST=${SEARCH_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
+      - REDIS_MASTER_SET=${SEARCH_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
 
 networks:
   app-network:
-    external: true
+    name: ${APP_NETWORK}
