@@ -3,36 +3,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: user-service
+    container_name: ${USER_SERVICE_CONTAINER}
     restart: unless-stopped
     ports:
-      - "4001:4001"
-    env_file:
-      - .env
+      - "${USER_SERVICE_EXT_PORT}:${USER_SERVICE_INT_PORT}"
     environment:
-      - REDIS_MASTER_NAME=mymaster
-      - REDIS_SENTINELS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_MASTER_NAME=${USER_REDIS_MASTER_NAME}
+      - REDIS_SENTINELS=${USER_REDIS_SENTINEL_1_CONTAINER}:${USER_REDIS_SENTINEL_INT_PORT},${USER_REDIS_SENTINEL_2_CONTAINER}:${USER_REDIS_SENTINEL_INT_PORT},${USER_REDIS_SENTINEL_3_CONTAINER}:${USER_REDIS_SENTINEL_INT_PORT}
     depends_on:
-      postgres-primary:
+      user-postgres-primary:
         condition: service_started
-      redis-sentinel-1:
+      user-redis-sentinel-1:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:4001/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:${USER_SERVICE_INT_PORT}/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - app-network
 
-  postgres-primary:
+  user-postgres-primary:
     image: postgres:15-alpine
-    container_name: postgres-primary
+    container_name: ${USER_POSTGRES_PRIMARY_CONTAINER}
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-user_db}
+      POSTGRES_USER: ${USER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${USER_POSTGRES_DB}
     command: |
       postgres 
       -c wal_level=replica 
@@ -43,41 +41,41 @@ services:
     volumes:
       - postgres_primary_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${USER_POSTGRES_PRIMARY_EXT_PORT}:${USER_POSTGRES_PRIMARY_INT_PORT}"
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  postgres-replica:
+  user-postgres-replica:
     image: postgres:15-alpine
-    container_name: postgres-replica
+    container_name: ${USER_POSTGRES_REPLICA_CONTAINER}
     restart: unless-stopped
     environment:
-      PGUSER: ${POSTGRES_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGUSER: ${USER_POSTGRES_USER}
+      PGPASSWORD: ${USER_POSTGRES_PASSWORD}
     command: |
       bash -c "
-      until pg_isready -h postgres-primary -p 5432; do echo waiting for primary; sleep 2; done;
+      until pg_isready -h ${USER_POSTGRES_PRIMARY_CONTAINER} -p ${USER_POSTGRES_PRIMARY_INT_PORT}; do echo waiting for primary; sleep 2; done;
       rm -rf /var/lib/postgresql/data/*
-      pg_basebackup -h postgres-primary -p 5432 -U postgres -D /var/lib/postgresql/data -R -P
+      pg_basebackup -h ${USER_POSTGRES_PRIMARY_CONTAINER} -p ${USER_POSTGRES_PRIMARY_INT_PORT} -U ${USER_POSTGRES_USER} -D /var/lib/postgresql/data -R -P
       postgres -c hot_standby=on
       "
     depends_on:
-      - postgres-primary
+      - user-postgres-primary
     volumes:
       - postgres_replica_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${USER_POSTGRES_REPLICA_EXT_PORT}:${USER_POSTGRES_REPLICA_INT_PORT}"
     networks:
       - app-network
 
-  redis-master:
+  user-redis-master:
     image: redis:7-alpine
-    container_name: redis-master
+    container_name: ${USER_REDIS_MASTER_CONTAINER}
     restart: unless-stopped
     command: redis-server --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
     volumes:
@@ -85,81 +83,66 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  redis-replica:
+  user-redis-replica:
     image: redis:7-alpine
-    container_name: redis-replica
+    container_name: ${USER_REDIS_REPLICA_CONTAINER}
     restart: unless-stopped
-    command: redis-server --replicaof redis-master 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    command: redis-server --replicaof ${USER_REDIS_MASTER_CONTAINER} 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
     volumes:
       - redis_replica_data:/data
     depends_on:
-      - redis-master
+      - user-redis-master
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  redis-sentinel-1:
+  user-redis-sentinel-1:
     image: redis:7-alpine
-    container_name: redis-sentinel-1
+    container_name: ${USER_REDIS_SENTINEL_1_CONTAINER}
     restart: unless-stopped
     command: >
-      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
-      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
-      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
-      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
-      redis-sentinel /tmp/sentinel.conf"
+      /bin/sh -c "echo 'sentinel monitor ${USER_REDIS_MASTER_NAME} ${USER_REDIS_MASTER_CONTAINER} 6379 2' > /tmp/sentinel.conf && echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf && echo 'sentinel down-after-milliseconds ${USER_REDIS_MASTER_NAME} 5000' >> /tmp/sentinel.conf && echo 'sentinel failover-timeout ${USER_REDIS_MASTER_NAME} 10000' >> /tmp/sentinel.conf && echo 'sentinel parallel-syncs ${USER_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
-      - redis-master
+      - user-redis-master
     ports:
-      - "26379:26379"
+      - "${USER_REDIS_SENTINEL_EXT_PORT}:${USER_REDIS_SENTINEL_INT_PORT}"
     networks:
       - app-network
 
-  redis-sentinel-2:
+  user-redis-sentinel-2:
     image: redis:7-alpine
-    container_name: redis-sentinel-2
+    container_name: ${USER_REDIS_SENTINEL_2_CONTAINER}
     restart: unless-stopped
     command: >
-      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
-      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
-      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
-      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
-      redis-sentinel /tmp/sentinel.conf"
+      /bin/sh -c "echo 'sentinel monitor ${USER_REDIS_MASTER_NAME} ${USER_REDIS_MASTER_CONTAINER} 6379 2' > /tmp/sentinel.conf && echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf && echo 'sentinel down-after-milliseconds ${USER_REDIS_MASTER_NAME} 5000' >> /tmp/sentinel.conf && echo 'sentinel failover-timeout ${USER_REDIS_MASTER_NAME} 10000' >> /tmp/sentinel.conf && echo 'sentinel parallel-syncs ${USER_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
-      - redis-master
+      - user-redis-master
     networks:
       - app-network
 
-  redis-sentinel-3:
+  user-redis-sentinel-3:
     image: redis:7-alpine
-    container_name: redis-sentinel-3
+    container_name: ${USER_REDIS_SENTINEL_3_CONTAINER}
     restart: unless-stopped
     command: >
-      /bin/sh -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /tmp/sentinel.conf &&
-      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
-      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
-      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
-      redis-sentinel /tmp/sentinel.conf"
+      /bin/sh -c "echo 'sentinel monitor ${USER_REDIS_MASTER_NAME} ${USER_REDIS_MASTER_CONTAINER} 6379 2' > /tmp/sentinel.conf && echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf && echo 'sentinel down-after-milliseconds ${USER_REDIS_MASTER_NAME} 5000' >> /tmp/sentinel.conf && echo 'sentinel failover-timeout ${USER_REDIS_MASTER_NAME} 10000' >> /tmp/sentinel.conf && echo 'sentinel parallel-syncs ${USER_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
-      - redis-master
+      - user-redis-master
     networks:
       - app-network
 
 networks:
   app-network:
-    driver: bridge
+    name: ${APP_NETWORK}
 
 volumes:
   postgres_primary_data:
