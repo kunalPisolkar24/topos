@@ -1,17 +1,18 @@
 name: blog-app
 
 include:
-  - gateway/compose.yml
-  - frontend/compose.yml
-  - services/user/compose.yml
-  - services/content/compose.yml
-  - services/search/infra/search-cache.yml
-  - services/search/infra/search-db.yml
-  - services/search/compose.yml
-  - services/ai/compose.yml
-  - infrastructure/docker/shared/kafka.yml
-  - infrastructure/docker/shared/logging.yml
+  - path: gateway/compose.yml
+  - path: frontend/compose.yml
+  - path: services/user/compose.yml
+  - path: services/content/compose.yml
+  - path: services/search/infra/search-cache.yml
+  - path: services/search/infra/search-db.yml
+  - path: services/search/compose.yml
+  - path: services/ai/compose.yml
+  - path: infrastructure/docker/shared/kafka.yml
+  - path: infrastructure/docker/shared/logging.yml
 
 networks:
-  ${APP_NETWORK}:
+  app-network:
+    name: ${APP_NETWORK}
     driver: bridge

@@ -11,23 +11,23 @@ help:
 	@echo "  make prune    - Prune completely out all unused docker resources"
 
 build:
-	docker compose build
+	docker compose --env-file .env build
 
 up:
-	docker compose up -d
+	docker compose --env-file .env up -d
 
 down:
-	docker compose down
+	docker compose --env-file .env down
 
 restart:
-	docker compose down
-	docker compose up -d
+	docker compose --env-file .env down
+	docker compose --env-file .env up -d
 
 logs:
-	docker compose logs -f
+	docker compose --env-file .env logs -f
 
 clean:
-	docker compose down -v
+	docker compose --env-file .env down -v
 
 prune:
 	docker system prune -a --volumes -f
