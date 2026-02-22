@@ -1,0 +1,17 @@
+name: blog-app
+
+include:
+  - gateway/compose.yml
+  - frontend/compose.yml
+  - services/user/compose.yml
+  - services/content/compose.yml
+  - services/search/infra/search-cache.yml
+  - services/search/infra/search-db.yml
+  - services/search/compose.yml
+  - services/ai/compose.yml
+  - infrastructure/docker/shared/kafka.yml
+  - infrastructure/docker/shared/logging.yml
+
+networks:
+  ${APP_NETWORK}:
+    driver: bridge
