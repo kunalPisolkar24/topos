@@ -142,6 +142,7 @@ services:
 
 networks:
   app-network:
+    external: true
     name: ${APP_NETWORK}
 
 volumes:
