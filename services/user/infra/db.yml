@@ -1,0 +1,60 @@
+services:
+  user-postgres-primary:
+    image: postgres:15-alpine
+    container_name: ${USER_POSTGRES_PRIMARY_CONTAINER}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${USER_POSTGRES_DB}
+    command: |
+      postgres 
+      -c wal_level=replica 
+      -c hot_standby=on 
+      -c max_wal_senders=10 
+      -c max_replication_slots=10 
+      -c hot_standby_feedback=on
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+    ports:
+      - "${USER_POSTGRES_PRIMARY_EXT_PORT}:${USER_POSTGRES_PRIMARY_INT_PORT}"
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-postgres-replica:
+    image: postgres:15-alpine
+    container_name: ${USER_POSTGRES_REPLICA_CONTAINER}
+    restart: unless-stopped
+    environment:
+      PGUSER: ${USER_POSTGRES_USER}
+      PGPASSWORD: ${USER_POSTGRES_PASSWORD}
+    command: |
+      bash -c "
+      until pg_isready -h ${USER_POSTGRES_PRIMARY_CONTAINER} -p ${USER_POSTGRES_PRIMARY_INT_PORT} -U ${USER_POSTGRES_USER}; do echo waiting for primary; sleep 2; done;
+      rm -rf /var/lib/postgresql/data/*
+      pg_basebackup -h ${USER_POSTGRES_PRIMARY_CONTAINER} -p ${USER_POSTGRES_PRIMARY_INT_PORT} -U ${USER_POSTGRES_USER} -D /var/lib/postgresql/data -R -P
+      postgres -c hot_standby=on
+      "
+    depends_on:
+      user-postgres-primary:
+        condition: service_healthy
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    ports:
+      - "${USER_POSTGRES_REPLICA_EXT_PORT}:${USER_POSTGRES_REPLICA_INT_PORT}"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: ${APP_NETWORK}
+
+volumes:
+  postgres_primary_data:
+  postgres_replica_data:
