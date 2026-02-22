@@ -3,12 +3,16 @@ services:
     build:
       context: ../
       dockerfile: gateway/Dockerfile
-    container_name: gateway
+    container_name: ${GATEWAY_CONTAINER}
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "${GATEWAY_EXT_PORT}:${GATEWAY_INT_PORT}"
     depends_on:
       - user-service
       - content-service
     networks:
       - app-network
+
+networks:
+  app-network:
+    name: ${APP_NETWORK}
