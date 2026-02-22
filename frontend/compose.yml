@@ -3,13 +3,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: frontend
+    container_name: ${FRONTEND_CONTAINER}
     restart: unless-stopped
     ports:
-      - "5173:5173"
-    env_file:
-      - .env
+      - "${FRONTEND_EXT_PORT}:${FRONTEND_INT_PORT}"
     depends_on:
       - gateway
     networks:
       - app-network
+
+networks:
+  app-network:
+    name: ${APP_NETWORK}
