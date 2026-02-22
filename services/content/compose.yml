@@ -27,9 +27,9 @@ services:
       content-mongo-1:
         condition: service_healthy
       content-redis-master:
-        condition: service_started
+        condition: service_healthy
       content-redis-sentinel-1:
-        condition: service_started
+        condition: service_healthy
 
   content-worker:
     build:
@@ -59,9 +59,9 @@ services:
       content-mongo-1:
         condition: service_healthy
       content-redis-master:
-        condition: service_started
+        condition: service_healthy
       content-redis-sentinel-1:
-        condition: service_started
+        condition: service_healthy
 
   content-mongo-1:
     image: mongo:7.0
@@ -99,67 +99,75 @@ services:
       - app-network
 
   content-redis-master:
-    image: redis:7.0
+    image: redis:7.0-alpine
     container_name: ${CONTENT_REDIS_MASTER_CONTAINER}
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    restart: unless-stopped
+    volumes:
+      - content_redis_master_data:/data
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   content-redis-replica:
-    image: redis:7.0
+    image: redis:7.0-alpine
     container_name: ${CONTENT_REDIS_REPLICA_CONTAINER}
-    command: redis-server --replicaof ${CONTENT_REDIS_MASTER_CONTAINER} 6379
+    command: redis-server --replicaof ${CONTENT_REDIS_MASTER_CONTAINER} 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    restart: unless-stopped
+    volumes:
+      - content_redis_replica_data:/data
     depends_on:
-      - content-redis-master
+      content-redis-master:
+        condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   content-redis-sentinel-1:
-    image: bitnami/redis-sentinel:7.0
+    <<: *sentinel-common
     container_name: ${CONTENT_REDIS_SENTINEL_1_CONTAINER}
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - content-redis-master
-      - content-redis-replica
     ports:
       - "${CONTENT_REDIS_SENTINEL_EXT_PORT}:${CONTENT_REDIS_SENTINEL_INT_PORT}"
-    networks:
-      - app-network
 
   content-redis-sentinel-2:
-    image: bitnami/redis-sentinel:7.0
+    <<: *sentinel-common
     container_name: ${CONTENT_REDIS_SENTINEL_2_CONTAINER}
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - content-redis-master
-      - content-redis-replica
-    networks:
-      - app-network
 
   content-redis-sentinel-3:
-    image: bitnami/redis-sentinel:7.0
+    <<: *sentinel-common
     container_name: ${CONTENT_REDIS_SENTINEL_3_CONTAINER}
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - content-redis-master
-      - content-redis-replica
-    networks:
-      - app-network
+
+x-sentinel-common: &sentinel-common
+  image: redis:7.0-alpine
+  restart: unless-stopped
+  command: >
+    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+    echo 'sentinel monitor ${CONTENT_REDIS_MASTER_NAME} ${CONTENT_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
+    echo 'sentinel down-after-milliseconds ${CONTENT_REDIS_MASTER_NAME} 3000' >> /tmp/sentinel.conf &&
+    echo 'sentinel failover-timeout ${CONTENT_REDIS_MASTER_NAME} 60000' >> /tmp/sentinel.conf &&
+    echo 'sentinel parallel-syncs ${CONTENT_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
+    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+    redis-sentinel /tmp/sentinel.conf"
+  networks:
+    - app-network
+  depends_on:
+    content-redis-master:
+      condition: service_healthy
+    content-redis-replica:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "${CONTENT_REDIS_SENTINEL_INT_PORT}", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
 
 networks:
   app-network:
@@ -170,3 +178,5 @@ volumes:
   content_mongo1_data:
   content_mongo2_data:
   content_mongo3_data:
+  content_redis_master_data:
+  content_redis_replica_data:
