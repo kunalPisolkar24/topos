@@ -3,169 +3,169 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: content-service
+    container_name: ${CONTENT_SERVICE_CONTAINER}
     restart: unless-stopped
     ports:
-      - "4002:4002"
+      - "${CONTENT_SERVICE_EXT_PORT}:${CONTENT_SERVICE_INT_PORT}"
     environment:
-      - PORT=4002
-      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
-      - DB_NAME=blog_content
-      - JWT_SECRET=my_secret_pass
-      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
-      - KAFKA_TOPIC=posts
-      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
-      - REDIS_MASTER_NAME=mymaster
+      - PORT=${CONTENT_SERVICE_INT_PORT}
+      - MONGO_URI=${CONTENT_MONGO_URI}
+      - DB_NAME=${CONTENT_DB_NAME}
+      - JWT_SECRET=${CONTENT_JWT_SECRET}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
+      - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_SERVICE_INT_PORT}/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - app-network
     depends_on:
-      mongo1:
+      content-mongo-1:
         condition: service_healthy
-      redis-master:
+      content-redis-master:
         condition: service_started
-      redis-sentinel-1:
+      content-redis-sentinel-1:
         condition: service_started
 
   content-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: content-worker
+    container_name: ${CONTENT_WORKER_CONTAINER}
     restart: unless-stopped
-    command: ["./content-worker"]
+    command: [ "./content-worker" ]
     ports:
-      - "4003:4002"
+      - "${CONTENT_WORKER_EXT_PORT}:${CONTENT_WORKER_INT_PORT}"
     environment:
-      - PORT=4002
-      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
-      - DB_NAME=blog_content
-      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
-      - KAFKA_TOPIC=posts
-      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
-      - REDIS_MASTER_NAME=mymaster
+      - PORT=${CONTENT_WORKER_INT_PORT}
+      - MONGO_URI=${CONTENT_MONGO_URI}
+      - DB_NAME=${CONTENT_DB_NAME}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
+      - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_WORKER_INT_PORT}/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - app-network
     depends_on:
-      mongo1:
+      content-mongo-1:
         condition: service_healthy
-      redis-master:
+      content-redis-master:
         condition: service_started
-      redis-sentinel-1:
+      content-redis-sentinel-1:
         condition: service_started
 
-  mongo1:
+  content-mongo-1:
     image: mongo:7.0
-    container_name: mongo1
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    container_name: ${CONTENT_MONGO_1_CONTAINER}
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "${CONTENT_MONGO_INT_PORT}" ]
     ports:
-      - "27017:27017"
+      - "${CONTENT_MONGO_EXT_PORT}:${CONTENT_MONGO_INT_PORT}"
     volumes:
-      - mongo1_data:/data/db
+      - content_mongo1_data:/data/db
     networks:
       - app-network
     healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo1:27017'},{_id:1,host:'mongo2:27017'},{_id:2,host:'mongo3:27017'}]}) }" | mongosh --port 27017 --quiet
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'${CONTENT_MONGO_1_CONTAINER}:${CONTENT_MONGO_INT_PORT}'},{_id:1,host:'${CONTENT_MONGO_2_CONTAINER}:${CONTENT_MONGO_INT_PORT}'},{_id:2,host:'${CONTENT_MONGO_3_CONTAINER}:${CONTENT_MONGO_INT_PORT}'}]}) }" | mongosh --port ${CONTENT_MONGO_INT_PORT} --quiet
       interval: 10s
       timeout: 10s
       retries: 5
       start_period: 5s
 
-  mongo2:
+  content-mongo-2:
     image: mongo:7.0
-    container_name: mongo2
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    container_name: ${CONTENT_MONGO_2_CONTAINER}
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "${CONTENT_MONGO_INT_PORT}" ]
     volumes:
-      - mongo2_data:/data/db
+      - content_mongo2_data:/data/db
     networks:
       - app-network
 
-  mongo3:
+  content-mongo-3:
     image: mongo:7.0
-    container_name: mongo3
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    container_name: ${CONTENT_MONGO_3_CONTAINER}
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "${CONTENT_MONGO_INT_PORT}" ]
     volumes:
-      - mongo3_data:/data/db
+      - content_mongo3_data:/data/db
     networks:
       - app-network
 
-  redis-master:
+  content-redis-master:
     image: redis:7.0
-    container_name: redis-master
+    container_name: ${CONTENT_REDIS_MASTER_CONTAINER}
     command: redis-server --appendonly yes
     networks:
       - app-network
 
-  redis-replica:
+  content-redis-replica:
     image: redis:7.0
-    container_name: redis-replica
-    command: redis-server --replicaof redis-master 6379
+    container_name: ${CONTENT_REDIS_REPLICA_CONTAINER}
+    command: redis-server --replicaof ${CONTENT_REDIS_MASTER_CONTAINER} 6379
     depends_on:
-      - redis-master
+      - content-redis-master
     networks:
       - app-network
 
-  redis-sentinel-1:
+  content-redis-sentinel-1:
     image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-1
+    container_name: ${CONTENT_REDIS_SENTINEL_1_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
+      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
     depends_on:
-      - redis-master
-      - redis-replica
+      - content-redis-master
+      - content-redis-replica
     ports:
-      - "26379:26379"
+      - "${CONTENT_REDIS_SENTINEL_EXT_PORT}:${CONTENT_REDIS_SENTINEL_INT_PORT}"
     networks:
       - app-network
 
-  redis-sentinel-2:
+  content-redis-sentinel-2:
     image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-2
+    container_name: ${CONTENT_REDIS_SENTINEL_2_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
+      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
     depends_on:
-      - redis-master
-      - redis-replica
+      - content-redis-master
+      - content-redis-replica
     networks:
       - app-network
 
-  redis-sentinel-3:
+  content-redis-sentinel-3:
     image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-3
+    container_name: ${CONTENT_REDIS_SENTINEL_3_CONTAINER}
     environment:
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_HOST=${CONTENT_REDIS_MASTER_CONTAINER}
       - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
+      - REDIS_MASTER_SET=${CONTENT_REDIS_MASTER_NAME}
       - REDIS_SENTINEL_QUORUM=2
     depends_on:
-      - redis-master
-      - redis-replica
+      - content-redis-master
+      - content-redis-replica
     networks:
       - app-network
 
 networks:
   app-network:
-    driver: bridge
+    name: ${APP_NETWORK}
 
 volumes:
-  mongo1_data:
-  mongo2_data:
-  mongo3_data:
+  content_mongo1_data:
+  content_mongo2_data:
+  content_mongo3_data:
