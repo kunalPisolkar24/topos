@@ -16,8 +16,7 @@ COPY . .
 
 ENV PYTHONPATH=/install/lib/python3.12/site-packages
 
-RUN python3 -m pip install --no-cache-dir setuptools && \
-    mkdir -p src/generated && \
+RUN mkdir -p src/generated && \
     touch src/generated/__init__.py && \
     python3 -m grpc_tools.protoc -Iproto --python_out=src/generated --grpc_python_out=src/generated ai_service.proto && \
     find src/generated -type f -name "*.py" -exec sed -i 's/^import ai_service_pb2/from . import ai_service_pb2/' {} +

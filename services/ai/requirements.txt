@@ -1,5 +1,6 @@
 grpcio==1.60.0
 grpcio-tools==1.60.0
+setuptools<81
 httpx==0.26.0
 python-dotenv==1.0.1
 beautifulsoup4==4.12.3
