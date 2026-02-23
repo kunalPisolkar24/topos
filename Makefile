@@ -1,8 +1,13 @@
-.PHONY: help build up down logs restart clean prune
+.PHONY: help build ensure-network up down logs restart clean prune
+
+ENV_FILE ?= .env
+APP_NETWORK ?= blog_app_network
+COMPOSE ?= docker compose --env-file $(ENV_FILE)
 
 help:
 	@echo "Available commands:"
 	@echo "  make build    - Build all docker containers"
+	@echo "  make ensure-network - Ensure the external docker network exists"
 	@echo "  make up       - Start all services in the background"
 	@echo "  make down     - Stop and remove all containers, networks"
 	@echo "  make restart  - Restart all services"
@@ -11,23 +16,32 @@ help:
 	@echo "  make prune    - Prune completely out all unused docker resources"
 
 build:
-	docker compose --env-file .env build
+	$(COMPOSE) build
 
-up:
-	docker compose --env-file .env up -d
+ensure-network:
+	@network="$(APP_NETWORK)"; \
+	if [ -f "$(ENV_FILE)" ]; then \
+		env_network="$$(awk -F= '/^APP_NETWORK=/{print substr($$0, index($$0, "=")+1); exit}' "$(ENV_FILE)")"; \
+		if [ -n "$$env_network" ]; then network="$$env_network"; fi; \
+	fi; \
+	docker network inspect "$$network" >/dev/null 2>&1 || \
+		docker network create --driver bridge "$$network" >/dev/null
+
+up: ensure-network
+	$(COMPOSE) up -d
 
 down:
-	docker compose --env-file .env down
+	$(COMPOSE) down
 
 restart:
-	docker compose --env-file .env down
-	docker compose --env-file .env up -d
+	$(MAKE) down
+	$(MAKE) up
 
 logs:
-	docker compose --env-file .env logs -f
+	$(COMPOSE) logs -f
 
 clean:
-	docker compose --env-file .env down -v
+	$(COMPOSE) down -v
 
 prune:
 	docker system prune -a --volumes -f
