@@ -1,3 +1,27 @@
+x-sentinel-common: &sentinel-common
+  image: redis:7.0-alpine
+  restart: unless-stopped
+  command: >
+    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+    echo 'sentinel monitor ${CONTENT_REDIS_MASTER_NAME} ${CONTENT_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
+    echo 'sentinel down-after-milliseconds ${CONTENT_REDIS_MASTER_NAME} 3000' >> /tmp/sentinel.conf &&
+    echo 'sentinel failover-timeout ${CONTENT_REDIS_MASTER_NAME} 60000' >> /tmp/sentinel.conf &&
+    echo 'sentinel parallel-syncs ${CONTENT_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
+    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+    redis-sentinel /tmp/sentinel.conf"
+  networks:
+    - app-network
+  depends_on:
+    content-redis-master:
+      condition: service_healthy
+    content-redis-replica:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "${CONTENT_REDIS_SENTINEL_INT_PORT}", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
 services:
   content-redis-master:
     image: redis:7.0-alpine
@@ -45,30 +69,6 @@ services:
   content-redis-sentinel-3:
     <<: *sentinel-common
     container_name: ${CONTENT_REDIS_SENTINEL_3_CONTAINER}
-
-x-sentinel-common: &sentinel-common
-  image: redis:7.0-alpine
-  restart: unless-stopped
-  command: >
-    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
-    echo 'sentinel monitor ${CONTENT_REDIS_MASTER_NAME} ${CONTENT_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
-    echo 'sentinel down-after-milliseconds ${CONTENT_REDIS_MASTER_NAME} 3000' >> /tmp/sentinel.conf &&
-    echo 'sentinel failover-timeout ${CONTENT_REDIS_MASTER_NAME} 60000' >> /tmp/sentinel.conf &&
-    echo 'sentinel parallel-syncs ${CONTENT_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
-    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
-    redis-sentinel /tmp/sentinel.conf"
-  networks:
-    - app-network
-  depends_on:
-    content-redis-master:
-      condition: service_healthy
-    content-redis-replica:
-      condition: service_healthy
-  healthcheck:
-    test: ["CMD", "redis-cli", "-p", "${CONTENT_REDIS_SENTINEL_INT_PORT}", "ping"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
 
 networks:
   app-network:

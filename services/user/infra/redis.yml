@@ -1,3 +1,27 @@
+x-sentinel-common: &sentinel-common
+  image: redis:7-alpine
+  restart: unless-stopped
+  command: >
+    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+    echo 'sentinel monitor ${USER_REDIS_MASTER_NAME} ${USER_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
+    echo 'sentinel down-after-milliseconds ${USER_REDIS_MASTER_NAME} 5000' >> /tmp/sentinel.conf &&
+    echo 'sentinel failover-timeout ${USER_REDIS_MASTER_NAME} 10000' >> /tmp/sentinel.conf &&
+    echo 'sentinel parallel-syncs ${USER_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
+    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+    redis-sentinel /tmp/sentinel.conf"
+  networks:
+    - app-network
+  depends_on:
+    user-redis-master:
+      condition: service_healthy
+    user-redis-replica:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "${USER_REDIS_SENTINEL_INT_PORT}", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
 services:
   user-redis-master:
     image: redis:7-alpine
@@ -45,30 +69,6 @@ services:
   user-redis-sentinel-3:
     <<: *sentinel-common
     container_name: ${USER_REDIS_SENTINEL_3_CONTAINER}
-
-x-sentinel-common: &sentinel-common
-  image: redis:7-alpine
-  restart: unless-stopped
-  command: >
-    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
-    echo 'sentinel monitor ${USER_REDIS_MASTER_NAME} ${USER_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
-    echo 'sentinel down-after-milliseconds ${USER_REDIS_MASTER_NAME} 5000' >> /tmp/sentinel.conf &&
-    echo 'sentinel failover-timeout ${USER_REDIS_MASTER_NAME} 10000' >> /tmp/sentinel.conf &&
-    echo 'sentinel parallel-syncs ${USER_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
-    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
-    redis-sentinel /tmp/sentinel.conf"
-  networks:
-    - app-network
-  depends_on:
-    user-redis-master:
-      condition: service_healthy
-    user-redis-replica:
-      condition: service_healthy
-  healthcheck:
-    test: ["CMD", "redis-cli", "-p", "${USER_REDIS_SENTINEL_INT_PORT}", "ping"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
 
 networks:
   app-network:
