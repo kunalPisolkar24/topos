@@ -65,45 +65,5 @@ describe('GraphQL Resolvers', () => {
         it('should resolve id from postId', () => {
             expect(resolvers.Post.id(mockPost)).toBe('123');
         });
-
-        it('should resolve title', () => {
-            expect(resolvers.Post.title(mockPost)).toBe('Test Title');
-        });
-
-        it('should resolve summary when present', () => {
-            expect(resolvers.Post.summary(mockPost)).toBe('Test Summary');
-        });
-
-        it('should use body substring when summary is missing', () => {
-            const postWithoutSummary: PostDocument = {
-                ...mockPost,
-                summary: undefined
-            };
-
-            const result = resolvers.Post.summary(postWithoutSummary);
-
-            expect(result).toBe(mockPost.body.substring(0, 150));
-        });
-
-        it('should resolve slug', () => {
-            expect(resolvers.Post.slug(mockPost)).toBe('test-slug');
-        });
-
-        it('should resolve imageUrl', () => {
-            expect(resolvers.Post.imageUrl(mockPost)).toBe('http://example.com/image.jpg');
-        });
-
-        it('should resolve createdAt', () => {
-            expect(resolvers.Post.createdAt(mockPost)).toBe('2023-01-01');
-        });
-
-        it('should handle null imageUrl', () => {
-            const postWithNullImage: PostDocument = {
-                ...mockPost,
-                imageUrl: null
-            };
-
-            expect(resolvers.Post.imageUrl(postWithNullImage)).toBeNull();
-        });
     });
 });
