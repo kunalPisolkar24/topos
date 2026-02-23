@@ -13,7 +13,7 @@ services:
       - TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS}
     ports:
       - "${AI_SERVICE_EXT_PORT}:${AI_SERVICE_INT_PORT}"
-      - "${AI_METRICS_EXT_PORT}:${AI_METRICS_INT_PORT}"
+      - "${AI_METRICS_BIND_HOST:-127.0.0.1}:${AI_METRICS_EXT_PORT:-19090}:${AI_METRICS_INT_PORT}"
     networks:
       - app-network
     deploy:
