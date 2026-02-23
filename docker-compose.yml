@@ -5,8 +5,6 @@ include:
   - path: frontend/compose.yml
   - path: services/user/compose.yml
   - path: services/content/compose.yml
-  - path: services/search/infra/search-cache.yml
-  - path: services/search/infra/search-db.yml
   - path: services/search/compose.yml
   - path: services/ai/compose.yml
   - path: infrastructure/docker/shared/kafka.yml
