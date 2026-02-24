@@ -1,9 +1,11 @@
 package config
 
 import (
-	"log"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -18,29 +20,102 @@ type Config struct {
 	RedisAddrs      []string
 	RedisMasterName string
 	AIServiceURL    string
+	AIRequired      bool
+	AIDialTimeout   time.Duration
 }
 
+var envLoadOnce sync.Once
+
 func LoadConfig() *Config {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
-	}
+	loadEnvIfPresent()
 
 	return &Config{
 		Port:            getEnv("PORT", "4002"),
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:          getEnv("DB_NAME", "blog_content"),
 		JwtSecret:       getEnv("JWT_SECRET", "secret"),
-		KafkaBrokers:    strings.Split(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092"), ","),
+		KafkaBrokers:    splitAndTrim(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")),
 		KafkaTopic:      getEnv("KAFKA_TOPIC", "posts"),
-		RedisAddrs:      strings.Split(getEnv("REDIS_ADDRS", "localhost:26379"), ","),
-		RedisMasterName: getEnv("REDIS_MASTER_NAME", "mymaster"),
-		AIServiceURL:    getEnv("AI_SERVICE_URL", "localhost:50051"),
+		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "content-redis-sentinel-1:26379,content-redis-sentinel-2:26379,content-redis-sentinel-3:26379")),
+		RedisMasterName: getEnv("REDIS_MASTER_NAME", "contentmaster"),
+		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),
+		AIRequired:      getEnvBool("AI_REQUIRED", false),
+		AIDialTimeout:   time.Duration(getEnvInt("AI_DIAL_TIMEOUT_SECONDS", 5)) * time.Second,
 	}
 }
 
+func loadEnvIfPresent() {
+	envLoadOnce.Do(func() {
+		paths := []string{
+			".env",
+			"/app/.env",
+			"../.env",
+			"../../.env",
+			"../../../.env",
+		}
+
+		for _, path := range paths {
+			if _, err := os.Stat(path); err == nil {
+				_ = godotenv.Overload(path)
+				return
+			}
+		}
+	})
+}
+
 func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
+	if value, exists := os.LookupEnv(key); exists && strings.TrimSpace(value) != "" {
 		return value
 	}
 	return fallback
+}
+
+func getEnvAny(keys []string, fallback string) string {
+	for _, key := range keys {
+		if value, exists := os.LookupEnv(key); exists && strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	raw, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback
+	}
+
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func getEnvInt(key string, fallback int) int {
+	raw, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback
+	}
+
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func splitAndTrim(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
