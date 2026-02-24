@@ -20,6 +20,9 @@ services:
       - KAFKA_TOPIC=${KAFKA_TOPIC}
       - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
       - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
+      - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_SERVICE_INT_PORT}/health" ]
       interval: 30s
@@ -52,6 +55,9 @@ services:
       - KAFKA_TOPIC=${KAFKA_TOPIC}
       - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
       - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
+      - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_WORKER_INT_PORT}/health" ]
       interval: 30s
