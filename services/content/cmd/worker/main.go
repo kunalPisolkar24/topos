@@ -45,7 +45,7 @@ func main() {
 		}
 	}()
 
-	aiClient, err := ai.NewAIClient(cfg.AIServiceURL)
+	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
 	if err != nil {
 		logger.Error("Failed to connect to AI Service", "error", err)
 		os.Exit(1)
