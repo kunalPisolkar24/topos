@@ -19,14 +19,21 @@ psql \
   -d postgres \
   --set=repl_user="${USER_POSTGRES_REPLICATION_USER}" \
   --set=repl_password="${USER_POSTGRES_REPLICATION_PASSWORD}" <<'SQL'
-DO
-$$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'repl_user') THEN
-    EXECUTE format('CREATE ROLE %I WITH REPLICATION LOGIN PASSWORD %L', :'repl_user', :'repl_password');
-  ELSE
-    EXECUTE format('ALTER ROLE %I WITH REPLICATION LOGIN PASSWORD %L', :'repl_user', :'repl_password');
-  END IF;
-END
-$$;
+SELECT format(
+  'CREATE ROLE %I WITH REPLICATION LOGIN PASSWORD %L',
+  :'repl_user',
+  :'repl_password'
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_roles WHERE rolname = :'repl_user'
+)\gexec
+
+SELECT format(
+  'ALTER ROLE %I WITH REPLICATION LOGIN PASSWORD %L',
+  :'repl_user',
+  :'repl_password'
+)
+WHERE EXISTS (
+  SELECT 1 FROM pg_roles WHERE rolname = :'repl_user'
+)\gexec
 SQL
