@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	pb "github.com/kunalPisolkar24/blogapp/services/content/proto/ai"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -15,8 +16,38 @@ type grpcAIClient struct {
 	conn   *grpc.ClientConn
 }
 
+type resilientAIClient struct {
+	primary  domain.AIService
+	fallback domain.AIService
+}
+
 func NewAIClient(url string) (domain.AIService, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	return newGRPCAIClient(url, 5*time.Second)
+}
+
+func NewResilientAIClient(url string, required bool, dialTimeout time.Duration) (domain.AIService, error) {
+	fallback := NewNoopAIClient()
+	primary, err := newGRPCAIClient(url, dialTimeout)
+	if err != nil {
+		if required {
+			return nil, err
+		}
+		logger.Warn("AI service unavailable, using fallback mode", "error", err, "url", url)
+		return fallback, nil
+	}
+
+	return &resilientAIClient{
+		primary:  primary,
+		fallback: fallback,
+	}, nil
+}
+
+func newGRPCAIClient(url string, dialTimeout time.Duration) (domain.AIService, error) {
+	if dialTimeout <= 0 {
+		dialTimeout = 5 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, url,
@@ -31,6 +62,33 @@ func NewAIClient(url string) (domain.AIService, error) {
 		client: pb.NewAIServiceClient(conn),
 		conn:   conn,
 	}, nil
+}
+
+func (c *resilientAIClient) GenerateSummary(ctx context.Context, content string) (string, error) {
+	summary, err := c.primary.GenerateSummary(ctx, content)
+	if err == nil {
+		return summary, nil
+	}
+	logger.Warn("AI summary generation failed, using fallback", "error", err)
+	return c.fallback.GenerateSummary(ctx, content)
+}
+
+func (c *resilientAIClient) GenerateTags(ctx context.Context, title, body string) ([]string, error) {
+	tags, err := c.primary.GenerateTags(ctx, title, body)
+	if err == nil {
+		return tags, nil
+	}
+	logger.Warn("AI tags generation failed, using fallback", "error", err)
+	return c.fallback.GenerateTags(ctx, title, body)
+}
+
+func (c *resilientAIClient) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+	post, err := c.primary.GeneratePost(ctx, prompt)
+	if err == nil {
+		return post, nil
+	}
+	logger.Warn("AI post generation failed, using fallback", "error", err)
+	return c.fallback.GeneratePost(ctx, prompt)
 }
 
 func (c *grpcAIClient) GenerateSummary(ctx context.Context, content string) (string, error) {
