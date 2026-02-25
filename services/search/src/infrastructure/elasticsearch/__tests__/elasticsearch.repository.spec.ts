@@ -4,10 +4,13 @@ import { ILogger } from '../../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../../core/interfaces/metrics.interface.js';
 
 vi.mock('../../../config/index.js', () => ({
-  config: {
+  getSharedConfig: () => ({
     ELASTICSEARCH_URL: 'http://localhost:9200',
-    ELASTICSEARCH_INDEX: 'test_index'
-  }
+    ELASTICSEARCH_INDEX: 'test_index',
+    NODE_ENV: 'test',
+    REDIS_SENTINEL_HOSTS: 'localhost:26379',
+    REDIS_MASTER_NAME: 'mymaster'
+  })
 }));
 
 const mockBulk = vi.fn();

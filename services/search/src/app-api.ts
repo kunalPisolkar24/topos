@@ -10,9 +10,10 @@ import { ElasticsearchRepository } from './infrastructure/elasticsearch/elastics
 import { RedisCache } from './infrastructure/redis/redis.cache.js';
 import { PrometheusMetrics } from './infrastructure/monitoring/prometheus.metrics.js';
 import { SearchService } from './api/services/search.service.js';
-import { config } from './config/index.js';
+import { getApiConfig } from './config/index.js';
 
 const start = async () => {
+	const config = getApiConfig();
 	const app = express();
 	const httpServer = http.createServer(app);
 	const logger = new PinoLogger();

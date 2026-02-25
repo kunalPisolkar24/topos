@@ -1,20 +1,21 @@
 import { Client } from '@elastic/elasticsearch';
 import { ISearchReader, ISearchIndexer } from '../../core/interfaces/repository.interface.js';
 import { PostDocument, SearchResult } from '../../core/entities/post.entity.js';
-import { config } from '../../config/index.js';
+import { getSharedConfig } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../core/interfaces/metrics.interface.js';
 import { InfrastructureError } from '../../core/errors/app.error.js';
 
 export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
   private client: Client;
+  private readonly config = getSharedConfig();
 
   constructor(
     private readonly logger: ILogger,
     private readonly metrics: IMetricsService
   ) {
     this.client = new Client({ 
-      node: config.ELASTICSEARCH_URL,
+      node: this.config.ELASTICSEARCH_URL,
       tls: { rejectUnauthorized: false }
     });
   }
@@ -24,7 +25,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
     const start = performance.now();
 
     const operations = documents.flatMap(doc => [
-      { index: { _index: config.ELASTICSEARCH_INDEX, _id: doc.postId } },
+      { index: { _index: this.config.ELASTICSEARCH_INDEX, _id: doc.postId } },
       doc
     ]);
 
@@ -60,7 +61,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
     const start = performance.now();
 
     const operations = ids.flatMap(id => [
-      { delete: { _index: config.ELASTICSEARCH_INDEX, _id: id } }
+      { delete: { _index: this.config.ELASTICSEARCH_INDEX, _id: id } }
     ]);
 
     try {
@@ -80,7 +81,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
     
     try {
       const result = await this.client.search({
-        index: config.ELASTICSEARCH_INDEX,
+        index: this.config.ELASTICSEARCH_INDEX,
         from,
         size: limit,
         query: {

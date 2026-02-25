@@ -3,10 +3,13 @@ import { mock, MockProxy } from 'vitest-mock-extended';
 import { ILogger } from '../../../core/interfaces/logger.interface.js';
 
 vi.mock('../../../config/index.js', () => ({
-  config: {
+  getSharedConfig: () => ({
+    NODE_ENV: 'test',
+    ELASTICSEARCH_URL: 'http://localhost:9200',
+    ELASTICSEARCH_INDEX: 'test_index',
     REDIS_SENTINEL_HOSTS: 'localhost:26379',
     REDIS_MASTER_NAME: 'mymaster'
-  }
+  })
 }));
 
 const mockGet = vi.fn();

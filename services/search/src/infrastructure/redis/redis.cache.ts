@@ -1,20 +1,21 @@
 import { Redis, RedisOptions } from 'ioredis';
-import { config } from '../../config/index.js';
+import { getSharedConfig } from '../../config/index.js';
 import { ICacheService } from '../../core/interfaces/cache.interface.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 
 export class RedisCache implements ICacheService {
   private client: Redis;
+  private readonly config = getSharedConfig();
 
   constructor(private readonly logger: ILogger) {
-    const sentinels = config.REDIS_SENTINEL_HOSTS.split(',').map(pair => {
+    const sentinels = this.config.REDIS_SENTINEL_HOSTS.split(',').map(pair => {
       const [host, port] = pair.split(':');
       return { host, port: parseInt(port, 10) };
     });
 
     const redisConfig: RedisOptions = {
       sentinels: sentinels,
-      name: config.REDIS_MASTER_NAME,
+      name: this.config.REDIS_MASTER_NAME,
       retryStrategy: (times) => Math.min(times * 50, 2000),
       enableOfflineQueue: false,
     };

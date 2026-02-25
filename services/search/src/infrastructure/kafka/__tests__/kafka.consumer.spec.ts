@@ -15,10 +15,19 @@ const kafkaMock = {
 };
 
 vi.mock('../../../config/index.js', () => ({
-    config: {
+    getWorkerConfig: () => ({
+        NODE_ENV: 'test',
+        ELASTICSEARCH_URL: 'http://localhost:9200',
+        ELASTICSEARCH_INDEX: 'test_index',
+        REDIS_SENTINEL_HOSTS: 'localhost:26379',
+        REDIS_MASTER_NAME: 'mymaster',
+        KAFKA_BROKER: 'localhost:9092',
+        KAFKA_CLIENT_ID: 'search-service',
         KAFKA_GROUP_ID: 'test-group',
-        TOPIC_POSTS: 'posts'
-    }
+        TOPIC_POSTS: 'posts',
+        TOPIC_DLQ: 'posts.dlq',
+        WORKER_METRICS_PORT: 7091
+    })
 }));
 
 import { KafkaConsumer } from '../kafka.consumer.js';

@@ -1,6 +1,6 @@
 import { Kafka, Consumer, EachBatchPayload } from 'kafkajs';
 import { IMessageConsumer } from '../../core/interfaces/message-broker.interface.js';
-import { config } from '../../config/index.js';
+import { getWorkerConfig } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 
 export interface IBatchConsumer {
@@ -11,10 +11,11 @@ export interface IBatchConsumer {
 
 export class KafkaConsumer implements IBatchConsumer {
   private consumer: Consumer;
+  private readonly config = getWorkerConfig();
 
   constructor(kafka: Kafka, private readonly logger: ILogger) {
     this.consumer = kafka.consumer({ 
-      groupId: config.KAFKA_GROUP_ID,
+      groupId: this.config.KAFKA_GROUP_ID,
       sessionTimeout: 30000,
       heartbeatInterval: 3000,
     });
@@ -31,7 +32,7 @@ export class KafkaConsumer implements IBatchConsumer {
   }
 
   async startBatch(handler: (payload: EachBatchPayload) => Promise<void>): Promise<void> {
-    await this.consumer.subscribe({ topic: config.TOPIC_POSTS, fromBeginning: true });
+    await this.consumer.subscribe({ topic: this.config.TOPIC_POSTS, fromBeginning: true });
     
     await this.consumer.run({
       autoCommit: false, 
