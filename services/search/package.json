@@ -17,6 +17,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=20.18.1"
+  },
   "dependencies": {
     "@apollo/server": "^5.2.0",
     "@apollo/subgraph": "^2.12.2",
