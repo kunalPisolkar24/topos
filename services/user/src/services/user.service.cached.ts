@@ -3,8 +3,14 @@ import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.se
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { metrics } from '../lib/metrics';
 
+interface MissingUserCacheEntry {
+    __cacheType: 'missing-user';
+}
+
 export class CachedUserService implements IUserService {
     private readonly ttlMs = 3600000;
+    private readonly missingTtlMs = 60000;
+    private readonly missingUserCacheEntry: MissingUserCacheEntry = { __cacheType: 'missing-user' };
 
     constructor(
         private readonly service: IUserService,
@@ -25,13 +31,15 @@ export class CachedUserService implements IUserService {
 
     async findById(id: number) {
         const cachedUser = await this.readUserFromCache(id);
-        if (cachedUser) {
+        if (cachedUser !== undefined) {
             return cachedUser;
         }
 
         const user = await this.service.findById(id);
         if (user) {
             await this.writeUserToCache(user);
+        } else {
+            await this.writeMissingUserToCache(id);
         }
 
         return user;
@@ -42,7 +50,7 @@ export class CachedUserService implements IUserService {
 
         const missingIds: number[] = [];
         cachedUsers.forEach((cachedUser, index) => {
-            if (!cachedUser) {
+            if (cachedUser === undefined) {
                 missingIds.push(ids[index]);
             }
         });
@@ -53,19 +61,29 @@ export class CachedUserService implements IUserService {
 
         const fetchedUsers = await this.service.findByIds(missingIds);
         const fetchedById = new Map<number, UserResponse>();
+        const cacheWrites: Promise<void>[] = [];
 
         fetchedUsers.forEach((user, index) => {
+            const userId = missingIds[index];
             if (!user) {
+                cacheWrites.push(this.writeMissingUserToCache(userId));
                 return;
             }
 
-            const userId = missingIds[index];
             fetchedById.set(userId, user);
+            cacheWrites.push(this.writeUserToCache(user));
         });
 
-        await Promise.all(Array.from(fetchedById.values()).map((user) => this.writeUserToCache(user)));
+        await Promise.all(cacheWrites);
 
-        return ids.map((id, index) => cachedUsers[index] ?? fetchedById.get(id) ?? null);
+        return ids.map((id, index) => {
+            const cachedUser = cachedUsers[index];
+            if (cachedUser !== undefined) {
+                return cachedUser;
+            }
+
+            return fetchedById.get(id) ?? null;
+        });
     }
 
     async findAll(args: PaginationArgs) {
@@ -82,13 +100,18 @@ export class CachedUserService implements IUserService {
         return `user:${id}`;
     }
 
-    private async readUserFromCache(id: number): Promise<UserResponse | undefined> {
+    private async readUserFromCache(id: number): Promise<UserResponse | null | undefined> {
         const key = this.userKey(id);
 
         try {
-            const cached = await this.cache.get<UserResponse>(key);
+            const cached = await this.cache.get<UserResponse | MissingUserCacheEntry>(key);
             if (cached !== undefined && cached !== null) {
                 metrics.cacheOperations.inc({ type: 'read', status: 'hit' });
+
+                if (this.isMissingUserCacheEntry(cached)) {
+                    return null;
+                }
+
                 return cached;
             }
 
@@ -98,6 +121,15 @@ export class CachedUserService implements IUserService {
         }
 
         return undefined;
+    }
+
+    private isMissingUserCacheEntry(value: unknown): value is MissingUserCacheEntry {
+        return (
+            typeof value === 'object' &&
+            value !== null &&
+            '__cacheType' in value &&
+            (value as MissingUserCacheEntry).__cacheType === 'missing-user'
+        );
     }
 
     private async writeUserToCache(user: UserResponse, invalidateOnError = false): Promise<void> {
@@ -113,6 +145,17 @@ export class CachedUserService implements IUserService {
             if (invalidateOnError) {
                 await this.invalidateUserCache(user.id);
             }
+        }
+    }
+
+    private async writeMissingUserToCache(userId: number): Promise<void> {
+        const key = this.userKey(userId);
+
+        try {
+            await this.cache.set(key, this.missingUserCacheEntry, this.missingTtlMs);
+            metrics.cacheOperations.inc({ type: 'write', status: 'success' });
+        } catch (error) {
+            metrics.cacheOperations.inc({ type: 'write', status: 'error' });
         }
     }
 
