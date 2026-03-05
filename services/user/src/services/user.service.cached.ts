@@ -2,20 +2,34 @@ import Keyv from 'keyv';
 import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { metrics } from '../lib/metrics';
+import { env } from '../config/env';
+import { logger } from '../lib/logger';
 
 interface MissingUserCacheEntry {
     __cacheType: 'missing-user';
 }
 
+interface CachedUserServiceOptions {
+    userTtlMs: number;
+    missingUserTtlMs: number;
+}
+
 export class CachedUserService implements IUserService {
-    private readonly ttlMs = 3600000;
-    private readonly missingTtlMs = 60000;
+    private readonly ttlMs: number;
+    private readonly missingTtlMs: number;
     private readonly missingUserCacheEntry: MissingUserCacheEntry = { __cacheType: 'missing-user' };
 
     constructor(
         private readonly service: IUserService,
-        private readonly cache: Keyv
-    ) {}
+        private readonly cache: Keyv,
+        options: CachedUserServiceOptions = {
+            userTtlMs: env.USER_CACHE_TTL_MS,
+            missingUserTtlMs: env.USER_MISSING_CACHE_TTL_MS,
+        }
+    ) {
+        this.ttlMs = options.userTtlMs;
+        this.missingTtlMs = options.missingUserTtlMs;
+    }
 
     async signup(data: SignupInput) {
         const authResponse = await this.service.signup(data);
@@ -118,6 +132,7 @@ export class CachedUserService implements IUserService {
             metrics.cacheOperations.inc({ type: 'read', status: 'miss' });
         } catch (error) {
             metrics.cacheOperations.inc({ type: 'read', status: 'error' });
+            this.logCacheError('read', key, error);
         }
 
         return undefined;
@@ -141,6 +156,7 @@ export class CachedUserService implements IUserService {
             metrics.cacheOperations.inc({ type: 'write', status: 'success' });
         } catch (error) {
             metrics.cacheOperations.inc({ type: 'write', status: 'error' });
+            this.logCacheError('write', key, error);
 
             if (invalidateOnError) {
                 await this.invalidateUserCache(user.id);
@@ -156,6 +172,7 @@ export class CachedUserService implements IUserService {
             metrics.cacheOperations.inc({ type: 'write', status: 'success' });
         } catch (error) {
             metrics.cacheOperations.inc({ type: 'write', status: 'error' });
+            this.logCacheError('write', key, error);
         }
     }
 
@@ -180,6 +197,16 @@ export class CachedUserService implements IUserService {
             metrics.cacheOperations.inc({ type: 'delete', status: 'success' });
         } catch (error) {
             metrics.cacheOperations.inc({ type: 'delete', status: 'error' });
+            this.logCacheError('delete', key, error);
         }
+    }
+
+    private logCacheError(operation: 'read' | 'write' | 'delete', key: string, error: unknown): void {
+        logger.error({
+            msg: 'User cache operation failed',
+            operation,
+            key,
+            error,
+        });
     }
 }
