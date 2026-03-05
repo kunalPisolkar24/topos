@@ -1,7 +1,7 @@
 import { User } from '../../generated/prisma/client';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../../types';
 
-export interface UserResponse extends Omit<User, 'createdAt'> {
+export interface UserResponse extends Omit<User, 'createdAt' | 'password'> {
     createdAt: string;
 }
 

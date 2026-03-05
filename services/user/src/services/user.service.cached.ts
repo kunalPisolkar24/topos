@@ -102,9 +102,10 @@ export class CachedUserService implements IUserService {
 
     private async writeUserToCache(user: UserResponse, invalidateOnError = false): Promise<void> {
         const key = this.userKey(user.id);
+        const cacheableUser = this.toCacheableUser(user);
 
         try {
-            await this.cache.set(key, user, this.ttlMs);
+            await this.cache.set(key, cacheableUser, this.ttlMs);
             metrics.cacheOperations.inc({ type: 'write', status: 'success' });
         } catch (error) {
             metrics.cacheOperations.inc({ type: 'write', status: 'error' });
@@ -113,6 +114,19 @@ export class CachedUserService implements IUserService {
                 await this.invalidateUserCache(user.id);
             }
         }
+    }
+
+    private toCacheableUser(user: UserResponse): UserResponse {
+        return {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            name: user.name,
+            bio: user.bio,
+            avatarUrl: user.avatarUrl,
+            bannerUrl: user.bannerUrl,
+            createdAt: user.createdAt,
+        };
     }
 
     private async invalidateUserCache(userId: number): Promise<void> {
