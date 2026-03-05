@@ -1,16 +1,18 @@
-FROM node:20
+FROM node:20-bookworm-slim
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY . .
 
-RUN npm install
+RUN npm ci \
+    && DATABASE_URL_MIGRATE="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate \
+    && npm run build \
+    && npm prune --omit=dev \
+    && npm cache clean --force
 
-RUN DATABASE_URL_MIGRATE="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
-
-RUN npm run build
+ENV NODE_ENV=production
 
 EXPOSE 4001
 
