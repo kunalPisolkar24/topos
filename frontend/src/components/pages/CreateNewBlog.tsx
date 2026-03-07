@@ -31,9 +31,11 @@ import {
 import { toast } from "../../hooks/use-toast";
 import { createPostSchema } from "@kunalpisolkar24/blogapp-common";
 import { StickyNavbar } from "../layouts";
+import { useSessionStore } from "@/stores/session-store";
 
 const CreateNewBlog: React.FC = () => {
   const navigate = useNavigate();
+  const token = useSessionStore((state) => state.token);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [cardImage, setCardImage] = useState<File | null>(null);
@@ -261,14 +263,13 @@ const CreateNewBlog: React.FC = () => {
 
     try {
       createPostSchema.parse(blogData);
-      const token = localStorage.getItem("jwt");
       if (!token) {
         toast({
           title: "Authentication Error",
           description: "Please log in.",
           variant: "destructive",
         });
-        navigate("/login");
+        navigate("/signin");
         return;
       }
       await axios.post(
@@ -280,23 +281,24 @@ const CreateNewBlog: React.FC = () => {
       );
       toast({ title: "Blog Created", description: "Successfully created." });
       navigate("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating blog:", error);
-      if (error.errors) {
-        error.errors.forEach((err: any) => {
+      if (error instanceof z.ZodError) {
+        error.issues.forEach((issue) => {
           toast({
             title: "Validation Error",
-            description: `${err.path.join(".")} - ${err.message}`,
+            description: `${issue.path.join(".")} - ${issue.message}`,
             variant: "destructive",
           });
         });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to create blog post.",
-          variant: "destructive",
-        });
+        return;
       }
+
+      toast({
+        title: "Error",
+        description: "Failed to create blog post.",
+        variant: "destructive",
+      });
     }
   };
 
