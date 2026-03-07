@@ -45,6 +45,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { StickyNavbar } from "../layouts";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useSessionStore } from "@/stores/session-store";
 
 const internalUpdatePostSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
@@ -88,7 +90,6 @@ interface Blog {
 
 const ViewBlogPage: React.FC = () => {
   const [blog, setBlog] = useState<Blog | null>(null);
-  const [isAuthor, setIsAuthor] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -109,6 +110,8 @@ const ViewBlogPage: React.FC = () => {
 
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const token = useSessionStore((state) => state.token);
+  const { user: currentUser } = useCurrentUser();
 
   const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
     }/image/upload`;
@@ -123,18 +126,6 @@ const ViewBlogPage: React.FC = () => {
           `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`
         );
         setBlog(response.data);
-
-        const jwt = localStorage.getItem("jwt");
-        if (jwt) {
-          try {
-            const decodedToken = JSON.parse(atob(jwt.split(".")[1]));
-            const userId = decodedToken.id;
-            setIsAuthor(userId === response.data.authorId);
-          } catch (e) {
-            console.error("Error decoding JWT:", e);
-            setIsAuthor(false);
-          }
-        }
       } catch (error) {
         console.error("Failed to fetch blog data:", error);
         toast({
@@ -155,14 +146,13 @@ const ViewBlogPage: React.FC = () => {
 
   const confirmDelete = async () => {
     try {
-      const jwt = localStorage.getItem("jwt");
-      if (!jwt) {
+      if (!token) {
         throw new Error("No token found");
       }
       await axios.delete(
         `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`,
         {
-          headers: { Authorization: `Bearer ${jwt}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       toast({
@@ -258,8 +248,7 @@ const ViewBlogPage: React.FC = () => {
     }
 
     try {
-      const jwt = localStorage.getItem("jwt");
-      if (!jwt) throw new Error("No token found");
+      if (!token) throw new Error("No token found");
 
       const blogData: Partial<InternalUpdatePostSchemaType> = {};
 
@@ -283,7 +272,7 @@ const ViewBlogPage: React.FC = () => {
         `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`,
         parsedData,
         {
-          headers: { Authorization: `Bearer ${jwt}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -296,23 +285,24 @@ const ViewBlogPage: React.FC = () => {
         `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`
       );
       setBlog(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating blog:", error);
-      if (error.errors) {
-        error.errors.forEach((err: any) => {
+      if (error instanceof z.ZodError) {
+        error.issues.forEach((issue) => {
           toast({
             title: "Validation Error",
-            description: `${err.path.join(".")} - ${err.message}`,
+            description: `${issue.path.join(".")} - ${issue.message}`,
             variant: "destructive",
           });
         });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to update the blog post.",
-          variant: "destructive",
-        });
+        return;
       }
+
+      toast({
+        title: "Error",
+        description: "Failed to update the blog post.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -438,6 +428,7 @@ const ViewBlogPage: React.FC = () => {
   });
 
   const authorInitial = blog.author.name?.charAt(0).toUpperCase() || blog.author.username.charAt(0).toUpperCase();
+  const isAuthor = currentUser ? Number(currentUser.id) === blog.authorId : false;
 
   return (
     <div className="min-h-screen bg-zinc-950/20">

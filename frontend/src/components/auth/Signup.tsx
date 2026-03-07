@@ -1,132 +1,99 @@
-import type React from "react"
-import { useState } from "react"
-import { z } from "zod"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { signupSchema as baseSignupSchema, type SignupSchemaType } from "@kunalpisolkar24/blogapp-common"
+import { useState } from "react";
+import { useMutation } from "@apollo/client/react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SignupDocument } from "@/graphql/generated/graphql";
+import { useToast } from "@/hooks/use-toast";
+import { useSessionActions } from "@/hooks/use-session-actions";
 
-const extendedSignupSchema = z
+const signupSchema = z
   .object({
     email: z.string().email("Please enter a valid email address"),
     username: z.string().min(3, "Username must be at least 3 characters"),
-    password: z.string().min(6, "Password must be at least 8 characters"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
-  })
+  });
+
+type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const Signup = () => {
-  const [formData, setFormData] = useState({
-    email: "",
-    username: "",
-    password: "",
-    confirmPassword: "",
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
-  const navigate = useNavigate()
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { authenticate } = useSessionActions();
+  const [signup, { loading }] = useMutation(SignupDocument);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+  const form = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      email: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[name]
-        return newErrors
-      })
-    }
-  }
-
-  const validateForm = () => {
+  const handleSubmit = form.handleSubmit(async (values) => {
     try {
-      extendedSignupSchema.parse(formData)
-      setErrors({})
-      return true
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {}
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message
-          }
-        })
-        setErrors(newErrors)
-      }
-      return false
-    }
-  }
+      const { data } = await signup({
+        variables: {
+          email: values.email,
+          username: values.username,
+          password: values.password,
+        },
+      });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+      const payload = data?.signup;
 
-    if (!validateForm()) return
-
-    setIsLoading(true)
-
-    try {
-      const { confirmPassword, ...signupData } = formData
-      const parsedInput = baseSignupSchema.safeParse(signupData)
-
-      if (!parsedInput.success) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: parsedInput.error.errors[0].message,
-        })
-        setIsLoading(false)
-        return
+      if (!payload) {
+        throw new Error("Signup response was empty.");
       }
 
-      const validatedInput: SignupSchemaType = parsedInput.data
-
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/signup`, validatedInput)
+      authenticate(payload.token, payload.user);
 
       toast({
         title: "Success",
-        description: "Successfully signed up",
-      })
-      navigate("/signin")
-    } catch (error: any) {
+        description: "Account created successfully.",
+      });
+
+      navigate("/", { replace: true });
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.response?.data?.message || "Signup failed",
-      })
-      console.error("Signup failed:", error)
-    } finally {
-      setIsLoading(false)
+        description: error instanceof Error ? error.message : "Signup failed.",
+      });
+      console.error("Signup failed:", error);
     }
-  }
-
-  const togglePasswordVisibility = (field: "password" | "confirmPassword") => {
-    if (field === "password") {
-      setShowPassword(!showPassword)
-    } else {
-      setShowConfirmPassword(!showConfirmPassword)
-    }
-  }
+  });
 
   return (
-    <div className="flex min-h-screen items-center bg-zinc-900/20 justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-900/20 p-4">
       <Card className="w-full max-w-md border-zinc-800 shadow-xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="md:text-3xl text-2xl text-center font-bold tracking-tight text-zinc-100">
+          <CardTitle className="text-center text-2xl font-bold tracking-tight text-zinc-100 md:text-3xl">
             Your Story Starts Here
           </CardTitle>
-          <CardDescription className="text-zinc-400 text-center pt-[10px]">
+          <CardDescription className="pt-[10px] text-center text-zinc-400">
             Create an account to share your stories and insights.
           </CardDescription>
         </CardHeader>
@@ -138,16 +105,20 @@ export const Signup = () => {
               </Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
                 placeholder="Enter your email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  errors.email ? "border-red-500" : ""
+                {...form.register("email")}
+                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                  form.formState.errors.email
+                    ? "border-red-500"
+                    : "border-zinc-800"
                 }`}
               />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {form.formState.errors.email && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -156,15 +127,19 @@ export const Signup = () => {
               </Label>
               <Input
                 id="username"
-                name="username"
                 placeholder="Enter your username"
-                value={formData.username}
-                onChange={handleChange}
-                className={`border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  errors.username ? "border-red-500" : ""
+                {...form.register("username")}
+                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                  form.formState.errors.username
+                    ? "border-red-500"
+                    : "border-zinc-800"
                 }`}
               />
-              {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
+              {form.formState.errors.username && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.username.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -174,13 +149,13 @@ export const Signup = () => {
               <div className="relative">
                 <Input
                   id="password"
-                  name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={` border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 pr-10 ${
-                    errors.password ? "border-red-500" : ""
+                  {...form.register("password")}
+                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                    form.formState.errors.password
+                      ? "border-red-500"
+                      : "border-zinc-800"
                   }`}
                 />
                 <Button
@@ -188,13 +163,23 @@ export const Signup = () => {
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={() => togglePasswordVisibility("password")}
+                  onClick={() => setShowPassword((current) => !current)}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {showPassword ? "Hide password" : "Show password"}
+                  </span>
                 </Button>
               </div>
-              {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+              {form.formState.errors.password && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.password.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -204,13 +189,13 @@ export const Signup = () => {
               <div className="relative">
                 <Input
                   id="confirmPassword"
-                  name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={`border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 pr-10 ${
-                    errors.confirmPassword ? "border-red-500" : ""
+                  {...form.register("confirmPassword")}
+                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                    form.formState.errors.confirmPassword
+                      ? "border-red-500"
+                      : "border-zinc-800"
                   }`}
                 />
                 <Button
@@ -218,21 +203,33 @@ export const Signup = () => {
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={() => togglePasswordVisibility("confirmPassword")}
+                  onClick={() =>
+                    setShowConfirmPassword((current) => !current)
+                  }
                 >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {showConfirmPassword ? "Hide password" : "Show password"}
+                  </span>
                 </Button>
               </div>
-              {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
+              {form.formState.errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.confirmPassword.message}
+                </p>
+              )}
             </div>
 
             <Button
               type="submit"
-              className="w-full bg-zinc-50 hover:bg-zinc-200 text-zinc-950 mt-6 transition-all duration-200 transform hover:scale-[1.02]"
-              disabled={isLoading}
+              className="mt-6 w-full transform bg-zinc-50 text-zinc-950 transition-all duration-200 hover:scale-[1.02] hover:bg-zinc-200"
+              disabled={loading}
             >
-              {isLoading ? (
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing up...
@@ -257,5 +254,5 @@ export const Signup = () => {
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 };
