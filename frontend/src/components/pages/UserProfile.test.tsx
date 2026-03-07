@@ -33,7 +33,7 @@ describe("UserProfile", () => {
         }),
       ),
       graphqlApi.mutation("UpdateProfile", async ({ request }) => {
-        const body = (await request.json()) as {
+        const body = (await request.json()) as unknown as {
           variables?: { name?: string; bio?: string | null };
         };
 

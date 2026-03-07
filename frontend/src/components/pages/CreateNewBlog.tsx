@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { z } from "zod";
 import {
   X,
   UploadCloud,
