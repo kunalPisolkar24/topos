@@ -1,117 +1,99 @@
-import type React from "react"
-import { useState } from "react"
-import { z } from "zod"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { signinSchema as baseSigninSchema, type SigninSchemaType } from "@kunalpisolkar24/blogapp-common"
+import { useState } from "react";
+import { useMutation } from "@apollo/client/react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SigninDocument } from "@/graphql/generated/graphql";
+import { useToast } from "@/hooks/use-toast";
+import { useSessionActions } from "@/hooks/use-session-actions";
 
-const extendedSigninSchema = z.object({
+const signinSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
-})
+});
+
+type SigninFormValues = z.infer<typeof signinSchema>;
 
 export const Signin = () => {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
-  const navigate = useNavigate()
+  const [showPassword, setShowPassword] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { authenticate } = useSessionActions();
+  const [signin, { loading }] = useMutation(SigninDocument);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+  const form = useForm<SigninFormValues>({
+    resolver: zodResolver(signinSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[name]
-        return newErrors
-      })
-    }
-  }
+  const redirectTarget =
+    (location.state as
+      | {
+          from?: { pathname?: string; search?: string; hash?: string };
+        }
+      | null)?.from;
 
-  const validateForm = () => {
+  const handleSubmit = form.handleSubmit(async (values) => {
     try {
-      extendedSigninSchema.parse(formData)
-      setErrors({})
-      return true
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {}
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message
-          }
-        })
-        setErrors(newErrors)
-      }
-      return false
-    }
-  }
+      const { data } = await signin({
+        variables: values,
+      });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+      const payload = data?.signin;
 
-    if (!validateForm()) return
-
-    setIsLoading(true)
-
-    try {
-      const parsedInput = baseSigninSchema.safeParse(formData)
-
-      if (!parsedInput.success) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: parsedInput.error.errors[0].message,
-        })
-        setIsLoading(false)
-        return
+      if (!payload) {
+        throw new Error("Sign-in response was empty.");
       }
 
-      const validatedInput: SigninSchemaType = parsedInput.data
-
-      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/signin`, validatedInput)
-
-      localStorage.setItem("jwt", response.data.jwt)
+      authenticate(payload.token, payload.user);
 
       toast({
         title: "Success",
-        description: "Successfully signed in",
-      })
-      navigate("/")
-    } catch (error: any) {
+        description: "Successfully signed in.",
+      });
+
+      navigate(
+        redirectTarget
+          ? `${redirectTarget.pathname ?? ""}${redirectTarget.search ?? ""}${redirectTarget.hash ?? ""}`
+          : "/",
+        { replace: true },
+      );
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.response?.data?.message || "Invalid credentials",
-      })
-      console.error("Sign-in failed:", error)
-    } finally {
-      setIsLoading(false)
+        description:
+          error instanceof Error ? error.message : "Invalid credentials.",
+      });
+      console.error("Sign-in failed:", error);
     }
-  }
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword)
-  }
+  });
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-900/20">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-900/20 p-4">
       <Card className="w-full max-w-md border-zinc-800 bg-zinc-950 shadow-xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="md:text-3xl text-2xl text-center font-bold tracking-tight text-zinc-100">Welcome Back</CardTitle>
-          <CardDescription className="text-zinc-400 text-center pt-[10px]">
+          <CardTitle className="text-center text-2xl font-bold tracking-tight text-zinc-100 md:text-3xl">
+            Welcome Back
+          </CardTitle>
+          <CardDescription className="pt-[10px] text-center text-zinc-400">
             Sign in to continue your storytelling journey
           </CardDescription>
         </CardHeader>
@@ -123,16 +105,20 @@ export const Signin = () => {
               </Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
                 placeholder="Enter your email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  errors.email ? "border-red-500" : ""
+                {...form.register("email")}
+                className={`bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                  form.formState.errors.email
+                    ? "border-red-500"
+                    : "border-zinc-800"
                 }`}
               />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {form.formState.errors.email && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -141,8 +127,9 @@ export const Signin = () => {
                   Password
                 </Label>
                 <Button
+                  type="button"
                   variant="link"
-                  className="p-0 h-auto text-xs text-zinc-400 hover:text-zinc-300"
+                  className="h-auto p-0 text-xs text-zinc-400 hover:text-zinc-300"
                   onClick={() => navigate("/forgot-password")}
                 >
                   Forgot password?
@@ -151,13 +138,13 @@ export const Signin = () => {
               <div className="relative">
                 <Input
                   id="password"
-                  name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={`bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 pr-10 ${
-                    errors.password ? "border-red-500" : ""
+                  {...form.register("password")}
+                  className={`bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
+                    form.formState.errors.password
+                      ? "border-red-500"
+                      : "border-zinc-800"
                   }`}
                 />
                 <Button
@@ -165,21 +152,31 @@ export const Signin = () => {
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={togglePasswordVisibility}
+                  onClick={() => setShowPassword((current) => !current)}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {showPassword ? "Hide password" : "Show password"}
+                  </span>
                 </Button>
               </div>
-              {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+              {form.formState.errors.password && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.password.message}
+                </p>
+              )}
             </div>
 
             <Button
               type="submit"
-              className="w-full bg-zinc-50 hover:bg-zinc-200 text-zinc-950 mt-6 transition-all duration-200 transform hover:scale-[1.02]"
-              disabled={isLoading}
+              className="mt-6 w-full transform bg-zinc-50 text-zinc-950 transition-all duration-200 hover:scale-[1.02] hover:bg-zinc-200"
+              disabled={loading}
             >
-              {isLoading ? (
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
@@ -204,5 +201,5 @@ export const Signin = () => {
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 };
