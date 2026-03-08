@@ -1,7 +1,8 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import axios from "axios";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
@@ -22,7 +23,7 @@ import {
   UploadCloud,
   Clock,
   Sparkles,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -45,8 +46,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { StickyNavbar } from "../layouts";
+import {
+  DeletePostDocument,
+  PostDocument,
+  type UpdatePostInput,
+  UpdatePostDocument,
+} from "@/graphql/content-documents";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useSessionStore } from "@/stores/session-store";
+import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 
 const internalUpdatePostSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
@@ -56,41 +63,7 @@ const internalUpdatePostSchema = z.object({
 });
 type InternalUpdatePostSchemaType = z.infer<typeof internalUpdatePostSchema>;
 
-interface TagItem {
-  postId: number;
-  tagId: number;
-  tag: {
-    id: number;
-    name: string;
-  };
-}
-
-interface AuthorData {
-  id: number;
-  username: string;
-  email: string;
-  name: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-}
-
-interface Blog {
-  id: number;
-  title: string;
-  body: string;
-  imageUrl?: string | null;
-  authorId: number;
-  tags: TagItem[];
-  author: AuthorData;
-  createdAt: string;
-  updatedAt: string;
-  summary?: string | null;
-  summaryStatus?: string | null;
-}
-
 const ViewBlogPage: React.FC = () => {
-  const [blog, setBlog] = useState<Blog | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
@@ -110,51 +83,60 @@ const ViewBlogPage: React.FC = () => {
 
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const token = useSessionStore((state) => state.token);
   const { user: currentUser } = useCurrentUser();
+  const {
+    data,
+    loading: isLoading,
+    error: postError,
+    refetch,
+  } = useQuery(PostDocument, {
+    variables: {
+      id: id ?? "",
+    },
+    skip: !id,
+    notifyOnNetworkStatusChange: true,
+  });
+  const [updatePost, { loading: isUpdatingPost }] =
+    useMutation(UpdatePostDocument);
+  const [deletePost, { loading: isDeletingPost }] =
+    useMutation(DeletePostDocument);
 
-  const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-    }/image/upload`;
+  const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${
+    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  }/image/upload`;
   const CLOUDINARY_UPLOAD_PRESET = import.meta.env
     .VITE_CLOUDINARY_UPLOAD_PRESET;
+  const blog = data?.post ?? null;
 
   useEffect(() => {
-    const fetchBlogData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axios.get<Blog>(
-          `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`
-        );
-        setBlog(response.data);
-      } catch (error) {
-        console.error("Failed to fetch blog data:", error);
-        toast({
-          title: "Error",
-          description: "Could not load blog post.",
-          variant: "destructive",
-        });
-        navigate("/");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchBlogData();
+    if (!postError) {
+      return;
     }
-  }, [id, navigate]);
+
+    toast({
+      title: "Error",
+      description: "Could not load blog post.",
+      variant: "destructive",
+    });
+    navigate("/");
+  }, [navigate, postError]);
 
   const confirmDelete = async () => {
     try {
-      if (!token) {
-        throw new Error("No token found");
+      if (!id) {
+        throw new Error("Blog post id is missing.");
       }
-      await axios.delete(
-        `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+
+      const { data: mutationData } = await deletePost({
+        variables: {
+          id,
+        },
+      });
+
+      if (!mutationData?.deletePost) {
+        throw new Error("Failed to delete the blog post.");
+      }
+
       toast({
         title: "Blog Deleted",
         description: "Your blog post has been successfully deleted.",
@@ -164,7 +146,10 @@ const ViewBlogPage: React.FC = () => {
       console.error("Error deleting blog:", error);
       toast({
         title: "Error",
-        description: "Failed to delete the blog post.",
+        description: getGraphQLErrorMessage(
+          error,
+          "Failed to delete the blog post.",
+        ),
         variant: "destructive",
       });
     } finally {
@@ -248,14 +233,18 @@ const ViewBlogPage: React.FC = () => {
     }
 
     try {
-      if (!token) throw new Error("No token found");
-
       const blogData: Partial<InternalUpdatePostSchemaType> = {};
 
       if (editTitle !== blog.title) blogData.title = editTitle;
       if (editContent !== blog.body) blogData.body = editContent;
-      if (JSON.stringify(editTags) !== JSON.stringify(blog.tags.map(t => t.tag.name))) blogData.tags = editTags;
-      if (finalCardImageUrl !== blog.imageUrl) blogData.imageUrl = finalCardImageUrl;
+      if (
+        JSON.stringify(editTags) !== JSON.stringify(blog.tags.map((tag) => tag.name))
+      ) {
+        blogData.tags = editTags;
+      }
+      if (finalCardImageUrl !== (blog.imageUrl ?? null)) {
+        blogData.imageUrl = finalCardImageUrl;
+      }
 
       if (Object.keys(blogData).length === 0) {
         toast({
@@ -266,25 +255,23 @@ const ViewBlogPage: React.FC = () => {
         return;
       }
 
-      const parsedData = internalUpdatePostSchema.parse(blogData);
+      const parsedData = internalUpdatePostSchema.parse(
+        blogData,
+      ) as UpdatePostInput;
 
-      await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`,
-        parsedData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await updatePost({
+        variables: {
+          id: blog.id,
+          input: parsedData,
+        },
+      });
 
       toast({
         title: "Blog Updated",
         description: "Your blog post has been successfully updated.",
       });
       setIsEditing(false);
-      const response = await axios.get<Blog>(
-        `${import.meta.env.VITE_BACKEND_URL}/api/posts/${id}`
-      );
-      setBlog(response.data);
+      await refetch();
     } catch (error: unknown) {
       console.error("Error updating blog:", error);
       if (error instanceof z.ZodError) {
@@ -300,7 +287,10 @@ const ViewBlogPage: React.FC = () => {
 
       toast({
         title: "Error",
-        description: "Failed to update the blog post.",
+        description: getGraphQLErrorMessage(
+          error,
+          "Failed to update the blog post.",
+        ),
         variant: "destructive",
       });
     }
@@ -310,7 +300,7 @@ const ViewBlogPage: React.FC = () => {
     if (blog) {
       setEditTitle(blog.title);
       setEditContent(blog.body);
-      setEditTags(blog.tags.map((tagItem) => tagItem.tag.name));
+      setEditTags(blog.tags.map((tag) => tag.name));
       setEditCardImageUrl(blog.imageUrl || null);
       setEditCardImagePreview(blog.imageUrl || null);
       setEditCardImage(null);
@@ -427,8 +417,10 @@ const ViewBlogPage: React.FC = () => {
     ],
   });
 
-  const authorInitial = blog.author.name?.charAt(0).toUpperCase() || blog.author.username.charAt(0).toUpperCase();
-  const isAuthor = currentUser ? Number(currentUser.id) === blog.authorId : false;
+  const authorInitial =
+    blog.author.name?.charAt(0).toUpperCase() ||
+    blog.author.username.charAt(0).toUpperCase();
+  const isAuthor = currentUser ? currentUser.id === blog.author.id : false;
 
   return (
     <div className="min-h-screen bg-zinc-950/20">
@@ -583,8 +575,8 @@ const ViewBlogPage: React.FC = () => {
                   <Button type="button" variant="outline" onClick={handleCancelEdit} className="border-zinc-700 text-zinc-300">
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isUploadingCardImage} className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200">
-                    Save Changes
+                  <Button type="submit" disabled={isUploadingCardImage || isUpdatingPost} className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200">
+                    {isUpdatingPost ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </form>
@@ -615,9 +607,9 @@ const ViewBlogPage: React.FC = () => {
                   dangerouslySetInnerHTML={{ __html: cleanBlogBody }}
                 />
                 <div className="flex flex-wrap gap-2 mb-8">
-                  {blog.tags.map((tagItem) => (
-                    <Badge key={tagItem.tag.id} variant="secondary" className="bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer" onClick={() => navigate(`/tag/${tagItem.tag.name}`)}>
-                      {tagItem.tag.name}
+                  {blog.tags.map((tag) => (
+                    <Badge key={tag.id} variant="secondary" className="bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer" onClick={() => navigate(`/tag/${tag.name}`)}>
+                      {tag.name}
                     </Badge>
                   ))}
                 </div>
@@ -722,7 +714,7 @@ const ViewBlogPage: React.FC = () => {
                     </Button>
                     <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="w-full bg-red-900 hover:bg-red-800">
+                        <Button variant="destructive" className="w-full bg-red-900 hover:bg-red-800" disabled={isDeletingPost}>
                           <Trash2 size={16} className="mr-2" /> Delete Blog
                         </Button>
                       </AlertDialogTrigger>
@@ -735,8 +727,8 @@ const ViewBlogPage: React.FC = () => {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={confirmDelete} className="bg-red-900 hover:bg-red-800 text-white">
-                            Continue
+                          <AlertDialogAction onClick={confirmDelete} className="bg-red-900 hover:bg-red-800 text-white" disabled={isDeletingPost}>
+                            {isDeletingPost ? "Deleting..." : "Continue"}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
