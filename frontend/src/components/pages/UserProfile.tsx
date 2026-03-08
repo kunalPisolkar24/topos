@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Calendar, Camera, Edit, FileText, Loader2, Mail } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { UpdateProfileDocument } from "@/graphql/generated/graphql";
+import { MyPostsDocument } from "@/graphql/content-documents";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "@/hooks/use-toast";
 import { env } from "@/lib/env";
@@ -31,7 +32,8 @@ import {
   sanitizeProfileName,
   type EditableProfileFormData,
 } from "@/lib/user-input";
-import { useSessionStore } from "@/stores/session-store";
+import { BlogCardSkeleton } from "@/components/skeletons";
+import { mapPostToBlogCardItem } from "@/lib/content";
 import { BlogCard } from "../blog";
 import { StickyNavbar } from "../layouts";
 
@@ -46,66 +48,12 @@ interface UserProfileData {
   createdAt: string;
 }
 
-interface BlogPost {
-  id: number;
-  title: string;
-  body: string;
-  imageUrl?: string;
-  author: { id: number; username: string; email: string };
-  tags: { tag: { name: string } }[];
-  createdAt: string;
-}
-
-interface FormattedBlogPost {
-  id: number;
-  title: string;
-  snippet: string;
-  author: { name: string; avatarUrl: string };
-  tags: string[];
-  slug: string;
-  imageUrl: string;
-  publishedAt: Date;
-}
-
 const DEFAULT_BANNER_URL =
   "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
 
-const stripHtml = (html: string) => {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  return doc.body.textContent || "";
-};
-
-const formatBlogData = (data: BlogPost[]): FormattedBlogPost[] => {
-  return data.map((post) => {
-    const plainTextBody = stripHtml(post.body);
-
-    return {
-      id: post.id,
-      title: post.title,
-      snippet:
-        plainTextBody.substring(0, 150) +
-        (plainTextBody.length > 150 ? "..." : ""),
-      author: {
-        name: post.author.username,
-        avatarUrl: `https://i.pravatar.cc/48?u=${encodeURIComponent(
-          post.author.username,
-        )}`,
-      },
-      tags: post.tags.map((tagItem) => tagItem.tag.name),
-      slug: `post-${post.id}`,
-      imageUrl:
-        post.imageUrl ||
-        "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=600&q=80",
-      publishedAt: new Date(post.createdAt),
-    };
-  });
-};
-
 const UserProfile: React.FC = () => {
   const navigate = useNavigate();
-  const token = useSessionStore((state) => state.token);
   const { user: currentUser, loading: isUserLoading } = useCurrentUser();
-  const [userBlogs, setUserBlogs] = useState<FormattedBlogPost[]>([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -118,7 +66,6 @@ const UserProfile: React.FC = () => {
   });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const [updateProfile, { loading: isSaving }] = useMutation(
     UpdateProfileDocument,
@@ -156,6 +103,26 @@ const UserProfile: React.FC = () => {
     [userProfile],
   );
 
+  const {
+    data: postsData,
+    loading: isPostsLoading,
+    error: postsError,
+  } = useQuery(MyPostsDocument, {
+    variables: {
+      page: currentPage,
+      limit: postsPerPage,
+    },
+    skip: !userProfile,
+    notifyOnNetworkStatusChange: true,
+  });
+
+  const userBlogs = useMemo(
+    () => postsData?.me?.posts.posts.map(mapPostToBlogCardItem) ?? [],
+    [postsData],
+  );
+  const totalPages = postsData?.me?.posts.totalPages ?? 1;
+  const totalPosts = postsData?.me?.posts.totalPosts ?? 0;
+
   useEffect(() => {
     if (!userProfile || isEditingProfile) {
       return;
@@ -167,49 +134,17 @@ const UserProfile: React.FC = () => {
   }, [isEditingProfile, profileFormDefaults, userProfile]);
 
   useEffect(() => {
-    if (!userProfile || !env.VITE_BACKEND_URL) {
-      setUserBlogs([]);
-      setTotalPages(1);
+    if (!postsError) {
       return;
     }
 
-    let cancelled = false;
-
-    const fetchUserBlogs = async () => {
-      try {
-        const response = await axios.get(
-          `${env.VITE_BACKEND_URL}/api/users/${userProfile.id}/posts?page=${currentPage}&limit=${postsPerPage}`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          },
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        setUserBlogs(formatBlogData(response.data.data));
-        setTotalPages(response.data.totalPages);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error("Failed to fetch user blogs:", error);
-        toast({
-          title: "Error",
-          description: "Could not load your blogs.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    void fetchUserBlogs();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentPage, postsPerPage, token, userProfile]);
+    console.error("Failed to fetch user blogs:", postsError);
+    toast({
+      title: "Error",
+      description: "Could not load your blogs.",
+      variant: "destructive",
+    });
+  }, [postsError]);
 
   const uploadToCloudinary = async (file: File) => {
     if (!cloudinaryUrl || !cloudinaryUploadPreset) {
@@ -506,7 +441,7 @@ const UserProfile: React.FC = () => {
                         <div className="flex flex-wrap items-center justify-center gap-4 pt-2 sm:justify-start">
                           <div className="flex items-center gap-2 text-sm text-zinc-300">
                             <FileText className="h-4 w-4 text-zinc-400" />
-                            <b>{userBlogs.length}</b> Posts
+                            <b>{totalPosts}</b> Posts
                           </div>
                           <div className="flex items-center gap-2 text-sm text-zinc-300">
                             <Calendar className="h-4 w-4 text-zinc-400" />
@@ -603,11 +538,17 @@ const UserProfile: React.FC = () => {
             <h2 className="mb-6 text-2xl font-bold text-zinc-100 md:text-3xl">
               Published Blogs
             </h2>
-            {userBlogs.length > 0 ? (
+            {isPostsLoading ? (
+              <div className="grid grid-cols-1 gap-6">
+                {Array.from({ length: postsPerPage }).map((_, index) => (
+                  <BlogCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : userBlogs.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 gap-6">
                   {userBlogs.map((blog) => (
-                    <BlogCard key={blog.slug} {...blog} />
+                    <BlogCard key={blog.id} {...blog} />
                   ))}
                 </div>
                 {totalPages > 1 && (
