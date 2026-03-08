@@ -96,7 +96,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             return;
           }
 
-          setTagsToShow(data.tags);
+          setTagsToShow(data?.tags ?? []);
         } catch (error) {
           if (requestSequenceRef.current !== requestId) {
             return;
@@ -131,15 +131,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           return;
         }
 
+        const searchPosts = data?.searchPosts;
+
+        if (!searchPosts) {
+          setPostsToShow([]);
+          setTotalPostResults(0);
+          return;
+        }
+
         setPostsToShow(
-          data.searchPosts.hits.map((post) => ({
+          searchPosts.hits.map((post) => ({
             id: post.id,
             title: post.title,
             imageUrl: post.imageUrl || DEFAULT_BLOG_CARD_IMAGE,
             authorName: getAuthorDisplayName(post.author),
           })),
         );
-        setTotalPostResults(data.searchPosts.total);
+        setTotalPostResults(searchPosts.total);
       } catch (error) {
         if (requestSequenceRef.current !== requestId) {
           return;
