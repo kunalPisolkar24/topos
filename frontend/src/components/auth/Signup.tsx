@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -18,12 +18,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SignupDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
+import {
+  USERNAME_MAX_LENGTH,
+  sanitizeUsernameInput,
+} from "@/lib/user-input";
 import { useSessionActions } from "@/hooks/use-session-actions";
 
 const signupSchema = z
   .object({
     email: z.string().email("Please enter a valid email address"),
-    username: z.string().min(3, "Username must be at least 3 characters"),
+    username: z
+      .string()
+      .transform(sanitizeUsernameInput)
+      .pipe(
+        z
+          .string()
+          .min(3, "Username must be at least 3 characters")
+          .max(
+            USERNAME_MAX_LENGTH,
+            `Username must be ${USERNAME_MAX_LENGTH} characters or less`,
+          ),
+      ),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
   })
@@ -52,12 +67,14 @@ export const Signup = () => {
     },
   });
 
+  const usernameField = form.register("username");
+
   const handleSubmit = form.handleSubmit(async (values) => {
     try {
       const { data } = await signup({
         variables: {
           email: values.email,
-          username: values.username,
+          username: sanitizeUsernameInput(values.username),
           password: values.password,
         },
       });
@@ -85,6 +102,16 @@ export const Signup = () => {
       console.error("Signup failed:", error);
     }
   });
+
+  const handleUsernameChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const sanitizedValue = sanitizeUsernameInput(event.target.value);
+
+    if (sanitizedValue !== event.target.value) {
+      event.target.value = sanitizedValue;
+    }
+
+    usernameField.onChange(event);
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-900/20 p-4">
@@ -128,7 +155,9 @@ export const Signup = () => {
               <Input
                 id="username"
                 placeholder="Enter your username"
-                {...form.register("username")}
+                maxLength={USERNAME_MAX_LENGTH}
+                {...usernameField}
+                onChange={handleUsernameChange}
                 className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
                   form.formState.errors.username
                     ? "border-red-500"

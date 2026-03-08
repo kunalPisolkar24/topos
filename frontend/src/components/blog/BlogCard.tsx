@@ -111,8 +111,8 @@ export const BlogCard: React.FC<BlogCardProps> = ({
                     {author.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-zinc-300">
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium text-zinc-300">
                     {author.name}
                   </span>
                   <div className="flex items-center text-xs text-zinc-500">

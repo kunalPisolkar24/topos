@@ -16,10 +16,21 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { UpdateProfileDocument } from "@/graphql/generated/graphql";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "@/hooks/use-toast";
 import { env } from "@/lib/env";
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+  buildProfileUpdatePayload,
+  getCharacterCount,
+  sanitizeProfileBioInput,
+  sanitizeProfileFormData,
+  sanitizeProfileName,
+  type EditableProfileFormData,
+} from "@/lib/user-input";
 import { useSessionStore } from "@/stores/session-store";
 import { BlogCard } from "../blog";
 import { StickyNavbar } from "../layouts";
@@ -101,7 +112,10 @@ const UserProfile: React.FC = () => {
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", bio: "" });
+  const [formData, setFormData] = useState<EditableProfileFormData>({
+    name: "",
+    bio: "",
+  });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -133,18 +147,24 @@ const UserProfile: React.FC = () => {
     };
   }, [currentUser]);
 
+  const profileFormDefaults = useMemo<EditableProfileFormData>(
+    () =>
+      sanitizeProfileFormData({
+        name: userProfile?.name ?? "",
+        bio: userProfile?.bio ?? "",
+      }),
+    [userProfile],
+  );
+
   useEffect(() => {
     if (!userProfile || isEditingProfile) {
       return;
     }
 
-    setFormData({
-      name: userProfile.name || "",
-      bio: userProfile.bio || "",
-    });
+    setFormData(profileFormDefaults);
     setAvatarPreview(userProfile.avatarUrl);
     setBannerPreview(userProfile.bannerUrl);
-  }, [isEditingProfile, userProfile]);
+  }, [isEditingProfile, profileFormDefaults, userProfile]);
 
   useEffect(() => {
     if (!userProfile || !env.VITE_BACKEND_URL) {
@@ -235,9 +255,18 @@ const UserProfile: React.FC = () => {
   const handleFormChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
+    const { name, value } = event.target;
+
+    if (name !== "name" && name !== "bio") {
+      return;
+    }
+
     setFormData((previous) => ({
       ...previous,
-      [event.target.name]: event.target.value,
+      [name]:
+        name === "name"
+          ? sanitizeProfileName(value)
+          : sanitizeProfileBioInput(value),
     }));
   };
 
@@ -246,23 +275,17 @@ const UserProfile: React.FC = () => {
       return;
     }
 
+    const sanitizedFormData = sanitizeProfileFormData(formData);
     const updatePayload: {
       name?: string;
       bio?: string | null;
       avatarUrl?: string | null;
       bannerUrl?: string | null;
-    } = {};
+    } = {
+      ...buildProfileUpdatePayload(sanitizedFormData, profileFormDefaults),
+    };
 
-    const trimmedName = formData.name.trim();
-    const trimmedBio = formData.bio.trim();
-
-    if (trimmedName && trimmedName !== (userProfile.name || "")) {
-      updatePayload.name = trimmedName;
-    }
-
-    if (trimmedBio !== (userProfile.bio || "")) {
-      updatePayload.bio = trimmedBio || null;
-    }
+    setFormData(sanitizedFormData);
 
     if (avatarFile) {
       const nextAvatarUrl = await uploadToCloudinary(avatarFile);
@@ -300,10 +323,12 @@ const UserProfile: React.FC = () => {
         throw new Error("Profile update response was empty.");
       }
 
-      setFormData({
-        name: updatedProfile.name || "",
-        bio: updatedProfile.bio || "",
-      });
+      setFormData(
+        sanitizeProfileFormData({
+          name: updatedProfile.name || "",
+          bio: updatedProfile.bio || "",
+        }),
+      );
       setAvatarPreview(updatedProfile.avatarUrl ?? null);
       setBannerPreview(updatedProfile.bannerUrl ?? null);
       setAvatarFile(null);
@@ -331,10 +356,7 @@ const UserProfile: React.FC = () => {
       return;
     }
 
-    setFormData({
-      name: userProfile.name || "",
-      bio: userProfile.bio || "",
-    });
+    setFormData(profileFormDefaults);
     setAvatarPreview(userProfile.avatarUrl);
     setBannerPreview(userProfile.bannerUrl);
     setAvatarFile(null);
@@ -376,6 +398,7 @@ const UserProfile: React.FC = () => {
   }
 
   const bannerSrc = bannerPreview || userProfile.bannerUrl || DEFAULT_BANNER_URL;
+  const displayName = userProfile.name || userProfile.username;
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -466,16 +489,16 @@ const UserProfile: React.FC = () => {
                   </div>
 
                   {!isEditingProfile && (
-                    <div className="mt-4 w-full sm:ml-6">
+                    <div className="mt-4 w-full min-w-0 sm:ml-6">
                       <div className="space-y-2">
-                        <h1 className="text-3xl font-bold text-zinc-100 md:text-4xl">
-                          {userProfile.name || userProfile.username}
+                        <h1 className="max-w-full break-words text-3xl font-bold text-zinc-100 [overflow-wrap:anywhere] md:text-4xl">
+                          {displayName}
                         </h1>
-                        <div className="flex items-center justify-center gap-2 text-zinc-400 sm:justify-start">
+                        <div className="flex w-full flex-wrap items-center justify-center gap-2 text-zinc-400 sm:justify-start">
                           <Mail className="h-4 w-4" />
-                          <p>{userProfile.email}</p>
+                          <p className="break-all">{userProfile.email}</p>
                         </div>
-                        <p className="max-w-2xl pt-2 text-sm leading-relaxed text-zinc-400 md:text-base">
+                        <p className="max-h-48 max-w-2xl overflow-y-auto whitespace-pre-wrap break-words pt-2 pr-2 text-sm leading-relaxed text-zinc-400 [overflow-wrap:anywhere] md:text-base">
                           {userProfile.bio || (
                             <span className="italic">No bio added yet.</span>
                           )}
@@ -518,8 +541,15 @@ const UserProfile: React.FC = () => {
                         name="name"
                         value={formData.name}
                         onChange={handleFormChange}
+                        maxLength={PROFILE_NAME_MAX_LENGTH}
                         className="border-zinc-700 bg-zinc-800/50 text-zinc-100 placeholder:text-zinc-500"
                       />
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>Up to {PROFILE_NAME_MAX_LENGTH} characters</span>
+                        <span>
+                          {getCharacterCount(formData.name)}/{PROFILE_NAME_MAX_LENGTH}
+                        </span>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label
@@ -528,14 +558,21 @@ const UserProfile: React.FC = () => {
                       >
                         Bio / About
                       </label>
-                      <textarea
+                      <Textarea
                         id="bio"
                         name="bio"
                         value={formData.bio}
                         onChange={handleFormChange}
+                        maxLength={PROFILE_BIO_MAX_LENGTH}
                         className="min-h-[100px] w-full rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500"
                         rows={3}
                       />
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>Up to {PROFILE_BIO_MAX_LENGTH} characters</span>
+                        <span>
+                          {getCharacterCount(formData.bio)}/{PROFILE_BIO_MAX_LENGTH}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col justify-end gap-3 pt-2 sm:flex-row">
                       <Button

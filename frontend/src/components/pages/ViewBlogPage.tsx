@@ -705,12 +705,14 @@ const ViewBlogPage: React.FC = () => {
                     <AvatarFallback className="text-4xl bg-zinc-800 text-zinc-300">{authorInitial}</AvatarFallback>
                   </Avatar>
                 </Link>
-                <CardTitle className="text-xl mb-1 text-zinc-100">{blog.author.name || blog.author.username}</CardTitle>
-                <p className="text-sm text-zinc-400">{blog.author.email}</p>
+                <CardTitle className="mb-1 break-words text-xl text-zinc-100 [overflow-wrap:anywhere]">
+                  {blog.author.name || blog.author.username}
+                </CardTitle>
+                <p className="break-all text-sm text-zinc-400">{blog.author.email}</p>
               </CardHeader>
               <CardContent className="pt-6 border-t border-zinc-800">
                 <h3 className="font-semibold mb-2 text-zinc-200">About Author</h3>
-                <p className="text-sm text-zinc-400 mb-6">
+                <p className="mb-6 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
                   {blog.author.bio || <span className="italic">No bio provided.</span>}
                 </p>
                 {isAuthor && !isEditing && (
