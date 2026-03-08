@@ -1,13 +1,16 @@
 FROM node:20-bookworm
 
-WORKDIR /app
+WORKDIR /app/frontend
 
-COPY package*.json ./
+COPY frontend/package*.json ./
 
-RUN npm install
+RUN npm ci
 
-COPY . .
+COPY frontend/ ./
+COPY services/user/schema.graphql /app/services/user/schema.graphql
+
+RUN npm run codegen
 
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

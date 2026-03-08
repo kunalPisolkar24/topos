@@ -1,12 +1,18 @@
 services:
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: frontend/Dockerfile
     container_name: ${FRONTEND_CONTAINER}
     restart: unless-stopped
     ports:
       - "${FRONTEND_EXT_PORT}:${FRONTEND_INT_PORT}"
+    environment:
+      NODE_ENV: development
+      VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL}
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL}
+      VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME}
+      VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET}
     depends_on:
       - gateway
     networks:
