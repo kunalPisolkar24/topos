@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState, useRef, useMemo } from "react";
+import { useMutation } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { z } from "zod";
@@ -30,13 +31,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "../../hooks/use-toast";
+import { CreatePostDocument } from "@/graphql/content-documents";
+import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 import { createPostSchema } from "@kunalpisolkar24/blogapp-common";
 import { StickyNavbar } from "../layouts";
-import { useSessionStore } from "@/stores/session-store";
 
 const CreateNewBlog: React.FC = () => {
   const navigate = useNavigate();
-  const token = useSessionStore((state) => state.token);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [cardImage, setCardImage] = useState<File | null>(null);
@@ -48,6 +49,8 @@ const CreateNewBlog: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const quillRef = useRef<ReactQuill>(null);
   const cardImageInputRef = useRef<HTMLInputElement>(null);
+  const [createPost, { loading: isCreatingPost }] =
+    useMutation(CreatePostDocument);
 
   const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${
     import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
@@ -264,22 +267,13 @@ const CreateNewBlog: React.FC = () => {
 
     try {
       createPostSchema.parse(blogData);
-      if (!token) {
-        toast({
-          title: "Authentication Error",
-          description: "Please log in.",
-          variant: "destructive",
-        });
-        navigate("/signin");
-        return;
-      }
-      await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/posts`,
-        blogData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+
+      await createPost({
+        variables: {
+          input: blogData,
+        },
+      });
+
       toast({ title: "Blog Created", description: "Successfully created." });
       navigate("/");
     } catch (error: unknown) {
@@ -297,7 +291,10 @@ const CreateNewBlog: React.FC = () => {
 
       toast({
         title: "Error",
-        description: "Failed to create blog post.",
+        description: getGraphQLErrorMessage(
+          error,
+          "Failed to create blog post.",
+        ),
         variant: "destructive",
       });
     }
@@ -556,10 +553,14 @@ const CreateNewBlog: React.FC = () => {
               </Button>
               <Button
                 type="submit"
-                disabled={isUploadingCardImage}
+                disabled={isUploadingCardImage || isCreatingPost}
                 className="bg-zinc-300 hover:bg-zinc-400 text-zinc-900"
               >
-                {isUploadingCardImage ? "Uploading..." : "Publish Post"}
+                {isUploadingCardImage
+                  ? "Uploading..."
+                  : isCreatingPost
+                    ? "Publishing..."
+                    : "Publish Post"}
               </Button>
             </div>
           </form>
