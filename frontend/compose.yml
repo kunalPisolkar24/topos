@@ -3,16 +3,17 @@ services:
     build:
       context: ..
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL}
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL}
+        VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME}
+        VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET}
     container_name: ${FRONTEND_CONTAINER}
     restart: unless-stopped
     ports:
       - "${FRONTEND_EXT_PORT}:${FRONTEND_INT_PORT}"
     environment:
-      NODE_ENV: development
-      VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL}
-      VITE_BACKEND_URL: ${VITE_BACKEND_URL}
-      VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME}
-      VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET}
+      PORT: ${FRONTEND_INT_PORT}
     depends_on:
       - gateway
     networks:
