@@ -12,12 +12,11 @@ interface BlogCardProps {
   snippet: string;
   author: {
     name: string;
-    avatarUrl: string | null; 
+    avatarUrl: string | null;
   };
   tags: string[];
-  slug: string;
-  id: number;
-  publishedAt: Date;
+  id: string;
+  publishedAt: Date | string;
 }
 
 const MAX_VISIBLE_TAGS = 3;
@@ -104,7 +103,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8 border border-zinc-700">
                   <AvatarImage
-                    src={author.avatarUrl || undefined} // Updated to handle null
+                    src={author.avatarUrl || undefined}
                     alt={author.name}
                   />
                   <AvatarFallback className="bg-zinc-800 text-zinc-300">
