@@ -33,7 +33,7 @@ import {
 import { toast } from "../../hooks/use-toast";
 import { CreatePostDocument } from "@/graphql/content-documents";
 import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
-import { createPostSchema } from "@kunalpisolkar24/blogapp-common";
+import { createPostSchema } from "@/lib/post-input";
 import { StickyNavbar } from "../layouts";
 
 const CreateNewBlog: React.FC = () => {
@@ -266,11 +266,11 @@ const CreateNewBlog: React.FC = () => {
     };
 
     try {
-      createPostSchema.parse(blogData);
+      const parsedData = createPostSchema.parse(blogData);
 
       await createPost({
         variables: {
-          input: blogData,
+          input: parsedData,
         },
       });
 
