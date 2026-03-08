@@ -1,4 +1,4 @@
-import { HttpResponse, graphql, http } from "msw";
+import { HttpResponse, graphql } from "msw";
 import userEvent from "@testing-library/user-event";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
@@ -24,7 +24,7 @@ describe("UserProfile", () => {
     )}`;
     const expectedName = sanitizeProfileName(rawName);
     const expectedBioInput = sanitizeProfileBioInput(rawBio);
-    const expectedBio = sanitizeProfileBio(rawBio);
+    const expectedBio = sanitizeProfileBio(expectedBioInput);
     let receivedVariables:
       | { name?: string; bio?: string | null }
       | undefined;
@@ -71,10 +71,21 @@ describe("UserProfile", () => {
           },
         });
       }),
-      http.get("http://localhost:8787/api/users/1/posts", () =>
+      graphqlApi.query("MyPosts", () =>
         HttpResponse.json({
-          data: [],
-          totalPages: 1,
+          data: {
+            me: {
+              __typename: "User",
+              id: "1",
+              posts: {
+                __typename: "PaginatedPosts",
+                posts: [],
+                totalPages: 1,
+                currentPage: 1,
+                totalPosts: 0,
+              },
+            },
+          },
         }),
       ),
     );

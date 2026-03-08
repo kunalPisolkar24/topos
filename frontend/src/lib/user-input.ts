@@ -36,10 +36,10 @@ const normalizeMultilineText = (value: string) =>
 export const getCharacterCount = (value: string) => Array.from(value).length;
 
 export const sanitizeUsernameInput = (value: string) =>
-  clampCharacters(normalizeSingleLineText(value), USERNAME_MAX_LENGTH);
+  clampCharacters(normalizeSingleLineText(value), USERNAME_MAX_LENGTH).trim();
 
 export const sanitizeProfileName = (value: string) =>
-  clampCharacters(normalizeSingleLineText(value), PROFILE_NAME_MAX_LENGTH);
+  clampCharacters(normalizeSingleLineText(value), PROFILE_NAME_MAX_LENGTH).trim();
 
 export const sanitizeProfileBioInput = (value: string) =>
   clampCharacters(normalizeText(value), PROFILE_BIO_MAX_LENGTH);
