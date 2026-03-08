@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { StickyNavbar } from '../layouts';
-import { BlogCard } from '../blog';
-import { BlogCardSkeleton } from '@/components/skeletons';
+import React, { useEffect, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@apollo/client/react";
+import { StickyNavbar } from "../layouts";
+import { BlogCard } from "../blog";
+import { BlogCardSkeleton } from "@/components/skeletons";
 import {
   Pagination,
   PaginationContent,
@@ -12,125 +12,100 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { SearchPostsDocument } from "@/graphql/content-documents";
+import { buildSearchPagination, mapPostToBlogCardItem } from "@/lib/content";
 
-interface PostSearchResult {
-  postId: number;
-  title: string;
-  authorName: string;
-  imageUrl: string | null;
-  createdAt: string;
-}
-
-interface FormattedPostForCard {
-  id: number;
-  title: string;
-  imageUrl: string | null;
-  snippet: string;
-  author: {
-    name: string;
-    avatarUrl: string | null;
-  };
-  tags: string[];
-  slug: string;
-  publishedAt: Date;
-}
-
-interface PaginationInfo {
-  currentPage: number;
-  totalPages: number;
-  totalResults: number;
-}
-
-const DEFAULT_PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80";
-
-const formatPostDataForBlogCard = (post: PostSearchResult): FormattedPostForCard => ({
-  id: post.postId,
-  title: post.title,
-  imageUrl: post.imageUrl,
-  snippet: 'Full content available after clicking...',
-  author: { name: post.authorName, avatarUrl: null },
-  tags: [],
-  slug: `post-${post.postId}`,
-  publishedAt: new Date(post.createdAt),
-});
+const SEARCH_RESULTS_PAGE_SIZE = 6;
 
 const SearchResultsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const query = searchParams.get('q');
-  const page = parseInt(searchParams.get('page') || '1', 10);
-
-  const [results, setResults] = useState<FormattedPostForCard[]>([]);
-  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const query = searchParams.get("q")?.trim() ?? "";
+  const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+  const page = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage;
 
   useEffect(() => {
     if (!query) {
-      navigate('/');
-      return;
+      navigate("/");
     }
+  }, [navigate, query]);
 
-    const fetchResults = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axios.get<{ data: PostSearchResult[]; pagination: PaginationInfo }>(
-          `${import.meta.env.VITE_BACKEND_URL}/api/search?q=${encodeURIComponent(query)}&page=${page}&limit=6`
-        );
-        setResults(response.data.data.map(formatPostDataForBlogCard));
-        setPaginationInfo(response.data.pagination);
-      } catch (error) {
-        console.error('Failed to fetch search results:', error);
-        setResults([]);
-        setPaginationInfo(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const { data, loading } = useQuery(SearchPostsDocument, {
+    variables: {
+      query,
+      page,
+      limit: SEARCH_RESULTS_PAGE_SIZE,
+    },
+    skip: query.length === 0,
+    notifyOnNetworkStatusChange: true,
+  });
 
-    fetchResults();
+  const results = useMemo(
+    () => data?.searchPosts.hits.map(mapPostToBlogCardItem) ?? [],
+    [data],
+  );
+
+  const paginationInfo = useMemo(
+    () =>
+      buildSearchPagination(
+        data?.searchPosts.total ?? 0,
+        page,
+        SEARCH_RESULTS_PAGE_SIZE,
+      ),
+    [data, page],
+  );
+
+  useEffect(() => {
     window.scrollTo(0, 0);
-  }, [query, page, navigate]);
+  }, [page, query]);
 
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = (nextPage: number) => {
     if (query) {
-      setSearchParams({ q: query, page: newPage.toString() });
+      setSearchParams({ q: query, page: nextPage.toString() });
     }
   };
 
   const renderPagination = () => {
-    if (!paginationInfo || paginationInfo.totalPages <= 1) {
+    if (paginationInfo.totalPages <= 1) {
       return null;
     }
-
-    const { currentPage, totalPages } = paginationInfo;
 
     return (
       <Pagination>
         <PaginationContent>
           <PaginationItem>
-            {currentPage > 1 && (
+            {paginationInfo.currentPage > 1 && (
               <PaginationPrevious
                 href="#"
-                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handlePageChange(paginationInfo.currentPage - 1);
+                }}
               />
             )}
           </PaginationItem>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <PaginationItem key={i}>
+          {Array.from({ length: paginationInfo.totalPages }, (_, index) => (
+            <PaginationItem key={index}>
               <PaginationLink
                 href="#"
-                onClick={(e) => { e.preventDefault(); handlePageChange(i + 1); }}
-                isActive={currentPage === i + 1}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handlePageChange(index + 1);
+                }}
+                isActive={paginationInfo.currentPage === index + 1}
               >
-                {i + 1}
+                {index + 1}
               </PaginationLink>
             </PaginationItem>
           ))}
           <PaginationItem>
-            {currentPage < totalPages && (
+            {paginationInfo.currentPage < paginationInfo.totalPages && (
               <PaginationNext
                 href="#"
-                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handlePageChange(paginationInfo.currentPage + 1);
+                }}
               />
             )}
           </PaginationItem>
@@ -142,40 +117,36 @@ const SearchResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-900/20">
       <StickyNavbar />
-      <main className="container mx-auto py-8 mt-[70px]">
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-8 m-6 max-w-7xl lg:mx-auto">
-            {Array.from({ length: 5 }).map((_, index) => <BlogCardSkeleton key={index} />)}
+      <main className="container mx-auto mt-[70px] py-8">
+        {loading ? (
+          <div className="m-6 grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-1 lg:mx-auto">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <BlogCardSkeleton key={index} />
+            ))}
           </div>
         ) : (
           <>
-            <div className='max-w-7xl lg:mx-auto px-4'>
-              <h1 className="text-3xl font-bold text-zinc-100 mb-2">
+            <div className="max-w-7xl px-4 lg:mx-auto">
+              <h1 className="mb-2 text-3xl font-bold text-zinc-100">
                 Search Results for "{query}"
               </h1>
-              <p className="text-zinc-400 mb-8">
-                {paginationInfo?.totalResults ?? 0} posts found.
+              <p className="mb-8 text-zinc-400">
+                {data?.searchPosts.total ?? 0} posts found.
               </p>
             </div>
-            
+
             {results.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-8 m-6 max-w-7xl lg:mx-auto">
-                {results.map(post => (
-                  <BlogCard 
-                    key={post.id} 
-                    {...post} 
-                    imageUrl={post.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} 
-                  />
+              <div className="m-6 grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-1 lg:mx-auto">
+                {results.map((post) => (
+                  <BlogCard key={post.id} {...post} />
                 ))}
               </div>
             ) : (
-              <p className="text-center text-zinc-400 text-xl mt-16">
+              <p className="mt-16 text-center text-xl text-zinc-400">
                 No posts found matching your query.
               </p>
             )}
-            <div className="mt-12">
-              {renderPagination()}
-            </div>
+            <div className="mt-12">{renderPagination()}</div>
           </>
         )}
       </main>
