@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +32,28 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "../../hooks/use-toast";
-import { CreatePostDocument } from "@/graphql/content-documents";
+import {
+  CreatePostDocument,
+  GeneratePostContentDocument,
+  GenerateTagsDocument,
+} from "@/graphql/content-documents";
 import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 import { createPostSchema } from "@/lib/post-input";
 import { StickyNavbar } from "../layouts";
+
+const MIN_TAG_TITLE_LENGTH = 5;
+const MIN_TAG_BODY_LENGTH = 80;
+const MIN_PROMPT_LENGTH = 30;
+
+const toPlainText = (value: string) =>
+  value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeTags = (values: string[]) =>
+  Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
 const CreateNewBlog: React.FC = () => {
   const navigate = useNavigate();
@@ -47,10 +66,19 @@ const CreateNewBlog: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [postPrompt, setPostPrompt] = useState("");
+  const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
+  const [isSummaryVisible, setIsSummaryVisible] = useState(false);
   const quillRef = useRef<ReactQuill>(null);
   const cardImageInputRef = useRef<HTMLInputElement>(null);
   const [createPost, { loading: isCreatingPost }] =
     useMutation(CreatePostDocument);
+  const [generateTags, { loading: isGeneratingTags }] = useMutation(
+    GenerateTagsDocument
+  );
+  const [generatePostContent, { loading: isGeneratingPost }] = useMutation(
+    GeneratePostContentDocument
+  );
 
   const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${
     import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
@@ -207,6 +235,116 @@ const CreateNewBlog: React.FC = () => {
     "background",
   ];
 
+  const contentText = useMemo(() => toPlainText(content), [content]);
+  const canGenerateTags =
+    title.trim().length >= MIN_TAG_TITLE_LENGTH &&
+    contentText.length >= MIN_TAG_BODY_LENGTH;
+  const canGeneratePost = postPrompt.trim().length >= MIN_PROMPT_LENGTH;
+
+  const handleGenerateTags = async () => {
+    const trimmedTitle = title.trim();
+    const trimmedBody = contentText;
+
+    if (!canGenerateTags) {
+      toast({
+        title: "Not Enough Content",
+        description:
+          "Add a longer title and more content before generating tags.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data } = await generateTags({
+        variables: {
+          title: trimmedTitle,
+          body: trimmedBody,
+        },
+      });
+
+      const generated = normalizeTags(data?.generateTags ?? []);
+
+      if (generated.length === 0) {
+        toast({
+          title: "No Tags Generated",
+          description: "Try adding more context and generate again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const merged = normalizeTags([...tags, ...generated]);
+      setTags(merged);
+      toast({
+        title: "Tags Generated",
+        description: `Added ${generated.length} tag${generated.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      console.error("Error generating tags:", error);
+      toast({
+        title: "Tag Generation Failed",
+        description: getGraphQLErrorMessage(
+          error,
+          "Unable to generate tags right now.",
+        ),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGeneratePost = async () => {
+    const trimmedPrompt = postPrompt.trim();
+
+    if (!canGeneratePost) {
+      toast({
+        title: "Prompt Too Short",
+        description: "Provide a longer prompt to generate a full draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data } = await generatePostContent({
+        variables: {
+          prompt: trimmedPrompt,
+        },
+      });
+
+      const generated = data?.generatePostContent;
+
+      if (!generated?.title || !generated?.body) {
+        toast({
+          title: "Incomplete Draft",
+          description: "The generated draft is missing required content.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTitle(generated.title);
+      setContent(generated.body);
+      setTags(normalizeTags(generated.tags ?? []));
+      setGeneratedSummary(generated.summary ?? null);
+      setIsSummaryVisible(false);
+      toast({
+        title: "Draft Generated",
+        description: "Title, content, and tags have been updated.",
+      });
+    } catch (error) {
+      console.error("Error generating post content:", error);
+      toast({
+        title: "Post Generation Failed",
+        description: getGraphQLErrorMessage(
+          error,
+          "Unable to generate a draft right now.",
+        ),
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       setTags([...tags, newTag.trim()]);
@@ -234,6 +372,27 @@ const CreateNewBlog: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const trimmedTitle = title.trim();
+    const trimmedBody = contentText;
+
+    if (!trimmedTitle) {
+      toast({
+        title: "Missing Title",
+        description: "Please add a title before publishing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!trimmedBody) {
+      toast({
+        title: "Missing Content",
+        description: "Please add blog content before publishing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     let finalCardImageUrl = cardImageUrl;
 
     if (cardImage && !finalCardImageUrl) {
@@ -259,7 +418,7 @@ const CreateNewBlog: React.FC = () => {
     }
 
     const blogData = {
-      title,
+      title: trimmedTitle,
       body: content,
       tags,
       imageUrl: finalCardImageUrl,
@@ -343,6 +502,75 @@ const CreateNewBlog: React.FC = () => {
                   className="text-xl prose p-4 bg-zinc-800/20 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500"
                   required
                 />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-zinc-100 flex items-center">
+                  <Sparkles className="mr-2 h-5 w-5 text-zinc-400" />
+                  AI Draft Generator
+                </CardTitle>
+                <p className="text-sm text-zinc-400">
+                  Generate a full draft from a prompt. Summary is saved but
+                  hidden by default.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Textarea
+                    value={postPrompt}
+                    onChange={(e) => setPostPrompt(e.target.value)}
+                    placeholder="Describe the post you want to generate..."
+                    className="min-h-[120px] bg-zinc-900/40 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      type="button"
+                      onClick={handleGeneratePost}
+                      disabled={isGeneratingPost || !canGeneratePost}
+                      className="bg-zinc-300 hover:bg-zinc-400 text-zinc-900"
+                    >
+                      {isGeneratingPost ? "Generating..." : "Generate Draft"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setPostPrompt("");
+                        setGeneratedSummary(null);
+                        setIsSummaryVisible(false);
+                      }}
+                      disabled={!postPrompt && !generatedSummary}
+                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Clear Prompt
+                    </Button>
+                  </div>
+                  {generatedSummary && (
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsSummaryVisible((value) => !value)}
+                        className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                      >
+                        {isSummaryVisible ? "Hide Summary" : "View Summary"}
+                      </Button>
+                      {isSummaryVisible && (
+                        <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-4">
+                          <p className="text-sm text-zinc-200 whitespace-pre-wrap">
+                            {generatedSummary}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-zinc-500">
+                    A longer prompt produces better results. Generating a draft
+                    will replace the current title, content, and tags.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -482,62 +710,78 @@ const CreateNewBlog: React.FC = () => {
                     </p>
                   )}
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                    >
-                      <Tag className="mr-2 h-4 w-4" />
-                      Add Tags
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800">
-                    <DialogHeader>
-                      <DialogTitle className="text-zinc-100">
-                        Add a new tag
-                      </DialogTitle>
-                      <DialogDescription className="text-zinc-400">
-                        Enter a new tag for your blog post. Click add when
-                        you're done.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <Input
-                        placeholder="Enter tag name"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddTag();
-                          }
-                        }}
-                      />
-                    </div>
-                    <DialogFooter>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
                       <Button
-                        type="button"
                         variant="outline"
-                        className="border-zinc-700 text-zinc-300"
-                        onClick={() => {
-                          setIsDialogOpen(false);
-                          setNewTag("");
-                        }}
+                        className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
                       >
-                        Cancel
+                        <Tag className="mr-2 h-4 w-4" />
+                        Add Tags
                       </Button>
-                      <Button
-                        type="button"
-                        onClick={handleAddTag}
-                        className="bg-zinc-300 hover:bg-zinc-400"
-                      >
-                        Add Tag
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800">
+                      <DialogHeader>
+                        <DialogTitle className="text-zinc-100">
+                          Add a new tag
+                        </DialogTitle>
+                        <DialogDescription className="text-zinc-400">
+                          Enter a new tag for your blog post. Click add when
+                          you're done.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <Input
+                          placeholder="Enter tag name"
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-zinc-700 text-zinc-300"
+                          onClick={() => {
+                            setIsDialogOpen(false);
+                            setNewTag("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleAddTag}
+                          className="bg-zinc-300 hover:bg-zinc-400"
+                        >
+                          Add Tag
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGenerateTags}
+                    disabled={isGeneratingTags || !canGenerateTags}
+                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {isGeneratingTags ? "Generating..." : "Generate Tags"}
+                  </Button>
+                </div>
+                <p className="text-xs text-zinc-500 mt-3">
+                  Generate tags from your title and content once you have enough
+                  text.
+                </p>
               </CardContent>
             </Card>
 

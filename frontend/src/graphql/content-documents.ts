@@ -63,6 +63,14 @@ export interface UpdatePostInput {
   imageUrl?: string | null;
 }
 
+export interface GeneratedPost {
+  __typename?: "GeneratedPost";
+  title: string;
+  body: string;
+  summary: string;
+  tags: string[];
+}
+
 export interface PostsQueryVariables {
   page?: number;
   limit?: number;
@@ -132,6 +140,25 @@ export interface DeletePostMutationVariables {
 export interface DeletePostMutation {
   __typename?: "Mutation";
   deletePost: boolean;
+}
+
+export interface GenerateTagsMutationVariables {
+  title: string;
+  body: string;
+}
+
+export interface GenerateTagsMutation {
+  __typename?: "Mutation";
+  generateTags: string[];
+}
+
+export interface GeneratePostContentMutationVariables {
+  prompt: string;
+}
+
+export interface GeneratePostContentMutation {
+  __typename?: "Mutation";
+  generatePostContent: GeneratedPost;
 }
 
 export interface MyPostsQueryVariables {
@@ -279,6 +306,26 @@ export const DeletePostDocument = gql`
     deletePost(id: $id)
   }
 ` as DocumentNode<DeletePostMutation, DeletePostMutationVariables>;
+
+export const GenerateTagsDocument = gql`
+  mutation GenerateTags($title: String!, $body: String!) {
+    generateTags(title: $title, body: $body)
+  }
+` as DocumentNode<GenerateTagsMutation, GenerateTagsMutationVariables>;
+
+export const GeneratePostContentDocument = gql`
+  mutation GeneratePostContent($prompt: String!) {
+    generatePostContent(prompt: $prompt) {
+      title
+      body
+      summary
+      tags
+    }
+  }
+` as DocumentNode<
+  GeneratePostContentMutation,
+  GeneratePostContentMutationVariables
+>;
 
 export const MyPostsDocument = gql`
   query MyPosts($page: Int, $limit: Int) {
