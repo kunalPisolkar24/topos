@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -20,20 +23,32 @@ type Worker struct {
 	aiService   domain.AIService
 }
 
-func NewWorker(brokers []string, topic string, postService *service.PostService, aiService domain.AIService) *Worker {
+var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
+
+func NewWorker(brokers []string, groupID string, topics []string, postService *service.PostService, aiService domain.AIService) (*Worker, error) {
+	if len(brokers) == 0 {
+		return nil, fmt.Errorf("kafka brokers are required")
+	}
+	if strings.TrimSpace(groupID) == "" {
+		return nil, fmt.Errorf("kafka consumer group id is required")
+	}
+	if len(topics) == 0 {
+		return nil, fmt.Errorf("kafka consumer topics are required")
+	}
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		GroupID:  "content-summary-worker-group",
-		Topic:    topic,
-		MinBytes: 10e3,
-		MaxBytes: 10e6,
+		Brokers:     brokers,
+		GroupID:     groupID,
+		GroupTopics: topics,
+		MinBytes:    10e3,
+		MaxBytes:    10e6,
 	})
 
 	return &Worker{
 		reader:      reader,
 		postService: postService,
 		aiService:   aiService,
-	}
+	}, nil
 }
 
 func (w *Worker) Start(ctx context.Context) {
@@ -72,7 +87,7 @@ func (w *Worker) Start(ctx context.Context) {
 func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	start := time.Now()
 	status := monitoring.StatusOk
-	
+
 	defer func() {
 		duration := time.Since(start).Seconds()
 		monitoring.WorkerJobDuration.WithLabelValues(monitoring.JobGenerate).Observe(duration)
@@ -90,6 +105,11 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 		return fmt.Errorf("unmarshal error: %w", err)
 	}
 
+	if strings.TrimSpace(event.PostID) == "" {
+		status = monitoring.StatusErr
+		return fmt.Errorf("postID is missing")
+	}
+
 	logger.Info("Processing message", "postID", event.PostID)
 
 	post, err := w.postService.GetPost(ctx, event.PostID)
@@ -98,19 +118,47 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 		return fmt.Errorf("failed to fetch post: %w", err)
 	}
 
-	if post.SummaryStatus == "COMPLETED" && post.Summary != "" {
+	if post.SummaryStatus == "COMPLETED" && strings.TrimSpace(post.Summary) != "" {
 		status = monitoring.StatusSkip
 		return nil
 	}
 
-	cleanBody := stripHtml(post.Body)
+	body := post.Body
+	if strings.TrimSpace(body) == "" && strings.TrimSpace(event.Body) != "" {
+		body = event.Body
+	}
+
+	cleanBody := stripHtml(body)
+	if cleanBody == "" {
+		summary := fallbackSummary(cleanBody)
+		if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+			status = monitoring.StatusErr
+			return fmt.Errorf("failed to update post summary: %w", err)
+		}
+		logger.Info("Generated fallback summary", "postID", post.ID)
+		return nil
+	}
+
 	summary, err := w.aiService.GenerateSummary(ctx, cleanBody)
 	if err != nil {
+		status = monitoring.StatusErr
+		fallback := fallbackSummary(cleanBody)
+		if updateErr := w.postService.SetPostSummary(ctx, post.ID, fallback, "FAILED"); updateErr != nil {
+			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
+		}
+		return fmt.Errorf("ai generation error: %w", err)
+	}
+
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		summary = fallbackSummary(cleanBody)
+	}
+	if summary == "" {
 		status = monitoring.StatusErr
 		if updateErr := w.postService.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
-		return fmt.Errorf("ai generation error: %w", err)
+		return fmt.Errorf("empty summary generated")
 	}
 
 	if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
@@ -127,5 +175,37 @@ func (w *Worker) Close() error {
 }
 
 func stripHtml(input string) string {
-	return input
+	if strings.TrimSpace(input) == "" {
+		return ""
+	}
+	decoded := html.UnescapeString(input)
+	stripped := htmlTagRegex.ReplaceAllString(decoded, " ")
+	return normalizeWhitespace(stripped)
+}
+
+func normalizeWhitespace(input string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
+}
+
+func fallbackSummary(input string) string {
+	normalized := normalizeWhitespace(input)
+	if normalized == "" {
+		return "Summary is currently unavailable."
+	}
+	return truncateText(normalized, 240)
+}
+
+func truncateText(input string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(input)
+	if len(runes) <= max {
+		return input
+	}
+	cut := string(runes[:max])
+	if idx := strings.LastIndex(cut, " "); idx > 0 {
+		cut = cut[:idx]
+	}
+	return strings.TrimSpace(cut) + "..."
 }

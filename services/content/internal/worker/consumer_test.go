@@ -75,7 +75,7 @@ func TestWorker_processMessage(t *testing.T) {
 					SummaryStatus: "PENDING",
 				}, nil)
 				ai.On("GenerateSummary", mock.Anything, "Some long content").Return("", errors.New("ai error"))
-				pr.On("UpdateSummary", mock.Anything, "post1", "", "FAILED").Return(nil)
+				pr.On("UpdateSummary", mock.Anything, "post1", mock.Anything, "FAILED").Return(nil)
 			},
 			expectedError: true,
 		},

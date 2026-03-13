@@ -57,7 +57,11 @@ func main() {
 
 	postService := service.NewPostService(postRepo, tagRepo, nil, aiClient)
 
-	w := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaTopic, postService, aiClient)
+	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, postService, aiClient)
+	if err != nil {
+		logger.Error("Failed to initialize worker", "error", err)
+		os.Exit(1)
+	}
 	defer w.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
