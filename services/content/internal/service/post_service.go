@@ -25,11 +25,21 @@ func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository
 	}
 }
 
-func (s *PostService) CreatePost(ctx context.Context, title, body, authorID string, tags []string, imageUrl *string) (*domain.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, title, body, authorID string, tags []string, imageUrl *string, summary *string) (*domain.Post, error) {
 	slug := generateSlug(title)
 
 	for _, tagName := range tags {
 		_, _ = s.tagRepo.CreateOrFind(ctx, tagName)
+	}
+
+	summaryValue := ""
+	summaryStatus := "PENDING"
+	if summary != nil {
+		trimmed := strings.TrimSpace(*summary)
+		if trimmed != "" {
+			summaryValue = trimmed
+			summaryStatus = "COMPLETED"
+		}
 	}
 
 	post := &domain.Post{
@@ -39,8 +49,8 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		AuthorID:      authorID,
 		Tags:          tags,
 		ImageUrl:      imageUrl,
-		Summary:       "",
-		SummaryStatus: "PENDING",
+		Summary:       summaryValue,
+		SummaryStatus: summaryStatus,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}

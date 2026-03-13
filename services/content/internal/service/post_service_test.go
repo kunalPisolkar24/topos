@@ -23,6 +23,7 @@ func TestPostService_CreatePost(t *testing.T) {
 		authorID string
 		tags     []string
 		imageUrl *string
+		summary  *string
 	}
 
 	img := "http://example.com/image.jpg"
@@ -65,6 +66,27 @@ func TestPostService_CreatePost(t *testing.T) {
 			},
 		},
 		{
+			name: "Success_WithSummary",
+			args: args{
+				title:    "AI Title",
+				body:     "AI Body",
+				authorID: "user123",
+				summary:  func() *string { s := "AI Summary"; return &s }(),
+			},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
+					return p.Summary == "AI Summary" && p.SummaryStatus == "COMPLETED"
+				})).Return(&domain.Post{
+					ID:       "post456",
+					Title:    "AI Title",
+					AuthorID: "user123",
+				}, nil)
+
+				ep.On("PublishPostCreated", mock.Anything, mock.Anything).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
 			name: "Success_EventPublishFailure_Ignored",
 			args: args{
 				title:    "Test Title",
@@ -104,7 +126,7 @@ func TestPostService_CreatePost(t *testing.T) {
 			}
 
 			s := NewPostService(pr, tr, ep, ai)
-			got, err := s.CreatePost(context.Background(), tt.args.title, tt.args.body, tt.args.authorID, tt.args.tags, tt.args.imageUrl)
+			got, err := s.CreatePost(context.Background(), tt.args.title, tt.args.body, tt.args.authorID, tt.args.tags, tt.args.imageUrl, tt.args.summary)
 
 			if tt.expectedError {
 				assert.Error(t, err)

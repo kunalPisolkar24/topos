@@ -25,7 +25,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 		tags = append(tags, input.Tags...)
 	}
 
-	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL)
+	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary)
 	if err != nil {
 		return nil, err
 	}

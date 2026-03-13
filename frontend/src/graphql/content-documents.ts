@@ -52,6 +52,7 @@ export interface PaginatedContentPosts {
 export interface CreatePostInput {
   title: string;
   body: string;
+  summary?: string | null;
   tags?: string[] | null;
   imageUrl?: string | null;
 }

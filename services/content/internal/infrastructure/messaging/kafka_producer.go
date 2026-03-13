@@ -61,11 +61,13 @@ func (k *kafkaProducer) Close() error {
 
 func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
 	payload := domain.PostEventPayload{
-		PostID:     post.ID,
-		Title:      post.Title,
-		Body:       post.Body,
-		ImageURL:   post.ImageUrl,
-		CreatedAt:  post.CreatedAt,
+		PostID:        post.ID,
+		Title:         post.Title,
+		Body:          post.Body,
+		ImageURL:      post.ImageUrl,
+		Summary:       post.Summary,
+		SummaryStatus: post.SummaryStatus,
+		CreatedAt:     post.CreatedAt,
 	}
 
 	value, err := json.Marshal(payload)

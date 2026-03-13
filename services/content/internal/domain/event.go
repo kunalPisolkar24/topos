@@ -6,11 +6,13 @@ import (
 )
 
 type PostEventPayload struct {
-	PostID    string    `json:"postId"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	ImageURL  *string   `json:"imageUrl"`
-	CreatedAt time.Time `json:"createdAt"`
+	PostID        string    `json:"postId"`
+	Title         string    `json:"title"`
+	Body          string    `json:"body"`
+	ImageURL      *string   `json:"imageUrl"`
+	Summary       string    `json:"summary,omitempty"`
+	SummaryStatus string    `json:"summaryStatus,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 type EventProducer interface {

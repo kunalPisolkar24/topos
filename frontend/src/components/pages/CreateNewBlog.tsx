@@ -417,9 +417,11 @@ const CreateNewBlog: React.FC = () => {
       return;
     }
 
+    const summaryValue = generatedSummary?.trim();
     const blogData = {
       title: trimmedTitle,
       body: content,
+      summary: summaryValue ? summaryValue : undefined,
       tags,
       imageUrl: finalCardImageUrl,
     };

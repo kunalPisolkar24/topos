@@ -12,6 +12,7 @@ import (
 type CreatePostInput struct {
 	Title    string   `json:"title"`
 	Body     string   `json:"body"`
+	Summary  *string  `json:"summary,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
 	ImageURL *string  `json:"imageUrl,omitempty"`
 }

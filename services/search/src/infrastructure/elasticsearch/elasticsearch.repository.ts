@@ -87,7 +87,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
         query: {
           multi_match: {
             query,
-            fields: ['title^3', 'summary^2', 'body'],
+            fields: ['title^3', 'body'],
             fuzziness: 'AUTO'
           }
         }
