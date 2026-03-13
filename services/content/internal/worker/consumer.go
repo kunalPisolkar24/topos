@@ -118,9 +118,20 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 		return fmt.Errorf("failed to fetch post: %w", err)
 	}
 
-	if post.SummaryStatus == "COMPLETED" && strings.TrimSpace(post.Summary) != "" {
-		status = monitoring.StatusSkip
-		return nil
+	trimmedSummary := strings.TrimSpace(post.Summary)
+	if trimmedSummary != "" {
+		if post.SummaryStatus != "COMPLETED" && post.SummaryStatus != "FAILED" {
+			if err := w.postService.SetPostSummary(ctx, post.ID, trimmedSummary, "COMPLETED"); err != nil {
+				status = monitoring.StatusErr
+				return fmt.Errorf("failed to update post summary: %w", err)
+			}
+			logger.Info("Summary already present, marking completed", "postID", post.ID)
+			return nil
+		}
+		if post.SummaryStatus == "COMPLETED" {
+			status = monitoring.StatusSkip
+			return nil
+		}
 	}
 
 	body := post.Body
