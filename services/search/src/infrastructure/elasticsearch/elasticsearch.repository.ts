@@ -16,7 +16,11 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
   ) {
     this.client = new Client({ 
       node: this.config.ELASTICSEARCH_URL,
-      tls: { rejectUnauthorized: false }
+      tls: { rejectUnauthorized: false },
+      headers: {
+        accept: 'application/vnd.elasticsearch+json; compatible-with=8',
+        'content-type': 'application/vnd.elasticsearch+json; compatible-with=8'
+      }
     });
   }
 
