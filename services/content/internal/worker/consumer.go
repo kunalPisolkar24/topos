@@ -96,15 +96,40 @@ func (w *Worker) Start(ctx context.Context) {
 				continue
 			}
 
-			if err := w.processMessage(ctx, m); err != nil {
-				logger.Error("Failed to process message",
-					"error", err,
+			var processErr error
+			maxRetries := 3
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				processErr = w.processMessage(ctx, m)
+				if processErr == nil {
+					break
+				}
+				logger.Warn("Failed to process message, retrying",
+					"error", processErr,
+					"attempt", attempt,
+					"maxRetries", maxRetries,
 					"offset", m.Offset,
 					"partition", m.Partition,
 				)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Duration(attempt) * 2 * time.Second): // Exponential backoff
+				}
+			}
+
+			if processErr != nil {
+				logger.Error("Message processing failed after all retries. Skipping.",
+					"error", processErr,
+					"offset", m.Offset,
+					"partition", m.Partition,
+				)
+				// Even if it fails entirely, we log it and commit to unblock the partition
+				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
+					logger.Error("Failed to commit message after skipping", "error", commitErr)
+				}
 			} else {
-				if err := w.reader.CommitMessages(ctx, m); err != nil {
-					logger.Error("Failed to commit message", "error", err)
+				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
+					logger.Error("Failed to commit message", "error", commitErr)
 				}
 			}
 		}
