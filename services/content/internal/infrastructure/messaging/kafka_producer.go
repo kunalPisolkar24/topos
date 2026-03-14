@@ -27,7 +27,7 @@ func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		RequiredAcks: kafka.RequireAll,
-		Compression:  compress.Snappy,
+		Compression:  compress.Gzip,
 		Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
 			logger.Info(fmt.Sprintf("Kafka Producer: "+msg, args...))
 		}),
