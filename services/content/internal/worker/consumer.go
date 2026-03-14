@@ -36,23 +36,19 @@ func NewWorker(brokers []string, groupID string, topics []string, postService *s
 		return nil, fmt.Errorf("kafka consumer topics are required")
 	}
 
-	var config kafka.ReaderConfig
-	if len(topics) == 1 {
-		config = kafka.ReaderConfig{
-			Brokers:  brokers,
-			GroupID:  groupID,
-			Topic:    topics[0],
-			MinBytes: 10e3,
-			MaxBytes: 10e6,
-		}
-	} else {
-		config = kafka.ReaderConfig{
-			Brokers:     brokers,
-			GroupID:     groupID,
-			GroupTopics: topics,
-			MinBytes:    10e3,
-			MaxBytes:    10e6,
-		}
+	config := kafka.ReaderConfig{
+		Brokers:     brokers,
+		GroupID:     groupID,
+		GroupTopics: topics,
+		MinBytes:    1,
+		MaxBytes:    10e6,
+		MaxWait:     2 * time.Second,
+		Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+			logger.Info(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
+		}),
+		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+			logger.Error(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
+		}),
 	}
 
 	reader := kafka.NewReader(config)
