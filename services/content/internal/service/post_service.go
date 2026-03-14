@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -63,6 +64,7 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 	if s.eventProducer != nil {
 		if err := s.eventProducer.PublishPostCreated(ctx, createdPost); err != nil {
 			logger.Error("Failed to publish PostCreated event", "error", err, "postID", createdPost.ID)
+			return nil, fmt.Errorf("failed to publish post creation event: %w", err)
 		}
 	}
 
@@ -99,6 +101,7 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 	if s.eventProducer != nil {
 		if err := s.eventProducer.PublishPostUpdated(ctx, updatedPost); err != nil {
 			logger.Error("Failed to publish PostUpdated event", "error", err, "postID", updatedPost.ID)
+			return nil, fmt.Errorf("failed to publish post update event: %w", err)
 		}
 	}
 
@@ -118,6 +121,7 @@ func (s *PostService) DeletePost(ctx context.Context, id string) error {
 	if s.eventProducer != nil {
 		if err := s.eventProducer.PublishPostDeleted(ctx, id); err != nil {
 			logger.Error("Failed to publish PostDeleted event", "error", err, "postID", id)
+			return fmt.Errorf("failed to publish post deletion event: %w", err)
 		}
 	}
 
