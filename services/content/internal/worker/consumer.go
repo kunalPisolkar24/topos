@@ -21,11 +21,13 @@ type Worker struct {
 	reader      *kafka.Reader
 	postService *service.PostService
 	aiService   domain.AIService
+	producer    domain.EventProducer
+	dlqTopic    string
 }
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
 
-func NewWorker(brokers []string, groupID string, topics []string, postService *service.PostService, aiService domain.AIService) (*Worker, error) {
+func NewWorker(brokers []string, groupID string, topics []string, dlqTopic string, postService *service.PostService, aiService domain.AIService, producer domain.EventProducer) (*Worker, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("kafka brokers are required")
 	}
@@ -75,6 +77,8 @@ func NewWorker(brokers []string, groupID string, topics []string, postService *s
 		reader:      reader,
 		postService: postService,
 		aiService:   aiService,
+		producer:    producer,
+		dlqTopic:    dlqTopic,
 	}, nil
 }
 
@@ -113,19 +117,27 @@ func (w *Worker) Start(ctx context.Context) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(time.Duration(attempt) * 2 * time.Second): // Exponential backoff
+				case <-time.After(time.Duration(attempt) * 2 * time.Second):
 				}
 			}
 
 			if processErr != nil {
-				logger.Error("Message processing failed after all retries. Skipping.",
+				logger.Error("Message processing failed after all retries. Sending to DLQ.",
 					"error", processErr,
 					"offset", m.Offset,
 					"partition", m.Partition,
+					"dlqTopic", w.dlqTopic,
 				)
-				// Even if it fails entirely, we log it and commit to unblock the partition
+
+				if w.producer != nil {
+					if dlqErr := w.producer.PublishDeadLetter(ctx, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
+						logger.Error("Failed to publish to DLQ", "error", dlqErr)
+						continue
+					}
+				}
+
 				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
-					logger.Error("Failed to commit message after skipping", "error", commitErr)
+					logger.Error("Failed to commit message after DLQ", "error", commitErr)
 				}
 			} else {
 				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {

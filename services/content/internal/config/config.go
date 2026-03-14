@@ -19,6 +19,7 @@ type Config struct {
 	KafkaTopic      string
 	KafkaConsumerGroupID string
 	KafkaConsumerTopics  []string
+	KafkaDLQTopic        string
 	RedisAddrs      []string
 	RedisMasterName string
 	AIServiceURL    string
@@ -46,6 +47,7 @@ func LoadConfig() *Config {
 		KafkaTopic:      kafkaTopic,
 		KafkaConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
 		KafkaConsumerTopics:  kafkaConsumerTopics,
+		KafkaDLQTopic:       getEnv("KAFKA_DLQ_TOPIC", kafkaTopic+"-dlq"),
 		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "content-redis-sentinel-1:26379,content-redis-sentinel-2:26379,content-redis-sentinel-3:26379")),
 		RedisMasterName: getEnv("REDIS_MASTER_NAME", "contentmaster"),
 		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),

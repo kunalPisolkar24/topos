@@ -15,6 +15,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -55,9 +56,12 @@ func main() {
 	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), redisClient)
 	tagRepo := repository.NewMongoTagRepository(database)
 
-	postService := service.NewPostService(postRepo, tagRepo, nil, aiClient)
+	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
+	defer kafkaProducer.Close()
 
-	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, postService, aiClient)
+	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer, aiClient)
+
+	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, cfg.KafkaDLQTopic, postService, aiClient, kafkaProducer)
 	if err != nil {
 		logger.Error("Failed to initialize worker", "error", err)
 		os.Exit(1)

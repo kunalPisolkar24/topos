@@ -55,6 +55,34 @@ func (k *kafkaProducer) PublishPostDeleted(ctx context.Context, id string) error
 	return k.writer.WriteMessages(ctx, message)
 }
 
+func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
+	dlqPayload := struct {
+		OriginalTopic string    `json:"originalTopic"`
+		Error         string    `json:"error"`
+		Payload       json.RawMessage `json:"payload"`
+		Timestamp     time.Time `json:"timestamp"`
+	}{
+		OriginalTopic: topic,
+		Error:         err.Error(),
+		Payload:       value,
+		Timestamp:     time.Now(),
+	}
+
+	dlqValue, marshalErr := json.Marshal(dlqPayload)
+	if marshalErr != nil {
+		return fmt.Errorf("failed to marshal dlq payload: %w", marshalErr)
+	}
+
+	message := kafka.Message{
+		Topic: topic + "-dlq",
+		Key:   key,
+		Value: dlqValue,
+		Time:  time.Now(),
+	}
+
+	return k.writer.WriteMessages(ctx, message)
+}
+
 func (k *kafkaProducer) Close() error {
 	return k.writer.Close()
 }
