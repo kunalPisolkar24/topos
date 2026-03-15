@@ -52,7 +52,7 @@ func (k *kafkaProducer) PublishPostDeleted(ctx context.Context, id string) error
 		Value: nil,
 		Time:  time.Now(),
 	}
-	return k.writer.WriteMessages(ctx, message)
+	return k.writeMessages(ctx, message)
 }
 
 func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
@@ -80,7 +80,7 @@ func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key
 		Time:  time.Now(),
 	}
 
-	return k.writer.WriteMessages(ctx, message)
+	return k.writeMessages(ctx, message)
 }
 
 func (k *kafkaProducer) Close() error {
@@ -109,5 +109,11 @@ func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
 		Time:  time.Now(),
 	}
 
-	return k.writer.WriteMessages(ctx, message)
+	return k.writeMessages(ctx, message)
+}
+
+func (k *kafkaProducer) writeMessages(ctx context.Context, msgs ...kafka.Message) error {
+	publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return k.writer.WriteMessages(publishCtx, msgs...)
 }
