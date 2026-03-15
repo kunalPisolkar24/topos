@@ -8,3 +8,5 @@ export const createPostSchema: z.ZodType<CreatePostInput> = z.object({
   tags: z.array(z.string().trim().min(1, "Tags cannot be empty")).nullish(),
   imageUrl: z.string().url("Invalid image URL format").nullish(),
 });
+
+export type CreatePostFormValues = z.infer<typeof createPostSchema>;
