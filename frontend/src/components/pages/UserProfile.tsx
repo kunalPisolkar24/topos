@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
+"use client";
+
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { Calendar, Camera, Edit, FileText, Loader2, Mail } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,292 +17,33 @@ import {
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { UpdateProfileDocument } from "@/graphql/generated/graphql";
-import { MyPostsDocument } from "@/graphql/content-documents";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { toast } from "@/hooks/use-toast";
-import { env } from "@/lib/env";
 import {
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
-  buildProfileUpdatePayload,
   getCharacterCount,
-  sanitizeProfileBioInput,
-  sanitizeProfileFormData,
-  sanitizeProfileName,
-  type EditableProfileFormData,
 } from "@/lib/user-input";
 import { BlogCardSkeleton } from "@/components/skeletons";
-import { mapPostToBlogCardItem } from "@/lib/content";
 import { BlogCard } from "../blog";
 import { StickyNavbar } from "../layouts";
+import { useUserProfile } from "@/hooks/user/use-user-profile";
+import { useUserPosts } from "@/hooks/user/use-user-posts";
 
-interface UserProfileData {
-  id: number;
-  username: string;
-  email: string;
-  name: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  bannerUrl: string | null;
-  createdAt: string;
-}
-
-const DEFAULT_BANNER_URL =
-  "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
+const DEFAULT_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
 
 const UserProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser, loading: isUserLoading } = useCurrentUser();
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [formData, setFormData] = useState<EditableProfileFormData>({
-    name: "",
-    bio: "",
-  });
-
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [updateProfile, { loading: isSaving }] = useMutation(
-    UpdateProfileDocument,
-  );
-
-  const cloudinaryUrl = env.VITE_CLOUDINARY_CLOUD_NAME
-    ? `https://api.cloudinary.com/v1_1/${env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`
-    : "";
-  const cloudinaryUploadPreset = env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  const postsPerPage = 3;
-
-  const userProfile = useMemo<UserProfileData | null>(() => {
-    if (!currentUser) {
-      return null;
-    }
-
-    return {
-      id: Number(currentUser.id),
-      username: currentUser.username,
-      email: currentUser.email,
-      name: currentUser.name ?? null,
-      bio: currentUser.bio ?? null,
-      avatarUrl: currentUser.avatarUrl ?? null,
-      bannerUrl: currentUser.bannerUrl ?? null,
-      createdAt: currentUser.createdAt,
-    };
-  }, [currentUser]);
-
-  const profileFormDefaults = useMemo<EditableProfileFormData>(
-    () =>
-      sanitizeProfileFormData({
-        name: userProfile?.name ?? "",
-        bio: userProfile?.bio ?? "",
-      }),
-    [userProfile],
-  );
-
+  
+  const { state: profileState, handlers: profileHandlers } = useUserProfile(currentUser);
   const {
-    data: postsData,
+    blogs: userBlogs,
     loading: isPostsLoading,
-    error: postsError,
-  } = useQuery(MyPostsDocument, {
-    variables: {
-      page: currentPage,
-      limit: postsPerPage,
-    },
-    skip: !userProfile,
-    notifyOnNetworkStatusChange: true,
-  });
-
-  const userBlogs = useMemo(
-    () => postsData?.me?.posts.posts.map(mapPostToBlogCardItem) ?? [],
-    [postsData],
-  );
-  const totalPages = postsData?.me?.posts.totalPages ?? 1;
-  const totalPosts = postsData?.me?.posts.totalPosts ?? 0;
-
-  useEffect(() => {
-    if (!userProfile || isEditingProfile) {
-      return;
-    }
-
-    setFormData(profileFormDefaults);
-    setAvatarPreview(userProfile.avatarUrl);
-    setBannerPreview(userProfile.bannerUrl);
-  }, [isEditingProfile, profileFormDefaults, userProfile]);
-
-  useEffect(() => {
-    if (!postsError) {
-      return;
-    }
-
-    console.error("Failed to fetch user blogs:", postsError);
-    toast({
-      title: "Error",
-      description: "Could not load your blogs.",
-      variant: "destructive",
-    });
-  }, [postsError]);
-
-  const uploadToCloudinary = async (file: File) => {
-    if (!cloudinaryUrl || !cloudinaryUploadPreset) {
-      toast({
-        title: "Upload Error",
-        description: "Cloudinary configuration missing.",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const uploadFormData = new FormData();
-    uploadFormData.append("file", file);
-    uploadFormData.append("upload_preset", cloudinaryUploadPreset);
-
-    try {
-      const response = await axios.post(cloudinaryUrl, uploadFormData);
-      return response.data.secure_url as string;
-    } catch (error) {
-      console.error("Error uploading to Cloudinary:", error);
-      toast({
-        title: "Image Upload Failed",
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
-
-  const handleFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    fileSetter: React.Dispatch<React.SetStateAction<File | null>>,
-    previewSetter: React.Dispatch<React.SetStateAction<string | null>>,
-  ) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      fileSetter(file);
-      const reader = new FileReader();
-      reader.onloadend = () => previewSetter(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFormChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = event.target;
-
-    if (name !== "name" && name !== "bio") {
-      return;
-    }
-
-    setFormData((previous) => ({
-      ...previous,
-      [name]:
-        name === "name"
-          ? sanitizeProfileName(value)
-          : sanitizeProfileBioInput(value),
-    }));
-  };
-
-  const handleSaveProfile = async () => {
-    if (!userProfile) {
-      return;
-    }
-
-    const sanitizedFormData = sanitizeProfileFormData(formData);
-    const updatePayload: {
-      name?: string;
-      bio?: string | null;
-      avatarUrl?: string | null;
-      bannerUrl?: string | null;
-    } = {
-      ...buildProfileUpdatePayload(sanitizedFormData, profileFormDefaults),
-    };
-
-    setFormData(sanitizedFormData);
-
-    if (avatarFile) {
-      const nextAvatarUrl = await uploadToCloudinary(avatarFile);
-      if (!nextAvatarUrl) {
-        return;
-      }
-      updatePayload.avatarUrl = nextAvatarUrl;
-    }
-
-    if (bannerFile) {
-      const nextBannerUrl = await uploadToCloudinary(bannerFile);
-      if (!nextBannerUrl) {
-        return;
-      }
-      updatePayload.bannerUrl = nextBannerUrl;
-    }
-
-    if (Object.keys(updatePayload).length === 0) {
-      toast({
-        title: "No Changes",
-        description: "You haven't made any changes.",
-      });
-      setIsEditingProfile(false);
-      return;
-    }
-
-    try {
-      const { data } = await updateProfile({
-        variables: updatePayload,
-      });
-
-      const updatedProfile = data?.updateProfile;
-
-      if (!updatedProfile) {
-        throw new Error("Profile update response was empty.");
-      }
-
-      setFormData(
-        sanitizeProfileFormData({
-          name: updatedProfile.name || "",
-          bio: updatedProfile.bio || "",
-        }),
-      );
-      setAvatarPreview(updatedProfile.avatarUrl ?? null);
-      setBannerPreview(updatedProfile.bannerUrl ?? null);
-      setAvatarFile(null);
-      setBannerFile(null);
-      setIsEditingProfile(false);
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully.",
-      });
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save your profile.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCancel = () => {
-    setIsEditingProfile(false);
-
-    if (!userProfile) {
-      return;
-    }
-
-    setFormData(profileFormDefaults);
-    setAvatarPreview(userProfile.avatarUrl);
-    setBannerPreview(userProfile.bannerUrl);
-    setAvatarFile(null);
-    setBannerFile(null);
-  };
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
+    currentPage,
+    totalPages,
+    totalPosts,
+    handlePageChange,
+  } = useUserPosts(currentUser?.id);
 
   if (isUserLoading) {
     return (
@@ -328,12 +69,10 @@ const UserProfile: React.FC = () => {
     );
   }
 
-  if (!userProfile) {
-    return null;
-  }
+  if (!currentUser) return null;
 
-  const bannerSrc = bannerPreview || userProfile.bannerUrl || DEFAULT_BANNER_URL;
-  const displayName = userProfile.name || userProfile.username;
+  const bannerSrc = profileState.bannerPreview || currentUser.bannerUrl || DEFAULT_BANNER_URL;
+  const displayName = currentUser.name || currentUser.username;
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -346,7 +85,7 @@ const UserProfile: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
 
-        {isEditingProfile && (
+        {profileState.isEditingProfile && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/70">
             <label
               htmlFor="bannerUpload"
@@ -360,9 +99,7 @@ const UserProfile: React.FC = () => {
                 id="bannerUpload"
                 type="file"
                 accept="image/*"
-                onChange={(event) =>
-                  handleFileChange(event, setBannerFile, setBannerPreview)
-                }
+                onChange={(e) => profileHandlers.handleFileChange(e, "banner")}
                 className="hidden"
               />
             </label>
@@ -375,9 +112,9 @@ const UserProfile: React.FC = () => {
           <div className="relative -mt-16 sm:-mt-20">
             <Card className="border-zinc-800 bg-zinc-900/50 shadow-lg backdrop-blur-sm">
               <CardHeader className="flex flex-row justify-end p-4 pb-0">
-                {!isEditingProfile && (
+                {!profileState.isEditingProfile && (
                   <Button
-                    onClick={() => setIsEditingProfile(true)}
+                    onClick={() => profileHandlers.setIsEditingProfile(true)}
                     variant="outline"
                     size="sm"
                     className="border-zinc-700 text-zinc-300"
@@ -392,15 +129,15 @@ const UserProfile: React.FC = () => {
                   <div className="group relative flex-shrink-0">
                     <Avatar className="h-32 w-32 border-4 border-zinc-950 shadow-lg md:h-40 md:w-40">
                       <AvatarImage
-                        src={avatarPreview || undefined}
-                        alt={userProfile.name || userProfile.username}
+                        src={profileState.avatarPreview || undefined}
+                        alt={currentUser.name || currentUser.username}
                       />
                       <AvatarFallback className="bg-zinc-800 text-4xl font-bold text-zinc-300">
-                        {userProfile.name?.charAt(0).toUpperCase() ||
-                          userProfile.username.charAt(0).toUpperCase()}
+                        {currentUser.name?.charAt(0).toUpperCase() ||
+                          currentUser.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    {isEditingProfile && (
+                    {profileState.isEditingProfile && (
                       <label
                         htmlFor="avatarUpload"
                         className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-zinc-50 text-zinc-950 shadow-md transition-transform hover:scale-110"
@@ -410,20 +147,14 @@ const UserProfile: React.FC = () => {
                           id="avatarUpload"
                           type="file"
                           accept="image/*"
-                          onChange={(event) =>
-                            handleFileChange(
-                              event,
-                              setAvatarFile,
-                              setAvatarPreview,
-                            )
-                          }
+                          onChange={(e) => profileHandlers.handleFileChange(e, "avatar")}
                           className="hidden"
                         />
                       </label>
                     )}
                   </div>
 
-                  {!isEditingProfile && (
+                  {!profileState.isEditingProfile && (
                     <div className="mt-4 w-full min-w-0 sm:ml-6">
                       <div className="space-y-2">
                         <h1 className="max-w-full break-words text-3xl font-bold text-zinc-100 [overflow-wrap:anywhere] md:text-4xl">
@@ -431,12 +162,10 @@ const UserProfile: React.FC = () => {
                         </h1>
                         <div className="flex w-full flex-wrap items-center justify-center gap-2 text-zinc-400 sm:justify-start">
                           <Mail className="h-4 w-4" />
-                          <p className="break-all">{userProfile.email}</p>
+                          <p className="break-all">{currentUser.email}</p>
                         </div>
                         <p className="max-h-48 max-w-2xl overflow-y-auto whitespace-pre-wrap break-words pt-2 pr-2 text-sm leading-relaxed text-zinc-400 [overflow-wrap:anywhere] md:text-base">
-                          {userProfile.bio || (
-                            <span className="italic">No bio added yet.</span>
-                          )}
+                          {currentUser.bio || <span className="italic">No bio added yet.</span>}
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-4 pt-2 sm:justify-start">
                           <div className="flex items-center gap-2 text-sm text-zinc-300">
@@ -447,13 +176,10 @@ const UserProfile: React.FC = () => {
                             <Calendar className="h-4 w-4 text-zinc-400" />
                             Joined{" "}
                             <b className="font-normal">
-                              {new Date(userProfile.createdAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "long",
-                                  year: "numeric",
-                                },
-                              )}
+                              {new Date(currentUser.createdAt).toLocaleDateString("en-US", {
+                                month: "long",
+                                year: "numeric",
+                              })}
                             </b>
                           </div>
                         </div>
@@ -462,42 +188,36 @@ const UserProfile: React.FC = () => {
                   )}
                 </div>
 
-                {isEditingProfile && (
+                {profileState.isEditingProfile && (
                   <div className="mt-8 w-full space-y-4 text-left">
                     <div className="space-y-2">
-                      <label
-                        htmlFor="name"
-                        className="text-sm font-medium text-zinc-300"
-                      >
+                      <label htmlFor="name" className="text-sm font-medium text-zinc-300">
                         Display Name
                       </label>
                       <Input
                         id="name"
                         name="name"
-                        value={formData.name}
-                        onChange={handleFormChange}
+                        value={profileState.formData.name}
+                        onChange={profileHandlers.handleFormChange}
                         maxLength={PROFILE_NAME_MAX_LENGTH}
                         className="border-zinc-700 bg-zinc-800/50 text-zinc-100 placeholder:text-zinc-500"
                       />
                       <div className="flex items-center justify-between text-xs text-zinc-500">
                         <span>Up to {PROFILE_NAME_MAX_LENGTH} characters</span>
                         <span>
-                          {getCharacterCount(formData.name)}/{PROFILE_NAME_MAX_LENGTH}
+                          {getCharacterCount(profileState.formData.name)}/{PROFILE_NAME_MAX_LENGTH}
                         </span>
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label
-                        htmlFor="bio"
-                        className="text-sm font-medium text-zinc-300"
-                      >
+                      <label htmlFor="bio" className="text-sm font-medium text-zinc-300">
                         Bio / About
                       </label>
                       <Textarea
                         id="bio"
                         name="bio"
-                        value={formData.bio}
-                        onChange={handleFormChange}
+                        value={profileState.formData.bio}
+                        onChange={profileHandlers.handleFormChange}
                         maxLength={PROFILE_BIO_MAX_LENGTH}
                         className="min-h-[100px] w-full rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500"
                         rows={3}
@@ -505,27 +225,25 @@ const UserProfile: React.FC = () => {
                       <div className="flex items-center justify-between text-xs text-zinc-500">
                         <span>Up to {PROFILE_BIO_MAX_LENGTH} characters</span>
                         <span>
-                          {getCharacterCount(formData.bio)}/{PROFILE_BIO_MAX_LENGTH}
+                          {getCharacterCount(profileState.formData.bio)}/{PROFILE_BIO_MAX_LENGTH}
                         </span>
                       </div>
                     </div>
                     <div className="flex flex-col justify-end gap-3 pt-2 sm:flex-row">
                       <Button
-                        onClick={handleCancel}
+                        onClick={profileHandlers.handleCancel}
                         variant="outline"
                         className="border-zinc-700 text-zinc-300"
                       >
                         Cancel
                       </Button>
                       <Button
-                        onClick={() => void handleSaveProfile()}
-                        disabled={isSaving}
+                        onClick={profileHandlers.handleSaveProfile}
+                        disabled={profileState.isSaving}
                         className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200"
                       >
-                        {isSaving && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        {isSaving ? "Saving..." : "Save Changes"}
+                        {profileState.isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {profileState.isSaving ? "Saving..." : "Save Changes"}
                       </Button>
                     </div>
                   </div>
@@ -540,16 +258,12 @@ const UserProfile: React.FC = () => {
             </h2>
             {isPostsLoading ? (
               <div className="grid grid-cols-1 gap-6">
-                {Array.from({ length: postsPerPage }).map((_, index) => (
-                  <BlogCardSkeleton key={index} />
-                ))}
+                {[...Array(3)].map((_, i) => <BlogCardSkeleton key={i} />)}
               </div>
             ) : userBlogs.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 gap-6">
-                  {userBlogs.map((blog) => (
-                    <BlogCard key={blog.id} {...blog} />
-                  ))}
+                  {userBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)}
                 </div>
                 {totalPages > 1 && (
                   <div className="mt-10">
@@ -559,30 +273,22 @@ const UserProfile: React.FC = () => {
                           {currentPage > 1 && (
                             <PaginationPrevious
                               href="#"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handlePageChange(currentPage - 1);
-                              }}
+                              onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
                               className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                             />
                           )}
                         </PaginationItem>
-                        {Array.from({ length: totalPages }, (_, index) => (
-                          <PaginationItem key={index}>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <PaginationItem key={i}>
                             <PaginationLink
                               href="#"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handlePageChange(index + 1);
-                              }}
-                              isActive={currentPage === index + 1}
+                              onClick={(e) => { e.preventDefault(); handlePageChange(i + 1); }}
+                              isActive={currentPage === i + 1}
                               className={`hover:bg-zinc-800 hover:text-zinc-200 ${
-                                currentPage === index + 1
-                                  ? "border-zinc-700 bg-zinc-800 text-zinc-100"
-                                  : "text-zinc-400"
+                                currentPage === i + 1 ? "border-zinc-700 bg-zinc-800 text-zinc-100" : "text-zinc-400"
                               }`}
                             >
-                              {index + 1}
+                              {i + 1}
                             </PaginationLink>
                           </PaginationItem>
                         ))}
@@ -590,10 +296,7 @@ const UserProfile: React.FC = () => {
                           {currentPage < totalPages && (
                             <PaginationNext
                               href="#"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                handlePageChange(currentPage + 1);
-                              }}
+                              onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
                               className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                             />
                           )}
@@ -607,12 +310,8 @@ const UserProfile: React.FC = () => {
               <Card className="border-zinc-800 bg-zinc-900/20">
                 <CardContent className="py-12 text-center">
                   <FileText className="mx-auto mb-4 h-10 w-10 text-zinc-600" />
-                  <h3 className="mb-2 text-xl font-semibold text-zinc-300">
-                    No blogs published yet
-                  </h3>
-                  <p className="mb-6 text-zinc-500">
-                    When you publish a blog, it will appear here.
-                  </p>
+                  <h3 className="mb-2 text-xl font-semibold text-zinc-300">No blogs published yet</h3>
+                  <p className="mb-6 text-zinc-500">When you publish a blog, it will appear here.</p>
                   <Button
                     onClick={() => navigate("/create-blog")}
                     className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200"
