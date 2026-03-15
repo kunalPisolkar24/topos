@@ -2,18 +2,12 @@ import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
-import { z } from "zod";
 import { SigninDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/hooks/use-session-actions";
 import { useState } from "react";
 
-const signinSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-export type SigninFormValues = z.infer<typeof signinSchema>;
+import { signinSchema, type SigninFormValues } from "@/schemas/auth/signin.schema";
 
 export const useSignin = () => {
   const [showPassword, setShowPassword] = useState(false);

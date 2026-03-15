@@ -2,37 +2,13 @@ import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
 import { SignupDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/hooks/use-session-actions";
 import { useState, type ChangeEvent } from "react";
-import { USERNAME_MAX_LENGTH, sanitizeUsernameInput } from "@/lib/user-input";
+import { sanitizeUsernameInput } from "@/lib/user-input";
 
-const signupSchema = z
-  .object({
-    email: z.string().email("Please enter a valid email address"),
-    username: z
-      .string()
-      .transform(sanitizeUsernameInput)
-      .pipe(
-        z
-          .string()
-          .min(3, "Username must be at least 3 characters")
-          .max(
-            USERNAME_MAX_LENGTH,
-            `Username must be ${USERNAME_MAX_LENGTH} characters or less`,
-          ),
-      ),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-export type SignupFormValues = z.infer<typeof signupSchema>;
+import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";
 
 export const useSignup = () => {
   const [showPassword, setShowPassword] = useState(false);
