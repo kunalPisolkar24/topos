@@ -17,6 +17,9 @@ type Config struct {
 	JwtSecret       string
 	KafkaBrokers    []string
 	KafkaTopic      string
+	KafkaConsumerGroupID string
+	KafkaConsumerTopics  []string
+	KafkaDLQTopic        string
 	RedisAddrs      []string
 	RedisMasterName string
 	AIServiceURL    string
@@ -29,13 +32,22 @@ var envLoadOnce sync.Once
 func LoadConfig() *Config {
 	loadEnvIfPresent()
 
+	kafkaTopic := getEnvAny([]string{"CONTENT_KAFKA_TOPIC", "KAFKA_TOPIC"}, "posts")
+	kafkaConsumerTopics := splitAndTrim(getEnv("KAFKA_CONSUMER_TOPICS", ""))
+	if len(kafkaConsumerTopics) == 0 {
+		kafkaConsumerTopics = splitAndTrim(kafkaTopic)
+	}
+
 	return &Config{
 		Port:            getEnv("PORT", "4002"),
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:          getEnv("DB_NAME", "blog_content"),
 		JwtSecret:       getEnv("JWT_SECRET", "secret"),
 		KafkaBrokers:    splitAndTrim(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")),
-		KafkaTopic:      getEnv("KAFKA_TOPIC", "posts"),
+		KafkaTopic:      kafkaTopic,
+		KafkaConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
+		KafkaConsumerTopics:  kafkaConsumerTopics,
+		KafkaDLQTopic:       getEnv("KAFKA_DLQ_TOPIC", kafkaTopic+"-dlq"),
 		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "content-redis-sentinel-1:26379,content-redis-sentinel-2:26379,content-redis-sentinel-3:26379")),
 		RedisMasterName: getEnv("REDIS_MASTER_NAME", "contentmaster"),
 		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),

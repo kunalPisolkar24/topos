@@ -3,18 +3,23 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
+	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/sync/singleflight"
 )
 
 const (
-	entityTTL = 1 * time.Hour
-	listTTL   = 30 * time.Second
+	entityTTL      = 5 * time.Minute
+	listTTL        = 30 * time.Second
+	notFoundTTL    = 1 * time.Minute
+	notFoundMarker = "NF"
 )
 
 type cachedPostRepo struct {
@@ -39,7 +44,9 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	if err != nil {
 		return nil, err
 	}
-	r.invalidate(ctx, id)
+	if err := r.invalidate(ctx, id); err != nil {
+		return nil, err
+	}
 	return updatedPost, nil
 }
 
@@ -48,8 +55,7 @@ func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary s
 	if err != nil {
 		return err
 	}
-	r.invalidate(ctx, id)
-	return nil
+	return r.invalidate(ctx, id)
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
@@ -57,8 +63,7 @@ func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	r.invalidate(ctx, id)
-	return nil
+	return r.invalidate(ctx, id)
 }
 
 func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
@@ -67,6 +72,9 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
 		monitoring.RecordCacheHit()
+		if val == notFoundMarker {
+			return nil, mongo.ErrNoDocuments
+		}
 		var post domain.Post
 		if jsonErr := json.Unmarshal([]byte(val), &post); jsonErr == nil {
 			return &post, nil
@@ -75,50 +83,69 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		monitoring.RecordCacheMiss()
 	}
 
-	v, err, _ := r.sf.Do(key, func() (interface{}, error) {
-		post, err := r.fallback.FindByID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if data, marshalErr := json.Marshal(post); marshalErr == nil {
-			if err := r.redis.Set(context.Background(), key, data, entityTTL).Err(); err == nil {
-				monitoring.RecordCacheSet()
-			}
-		}
-
-		return post, nil
+	ch := r.sf.DoChan(key, func() (interface{}, error) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return r.findByIDInternal(bgCtx, key, id)
 	})
 
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		if res.Val == nil {
+			return nil, mongo.ErrNoDocuments
+		}
+		return res.Val.(*domain.Post), nil
+	}
+}
+
+func (r *cachedPostRepo) findByIDInternal(ctx context.Context, key, id string) (*domain.Post, error) {
+	post, err := r.fallback.FindByID(ctx, id)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			if setErr := r.redis.Set(context.Background(), key, notFoundMarker, notFoundTTL).Err(); setErr == nil {
+				monitoring.RecordCacheSet()
+			}
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	return v.(*domain.Post), nil
+	if data, marshalErr := json.Marshal(post); marshalErr == nil {
+		if setErr := r.redis.Set(context.Background(), key, data, entityTTL).Err(); setErr == nil {
+			monitoring.RecordCacheSet()
+		}
+	}
+
+	return post, nil
 }
 
 func (r *cachedPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:all:%d:%d", page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindAll(ctx, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindAll(fctx, page, limit)
 	})
 }
 
 func (r *cachedPostRepo) FindByAuthor(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:author:%s:%d:%d", authorID, page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindByAuthor(ctx, authorID, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindByAuthor(fctx, authorID, page, limit)
 	})
 }
 
 func (r *cachedPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:tag:%s:%d:%d", tag, page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindByTag(ctx, tag, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindByTag(fctx, tag, page, limit)
 	})
 }
 
-func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn func() (*domain.PaginatedPosts, error)) (*domain.PaginatedPosts, error) {
+func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn func(context.Context) (*domain.PaginatedPosts, error)) (*domain.PaginatedPosts, error) {
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
 		monitoring.RecordCacheHit()
@@ -130,8 +157,11 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 		monitoring.RecordCacheMiss()
 	}
 
-	v, err, _ := r.sf.Do(key, func() (interface{}, error) {
-		pp, err := fetchFn()
+	ch := r.sf.DoChan(key, func() (interface{}, error) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		pp, err := fetchFn(bgCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -145,17 +175,24 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 		return pp, nil
 	})
 
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return res.Val.(*domain.PaginatedPosts), nil
 	}
-
-	return v.(*domain.PaginatedPosts), nil
 }
 
-func (r *cachedPostRepo) invalidate(ctx context.Context, id string) {
+func (r *cachedPostRepo) invalidate(ctx context.Context, id string) error {
 	key := fmt.Sprintf("post:%s", id)
 	r.sf.Forget(key)
-	if err := r.redis.Del(ctx, key).Err(); err == nil {
-		monitoring.RecordCacheDel()
+	if err := r.redis.Del(ctx, key).Err(); err != nil {
+		logger.Error("Critical: Failed to invalidate cache", "key", key, "error", err)
+		return fmt.Errorf("failed to invalidate cache: %w", err)
 	}
+	monitoring.RecordCacheDel()
+	return nil
 }

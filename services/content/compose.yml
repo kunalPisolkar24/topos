@@ -72,6 +72,8 @@ services:
         condition: service_healthy
       content-redis-sentinel-1:
         condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
 
 networks:
   app-network:

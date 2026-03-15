@@ -59,7 +59,7 @@ func main() {
 	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
 	if err != nil {
 		logger.Error("Failed to connect to AI Service", "error", err)
-		os.Exit(1)
+		return
 	}
 
 	database := mongoClient.Database(cfg.DbName)
@@ -82,10 +82,11 @@ func main() {
 	authMiddleware := middleware.AuthMiddleware(cfg)
 	metricsMiddleware := middleware.MetricsMiddleware
 
-	http.Handle("/query", metricsMiddleware(authMiddleware(srv)))
-	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.Handle("/query", metricsMiddleware(authMiddleware(srv)))
+	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := redisClient.Ping(r.Context()).Err(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -98,20 +99,20 @@ func main() {
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: nil,
+		Handler: mux,
 	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Server failed", "error", err)
-			os.Exit(1)
+			stop <- syscall.SIGTERM
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
+	<-stop
 	logger.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

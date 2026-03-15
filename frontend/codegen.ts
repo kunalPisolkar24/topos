@@ -1,8 +1,12 @@
 import type { CodegenConfig } from "@graphql-codegen/cli";
 
 const config: CodegenConfig = {
-  schema: "../services/user/schema.graphql",
-  documents: ["src/graphql/**/*.graphql"],
+  schema: [
+    "../services/user/schema.graphql",
+    "../services/content/graph/schema.graphqls",
+    "../services/search/schema.graphql",
+  ],
+  documents: ["src/**/*.{graphql,ts,tsx}", "!src/graphql/generated/**/*"],
   generates: {
     "./src/graphql/generated/": {
       preset: "client",

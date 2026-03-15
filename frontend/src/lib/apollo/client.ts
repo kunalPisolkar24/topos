@@ -54,12 +54,47 @@ export const apolloClient = new ApolloClient({
   ]),
   cache: new InMemoryCache({
     typePolicies: {
+      Post: {
+        keyFields: ["id"],
+      },
+      Tag: {
+        keyFields: ["id"],
+      },
+      SearchResult: {
+        keyFields: false,
+      },
       User: {
         keyFields: ["id"],
+        fields: {
+          posts: {
+            keyArgs: ["page", "limit"],
+            merge: false,
+          },
+        },
       },
       Query: {
         fields: {
           me: {
+            merge: false,
+          },
+          post: {
+            keyArgs: ["id"],
+            merge: false,
+          },
+          posts: {
+            keyArgs: ["page", "limit"],
+            merge: false,
+          },
+          postsByTag: {
+            keyArgs: ["tag", "page", "limit"],
+            merge: false,
+          },
+          searchPosts: {
+            keyArgs: ["query", "page", "limit"],
+            merge: false,
+          },
+          tags: {
+            keyArgs: ["query", "limit"],
             merge: false,
           },
         },
