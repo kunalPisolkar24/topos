@@ -49,7 +49,7 @@ func main() {
 	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
 	if err != nil {
 		logger.Error("Failed to connect to AI Service", "error", err)
-		os.Exit(1)
+		return
 	}
 
 	database := mongoClient.Database(cfg.DbName)
@@ -64,37 +64,39 @@ func main() {
 	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, cfg.KafkaDLQTopic, postService, aiClient, kafkaProducer)
 	if err != nil {
 		logger.Error("Failed to initialize worker", "error", err)
-		os.Exit(1)
+		return
 	}
 	defer w.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	metricsServer := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: nil,
-	}
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Worker OK"))
 	}))
+
+	metricsServer := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: mux,
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		logger.Info("Starting Worker Metrics Server", "port", cfg.Port)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Metrics server failed", "error", err)
-			cancel()
+			stop <- syscall.SIGTERM
 		}
 	}()
 
 	go w.Start(ctx)
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-stop
 
 	logger.Info("Shutting down worker...")
 	cancel()
