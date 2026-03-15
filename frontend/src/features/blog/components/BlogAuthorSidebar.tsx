@@ -1,5 +1,5 @@
 import type React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Trash2, Edit3 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +46,6 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
   isDeleteDialogOpen,
   setIsDeleteDialogOpen,
 }) => {
-  const navigate = useNavigate();
   const authorInitial = (author.name || author.username).charAt(0).toUpperCase();
 
   return (

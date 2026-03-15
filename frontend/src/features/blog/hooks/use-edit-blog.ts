@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useMutation } from "@apollo/client/react";
 import { UpdatePostDocument, type UpdatePostInput } from "@/graphql/content-documents";
 import { updatePostSchema, type UpdatePostFormValues } from "@/schemas/blog/post.schema";

@@ -10,7 +10,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { type ContentTag } from "@/graphql/content-documents";
-import { useSearchSuggestions, type SearchMode } from "@/features/blog/hooks/use-search-suggestions";
+import { useSearchSuggestions, type SearchMode } from "../hooks/use-search-suggestions";
 import { TagSuggestions } from "./TagSuggestions";
 import { PostSuggestions } from "./PostSuggestions";
 

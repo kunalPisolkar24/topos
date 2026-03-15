@@ -12,7 +12,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { BlogCardSkeleton } from "@/components/skeletons";
-import { BlogCard } from "../blog";
+import { BlogCard } from "@/features/blog";
 
 interface ProfilePostsSectionProps {
   blogs: any[];

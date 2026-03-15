@@ -1,6 +1,6 @@
 import React from "react";
 import { CommandGroup, CommandItem } from "@/components/ui/command";
-import { type SearchPostSuggestion } from "@/features/blog/hooks/use-search-suggestions";
+import { type SearchPostSuggestion } from "../hooks/use-search-suggestions";
 
 interface PostSuggestionsProps {
   posts: SearchPostSuggestion[];
