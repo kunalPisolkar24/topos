@@ -3,18 +3,22 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/sync/singleflight"
 )
 
 const (
-	entityTTL = 1 * time.Hour
-	listTTL   = 30 * time.Second
+	entityTTL      = 1 * time.Hour
+	listTTL        = 30 * time.Second
+	notFoundTTL    = 1 * time.Minute
+	notFoundMarker = "NF"
 )
 
 type cachedPostRepo struct {
@@ -67,6 +71,9 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
 		monitoring.RecordCacheHit()
+		if val == notFoundMarker {
+			return nil, mongo.ErrNoDocuments
+		}
 		var post domain.Post
 		if jsonErr := json.Unmarshal([]byte(val), &post); jsonErr == nil {
 			return &post, nil
@@ -78,19 +85,7 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 	ch := r.sf.DoChan(key, func() (interface{}, error) {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-
-		post, err := r.fallback.FindByID(bgCtx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if data, marshalErr := json.Marshal(post); marshalErr == nil {
-			if err := r.redis.Set(context.Background(), key, data, entityTTL).Err(); err == nil {
-				monitoring.RecordCacheSet()
-			}
-		}
-
-		return post, nil
+		return r.findByIDInternal(bgCtx, key, id)
 	})
 
 	select {
@@ -100,8 +95,32 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		if res.Err != nil {
 			return nil, res.Err
 		}
+		if res.Val == nil {
+			return nil, mongo.ErrNoDocuments
+		}
 		return res.Val.(*domain.Post), nil
 	}
+}
+
+func (r *cachedPostRepo) findByIDInternal(ctx context.Context, key, id string) (*domain.Post, error) {
+	post, err := r.fallback.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			if setErr := r.redis.Set(context.Background(), key, notFoundMarker, notFoundTTL).Err(); setErr == nil {
+				monitoring.RecordCacheSet()
+			}
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if data, marshalErr := json.Marshal(post); marshalErr == nil {
+		if setErr := r.redis.Set(context.Background(), key, data, entityTTL).Err(); setErr == nil {
+			monitoring.RecordCacheSet()
+		}
+	}
+
+	return post, nil
 }
 
 func (r *cachedPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
