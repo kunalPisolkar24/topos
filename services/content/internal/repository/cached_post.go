@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	entityTTL      = 1 * time.Hour
+	entityTTL      = 5 * time.Minute
 	listTTL        = 30 * time.Second
 	notFoundTTL    = 1 * time.Minute
 	notFoundMarker = "NF"
