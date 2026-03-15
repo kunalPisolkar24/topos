@@ -75,8 +75,11 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		monitoring.RecordCacheMiss()
 	}
 
-	v, err, _ := r.sf.Do(key, func() (interface{}, error) {
-		post, err := r.fallback.FindByID(ctx, id)
+	ch := r.sf.DoChan(key, func() (interface{}, error) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		post, err := r.fallback.FindByID(bgCtx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -90,35 +93,39 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		return post, nil
 	})
 
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return res.Val.(*domain.Post), nil
 	}
-
-	return v.(*domain.Post), nil
 }
 
 func (r *cachedPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:all:%d:%d", page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindAll(ctx, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindAll(fctx, page, limit)
 	})
 }
 
 func (r *cachedPostRepo) FindByAuthor(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:author:%s:%d:%d", authorID, page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindByAuthor(ctx, authorID, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindByAuthor(fctx, authorID, page, limit)
 	})
 }
 
 func (r *cachedPostRepo) FindByTag(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
 	key := fmt.Sprintf("posts:tag:%s:%d:%d", tag, page, limit)
-	return r.findPaginated(ctx, key, func() (*domain.PaginatedPosts, error) {
-		return r.fallback.FindByTag(ctx, tag, page, limit)
+	return r.findPaginated(ctx, key, func(fctx context.Context) (*domain.PaginatedPosts, error) {
+		return r.fallback.FindByTag(fctx, tag, page, limit)
 	})
 }
 
-func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn func() (*domain.PaginatedPosts, error)) (*domain.PaginatedPosts, error) {
+func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn func(context.Context) (*domain.PaginatedPosts, error)) (*domain.PaginatedPosts, error) {
 	val, err := r.redis.Get(ctx, key).Result()
 	if err == nil {
 		monitoring.RecordCacheHit()
@@ -130,8 +137,11 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 		monitoring.RecordCacheMiss()
 	}
 
-	v, err, _ := r.sf.Do(key, func() (interface{}, error) {
-		pp, err := fetchFn()
+	ch := r.sf.DoChan(key, func() (interface{}, error) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		pp, err := fetchFn(bgCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -145,11 +155,15 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 		return pp, nil
 	})
 
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return res.Val.(*domain.PaginatedPosts), nil
 	}
-
-	return v.(*domain.PaginatedPosts), nil
 }
 
 func (r *cachedPostRepo) invalidate(ctx context.Context, id string) {
