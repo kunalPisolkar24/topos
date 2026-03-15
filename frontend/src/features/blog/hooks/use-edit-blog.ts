@@ -18,7 +18,9 @@ export const useEditBlog = (blog: any, onComplete: () => void) => {
   const [editCardImagePreview, setEditCardImagePreview] = useState<string | null>(blog?.imageUrl || null);
 
   const { upload: uploadCardImage, isUploading: isUploadingCardImage } = useImageUpload();
-  const [updatePost, { loading: isUpdating }] = useMutation(UpdatePostDocument);
+  const [updatePost, { loading: isUpdating }] = useMutation(UpdatePostDocument, {
+    refetchQueries: ["Posts", "PostsByTag", "MyPosts", "SearchPosts"],
+  });
 
   const handleCardImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {

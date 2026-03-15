@@ -16,13 +16,24 @@ export const useViewBlog = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery(PostDocument, {
+  const { data, loading, error, refetch, startPolling, stopPolling } = useQuery(PostDocument, {
     variables: { id: id ?? "" },
     skip: !id,
     notifyOnNetworkStatusChange: true,
   });
 
-  const [deletePost, { loading: isDeleting }] = useMutation(DeletePostDocument);
+  useEffect(() => {
+    if (data?.post?.summaryStatus === "PENDING") {
+      startPolling(3000);
+    } else {
+      stopPolling();
+    }
+    return () => stopPolling();
+  }, [data?.post?.summaryStatus, startPolling, stopPolling]);
+
+  const [deletePost, { loading: isDeleting }] = useMutation(DeletePostDocument, {
+    refetchQueries: ["Posts", "PostsByTag", "MyPosts", "SearchPosts"],
+  });
 
   useEffect(() => {
     if (error) {

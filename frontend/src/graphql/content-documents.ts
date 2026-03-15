@@ -60,6 +60,7 @@ export interface CreatePostInput {
 export interface UpdatePostInput {
   title?: string | null;
   body?: string | null;
+  summary?: string | null;
   tags?: string[] | null;
   imageUrl?: string | null;
 }

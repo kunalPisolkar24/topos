@@ -46,7 +46,9 @@ export const useCreateBlog = () => {
   const quillRef = useRef<ReactQuill>(null);
   const cardImageInputRef = useRef<HTMLInputElement>(null);
 
-  const [createPost, { loading: isCreatingPost }] = useMutation(CreatePostDocument);
+  const [createPost, { loading: isCreatingPost }] = useMutation(CreatePostDocument, {
+    refetchQueries: ["Posts", "PostsByTag", "MyPosts", "SearchPosts"],
+  });
   const [generateTags, { loading: isGeneratingTags }] = useMutation(GenerateTagsDocument);
   const [generatePostContent, { loading: isGeneratingPost }] = useMutation(GeneratePostContentDocument);
 
