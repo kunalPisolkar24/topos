@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -11,6 +12,94 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type circuitState int
+
+const (
+	stateClosed circuitState = iota
+	stateOpen
+	stateHalfOpen
+)
+
+type circuitBreaker struct {
+	mu               sync.RWMutex
+	state            circuitState
+	failureCount     int
+	successCount     int
+	lastFailureTime  time.Time
+	failureThreshold int
+	successThreshold int
+	resetTimeout     time.Duration
+}
+
+func newCircuitBreaker() *circuitBreaker {
+	return &circuitBreaker{
+		state:            stateClosed,
+		failureThreshold: 5,
+		successThreshold: 2,
+		resetTimeout:     30 * time.Second,
+	}
+}
+
+func (cb *circuitBreaker) canProceed() bool {
+	cb.mu.RLock()
+	if cb.state == stateClosed {
+		cb.mu.RUnlock()
+		return true
+	}
+	if cb.state == stateOpen {
+		if time.Since(cb.lastFailureTime) > cb.resetTimeout {
+			cb.mu.RUnlock()
+			cb.mu.Lock()
+			defer cb.mu.Unlock()
+			if cb.state == stateOpen {
+				cb.state = stateHalfOpen
+				cb.successCount = 0
+				logger.Info("AI Circuit Breaker entering HALF-OPEN state")
+				return true
+			}
+			return cb.state != stateOpen
+		}
+		cb.mu.RUnlock()
+		return false
+	}
+	cb.mu.RUnlock()
+	return true
+}
+
+func (cb *circuitBreaker) recordSuccess() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	if cb.state == stateHalfOpen {
+		cb.successCount++
+		if cb.successCount >= cb.successThreshold {
+			cb.state = stateClosed
+			cb.failureCount = 0
+			logger.Info("AI Circuit Breaker reset to CLOSED")
+		}
+	} else if cb.state == stateClosed {
+		cb.failureCount = 0
+	}
+}
+
+func (cb *circuitBreaker) recordFailure() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	cb.failureCount++
+	cb.lastFailureTime = time.Now()
+
+	if cb.state == stateClosed {
+		if cb.failureCount >= cb.failureThreshold {
+			cb.state = stateOpen
+			logger.Warn("AI Circuit Breaker TRIPPED to OPEN")
+		}
+	} else if cb.state == stateHalfOpen {
+		cb.state = stateOpen
+		logger.Warn("AI Circuit Breaker returned to OPEN from HALF-OPEN")
+	}
+}
+
 type grpcAIClient struct {
 	client pb.AIServiceClient
 	conn   *grpc.ClientConn
@@ -19,6 +108,7 @@ type grpcAIClient struct {
 type resilientAIClient struct {
 	primary  domain.AIService
 	fallback domain.AIService
+	cb       *circuitBreaker
 }
 
 func NewAIClient(url string) (domain.AIService, error) {
@@ -39,6 +129,7 @@ func NewResilientAIClient(url string, required bool, dialTimeout time.Duration) 
 	return &resilientAIClient{
 		primary:  primary,
 		fallback: fallback,
+		cb:       newCircuitBreaker(),
 	}, nil
 }
 
@@ -65,29 +156,41 @@ func newGRPCAIClient(url string, dialTimeout time.Duration) (domain.AIService, e
 }
 
 func (c *resilientAIClient) GenerateSummary(ctx context.Context, content string) (string, error) {
-	summary, err := c.primary.GenerateSummary(ctx, content)
-	if err == nil {
-		return summary, nil
+	if c.cb.canProceed() {
+		summary, err := c.primary.GenerateSummary(ctx, content)
+		if err == nil {
+			c.cb.recordSuccess()
+			return summary, nil
+		}
+		c.cb.recordFailure()
+		logger.Warn("AI summary generation failed, using fallback", "error", err)
 	}
-	logger.Warn("AI summary generation failed, using fallback", "error", err)
 	return c.fallback.GenerateSummary(ctx, content)
 }
 
 func (c *resilientAIClient) GenerateTags(ctx context.Context, title, body string) ([]string, error) {
-	tags, err := c.primary.GenerateTags(ctx, title, body)
-	if err == nil {
-		return tags, nil
+	if c.cb.canProceed() {
+		tags, err := c.primary.GenerateTags(ctx, title, body)
+		if err == nil {
+			c.cb.recordSuccess()
+			return tags, nil
+		}
+		c.cb.recordFailure()
+		logger.Warn("AI tags generation failed, using fallback", "error", err)
 	}
-	logger.Warn("AI tags generation failed, using fallback", "error", err)
 	return c.fallback.GenerateTags(ctx, title, body)
 }
 
 func (c *resilientAIClient) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
-	post, err := c.primary.GeneratePost(ctx, prompt)
-	if err == nil {
-		return post, nil
+	if c.cb.canProceed() {
+		post, err := c.primary.GeneratePost(ctx, prompt)
+		if err == nil {
+			c.cb.recordSuccess()
+			return post, nil
+		}
+		c.cb.recordFailure()
+		logger.Warn("AI post generation failed, using fallback", "error", err)
 	}
-	logger.Warn("AI post generation failed, using fallback", "error", err)
 	return c.fallback.GeneratePost(ctx, prompt)
 }
 
