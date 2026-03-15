@@ -9,6 +9,7 @@ import (
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
+	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/sync/singleflight"
@@ -43,7 +44,9 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	if err != nil {
 		return nil, err
 	}
-	r.invalidate(ctx, id)
+	if err := r.invalidate(ctx, id); err != nil {
+		return nil, err
+	}
 	return updatedPost, nil
 }
 
@@ -52,8 +55,7 @@ func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary s
 	if err != nil {
 		return err
 	}
-	r.invalidate(ctx, id)
-	return nil
+	return r.invalidate(ctx, id)
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
@@ -61,8 +63,7 @@ func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	r.invalidate(ctx, id)
-	return nil
+	return r.invalidate(ctx, id)
 }
 
 func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
@@ -185,10 +186,13 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 	}
 }
 
-func (r *cachedPostRepo) invalidate(ctx context.Context, id string) {
+func (r *cachedPostRepo) invalidate(ctx context.Context, id string) error {
 	key := fmt.Sprintf("post:%s", id)
 	r.sf.Forget(key)
-	if err := r.redis.Del(ctx, key).Err(); err == nil {
-		monitoring.RecordCacheDel()
+	if err := r.redis.Del(ctx, key).Err(); err != nil {
+		logger.Error("Critical: Failed to invalidate cache", "key", key, "error", err)
+		return fmt.Errorf("failed to invalidate cache: %w", err)
 	}
+	monitoring.RecordCacheDel()
+	return nil
 }
