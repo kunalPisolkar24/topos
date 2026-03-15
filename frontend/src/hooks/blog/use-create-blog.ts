@@ -11,7 +11,7 @@ import {
 import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 import { createPostSchema } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { useImageUpload } from "@/hooks/use-image-upload";
 
 const MIN_TAG_TITLE_LENGTH = 5;
 const MIN_TAG_BODY_LENGTH = 80;
@@ -36,7 +36,6 @@ export const useCreateBlog = () => {
   const [cardImage, setCardImage] = useState<File | null>(null);
   const [cardImageUrl, setCardImageUrl] = useState<string | null>(null);
   const [cardImagePreview, setCardImagePreview] = useState<string | null>(null);
-  const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -50,6 +49,9 @@ export const useCreateBlog = () => {
   const [createPost, { loading: isCreatingPost }] = useMutation(CreatePostDocument);
   const [generateTags, { loading: isGeneratingTags }] = useMutation(GenerateTagsDocument);
   const [generatePostContent, { loading: isGeneratingPost }] = useMutation(GeneratePostContentDocument);
+
+  const { upload: uploadCardImage, isUploading: isUploadingCardImage } = useImageUpload();
+  const { upload: uploadRichTextImage, isUploading: isUploadingRichText } = useImageUpload();
 
   const handleCardImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -74,26 +76,17 @@ export const useCreateBlog = () => {
       return null;
     }
 
-    setIsUploadingCardImage(true);
-    try {
-      toast({ title: "Uploading Card Image...", description: "Please wait." });
-      const secureUrl = await uploadToCloudinary(cardImage);
+    const secureUrl = await uploadCardImage(cardImage, {
+      loadingTitle: "Uploading Card Image...",
+      successTitle: "Card Image Uploaded",
+      errorTitle: "Card Image Upload Failed",
+    });
+
+    if (secureUrl) {
       setCardImageUrl(secureUrl);
-      toast({
-        title: "Card Image Uploaded",
-        description: "Successfully uploaded to Cloudinary.",
-      });
-      return secureUrl;
-    } catch (error) {
-      toast({
-        title: "Card Image Upload Failed",
-        description: error instanceof Error ? error.message : "Could not upload image.",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setIsUploadingCardImage(false);
     }
+    
+    return secureUrl;
   };
 
   const richTextimageHandler = useCallback(async () => {
@@ -104,29 +97,19 @@ export const useCreateBlog = () => {
     input.onchange = async () => {
       if (input.files && input.files.length > 0) {
         const file = input.files[0];
-        try {
-          toast({ title: "Uploading Image...", description: "Please wait." });
-          const imageUrl = await uploadToCloudinary(file);
+        const imageUrl = await uploadRichTextImage(file);
+        
+        if (imageUrl) {
           const quill = quillRef.current?.getEditor();
           if (quill) {
             const range = quill.getSelection(true);
             quill.insertEmbed(range.index, "image", imageUrl);
             quill.setSelection(range.index + 1, 0);
           }
-          toast({
-            title: "Image Uploaded",
-            description: "Successfully added to content.",
-          });
-        } catch (error) {
-          toast({ 
-            title: "Image Upload Failed", 
-            description: error instanceof Error ? error.message : "Upload failed",
-            variant: "destructive" 
-          });
         }
       }
     };
-  }, [toast]);
+  }, [uploadRichTextImage]);
 
   const contentText = useMemo(() => toPlainText(content), [content]);
 
@@ -310,6 +293,7 @@ export const useCreateBlog = () => {
       cardImageUrl,
       cardImagePreview,
       isUploadingCardImage,
+      isUploadingRichText,
       tags,
       newTag,
       isDialogOpen,
