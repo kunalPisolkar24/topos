@@ -4,7 +4,7 @@ import { Mail, FileText, Calendar } from "lucide-react";
 interface ProfileViewInfoProps {
   displayName: string;
   email: string;
-  bio: string | null;
+  bio: string | null | undefined;
   totalPosts: number;
   createdAt: string;
 }
