@@ -10,3 +10,13 @@ export const createPostSchema: z.ZodType<CreatePostInput> = z.object({
 });
 
 export type CreatePostFormValues = z.infer<typeof createPostSchema>;
+
+export const updatePostSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").optional(),
+  body: z.string().trim().min(1, "Body content is required").optional(),
+  summary: z.string().trim().min(1, "Summary cannot be empty").nullish(),
+  tags: z.array(z.string().trim().min(1, "Tags cannot be empty")).optional(),
+  imageUrl: z.string().url("Invalid image URL format").nullable().optional(),
+});
+
+export type UpdatePostFormValues = z.infer<typeof updatePostSchema>;
