@@ -12,8 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useSessionActions } from "@/hooks/use-session-actions";
+import { useCurrentUser, useSessionActions } from "@/features/auth";
 import { useSessionStore } from "@/stores/session-store";
 
 export const StickyNavbar: React.FC = () => {

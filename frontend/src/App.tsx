@@ -1,32 +1,32 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Home from "@/components/pages/Home";
-import SearchResultsPage from "@/components/pages/SearchResultsPage";
-import ViewBlogPage from "@/components/pages/ViewBlogPage";
+import Home from "@/pages/Home";
+import SearchResultsPage from "@/pages/SearchResultsPage";
+import ViewBlogPage from "@/pages/ViewBlogPage";
 import { LoadingSpinner } from "@/components/utils";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { PublicOnlyRoute } from "@/routes/PublicOnlyRoute";
 
 const Signup = lazy(() =>
-  import("@/components/auth/Signup").then((module) => ({
+  import("@/features/auth").then((module) => ({
     default: module.Signup,
   })),
 );
 
 const Signin = lazy(() =>
-  import("@/components/auth/Signin").then((module) => ({
+  import("@/features/auth").then((module) => ({
     default: module.Signin,
   })),
 );
 
 const CreateNewBlog = lazy(() =>
-  import("@/components/pages/CreateNewBlog").then((module) => ({
+  import("@/pages/CreateNewBlog").then((module) => ({
     default: module.default,
   })),
 );
 
 const UserProfile = lazy(() =>
-  import("@/components/pages/UserProfile").then((module) => ({
+  import("@/pages/UserProfile").then((module) => ({
     default: module.default,
   })),
 );
