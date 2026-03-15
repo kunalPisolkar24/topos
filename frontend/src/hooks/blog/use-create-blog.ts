@@ -1,7 +1,6 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import { useMutation } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { z } from "zod";
 import type ReactQuill from "react-quill";
 import {
@@ -12,6 +11,7 @@ import {
 import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 import { createPostSchema } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 const MIN_TAG_TITLE_LENGTH = 5;
 const MIN_TAG_BODY_LENGTH = 80;
@@ -51,9 +51,6 @@ export const useCreateBlog = () => {
   const [generateTags, { loading: isGeneratingTags }] = useMutation(GenerateTagsDocument);
   const [generatePostContent, { loading: isGeneratingPost }] = useMutation(GeneratePostContentDocument);
 
-  const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`;
-  const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
   const handleCardImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
@@ -76,35 +73,21 @@ export const useCreateBlog = () => {
       });
       return null;
     }
-    if (!CLOUDINARY_URL || !CLOUDINARY_UPLOAD_PRESET) {
-      toast({
-        title: "Upload Error",
-        description: "Cloudinary configuration missing.",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const formData = new FormData();
-    formData.append("file", cardImage);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
     setIsUploadingCardImage(true);
     try {
       toast({ title: "Uploading Card Image...", description: "Please wait." });
-      const response = await axios.post(CLOUDINARY_URL, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setCardImageUrl(response.data.secure_url);
+      const secureUrl = await uploadToCloudinary(cardImage);
+      setCardImageUrl(secureUrl);
       toast({
         title: "Card Image Uploaded",
         description: "Successfully uploaded to Cloudinary.",
       });
-      return response.data.secure_url;
+      return secureUrl;
     } catch (error) {
       toast({
         title: "Card Image Upload Failed",
-        description: "Could not upload image.",
+        description: error instanceof Error ? error.message : "Could not upload image.",
         variant: "destructive",
       });
       return null;
@@ -114,14 +97,6 @@ export const useCreateBlog = () => {
   };
 
   const richTextimageHandler = useCallback(async () => {
-    if (!CLOUDINARY_URL || !CLOUDINARY_UPLOAD_PRESET) {
-      toast({
-        title: "Image Upload Error",
-        description: "Cloudinary configuration is missing.",
-        variant: "destructive",
-      });
-      return;
-    }
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");
@@ -129,15 +104,9 @@ export const useCreateBlog = () => {
     input.onchange = async () => {
       if (input.files && input.files.length > 0) {
         const file = input.files[0];
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
         try {
           toast({ title: "Uploading Image...", description: "Please wait." });
-          const response = await axios.post(CLOUDINARY_URL, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-          const imageUrl = response.data.secure_url;
+          const imageUrl = await uploadToCloudinary(file);
           const quill = quillRef.current?.getEditor();
           if (quill) {
             const range = quill.getSelection(true);
@@ -149,11 +118,15 @@ export const useCreateBlog = () => {
             description: "Successfully added to content.",
           });
         } catch (error) {
-          toast({ title: "Image Upload Failed", variant: "destructive" });
+          toast({ 
+            title: "Image Upload Failed", 
+            description: error instanceof Error ? error.message : "Upload failed",
+            variant: "destructive" 
+          });
         }
       }
     };
-  }, [CLOUDINARY_URL, CLOUDINARY_UPLOAD_PRESET, toast]);
+  }, [toast]);
 
   const contentText = useMemo(() => toPlainText(content), [content]);
 
