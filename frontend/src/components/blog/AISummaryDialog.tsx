@@ -3,7 +3,6 @@ import { Sparkles, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -14,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface AISummaryDialogProps {
-  summary: string | null;
+  summary: string | null | undefined;
   summaryStatus?: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
