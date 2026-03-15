@@ -1,9 +1,4 @@
-"use client";
-
 import type React from "react";
-import { useMemo } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
 import {
   X,
   UploadCloud,
@@ -29,49 +24,10 @@ import {
 } from "@/components/ui/dialog";
 import { StickyNavbar } from "../layouts";
 import { useCreateBlog } from "@/hooks/blog/use-create-blog";
+import { BlogEditor } from "../blog/BlogEditor";
 
 const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs } = useCreateBlog();
-
-  const quillModules = useMemo(
-    () => ({
-      toolbar: {
-        container: [
-          [{ header: [1, 2, 3, 4, 5, 6, false] }],
-          ["bold", "italic", "underline", "strike"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          [{ indent: "-1" }, { indent: "+1" }],
-          [{ align: [] }],
-          ["link", "image", "video"],
-          ["blockquote", "code-block"],
-          [{ color: [] }, { background: [] }],
-          ["clean"],
-        ],
-        handlers: { image: handlers.richTextimageHandler },
-      },
-      clipboard: { matchVisual: false },
-    }),
-    [handlers.richTextimageHandler]
-  );
-
-  const quillFormats = [
-    "header",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "list",
-    "bullet",
-    "indent",
-    "align",
-    "link",
-    "image",
-    "video",
-    "blockquote",
-    "code-block",
-    "color",
-    "background",
-  ];
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -226,28 +182,12 @@ const CreateNewBlog: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-zinc-100 flex items-center">
-                  <FileText className="mr-2 h-5 w-5 text-zinc-400" />
-                  Blog Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="blog-content-editor-wrapper rounded-lg overflow-hidden border border-zinc-700">
-                  <ReactQuill
-                    ref={refs.quillRef}
-                    theme="snow"
-                    value={state.content}
-                    onChange={setters.setContent}
-                    modules={quillModules}
-                    formats={quillFormats}
-                    placeholder="Write your masterpiece here..."
-                    bounds=".blog-content-editor-wrapper"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            <BlogEditor
+              ref={refs.quillRef}
+              value={state.content}
+              onChange={setters.setContent}
+              onImageUpload={handlers.richTextimageHandler}
+            />
 
             <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
               <CardHeader className="pb-4">
