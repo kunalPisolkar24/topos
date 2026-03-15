@@ -42,11 +42,11 @@ func newCircuitBreaker() *circuitBreaker {
 
 func (cb *circuitBreaker) canProceed() bool {
 	cb.mu.RLock()
-	if cb.state == stateClosed {
+	switch cb.state {
+	case stateClosed:
 		cb.mu.RUnlock()
 		return true
-	}
-	if cb.state == stateOpen {
+	case stateOpen:
 		if time.Since(cb.lastFailureTime) > cb.resetTimeout {
 			cb.mu.RUnlock()
 			cb.mu.Lock()
@@ -61,23 +61,25 @@ func (cb *circuitBreaker) canProceed() bool {
 		}
 		cb.mu.RUnlock()
 		return false
+	default:
+		cb.mu.RUnlock()
+		return true
 	}
-	cb.mu.RUnlock()
-	return true
 }
 
 func (cb *circuitBreaker) recordSuccess() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
-	if cb.state == stateHalfOpen {
+	switch cb.state {
+	case stateHalfOpen:
 		cb.successCount++
 		if cb.successCount >= cb.successThreshold {
 			cb.state = stateClosed
 			cb.failureCount = 0
 			logger.Info("AI Circuit Breaker reset to CLOSED")
 		}
-	} else if cb.state == stateClosed {
+	case stateClosed:
 		cb.failureCount = 0
 	}
 }
@@ -89,12 +91,13 @@ func (cb *circuitBreaker) recordFailure() {
 	cb.failureCount++
 	cb.lastFailureTime = time.Now()
 
-	if cb.state == stateClosed {
+	switch cb.state {
+	case stateClosed:
 		if cb.failureCount >= cb.failureThreshold {
 			cb.state = stateOpen
 			logger.Warn("AI Circuit Breaker TRIPPED to OPEN")
 		}
-	} else if cb.state == stateHalfOpen {
+	case stateHalfOpen:
 		cb.state = stateOpen
 		logger.Warn("AI Circuit Breaker returned to OPEN from HALF-OPEN")
 	}
