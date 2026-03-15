@@ -1,34 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import { BookText, Hash, Loader2, Search } from "lucide-react";
 import {
   Command,
   CommandEmpty,
-  CommandGroup,
   CommandInput,
-  CommandItem,
   CommandList,
 } from "@/components/ui/command";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  SearchPostsDocument,
-  TagsDocument,
-  type ContentTag,
-} from "@/graphql/content-documents";
-import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/lib/content";
+import { type ContentTag } from "@/graphql/content-documents";
+import { useSearchSuggestions, type SearchMode } from "@/hooks/blog/use-search-suggestions";
+import { TagSuggestions } from "./TagSuggestions";
+import { PostSuggestions } from "./PostSuggestions";
 
 interface SearchBarProps {
   onTagSelect: (tag: string | null) => void;
   currentFilterTag: string | null;
-}
-
-interface SearchPostSuggestion {
-  id: string;
-  title: string;
-  imageUrl: string;
-  authorName: string;
 }
 
 const TAG_SEARCH_LIMIT = 6;
@@ -38,133 +26,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onTagSelect,
   currentFilterTag,
 }) => {
-  const client = useApolloClient();
   const navigate = useNavigate();
   const commandWrapperRef = useRef<HTMLDivElement>(null);
-  const requestSequenceRef = useRef(0);
-  const [searchMode, setSearchMode] = useState<"tags" | "posts">("tags");
+  const [searchMode, setSearchMode] = useState<SearchMode>("tags");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
-  const [tagsToShow, setTagsToShow] = useState<ContentTag[]>([]);
-  const [postsToShow, setPostsToShow] = useState<SearchPostSuggestion[]>([]);
-  const [totalPostResults, setTotalPostResults] = useState(0);
-  const [isTagsLoading, setIsTagsLoading] = useState(false);
-  const [isPostsLoading, setIsPostsLoading] = useState(false);
   const [inputIsFocused, setInputIsFocused] = useState(false);
 
-  useEffect(() => {
-    const timerId = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 500);
-
-    return () => clearTimeout(timerId);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    const trimmedQuery = debouncedSearchQuery.trim();
-
-    if (!inputIsFocused || !trimmedQuery) {
-      requestSequenceRef.current += 1;
-      setTagsToShow([]);
-      setPostsToShow([]);
-      setTotalPostResults(0);
-      setIsTagsLoading(false);
-      setIsPostsLoading(false);
-      return;
-    }
-
-    const requestId = requestSequenceRef.current + 1;
-    requestSequenceRef.current = requestId;
-
-    const fetchData = async () => {
-      if (searchMode === "tags") {
-        setIsTagsLoading(true);
-        setPostsToShow([]);
-        setTotalPostResults(0);
-
-        try {
-          const { data } = await client.query({
-            query: TagsDocument,
-            variables: {
-              query: trimmedQuery,
-              limit: TAG_SEARCH_LIMIT,
-            },
-            fetchPolicy: "no-cache",
-          });
-
-          if (requestSequenceRef.current !== requestId) {
-            return;
-          }
-
-          setTagsToShow(data?.tags ?? []);
-        } catch (error) {
-          if (requestSequenceRef.current !== requestId) {
-            return;
-          }
-
-          setTagsToShow([]);
-          console.error("Error fetching tags:", error);
-        } finally {
-          if (requestSequenceRef.current === requestId) {
-            setIsTagsLoading(false);
-          }
-        }
-
-        return;
-      }
-
-      setIsPostsLoading(true);
-      setTagsToShow([]);
-
-      try {
-        const { data } = await client.query({
-          query: SearchPostsDocument,
-          variables: {
-            query: trimmedQuery,
-            limit: POST_SEARCH_LIMIT,
-            page: 1,
-          },
-          fetchPolicy: "no-cache",
-        });
-
-        if (requestSequenceRef.current !== requestId) {
-          return;
-        }
-
-        const searchPosts = data?.searchPosts;
-
-        if (!searchPosts) {
-          setPostsToShow([]);
-          setTotalPostResults(0);
-          return;
-        }
-
-        setPostsToShow(
-          searchPosts.hits.map((post) => ({
-            id: post.id,
-            title: post.title,
-            imageUrl: post.imageUrl || DEFAULT_BLOG_CARD_IMAGE,
-            authorName: getAuthorDisplayName(post.author),
-          })),
-        );
-        setTotalPostResults(searchPosts.total);
-      } catch (error) {
-        if (requestSequenceRef.current !== requestId) {
-          return;
-        }
-
-        setPostsToShow([]);
-        setTotalPostResults(0);
-        console.error("Error fetching search results:", error);
-      } finally {
-        if (requestSequenceRef.current === requestId) {
-          setIsPostsLoading(false);
-        }
-      }
-    };
-
-    void fetchData();
-  }, [client, debouncedSearchQuery, inputIsFocused, searchMode]);
+  const { tags, posts, totalPosts, isLoading, debouncedQuery } = useSearchSuggestions({
+    query: searchQuery,
+    mode: searchMode,
+    isFocused: inputIsFocused,
+    tagLimit: TAG_SEARCH_LIMIT,
+    postLimit: POST_SEARCH_LIMIT,
+  });
 
   useEffect(() => {
     if (currentFilterTag === null) {
@@ -186,8 +60,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleSeeAllResults = () => {
-    const trimmedQuery = debouncedSearchQuery.trim();
-
+    const trimmedQuery = debouncedQuery.trim();
     if (trimmedQuery) {
       navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
       setInputIsFocused(false);
@@ -195,9 +68,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const showCommandList = inputIsFocused && searchQuery.trim() !== "";
-  const isLoading = isTagsLoading || isPostsLoading;
-  const noResults =
-    !isLoading && tagsToShow.length === 0 && postsToShow.length === 0;
+  const noResults = !isLoading && tags.length === 0 && posts.length === 0;
 
   return (
     <div
@@ -258,60 +129,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   )}
                   {noResults && (
                     <CommandEmpty className="py-6 text-center text-sm text-zinc-400">
-                      No results found for "{debouncedSearchQuery}".
+                      No results found for "{debouncedQuery}".
                     </CommandEmpty>
                   )}
-                  {!isTagsLoading &&
-                    searchMode === "tags" &&
-                    tagsToShow.length > 0 && (
-                      <CommandGroup heading="Tag Suggestions">
-                        {tagsToShow.map((tag) => (
-                          <CommandItem
-                            key={tag.id}
-                            onSelect={() => handleSelectTag(tag)}
-                            value={tag.name}
-                            className="cursor-pointer"
-                          >
-                            <Hash className="mr-2 h-3 w-3" /> {tag.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                  {!isPostsLoading &&
-                    searchMode === "posts" &&
-                    postsToShow.length > 0 && (
-                      <CommandGroup heading="Post Suggestions">
-                        {postsToShow.map((post) => (
-                          <CommandItem
-                            key={post.id}
-                            onSelect={() => handleSelectPost(post.id)}
-                            className="flex cursor-pointer items-center gap-3 p-2"
-                          >
-                            <img
-                              src={post.imageUrl}
-                              alt={post.title}
-                              className="h-10 w-16 flex-shrink-0 rounded-md object-cover"
-                            />
-                            <div className="overflow-hidden">
-                              <p className="truncate text-sm font-medium text-zinc-100">
-                                {post.title}
-                              </p>
-                              <p className="text-xs text-zinc-400">
-                                by {post.authorName}
-                              </p>
-                            </div>
-                          </CommandItem>
-                        ))}
-                        {totalPostResults > POST_SEARCH_LIMIT && (
-                          <CommandItem
-                            onSelect={handleSeeAllResults}
-                            className="cursor-pointer justify-center text-center text-zinc-300 hover:text-zinc-100 focus:bg-zinc-800"
-                          >
-                            See all {totalPostResults} results
-                          </CommandItem>
-                        )}
-                      </CommandGroup>
-                    )}
+                  {searchMode === "tags" && (
+                    <TagSuggestions tags={tags} onSelect={handleSelectTag} />
+                  )}
+                  {searchMode === "posts" && (
+                    <PostSuggestions
+                      posts={posts}
+                      totalPosts={totalPosts}
+                      limit={POST_SEARCH_LIMIT}
+                      onSelect={handleSelectPost}
+                      onSeeAll={handleSeeAllResults}
+                    />
+                  )}
                 </>
               )}
             </CommandList>
