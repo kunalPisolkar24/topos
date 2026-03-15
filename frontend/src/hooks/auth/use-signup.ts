@@ -5,14 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { SignupDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/hooks/use-session-actions";
-import { useState, type ChangeEvent } from "react";
+import { type ChangeEvent } from "react";
 import { sanitizeUsernameInput } from "@/lib/user-input";
-
 import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";
 
 export const useSignup = () => {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { authenticate } = useSessionActions();
@@ -37,9 +34,6 @@ export const useSignup = () => {
     }
     usernameField.onChange(event);
   };
-
-  const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
-  const toggleConfirmPasswordVisibility = () => setShowConfirmPassword((prev) => !prev);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -77,10 +71,6 @@ export const useSignup = () => {
   return {
     form,
     loading,
-    showPassword,
-    showConfirmPassword,
-    togglePasswordVisibility,
-    toggleConfirmPasswordVisibility,
     handleUsernameChange,
     usernameField,
     onSubmit,

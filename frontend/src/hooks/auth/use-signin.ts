@@ -5,12 +5,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { SigninDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/hooks/use-session-actions";
-import { useState } from "react";
-
 import { signinSchema, type SigninFormValues } from "@/schemas/auth/signin.schema";
 
 export const useSignin = () => {
-  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,8 +28,6 @@ export const useSignin = () => {
           from?: { pathname?: string; search?: string; hash?: string };
         }
       | null)?.from;
-
-  const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -72,8 +67,6 @@ export const useSignin = () => {
   return {
     form,
     loading,
-    showPassword,
-    togglePasswordVisibility,
     onSubmit,
   };
 };

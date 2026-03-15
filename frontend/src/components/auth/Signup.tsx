@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,16 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { USERNAME_MAX_LENGTH } from "@/lib/user-input";
 import { useSignup } from "@/hooks/auth/use-signup";
+import { PasswordField } from "./PasswordField";
 
 export const Signup = () => {
   const navigate = useNavigate();
   const {
     form,
     loading,
-    showPassword,
-    showConfirmPassword,
-    togglePasswordVisibility,
-    toggleConfirmPasswordVisibility,
     handleUsernameChange,
     usernameField,
     onSubmit,
@@ -84,83 +81,20 @@ export const Signup = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-zinc-300">
-                Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  {...form.register("password")}
-                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.password
-                    ? "border-red-500"
-                    : "border-zinc-800"
-                    }`}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={togglePasswordVisibility}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">
-                    {showPassword ? "Hide password" : "Show password"}
-                  </span>
-                </Button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.password.message}
-                </p>
-              )}
-            </div>
+            <PasswordField
+              id="password"
+              label="Password"
+              registration={form.register("password")}
+              error={form.formState.errors.password?.message}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-zinc-300">
-                Confirm Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm your password"
-                  {...form.register("confirmPassword")}
-                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.confirmPassword
-                    ? "border-red-500"
-                    : "border-zinc-800"
-                    }`}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={toggleConfirmPasswordVisibility}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">
-                    {showConfirmPassword ? "Hide password" : "Show password"}
-                  </span>
-                </Button>
-              </div>
-              {form.formState.errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
+            <PasswordField
+              id="confirmPassword"
+              label="Confirm Password"
+              placeholder="Confirm your password"
+              registration={form.register("confirmPassword")}
+              error={form.formState.errors.confirmPassword?.message}
+            />
 
             <Button
               type="submit"

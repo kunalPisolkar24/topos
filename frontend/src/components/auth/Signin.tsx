@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,10 +12,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSignin } from "@/hooks/auth/use-signin";
+import { PasswordField } from "./PasswordField";
 
 export const Signin = () => {
   const navigate = useNavigate();
-  const { form, loading, showPassword, togglePasswordVisibility, onSubmit } =
+  const { form, loading, onSubmit } =
     useSignin();
 
   return (
@@ -52,11 +53,12 @@ export const Signin = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-zinc-300">
-                  Password
-                </Label>
+            <PasswordField
+              id="password"
+              label="Password"
+              registration={form.register("password")}
+              error={form.formState.errors.password?.message}
+              rightLabel={
                 <Button
                   type="button"
                   variant="link"
@@ -65,41 +67,8 @@ export const Signin = () => {
                 >
                   Forgot password?
                 </Button>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  {...form.register("password")}
-                  className={`bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.password
-                      ? "border-red-500"
-                      : "border-zinc-800"
-                    }`}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={togglePasswordVisibility}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">
-                    {showPassword ? "Hide password" : "Show password"}
-                  </span>
-                </Button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.password.message}
-                </p>
-              )}
-            </div>
+              }
+            />
 
             <Button
               type="submit"
