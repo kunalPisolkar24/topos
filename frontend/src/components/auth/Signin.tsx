@@ -1,10 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { useLocation, useNavigate } from "react-router-dom";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,75 +11,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SigninDocument } from "@/graphql/generated/graphql";
-import { useToast } from "@/hooks/use-toast";
-import { useSessionActions } from "@/hooks/use-session-actions";
-
-const signinSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type SigninFormValues = z.infer<typeof signinSchema>;
+import { useSignin } from "@/hooks/auth/use-signin";
 
 export const Signin = () => {
-  const [showPassword, setShowPassword] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { authenticate } = useSessionActions();
-  const [signin, { loading }] = useMutation(SigninDocument);
-
-  const form = useForm<SigninFormValues>({
-    resolver: zodResolver(signinSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
-
-  const redirectTarget =
-    (location.state as
-      | {
-          from?: { pathname?: string; search?: string; hash?: string };
-        }
-      | null)?.from;
-
-  const handleSubmit = form.handleSubmit(async (values) => {
-    try {
-      const { data } = await signin({
-        variables: values,
-      });
-
-      const payload = data?.signin;
-
-      if (!payload) {
-        throw new Error("Sign-in response was empty.");
-      }
-
-      authenticate(payload.token, payload.user);
-
-      toast({
-        title: "Success",
-        description: "Successfully signed in.",
-      });
-
-      navigate(
-        redirectTarget
-          ? `${redirectTarget.pathname ?? ""}${redirectTarget.search ?? ""}${redirectTarget.hash ?? ""}`
-          : "/",
-        { replace: true },
-      );
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Invalid credentials.",
-      });
-      console.error("Sign-in failed:", error);
-    }
-  });
+  const { form, loading, showPassword, togglePasswordVisibility, onSubmit } =
+    useSignin();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-900/20 p-4">
@@ -98,7 +30,7 @@ export const Signin = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-zinc-300">
                 Email
@@ -108,11 +40,10 @@ export const Signin = () => {
                 type="email"
                 placeholder="Enter your email"
                 {...form.register("email")}
-                className={`bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  form.formState.errors.email
+                className={`bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.email
                     ? "border-red-500"
                     : "border-zinc-800"
-                }`}
+                  }`}
               />
               {form.formState.errors.email && (
                 <p className="mt-1 text-sm text-red-500">
@@ -141,18 +72,17 @@ export const Signin = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   {...form.register("password")}
-                  className={`bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                    form.formState.errors.password
+                  className={`bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.password
                       ? "border-red-500"
                       : "border-zinc-800"
-                  }`}
+                    }`}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={() => setShowPassword((current) => !current)}
+                  onClick={togglePasswordVisibility}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -203,3 +133,4 @@ export const Signin = () => {
     </div>
   );
 };
+

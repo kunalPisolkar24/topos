@@ -1,10 +1,5 @@
-import { useState, type ChangeEvent } from "react";
-import { useMutation } from "@apollo/client/react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,102 +11,22 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SignupDocument } from "@/graphql/generated/graphql";
-import { useToast } from "@/hooks/use-toast";
-import {
-  USERNAME_MAX_LENGTH,
-  sanitizeUsernameInput,
-} from "@/lib/user-input";
-import { useSessionActions } from "@/hooks/use-session-actions";
-
-const signupSchema = z
-  .object({
-    email: z.string().email("Please enter a valid email address"),
-    username: z
-      .string()
-      .transform(sanitizeUsernameInput)
-      .pipe(
-        z
-          .string()
-          .min(3, "Username must be at least 3 characters")
-          .max(
-            USERNAME_MAX_LENGTH,
-            `Username must be ${USERNAME_MAX_LENGTH} characters or less`,
-          ),
-      ),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-type SignupFormValues = z.infer<typeof signupSchema>;
+import { USERNAME_MAX_LENGTH } from "@/lib/user-input";
+import { useSignup } from "@/hooks/auth/use-signup";
 
 export const Signup = () => {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const { authenticate } = useSessionActions();
-  const [signup, { loading }] = useMutation(SignupDocument);
-
-  const form = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      email: "",
-      username: "",
-      password: "",
-      confirmPassword: "",
-    },
-  });
-
-  const usernameField = form.register("username");
-
-  const handleSubmit = form.handleSubmit(async (values) => {
-    try {
-      const { data } = await signup({
-        variables: {
-          email: values.email,
-          username: sanitizeUsernameInput(values.username),
-          password: values.password,
-        },
-      });
-
-      const payload = data?.signup;
-
-      if (!payload) {
-        throw new Error("Signup response was empty.");
-      }
-
-      authenticate(payload.token, payload.user);
-
-      toast({
-        title: "Success",
-        description: "Account created successfully.",
-      });
-
-      navigate("/", { replace: true });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Signup failed.",
-      });
-      console.error("Signup failed:", error);
-    }
-  });
-
-  const handleUsernameChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const sanitizedValue = sanitizeUsernameInput(event.target.value);
-
-    if (sanitizedValue !== event.target.value) {
-      event.target.value = sanitizedValue;
-    }
-
-    usernameField.onChange(event);
-  };
+  const {
+    form,
+    loading,
+    showPassword,
+    showConfirmPassword,
+    togglePasswordVisibility,
+    toggleConfirmPasswordVisibility,
+    handleUsernameChange,
+    usernameField,
+    onSubmit,
+  } = useSignup();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-900/20 p-4">
@@ -125,7 +40,7 @@ export const Signup = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-zinc-300">
                 Email
@@ -135,11 +50,10 @@ export const Signup = () => {
                 type="email"
                 placeholder="Enter your email"
                 {...form.register("email")}
-                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  form.formState.errors.email
-                    ? "border-red-500"
-                    : "border-zinc-800"
-                }`}
+                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.email
+                  ? "border-red-500"
+                  : "border-zinc-800"
+                  }`}
               />
               {form.formState.errors.email && (
                 <p className="mt-1 text-sm text-red-500">
@@ -158,11 +72,10 @@ export const Signup = () => {
                 maxLength={USERNAME_MAX_LENGTH}
                 {...usernameField}
                 onChange={handleUsernameChange}
-                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                  form.formState.errors.username
-                    ? "border-red-500"
-                    : "border-zinc-800"
-                }`}
+                className={`text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.username
+                  ? "border-red-500"
+                  : "border-zinc-800"
+                  }`}
               />
               {form.formState.errors.username && (
                 <p className="mt-1 text-sm text-red-500">
@@ -181,18 +94,17 @@ export const Signup = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   {...form.register("password")}
-                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                    form.formState.errors.password
-                      ? "border-red-500"
-                      : "border-zinc-800"
-                  }`}
+                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.password
+                    ? "border-red-500"
+                    : "border-zinc-800"
+                    }`}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={() => setShowPassword((current) => !current)}
+                  onClick={togglePasswordVisibility}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -221,20 +133,17 @@ export const Signup = () => {
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
                   {...form.register("confirmPassword")}
-                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-                    form.formState.errors.confirmPassword
-                      ? "border-red-500"
-                      : "border-zinc-800"
-                  }`}
+                  className={`pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${form.formState.errors.confirmPassword
+                    ? "border-red-500"
+                    : "border-zinc-800"
+                    }`}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
-                  onClick={() =>
-                    setShowConfirmPassword((current) => !current)
-                  }
+                  onClick={toggleConfirmPasswordVisibility}
                 >
                   {showConfirmPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -285,3 +194,4 @@ export const Signup = () => {
     </div>
   );
 };
+
