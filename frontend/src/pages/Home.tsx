@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { StickyNavbar } from "../layouts";
-import { BlogList } from "../blog/BlogList";
-import { SearchBar } from "../blog/SearchBar";
-import { ErrorBoundary } from "../utils/";
+import { StickyNavbar } from "@/layouts";
+import { BlogList } from "@/features/blog";
+import { SearchBar } from "@/features/search";
+import { ErrorBoundary } from "@/components/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";

@@ -3,13 +3,15 @@
 import type React from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StickyNavbar } from "../layouts";
-import { useCreateBlog } from "@/hooks/blog/use-create-blog";
-import { BlogEditor } from "../blog/BlogEditor";
-import { BlogTitleSection } from "../blog/BlogTitleSection";
-import { AIDraftGenerator } from "../blog/AIDraftGenerator";
-import { FeaturedImageSection } from "../blog/FeaturedImageSection";
-import { BlogTagSection } from "../blog/BlogTagSection";
+import { StickyNavbar } from "@/layouts";
+import { 
+  useCreateBlog,
+  BlogEditor,
+  BlogTitleSection,
+  AIDraftGenerator,
+  FeaturedImageSection,
+  BlogTagSection,
+} from "@/features/blog";
 
 const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs } = useCreateBlog();

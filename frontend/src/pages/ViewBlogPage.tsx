@@ -1,15 +1,17 @@
 "use client";
 
 import type React from "react";
-import { StickyNavbar } from "../layouts";
+import { StickyNavbar } from "@/layouts";
 import { ViewBlogPageSkeleton } from "@/components/skeletons";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useViewBlog } from "@/hooks/blog/use-view-blog";
-import { BlogAuthorSidebar } from "../blog/BlogAuthorSidebar";
-import { BlogEditForm } from "../blog/BlogEditForm";
-import { AISummaryDialog } from "../blog/AISummaryDialog";
-import { BlogHeader } from "../blog/BlogHeader";
-import { BlogBody } from "../blog/BlogBody";
+import { 
+  useViewBlog,
+  BlogAuthorSidebar,
+  BlogEditForm,
+  AISummaryDialog,
+  BlogHeader,
+  BlogBody,
+} from "@/features/blog";
+import { useCurrentUser } from "@/features/auth";
 
 const ViewBlogPage: React.FC = () => {
   const { user: currentUser } = useCurrentUser();

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { SignupDocument } from "@/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionActions } from "@/hooks/use-session-actions";
+import { useSessionActions } from "@/features/auth/hooks/use-session-actions";
 import { type ChangeEvent } from "react";
 import { sanitizeUsernameInput } from "@/lib/user-input";
 import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";

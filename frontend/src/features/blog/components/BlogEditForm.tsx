@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BlogEditor } from "./BlogEditor";
-import { useEditBlog } from "@/hooks/blog/use-edit-blog";
+import { useEditBlog } from "@/features/blog/hooks/use-edit-blog";
 import {
   Dialog,
   DialogTrigger,

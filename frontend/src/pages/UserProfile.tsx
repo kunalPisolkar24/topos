@@ -6,14 +6,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { StickyNavbar } from "../layouts";
-import { useUserProfile } from "@/hooks/user/use-user-profile";
-import { useUserPosts } from "@/hooks/user/use-user-posts";
-import { ProfileBanner } from "../user/ProfileBanner";
-import { ProfileViewInfo } from "../user/ProfileViewInfo";
-import { ProfileEditForm } from "../user/ProfileEditForm";
-import { ProfilePostsSection } from "../user/ProfilePostsSection";
+import { useCurrentUser } from "@/features/auth";
+import { StickyNavbar } from "@/layouts";
+import { 
+  useUserProfile,
+  useUserPosts,
+  ProfileBanner,
+  ProfileViewInfo,
+  ProfileEditForm,
+  ProfilePostsSection,
+} from "@/features/user";
 
 const DEFAULT_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
 
