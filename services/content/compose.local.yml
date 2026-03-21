@@ -1,3 +1,6 @@
+include:
+  - path: infra/compose.local.yml
+
 services:
   content-service:
     build:
