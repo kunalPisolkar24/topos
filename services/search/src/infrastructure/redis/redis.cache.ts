@@ -8,22 +8,35 @@ export class RedisCache implements ICacheService {
   private readonly config = getSharedConfig();
 
   constructor(private readonly logger: ILogger) {
-    const sentinels = this.config.REDIS_SENTINEL_HOSTS.split(',').map(pair => {
+    if (this.config.REDIS_SENTINEL_HOSTS) {
+      this.client = this.createSentinelClient();
+    } else {
+      this.client = this.createStandaloneClient();
+    }
+
+    this.client.on('error', (err: Error) => {
+      this.logger.error('Redis Client Error', { error: err.message });
+    });
+  }
+
+  private createSentinelClient(): Redis {
+    const sentinels = this.config.REDIS_SENTINEL_HOSTS!.split(',').map(pair => {
       const [host, port] = pair.split(':');
       return { host, port: parseInt(port, 10) };
     });
 
-    const redisConfig: RedisOptions = {
-      sentinels: sentinels,
+    return new Redis({
+      sentinels,
       name: this.config.REDIS_MASTER_NAME,
       retryStrategy: (times) => Math.min(times * 50, 2000),
       enableOfflineQueue: false,
-    };
+    } as RedisOptions);
+  }
 
-    this.client = new Redis(redisConfig);
-
-    this.client.on('error', (err: Error) => {
-      this.logger.error('Redis Client Error', { error: err.message });
+  private createStandaloneClient(): Redis {
+    return new Redis(this.config.REDIS_URL!, {
+      retryStrategy: (times) => Math.min(times * 50, 2000),
+      enableOfflineQueue: false,
     });
   }
 
