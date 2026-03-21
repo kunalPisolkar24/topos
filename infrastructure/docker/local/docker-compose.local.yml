@@ -2,9 +2,6 @@ name: topos-local
 
 include:
   - path: kafka.yml
-  - path: content-infra.yml
-  - path: user-infra.yml
-  - path: search-infra.yml
   - path: ../../../services/content/compose.local.yml
   - path: ../../../services/user/compose.local.yml
   - path: ../../../services/search/compose.local.yml
