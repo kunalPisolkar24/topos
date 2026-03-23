@@ -22,11 +22,11 @@ const sharedConfigSchema = z.object({
   { message: 'Either REDIS_SENTINEL_HOSTS or REDIS_URL must be provided' }
 );
 
-const apiConfigSchema = sharedConfigSchema.extend({
+const apiConfigSchema = sharedConfigSchema.safeExtend({
   API_PORT: portSchema.default(4003),
 });
 
-const workerConfigSchema = sharedConfigSchema.extend({
+const workerConfigSchema = sharedConfigSchema.safeExtend({
   WORKER_METRICS_PORT: portSchema.default(7091),
   KAFKA_BROKER: z.string().min(1),
   KAFKA_CLIENT_ID: z.string().default('search-service'),
