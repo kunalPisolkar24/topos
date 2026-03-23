@@ -24,7 +24,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:${KAFKA_INT_PORT:-9092} --list"]
       interval: 10s
-      timeout: 5s
+      timeout: 15s
+      start_period: 20s
       retries: 5
     networks:
       - app-network
