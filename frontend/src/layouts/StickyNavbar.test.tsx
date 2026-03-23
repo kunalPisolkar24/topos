@@ -13,11 +13,13 @@ describe("StickyNavbar", () => {
     renderWithProviders(<StickyNavbar />);
 
     expect(screen.getByRole("link", { name: /go to home page/i })).toBeInTheDocument();
+    expect(screen.queryByText(/editorial workspace/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /explore/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /sign in/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /sign up/i }).length).toBeGreaterThan(0);
   });
 
-  it("shows authenticated user details and mobile navigation actions", async () => {
+  it("uses the avatar as the authenticated mobile navigation trigger", async () => {
     const user = userEvent.setup();
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
 
@@ -45,14 +47,16 @@ describe("StickyNavbar", () => {
 
     renderWithProviders(<StickyNavbar />);
 
-    expect(await screen.findByText("Shamu 22")).toBeInTheDocument();
+    await screen.findByRole("button", { name: /open mobile account menu/i });
+    expect(screen.queryByText("Shamu 22")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: /open navigation menu/i }),
+      screen.getByRole("button", { name: /open mobile account menu/i }),
     );
 
     expect(screen.getAllByRole("link", { name: /create blog/i }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /account/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+    expect(screen.queryByText("Shamu 22")).not.toBeInTheDocument();
   });
 });
