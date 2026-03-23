@@ -1,4 +1,8 @@
-import { useState, type ReactNode } from "react";
+import {
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +22,11 @@ interface PasswordFieldProps {
   inputClassName?: string;
   toggleClassName?: string;
   errorClassName?: string;
+  errorId?: string;
+  inputProps?: Omit<
+    ComponentPropsWithoutRef<"input">,
+    "id" | "type" | "placeholder" | "className"
+  >;
 }
 
 export const PasswordField = ({
@@ -32,6 +41,8 @@ export const PasswordField = ({
   inputClassName,
   toggleClassName,
   errorClassName,
+  errorId,
+  inputProps,
 }: PasswordFieldProps) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -49,6 +60,7 @@ export const PasswordField = ({
           type={showPassword ? "text" : "password"}
           placeholder={placeholder}
           {...registration}
+          {...inputProps}
           className={cn(
             "pr-12",
             error && "border-destructive",
@@ -76,7 +88,10 @@ export const PasswordField = ({
         </Button>
       </div>
       {error && (
-        <p className={cn("mt-1 text-sm text-destructive", errorClassName)}>
+        <p
+          id={errorId}
+          className={cn("mt-1 text-sm text-destructive", errorClassName)}
+        >
           {error}
         </p>
       )}
