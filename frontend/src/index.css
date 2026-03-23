@@ -99,6 +99,12 @@
     --sidebar-border: 113 113 122;
     --sidebar-ring: 77 68 227;
   }
+  .light {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -137,6 +143,22 @@
     box-shadow:
       0 0 0 1000px rgb(var(--surface-lowest)) inset,
       0 0 0 1px rgb(var(--primary));
+  }
+
+  ::selection {
+    background-color: rgb(var(--primary-container) / 0.82);
+    color: rgb(var(--primary-foreground));
+  }
+
+  input::selection,
+  textarea::selection,
+  input:-webkit-autofill::selection,
+  textarea:-webkit-autofill::selection,
+  select:-webkit-autofill::selection {
+    background-color: rgb(var(--primary-container));
+    color: rgb(var(--primary-foreground));
+    -webkit-text-fill-color: rgb(var(--primary-foreground));
+    text-shadow: none;
   }
 }
 
