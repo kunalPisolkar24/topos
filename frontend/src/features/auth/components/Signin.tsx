@@ -54,7 +54,7 @@ export const Signin = () => {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:64px_64px] opacity-30" />
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-6 sm:px-6 lg:px-10">
-        <div className="grid w-full lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+        <div className="grid w-full bg-surface ring-1 ring-outline-variant/20 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
           <section className="relative hidden min-h-[720px] overflow-hidden bg-surface-low px-12 pt-12 pb-6 lg:flex lg:flex-col lg:justify-between">
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px] opacity-60" />
             <div className="relative space-y-20">
@@ -91,7 +91,7 @@ export const Signin = () => {
             </div>
           </section>
 
-          <section className="bg-surface-low px-6 py-6 ring-1 ring-outline-variant/20 sm:mx-auto sm:w-full sm:max-w-xl sm:px-8 sm:py-8 lg:mx-0 lg:max-w-none lg:px-12 lg:py-12">
+          <section className="bg-surface-lowest px-6 py-6 sm:mx-auto sm:w-full sm:max-w-xl sm:px-8 sm:py-8 lg:mx-0 lg:max-w-none lg:px-12 lg:py-12">
             <div className="space-y-8">
               <div className="space-y-4">
                 <Eyebrow>Member Access</Eyebrow>
