@@ -108,7 +108,7 @@ To set up and run the entire BlogApp stack on your local machine for development
     *   **Frontend:** Typically accessible at `http://localhost:5173`
     *   **Backend API (Cloudflare Worker dev server):** `http://localhost:8787`
     *   **Summary API (Flask):** `http://localhost:5000`
-    *   *(Refer to the `docker-compose.yml` file and individual service logs for precise port mappings if they deviate from these defaults.)*
+    *   *(Refer to `infrastructure/docker/prod/docker-compose.yml` and individual service logs for precise port mappings if they deviate from these defaults.)*
 
 5.  **Stopping the Environment:**
     To stop all running services and remove the containers and network:

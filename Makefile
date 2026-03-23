@@ -3,7 +3,9 @@
 
 ENV_FILE ?= .env
 APP_NETWORK ?= blog_app_network
-COMPOSE ?= docker compose --env-file $(ENV_FILE)
+PROD_DIR      := infrastructure/docker/prod
+PROD_COMPOSE  := $(PROD_DIR)/docker-compose.yml
+COMPOSE ?= docker compose -f $(PROD_COMPOSE) --env-file $(ENV_FILE)
 
 LOCAL_DIR      := infrastructure/docker/local
 LOCAL_ENV_FILE := $(LOCAL_DIR)/.env.local
@@ -81,4 +83,3 @@ local-logs:
 
 local-clean:
 	$(LOCAL_COMPOSE) down -v
-
