@@ -22,6 +22,8 @@ type Config struct {
 	KafkaDLQTopic        string
 	RedisAddrs      []string
 	RedisMasterName string
+	RedisURL        string
+	RedisMode       string
 	AIServiceURL    string
 	AIRequired      bool
 	AIDialTimeout   time.Duration
@@ -48,8 +50,10 @@ func LoadConfig() *Config {
 		KafkaConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
 		KafkaConsumerTopics:  kafkaConsumerTopics,
 		KafkaDLQTopic:       getEnv("KAFKA_DLQ_TOPIC", kafkaTopic+"-dlq"),
-		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "content-redis-sentinel-1:26379,content-redis-sentinel-2:26379,content-redis-sentinel-3:26379")),
-		RedisMasterName: getEnv("REDIS_MASTER_NAME", "contentmaster"),
+		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "")),
+		RedisMasterName: getEnv("REDIS_MASTER_NAME", ""),
+		RedisURL:        getEnv("REDIS_URL", "redis://localhost:6379"),
+		RedisMode:       detectRedisMode(),
 		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),
 		AIRequired:      getEnvBool("AI_REQUIRED", false),
 		AIDialTimeout:   time.Duration(getEnvInt("AI_DIAL_TIMEOUT_SECONDS", 5)) * time.Second,
@@ -130,4 +134,12 @@ func splitAndTrim(value string) []string {
 		}
 	}
 	return result
+}
+
+func detectRedisMode() string {
+	masterName, exists := os.LookupEnv("REDIS_MASTER_NAME")
+	if exists && strings.TrimSpace(masterName) != "" {
+		return "sentinel"
+	}
+	return "standalone"
 }

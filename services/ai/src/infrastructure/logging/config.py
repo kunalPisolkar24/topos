@@ -15,7 +15,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
 
 def setup_logging():
     logger = logging.getLogger()
-    logger.setLevel(settings.LOG_LEVEL)
+    logger.setLevel(settings.LOG_LEVEL.upper())
     
     handler = logging.StreamHandler(sys.stdout)
     formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')

@@ -1,0 +1,16 @@
+name: blog-app
+
+include:
+  - path: ../../../gateway/compose.yml
+  - path: ../../../frontend/compose.yml
+  - path: ../../../services/user/compose.yml
+  - path: ../../../services/content/compose.yml
+  - path: ../../../services/search/compose.yml
+  - path: ../../../services/ai/compose.yml
+  - path: ../shared/kafka.yml
+  - path: ../shared/logging.yml
+
+networks:
+  app-network:
+    external: true
+    name: ${APP_NETWORK}

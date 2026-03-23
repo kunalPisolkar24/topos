@@ -38,9 +38,9 @@ func main() {
 		}
 	}()
 
-	redisClient, err := cache.NewRedisClient(cfg.RedisMasterName, cfg.RedisAddrs)
+	redisClient, err := cache.NewRedisClientAuto(cfg)
 	if err != nil {
-		logger.Error("Failed to connect to Redis Sentinel", "error", err)
+		logger.Error("Failed to connect to Redis", "mode", cfg.RedisMode, "error", err)
 		os.Exit(1)
 	}
 	defer func() {

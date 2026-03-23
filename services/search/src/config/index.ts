@@ -14,15 +14,19 @@ const sharedConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   ELASTICSEARCH_URL: z.string().url(),
   ELASTICSEARCH_INDEX: z.string().default('posts'),
-  REDIS_SENTINEL_HOSTS: z.string().min(1),
+  REDIS_SENTINEL_HOSTS: z.string().optional(),
   REDIS_MASTER_NAME: z.string().default('mymaster'),
-});
+  REDIS_URL: z.string().optional(),
+}).refine(
+  (data) => data.REDIS_SENTINEL_HOSTS || data.REDIS_URL,
+  { message: 'Either REDIS_SENTINEL_HOSTS or REDIS_URL must be provided' }
+);
 
-const apiConfigSchema = sharedConfigSchema.extend({
+const apiConfigSchema = sharedConfigSchema.safeExtend({
   API_PORT: portSchema.default(4003),
 });
 
-const workerConfigSchema = sharedConfigSchema.extend({
+const workerConfigSchema = sharedConfigSchema.safeExtend({
   WORKER_METRICS_PORT: portSchema.default(7091),
   KAFKA_BROKER: z.string().min(1),
   KAFKA_CLIENT_ID: z.string().default('search-service'),
