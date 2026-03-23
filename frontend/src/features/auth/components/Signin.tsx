@@ -7,15 +7,13 @@ import { Label } from "@/components/ui/label";
 import { PasswordField } from "./PasswordField";
 import { useSignin } from "../hooks/use-signin";
 
-const authLabelClassName =
-  "font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-zinc-500";
-const authFieldClassName =
-  "h-12 rounded-none border-white/10 bg-[#1a1a1a] px-4 text-sm text-zinc-100 placeholder:text-zinc-500 focus-visible:border-[#4d44e3] focus-visible:ring-1 focus-visible:ring-[#161138]";
 const authErrorClassName =
-  "font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[#c56a78]";
+  "font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-destructive";
+const authEyebrowClassName =
+  "font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground";
 
 function Eyebrow({ children }: PropsWithChildren) {
-  return <p className={authLabelClassName}>{children}</p>;
+  return <p className={authEyebrowClassName}>{children}</p>;
 }
 
 function GoogleIcon(props: SVGProps<SVGSVGElement>) {
@@ -51,57 +49,57 @@ export const Signin = () => {
   const { errors } = form.formState;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#1a1a1a] text-zinc-100">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(77,68,227,0.12),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_45%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:64px_64px] opacity-30" />
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-6 sm:px-6 lg:px-10">
         <div className="grid w-full lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-          <section className="relative hidden min-h-[720px] overflow-hidden bg-[#1b1d1d] px-12 py-12 lg:flex lg:flex-col lg:justify-between">
+          <section className="relative hidden min-h-[720px] overflow-hidden bg-surface-low px-12 pt-12 pb-6 lg:flex lg:flex-col lg:justify-between">
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px] opacity-60" />
             <div className="relative space-y-20">
               <div className="inline-flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center bg-[#a9a1f7] text-[#111111]">
-                  <Waypoints className="h-5 w-5 text-[#121212]" />
+                <span className="flex h-12 w-12 items-center justify-center bg-primary text-primary-foreground">
+                  <Waypoints className="h-5 w-5" />
                 </span>
                 <div className="space-y-1">
-                  <p className="font-mono text-[0.7rem] uppercase tracking-[0.28em] text-zinc-300">
+                  <p className="font-mono text-[0.7rem] uppercase tracking-[0.28em] text-foreground">
                     Topos
                   </p>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-muted-foreground">
                     Editorial workspace access
                   </p>
                 </div>
               </div>
 
               <div className="max-w-[28rem] space-y-6">
-                <h1 className="text-[3.75rem] font-semibold leading-[0.92] tracking-[-0.05em] text-white">
+                <h1 className="text-[3.75rem] font-semibold leading-[0.92] tracking-[-0.05em] text-foreground">
                   Access your{" "}
-                  <span className="text-[#b5b2ff]">writing</span>{" "}
+                  <span className="text-primary">writing</span>{" "}
                   workspace.
                 </h1>
-                <p className="max-w-sm text-base leading-8 text-zinc-500">
+                <p className="max-w-sm text-base leading-8 text-muted-foreground">
                   Deploy, manage, and shape your publishing flow through one
                   unified interface.
                 </p>
               </div>
             </div>
 
-            <div className="relative flex items-center gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-zinc-500">
-              <span className="h-2.5 w-2.5 bg-[#b5b2ff]" />
+            <div className="relative flex items-center gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="h-2.5 w-2.5 bg-primary" />
               System status: operational
             </div>
           </section>
 
-          <section className="bg-[#050505]/95 px-6 py-6 ring-1 ring-white/10 sm:mx-auto sm:w-full sm:max-w-xl sm:px-8 sm:py-8 lg:mx-0 lg:max-w-none lg:px-12 lg:py-12">
+          <section className="bg-surface-low px-6 py-6 ring-1 ring-outline-variant/20 sm:mx-auto sm:w-full sm:max-w-xl sm:px-8 sm:py-8 lg:mx-0 lg:max-w-none lg:px-12 lg:py-12">
             <div className="space-y-8">
               <div className="space-y-4">
                 <Eyebrow>Member Access</Eyebrow>
                 <div className="space-y-2">
-                  <h2 className="text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+                  <h2 className="text-3xl font-semibold tracking-[-0.03em] text-foreground sm:text-4xl">
                     Welcome back
                   </h2>
-                  <p className="max-w-md text-sm leading-7 text-zinc-400 sm:text-base">
+                  <p className="max-w-md text-sm leading-7 text-muted-foreground sm:text-base">
                     Sign in to continue your storytelling journey through a
                     calmer, sharper workspace.
                   </p>
@@ -110,18 +108,14 @@ export const Signin = () => {
 
               <form onSubmit={onSubmit} className="space-y-5" noValidate>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className={authLabelClassName}>
-                    Email Address
-                  </Label>
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
                     type="email"
                     autoComplete="email"
                     placeholder="Enter your email"
                     {...form.register("email")}
-                    className={`${authFieldClassName} ${
-                      errors.email ? "border-[#9e3f4e]" : ""
-                    }`}
+                    className={errors.email ? "border-destructive" : undefined}
                   />
                   {errors.email && (
                     <p className={authErrorClassName}>{errors.email.message}</p>
@@ -134,18 +128,14 @@ export const Signin = () => {
                   placeholder="Enter your password"
                   registration={form.register("password")}
                   error={errors.password?.message}
-                  labelClassName={authLabelClassName}
-                  inputClassName={`${authFieldClassName} ${
-                    errors.password ? "border-[#9e3f4e]" : ""
-                  }`}
-                  toggleClassName="absolute right-0 top-0 h-full w-12 rounded-none border-l border-white/10 px-0 text-zinc-500 transition hover:bg-white/[0.03] hover:text-zinc-100 focus-visible:border-[#4d44e3] focus-visible:ring-1 focus-visible:ring-[#161138]"
+                  inputClassName={errors.password ? "border-destructive" : undefined}
                   errorClassName={authErrorClassName}
                   rightLabel={
                     <Button
                       type="button"
                       variant="ghost"
                       disabled
-                      className="h-auto rounded-none p-0 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-zinc-500 disabled:opacity-100"
+                      className="h-auto p-0 text-muted-foreground disabled:opacity-100"
                     >
                       Forgot password?
                     </Button>
@@ -154,8 +144,9 @@ export const Signin = () => {
 
                 <Button
                   type="submit"
+                  size="lg"
                   disabled={loading}
-                  className="h-12 w-full rounded-none border border-transparent bg-[#4d44e3] px-4 font-mono text-[0.75rem] uppercase tracking-[0.18em] text-white hover:bg-[#5a52ef] focus-visible:border-[#4d44e3] focus-visible:ring-1 focus-visible:ring-[#161138] disabled:bg-[#312d69] disabled:text-zinc-300"
+                  className="w-full"
                 >
                   {loading ? (
                     <>
@@ -173,24 +164,25 @@ export const Signin = () => {
 
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <span className="h-px flex-1 bg-white/10" />
+                  <span className="h-px flex-1 bg-outline-variant/20" />
                   <Eyebrow>Federated Access</Eyebrow>
-                  <span className="h-px flex-1 bg-white/10" />
+                  <span className="h-px flex-1 bg-outline-variant/20" />
                 </div>
 
                 <div className="space-y-3">
                   <Button
                     type="button"
                     variant="outline"
+                    size="lg"
                     disabled
-                    className="h-12 w-full rounded-none border-white/10 bg-[#1a1a1a] px-4 font-mono text-[0.75rem] uppercase tracking-[0.16em] text-zinc-500 hover:bg-[#1a1a1a] hover:text-zinc-500 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-[#1a1a1a] disabled:text-zinc-500 disabled:opacity-100"
+                    className="w-full justify-start text-muted-foreground disabled:cursor-not-allowed disabled:opacity-100"
                   >
                     <span className="flex w-full items-center gap-3">
                       <span className="flex h-6 w-6 items-center justify-center">
                         <GoogleIcon className="h-4 w-4" />
                       </span>
                       Continue with Google
-                      <span className="ml-auto text-[0.625rem] tracking-[0.18em] text-zinc-600">
+                      <span className="ml-auto text-[0.625rem] tracking-[0.18em] text-muted-foreground/70">
                         Soon
                       </span>
                     </span>
@@ -198,13 +190,13 @@ export const Signin = () => {
                 </div>
               </div>
 
-              <div className="bg-[#1b1b1b] px-5 py-5">
-                <p className="text-sm text-zinc-400">
+              <div className="bg-surface px-5 py-5">
+                <p className="text-sm text-muted-foreground">
                   Don&apos;t have an account?{" "}
                   <Button
                     asChild
                     variant="link"
-                    className="h-auto rounded-none p-0 text-sm text-[#8f8aff] hover:text-[#b5b2ff]"
+                    className="h-auto p-0 text-sm"
                   >
                     <Link to="/signup">Sign up</Link>
                   </Button>
