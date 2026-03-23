@@ -2,10 +2,26 @@ include:
   - path: infra/compose.local.yml
 
 services:
+  user-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: local-user-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL_MIGRATE: ${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@local-user-postgres:5432/topos_users}}
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
   user-service:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
     container_name: ${USER_SERVICE_CONTAINER:-local-user-service}
     restart: unless-stopped
     ports:
@@ -26,6 +42,8 @@ services:
     networks:
       - app-network
     depends_on:
+      user-migrate:
+        condition: service_completed_successfully
       user-postgres:
         condition: service_healthy
       user-redis:

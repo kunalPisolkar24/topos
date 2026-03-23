@@ -16,17 +16,37 @@ x-user-service-env: &user-service-env
   USER_CACHE_TTL_MS: ${USER_CACHE_TTL_MS:-3600000}
   USER_MISSING_CACHE_TTL_MS: ${USER_MISSING_CACHE_TTL_MS:-60000}
 
+x-user-migrate-env: &user-migrate-env
+  DATABASE_URL_MIGRATE: ${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL}}
+
 services:
+  user-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: user-migrate
+    restart: "no"
+    environment: *user-migrate-env
+    depends_on:
+      user-postgres-primary:
+        condition: service_healthy
+    networks:
+      - app-network
+
   user-service:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
     container_name: ${USER_SERVICE_CONTAINER:?USER_SERVICE_CONTAINER is required}
     restart: unless-stopped
     ports:
       - "${USER_SERVICE_EXT_PORT:?USER_SERVICE_EXT_PORT is required}:${USER_SERVICE_INT_PORT:?USER_SERVICE_INT_PORT is required}"
     environment: *user-service-env
     depends_on:
+      user-migrate:
+        condition: service_completed_successfully
       user-postgres-primary:
         condition: service_healthy
       user-redis-sentinel-1:
