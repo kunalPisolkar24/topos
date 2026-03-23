@@ -90,10 +90,9 @@ describe("StickyNavbar", () => {
 
     await user.click(screen.getByRole("button", { name: /open account menu/i }));
 
-    expect(screen.getByText(/member access/i)).toBeInTheDocument();
-    expect(screen.getByText("Shamu 22")).toBeInTheDocument();
-    expect(screen.getByText("shamu22@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /account/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /log out/i })).toBeInTheDocument();
+    expect(screen.queryByText(/member access/i)).not.toBeInTheDocument();
   });
 });

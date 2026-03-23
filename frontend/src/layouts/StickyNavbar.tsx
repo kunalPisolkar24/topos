@@ -37,6 +37,29 @@ const accountNavigation = {
   icon: User,
 };
 
+const stackedMenuActionClassName = cn(
+  buttonVariants({ variant: "ghost", size: "lg" }),
+  "w-full justify-start border border-outline-variant/20 bg-surface-lowest px-4 hover:border-primary/45 hover:bg-primary-container/80 hover:text-primary-foreground focus-visible:border-primary/45 focus-visible:bg-primary-container/80 focus-visible:text-primary-foreground",
+);
+
+const stackedMenuDestructiveClassName = cn(
+  buttonVariants({ variant: "destructive", size: "lg" }),
+  "w-full justify-start border border-destructive/20 px-4 shadow-none",
+);
+
+const dropdownMenuActionClassName = cn(
+  stackedMenuActionClassName,
+  "cursor-pointer data-[highlighted]:border-primary/45 data-[highlighted]:bg-primary-container/80 data-[highlighted]:text-primary-foreground",
+);
+
+const dropdownMenuDestructiveClassName = cn(
+  stackedMenuDestructiveClassName,
+  "cursor-pointer text-destructive-foreground data-[highlighted]:bg-destructive data-[highlighted]:text-destructive-foreground",
+);
+
+const menuPanelSurfaceClassName =
+  "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none ring-1 ring-outline-variant/20";
+
 function NavbarBrand() {
   return (
     <Link
@@ -159,7 +182,6 @@ export const StickyNavbar = () => {
   const isAuthenticated = hasHydrated && status === "authenticated";
   const AuthoringIcon = authoringNavigation.icon;
   const displayName = user?.name || user?.username || "Workspace member";
-  const secondaryLabel = user?.email || "Active session";
   const userInitial =
     user?.name?.charAt(0).toUpperCase() ||
     user?.username?.charAt(0).toUpperCase() ||
@@ -167,8 +189,8 @@ export const StickyNavbar = () => {
     "U";
 
   return (
-    <nav className="fixed inset-x-0 top-0 z-50 border-b border-outline-variant/20 bg-background/92 text-foreground backdrop-blur-xl supports-[backdrop-filter]:bg-background/88">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(77,68,227,0.08),transparent_22%,transparent_78%,rgba(77,68,227,0.08))]" />
+    <nav className="fixed inset-x-0 top-0 z-50 border-b border-outline-variant/20 bg-surface-low text-foreground">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(77,68,227,0.06),transparent_24%,transparent_76%,rgba(77,68,227,0.06))]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
 
       <div className="relative mx-auto flex h-[var(--app-navbar-height)] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
@@ -209,35 +231,15 @@ export const StickyNavbar = () => {
                   align="end"
                   sideOffset={10}
                   forceMount
-                  className="w-72 rounded-none border border-outline-variant/20 bg-surface-lowest p-2 text-foreground shadow-none ring-1 ring-outline-variant/20"
+                  className={cn(menuPanelSurfaceClassName, "w-[19rem] p-0")}
                 >
-                  <div className="space-y-2">
-                    <div className="bg-surface px-3 py-3">
-                      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
-                        Member Access
-                      </p>
-                      <div className="mt-3 flex items-center gap-3">
-                        <UserAvatar
-                          avatarUrl={user?.avatarUrl}
-                          label={displayName}
-                          initial={userInitial}
-                          size="sm"
-                        />
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {displayName}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {secondaryLabel}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
+                  <div className="relative p-3">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]" />
+                    <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-gradient-to-r from-primary via-primary/45 to-transparent" />
+                    <div className="relative space-y-2 pt-2">
                       <DropdownMenuItem
                         asChild
-                        className="cursor-pointer rounded-none px-3 py-2 focus:bg-surface-low focus:text-foreground"
+                        className={dropdownMenuActionClassName}
                       >
                         <Link to="/profile" className="flex w-full items-center">
                           <User className="mr-2 h-4 w-4" />
@@ -246,8 +248,7 @@ export const StickyNavbar = () => {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => void handleLogout()}
-                        variant="destructive"
-                        className="cursor-pointer rounded-none px-3 py-2"
+                        className={dropdownMenuDestructiveClassName}
                       >
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
@@ -311,19 +312,19 @@ export const StickyNavbar = () => {
       </div>
 
       {isMobileMenuOpen ? (
-        <div className="relative border-t border-outline-variant/20 bg-surface-low/95 md:hidden">
+        <div className="relative border-t border-outline-variant/20 bg-surface-low md:hidden">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-            <div className="space-y-3">
-              <div className="space-y-2">
+            <div className={cn(menuPanelSurfaceClassName, "p-3 ring-0")}>
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]" />
+              <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-gradient-to-r from-primary via-primary/45 to-transparent" />
+              <div className="relative space-y-2 pt-2">
                 {isAuthenticated ? (
                   <>
                     <Link
                       to={authoringNavigation.to}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "lg" }),
-                        "w-full justify-start px-4",
-                      )}
+                      className={stackedMenuActionClassName}
                     >
                       <AuthoringIcon className="h-4 w-4" />
                       {authoringNavigation.label}
@@ -331,10 +332,7 @@ export const StickyNavbar = () => {
                     <Link
                       to={accountNavigation.to}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        buttonVariants({ variant: "ghost", size: "lg" }),
-                        "w-full justify-start border border-outline-variant/20 bg-surface-lowest px-4",
-                      )}
+                      className={stackedMenuActionClassName}
                     >
                       <User className="h-4 w-4" />
                       {accountNavigation.label}
@@ -343,7 +341,7 @@ export const StickyNavbar = () => {
                       type="button"
                       variant="destructive"
                       size="lg"
-                      className="w-full justify-start"
+                      className={stackedMenuDestructiveClassName}
                       onClick={() => void handleLogout()}
                     >
                       <LogOut className="h-4 w-4" />
@@ -355,10 +353,7 @@ export const StickyNavbar = () => {
                     <Link
                       to="/signin"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        buttonVariants({ variant: "ghost", size: "lg" }),
-                        "w-full justify-start border border-outline-variant/20 bg-surface-lowest px-4",
-                      )}
+                      className={stackedMenuActionClassName}
                     >
                       Sign In
                     </Link>
