@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const withAlpha = (variable) => `oklch(var(${variable}) / <alpha-value>)`
+const withAlpha = (variable) => `rgb(var(${variable}) / <alpha-value>)`
 
 module.exports = {
   darkMode: ["class"],
@@ -19,15 +19,37 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "sans-serif"],
+        mono: [
+          "var(--font-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "monospace",
+        ],
+      },
       colors: {
         border: withAlpha("--border"),
         input: withAlpha("--input"),
         ring: withAlpha("--ring"),
         background: withAlpha("--background"),
         foreground: withAlpha("--foreground"),
+        surface: {
+          DEFAULT: withAlpha("--surface"),
+          low: withAlpha("--surface-low"),
+          lowest: withAlpha("--surface-lowest"),
+          high: withAlpha("--surface-high"),
+          highest: withAlpha("--surface-highest"),
+        },
+        outline: {
+          DEFAULT: withAlpha("--outline"),
+          variant: withAlpha("--outline-variant"),
+        },
         primary: {
           DEFAULT: withAlpha("--primary"),
           foreground: withAlpha("--primary-foreground"),
+          container: withAlpha("--primary-container"),
+          "fixed-dim": withAlpha("--primary-fixed-dim"),
         },
         secondary: {
           DEFAULT: withAlpha("--secondary"),

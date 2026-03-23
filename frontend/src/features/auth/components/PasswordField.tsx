@@ -38,7 +38,7 @@ export const PasswordField = ({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-3">
-        <Label htmlFor={id} className={cn("text-zinc-300", labelClassName)}>
+        <Label htmlFor={id} className={labelClassName}>
           {label}
         </Label>
         {rightLabel}
@@ -50,8 +50,8 @@ export const PasswordField = ({
           placeholder={placeholder}
           {...registration}
           className={cn(
-            "bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500",
-            error ? "border-red-500" : "border-zinc-800",
+            "pr-12",
+            error && "border-destructive",
             inputClassName,
           )}
         />
@@ -60,7 +60,7 @@ export const PasswordField = ({
           variant="ghost"
           size="icon"
           className={cn(
-            "absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100",
+            "absolute right-0 top-0 h-full w-12 border-l border-outline-variant/20 px-0 text-muted-foreground hover:bg-surface-low hover:text-foreground",
             toggleClassName,
           )}
           onClick={() => setShowPassword((prev) => !prev)}
@@ -75,7 +75,11 @@ export const PasswordField = ({
           </span>
         </Button>
       </div>
-      {error && <p className={cn("mt-1 text-sm text-red-500", errorClassName)}>{error}</p>}
+      {error && (
+        <p className={cn("mt-1 text-sm text-destructive", errorClassName)}>
+          {error}
+        </p>
+      )}
     </div>
   );
 };
