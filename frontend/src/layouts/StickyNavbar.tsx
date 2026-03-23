@@ -60,6 +60,12 @@ const dropdownMenuDestructiveClassName = cn(
 const menuPanelSurfaceClassName =
   "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none ring-1 ring-outline-variant/20";
 
+const menuPanelTintClassName =
+  "pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]";
+
+const menuPanelDividerClassName =
+  "h-px bg-gradient-to-r from-primary via-primary/45 to-transparent";
+
 function NavbarBrand() {
   return (
     <Link
@@ -152,6 +158,42 @@ const AccountTriggerButton = forwardRef<
 
 AccountTriggerButton.displayName = "AccountTriggerButton";
 
+interface AccountMenuIdentityProps {
+  avatarUrl?: string | null;
+  displayName: string;
+  email: string;
+  initial: string;
+}
+
+function AccountMenuIdentity({
+  avatarUrl,
+  displayName,
+  email,
+  initial,
+}: AccountMenuIdentityProps) {
+  return (
+    <div className="relative overflow-hidden border border-outline-variant/20 bg-surface-lowest px-4 py-3">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(31,26,72,0.22)_0%,transparent_100%)]" />
+      <div className="relative flex items-center gap-3">
+        <UserAvatar
+          avatarUrl={avatarUrl}
+          label={displayName}
+          initial={initial}
+          size="sm"
+        />
+        <div className="min-w-0 space-y-1">
+          <p className="truncate text-sm font-medium text-foreground">
+            {displayName}
+          </p>
+          <p className="truncate font-mono text-[0.68rem] tracking-[0.08em] text-muted-foreground">
+            {email}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const StickyNavbar = () => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -182,6 +224,9 @@ export const StickyNavbar = () => {
   const isAuthenticated = hasHydrated && status === "authenticated";
   const AuthoringIcon = authoringNavigation.icon;
   const displayName = user?.name || user?.username || "Workspace member";
+  const accountIdentityName =
+    user?.username || user?.name || "Workspace member";
+  const userEmail = user?.email || "No email on file";
   const userInitial =
     user?.name?.charAt(0).toUpperCase() ||
     user?.username?.charAt(0).toUpperCase() ||
@@ -234,25 +279,33 @@ export const StickyNavbar = () => {
                   className={cn(menuPanelSurfaceClassName, "w-[19rem] p-0")}
                 >
                   <div className="relative p-3">
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]" />
-                    <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-gradient-to-r from-primary via-primary/45 to-transparent" />
-                    <div className="relative space-y-2 pt-2">
-                      <DropdownMenuItem
-                        asChild
-                        className={dropdownMenuActionClassName}
-                      >
-                        <Link to="/profile" className="flex w-full items-center">
-                          <User className="mr-2 h-4 w-4" />
-                          <span>Account</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => void handleLogout()}
-                        className={dropdownMenuDestructiveClassName}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
-                      </DropdownMenuItem>
+                    <div className={menuPanelTintClassName} />
+                    <div className="relative space-y-3">
+                      <AccountMenuIdentity
+                        avatarUrl={user?.avatarUrl}
+                        displayName={accountIdentityName}
+                        email={userEmail}
+                        initial={userInitial}
+                      />
+                      <div className={menuPanelDividerClassName} />
+                      <div className="space-y-2">
+                        <DropdownMenuItem
+                          asChild
+                          className={dropdownMenuActionClassName}
+                        >
+                          <Link to="/profile" className="flex w-full items-center">
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Account</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => void handleLogout()}
+                          className={dropdownMenuDestructiveClassName}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Log out</span>
+                        </DropdownMenuItem>
+                      </div>
                     </div>
                   </div>
                 </DropdownMenuContent>
@@ -316,37 +369,45 @@ export const StickyNavbar = () => {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
             <div className={cn(menuPanelSurfaceClassName, "p-3 ring-0")}>
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]" />
-              <div className="pointer-events-none absolute inset-x-3 top-3 h-px bg-gradient-to-r from-primary via-primary/45 to-transparent" />
-              <div className="relative space-y-2 pt-2">
+              <div className={menuPanelTintClassName} />
+              <div className="relative space-y-3">
                 {isAuthenticated ? (
                   <>
-                    <Link
-                      to={authoringNavigation.to}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={stackedMenuActionClassName}
-                    >
-                      <AuthoringIcon className="h-4 w-4" />
-                      {authoringNavigation.label}
-                    </Link>
-                    <Link
-                      to={accountNavigation.to}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={stackedMenuActionClassName}
-                    >
-                      <User className="h-4 w-4" />
-                      {accountNavigation.label}
-                    </Link>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="lg"
-                      className={stackedMenuDestructiveClassName}
-                      onClick={() => void handleLogout()}
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Log out
-                    </Button>
+                    <AccountMenuIdentity
+                      avatarUrl={user?.avatarUrl}
+                      displayName={accountIdentityName}
+                      email={userEmail}
+                      initial={userInitial}
+                    />
+                    <div className={menuPanelDividerClassName} />
+                    <div className="space-y-2">
+                      <Link
+                        to={authoringNavigation.to}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={stackedMenuActionClassName}
+                      >
+                        <AuthoringIcon className="h-4 w-4" />
+                        {authoringNavigation.label}
+                      </Link>
+                      <Link
+                        to={accountNavigation.to}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={stackedMenuActionClassName}
+                      >
+                        <User className="h-4 w-4" />
+                        {accountNavigation.label}
+                      </Link>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="lg"
+                        className={stackedMenuDestructiveClassName}
+                        onClick={() => void handleLogout()}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Log out
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   <>
