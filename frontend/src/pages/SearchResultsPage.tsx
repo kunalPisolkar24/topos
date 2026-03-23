@@ -117,7 +117,7 @@ const SearchResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-900/20">
       <StickyNavbar />
-      <main className="container mx-auto mt-[70px] py-8">
+      <main className="container mx-auto pb-8 pt-app-navbar-offset">
         {loading ? (
           <div className="m-6 grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-1 lg:mx-auto">
             {Array.from({ length: 5 }).map((_, index) => (

@@ -36,7 +36,7 @@ const UserProfile: React.FC = () => {
     return (
       <div className="min-h-screen bg-zinc-950">
         <StickyNavbar />
-        <div className="container mx-auto mt-[50px] px-4 pb-16">
+        <div className="container mx-auto px-4 pb-16 pt-app-navbar">
           <Skeleton className="h-48 w-full rounded-xl bg-zinc-800 sm:h-64" />
           <div className="mx-auto -mt-16 max-w-4xl sm:-mt-20">
             <div className="flex flex-col items-center p-4 sm:flex-row sm:items-end">
@@ -65,11 +65,13 @@ const UserProfile: React.FC = () => {
     <div className="min-h-screen bg-zinc-950">
       <StickyNavbar />
 
-      <ProfileBanner 
-        bannerUrl={bannerSrc}
-        isEditing={profileState.isEditingProfile}
-        onBannerChange={(e) => profileHandlers.handleFileChange(e, "banner")}
-      />
+      <div className="pt-app-navbar">
+        <ProfileBanner
+          bannerUrl={bannerSrc}
+          isEditing={profileState.isEditingProfile}
+          onBannerChange={(e) => profileHandlers.handleFileChange(e, "banner")}
+        />
+      </div>
 
       <main className="container mx-auto px-4 pb-16">
         <div className="mx-auto max-w-4xl">

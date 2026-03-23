@@ -35,7 +35,7 @@ const ViewBlogPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-zinc-950/20">
         <StickyNavbar />
-        <div className="container mx-auto px-4 py-8 mt-[70px] text-center text-zinc-400">
+        <div className="container mx-auto px-4 pb-8 pt-app-navbar-offset text-center text-zinc-400">
           Blog post not found.
         </div>
       </div>
@@ -47,7 +47,7 @@ const ViewBlogPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-950/20">
       <StickyNavbar />
-      <div className="container mx-auto px-4 py-8 mt-[50px]">
+      <div className="container mx-auto px-4 pb-8 pt-app-navbar-offset">
         <div className="flex flex-col lg:flex-row gap-8">
           <main className="flex-1">
             {isEditing ? (

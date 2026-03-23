@@ -10,6 +10,8 @@
   :root {
     --font-sans: "Inter";
     --font-mono: "Space Grotesk";
+    --app-navbar-height: 4.5rem;
+    --app-navbar-offset: calc(var(--app-navbar-height) + 1rem);
     --background: 248 248 249;
     --foreground: 20 20 20;
     --card: 255 255 255;
@@ -105,6 +107,7 @@
   }
   html {
     @apply font-sans;
+    scroll-padding-top: var(--app-navbar-offset);
   }
 
   input:-webkit-autofill,
@@ -134,6 +137,16 @@
     box-shadow:
       0 0 0 1000px rgb(var(--surface-lowest)) inset,
       0 0 0 1px rgb(var(--primary));
+  }
+}
+
+@layer utilities {
+  .pt-app-navbar {
+    padding-top: var(--app-navbar-height);
+  }
+
+  .pt-app-navbar-offset {
+    padding-top: var(--app-navbar-offset);
   }
 }
 

@@ -19,7 +19,7 @@ const CreateNewBlog: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-950">
       <StickyNavbar />
-      <div className="container mx-auto px-4 mt-[70px] py-8">
+      <div className="container mx-auto px-4 pb-8 pt-app-navbar-offset">
         <div className="max-w-4xl mx-auto">
           <header className="mb-8">
             <h1 className="text-3xl lg:text-4xl font-bold text-zinc-100 mb-2 flex items-center">
