@@ -3,7 +3,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UseFormRegisterReturn } from "react-hook-form";
+import type { UseFormRegisterReturn } from "react-hook-form";
+import { cn } from "@/lib/utils";
 
 interface PasswordFieldProps {
   id: string;
@@ -13,6 +14,10 @@ interface PasswordFieldProps {
   error?: string;
   rightLabel?: ReactNode;
   className?: string;
+  labelClassName?: string;
+  inputClassName?: string;
+  toggleClassName?: string;
+  errorClassName?: string;
 }
 
 export const PasswordField = ({
@@ -23,13 +28,17 @@ export const PasswordField = ({
   error,
   rightLabel,
   className,
+  labelClassName,
+  inputClassName,
+  toggleClassName,
+  errorClassName,
 }: PasswordFieldProps) => {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className={`space-y-2 ${className || ""}`}>
-      <div className="flex items-center justify-between">
-        <Label htmlFor={id} className="text-zinc-300">
+    <div className={cn("space-y-2", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id} className={cn("text-zinc-300", labelClassName)}>
           {label}
         </Label>
         {rightLabel}
@@ -40,15 +49,20 @@ export const PasswordField = ({
           type={showPassword ? "text" : "password"}
           placeholder={placeholder}
           {...registration}
-          className={`bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500 ${
-            error ? "border-red-500" : "border-zinc-800"
-          }`}
+          className={cn(
+            "bg-zinc-950 pr-10 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-zinc-500",
+            error ? "border-red-500" : "border-zinc-800",
+            inputClassName,
+          )}
         />
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100"
+          className={cn(
+            "absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-100",
+            toggleClassName,
+          )}
           onClick={() => setShowPassword((prev) => !prev)}
         >
           {showPassword ? (
@@ -61,7 +75,7 @@ export const PasswordField = ({
           </span>
         </Button>
       </div>
-      {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+      {error && <p className={cn("mt-1 text-sm text-red-500", errorClassName)}>{error}</p>}
     </div>
   );
 };
