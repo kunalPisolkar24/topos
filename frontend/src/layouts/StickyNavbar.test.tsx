@@ -59,4 +59,41 @@ describe("StickyNavbar", () => {
     expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
     expect(screen.queryByText("Shamu 22")).not.toBeInTheDocument();
   });
+
+  it("opens the desktop account dropdown and shows the refreshed menu design", async () => {
+    const user = userEvent.setup();
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+
+    sessionStoreActions.markAuthenticated("test-token");
+
+    server.use(
+      graphqlApi.query("Me", () =>
+        HttpResponse.json({
+          data: {
+            me: {
+              __typename: "User",
+              id: "1",
+              username: "shamu22",
+              email: "shamu22@example.com",
+              name: "Shamu 22",
+              bio: null,
+              avatarUrl: null,
+              bannerUrl: null,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        }),
+      ),
+    );
+
+    renderWithProviders(<StickyNavbar />);
+
+    await user.click(screen.getByRole("button", { name: /open account menu/i }));
+
+    expect(screen.getByText(/member access/i)).toBeInTheDocument();
+    expect(screen.getByText("Shamu 22")).toBeInTheDocument();
+    expect(screen.getByText("shamu22@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /account/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /log out/i })).toBeInTheDocument();
+  });
 });

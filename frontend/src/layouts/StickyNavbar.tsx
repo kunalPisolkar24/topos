@@ -1,4 +1,9 @@
-import { forwardRef, useEffect, useState } from "react";
+import {
+  forwardRef,
+  type ComponentPropsWithoutRef,
+  useEffect,
+  useState,
+} from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LogOut,
@@ -83,14 +88,11 @@ interface AccountTriggerButtonProps {
   label: string;
   initial: string;
   ariaLabel: string;
-  expanded?: boolean;
-  onClick?: () => void;
-  className?: string;
 }
 
 const AccountTriggerButton = forwardRef<
   HTMLButtonElement,
-  AccountTriggerButtonProps
+  AccountTriggerButtonProps & ComponentPropsWithoutRef<"button">
 >(
   (
     {
@@ -98,9 +100,8 @@ const AccountTriggerButton = forwardRef<
       label,
       initial,
       ariaLabel,
-      expanded,
-      onClick,
       className,
+      ...props
     },
     ref,
   ) => {
@@ -114,8 +115,7 @@ const AccountTriggerButton = forwardRef<
           className,
         )}
         aria-label={ariaLabel}
-        aria-expanded={expanded}
-        onClick={onClick}
+        {...props}
       >
         <UserAvatar
           avatarUrl={avatarUrl}
@@ -159,6 +159,7 @@ export const StickyNavbar = () => {
   const isAuthenticated = hasHydrated && status === "authenticated";
   const AuthoringIcon = authoringNavigation.icon;
   const displayName = user?.name || user?.username || "Workspace member";
+  const secondaryLabel = user?.email || "Active session";
   const userInitial =
     user?.name?.charAt(0).toUpperCase() ||
     user?.username?.charAt(0).toUpperCase() ||
@@ -208,25 +209,51 @@ export const StickyNavbar = () => {
                   align="end"
                   sideOffset={10}
                   forceMount
-                  className="w-64 rounded-none border border-outline-variant/20 bg-surface-lowest p-1 text-foreground shadow-none ring-1 ring-outline-variant/20"
+                  className="w-72 rounded-none border border-outline-variant/20 bg-surface-lowest p-2 text-foreground shadow-none ring-1 ring-outline-variant/20"
                 >
-                  <DropdownMenuItem
-                    asChild
-                    className="cursor-pointer rounded-none px-3 py-2 focus:bg-surface-low focus:text-foreground"
-                  >
-                    <Link to="/profile" className="flex w-full items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Account</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => void handleLogout()}
-                    variant="destructive"
-                    className="cursor-pointer rounded-none px-3 py-2"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
+                  <div className="space-y-2">
+                    <div className="bg-surface px-3 py-3">
+                      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+                        Member Access
+                      </p>
+                      <div className="mt-3 flex items-center gap-3">
+                        <UserAvatar
+                          avatarUrl={user?.avatarUrl}
+                          label={displayName}
+                          initial={userInitial}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {displayName}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {secondaryLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <DropdownMenuItem
+                        asChild
+                        className="cursor-pointer rounded-none px-3 py-2 focus:bg-surface-low focus:text-foreground"
+                      >
+                        <Link to="/profile" className="flex w-full items-center">
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Account</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => void handleLogout()}
+                        variant="destructive"
+                        className="cursor-pointer rounded-none px-3 py-2"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </div>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -239,7 +266,7 @@ export const StickyNavbar = () => {
                     ? "Close mobile account menu"
                     : "Open mobile account menu"
                 }
-                expanded={isMobileMenuOpen}
+                aria-expanded={isMobileMenuOpen}
                 onClick={handleAuthenticatedMobileToggle}
                 className="md:hidden"
               />
