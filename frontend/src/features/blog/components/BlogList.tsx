@@ -22,6 +22,8 @@ interface BlogListProps {
   filterTag?: string;
 }
 
+const BLOG_LIST_HEADING = "LATEST UPDATES";
+
 export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
@@ -81,20 +83,27 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
     }
   };
 
+  const sectionHeading = (
+    <p className="mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-muted-foreground">
+      {BLOG_LIST_HEADING}
+    </p>
+  );
+
   if (activeQuery.loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 gap-8 m-6 max-w-7xl xs:m-[15px] sm:m-[20px] md:m-[30px] md:grid-cols-1 lg:m-[40px] lg:mx-auto lg:grid-cols-1">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {sectionHeading}
+        <div className="space-y-4">
           {Array.from({ length: itemsPerPage }).map((_, index) => (
             <BlogCardSkeleton key={index} />
           ))}
         </div>
-        <div className="mt-10 mb-6 flex items-center justify-center space-x-2">
-          <Skeleton className="h-10 w-24 rounded-md bg-zinc-800" />
-          <Skeleton className="h-10 w-10 rounded-md bg-zinc-800" />
-          <Skeleton className="h-10 w-10 rounded-md bg-zinc-800" />
-          <Skeleton className="h-10 w-10 rounded-md bg-zinc-800" />
-          <Skeleton className="h-10 w-24 rounded-md bg-zinc-800" />
+        <div className="mb-6 mt-10 flex items-center justify-center space-x-2">
+          <Skeleton className="h-10 w-24 rounded-none bg-surface-low" />
+          <Skeleton className="h-10 w-10 rounded-none bg-surface-low" />
+          <Skeleton className="h-10 w-10 rounded-none bg-surface-low" />
+          <Skeleton className="h-10 w-10 rounded-none bg-surface-low" />
+          <Skeleton className="h-10 w-24 rounded-none bg-surface-low" />
         </div>
       </div>
     );
@@ -102,8 +111,9 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
 
   if (totalPosts === 0) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <p className="text-xl text-zinc-400">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {sectionHeading}
+        <p className="text-lg text-muted-foreground">
           {filterTag
             ? `No posts found for the tag "${filterTag}".`
             : "No blog posts available yet."}
@@ -113,15 +123,16 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 gap-8 m-6 max-w-7xl xs:m-[15px] sm:m-[20px] md:m-[30px] md:grid-cols-1 lg:m-[40px] lg:mx-auto lg:grid-cols-1">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {sectionHeading}
+      <div className="space-y-4">
         {blogPosts.map((post) => (
           <BlogCard key={post.id} {...post} />
         ))}
       </div>
 
       {totalPages > 1 && (
-        <Pagination>
+        <Pagination className="mt-10">
           <PaginationContent>
             <PaginationItem>
               {currentPage > 1 && (
@@ -131,7 +142,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     event.preventDefault();
                     handlePageChange(currentPage - 1);
                   }}
-                  className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  className="text-muted-foreground hover:bg-surface-low hover:text-foreground"
                 />
               )}
             </PaginationItem>
@@ -144,10 +155,10 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     handlePageChange(index + 1);
                   }}
                   isActive={currentPage === index + 1}
-                  className={`hover:bg-zinc-800 hover:text-zinc-200 ${
+                  className={`hover:bg-surface-low hover:text-foreground ${
                     currentPage === index + 1
-                      ? "border-zinc-700 bg-zinc-800 text-zinc-100"
-                      : "text-zinc-400"
+                      ? "border-outline-variant/20 bg-surface-lowest text-foreground"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {index + 1}
@@ -162,7 +173,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     event.preventDefault();
                     handlePageChange(currentPage + 1);
                   }}
-                  className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  className="text-muted-foreground hover:bg-surface-low hover:text-foreground"
                 />
               )}
             </PaginationItem>

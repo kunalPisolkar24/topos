@@ -1,33 +1,33 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 export const BlogCardSkeleton: React.FC = () => {
   return (
-    <Card className="overflow-hidden border-zinc-800 bg-zinc-950">
-      <div className="flex flex-col sm:flex-row md:h-[300px]">
-        <Skeleton className="h-48 w-full sm:h-auto sm:w-2/5 sm:order-2 bg-zinc-800" />
-        <CardContent className="flex flex-1 flex-col justify-between p-5 sm:order-1 sm:p-6">
-          <div className="mb-4">
-            <Skeleton className="mb-3 h-6 w-3/4 rounded bg-zinc-700 sm:h-7" />
-            <Skeleton className="mb-1 h-5 w-full rounded bg-zinc-700" />
-            <Skeleton className="h-5 w-5/6 rounded bg-zinc-700" />
-          </div>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Skeleton className="h-6 w-16 rounded-md bg-zinc-800" />
-            <Skeleton className="h-6 w-20 rounded-md bg-zinc-800" />
-            <Skeleton className="h-6 w-12 rounded-md bg-zinc-800" />
-          </div>
-          <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full bg-zinc-800" />
-              <div className="flex flex-col gap-1">
-                <Skeleton className="h-4 w-20 rounded bg-zinc-700" />
-                <Skeleton className="h-3 w-24 rounded bg-zinc-700" />
-              </div>
+    <Card className="gap-0 bg-surface-lowest py-0">
+      <div className="grid gap-0 md:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.95fr)]">
+        <div className="flex min-w-0 flex-col justify-between px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-4/5 rounded-none bg-surface-low sm:h-9" />
+              <Skeleton className="h-8 w-3/5 rounded-none bg-surface-low sm:h-9" />
+              <Skeleton className="h-4 w-full rounded-none bg-surface-low" />
+              <Skeleton className="h-4 w-11/12 rounded-none bg-surface-low" />
+              <Skeleton className="h-4 w-3/4 rounded-none bg-surface-low" />
             </div>
-            <Skeleton className="h-5 w-24 rounded bg-zinc-700 sm:self-end" />
+            <div className="flex flex-wrap gap-x-3 gap-y-2">
+              <Skeleton className="h-3 w-24 rounded-none bg-primary-container/80" />
+              <Skeleton className="h-3 w-20 rounded-none bg-primary-container/80" />
+              <Skeleton className="h-3 w-28 rounded-none bg-primary-container/80" />
+            </div>
           </div>
-        </CardContent>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Skeleton className="size-2.5 rounded-none bg-primary-container/80" />
+            <Skeleton className="h-3 w-28 rounded-none bg-surface-low" />
+            <Skeleton className="h-3 w-px rounded-none bg-outline-variant/30" />
+            <Skeleton className="h-3 w-24 rounded-none bg-surface-low" />
+          </div>
+        </div>
+        <Skeleton className="min-h-[220px] w-full rounded-none bg-surface-low md:min-h-full" />
       </div>
     </Card>
   );

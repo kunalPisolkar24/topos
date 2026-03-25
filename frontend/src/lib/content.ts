@@ -1,6 +1,12 @@
 export const DEFAULT_BLOG_CARD_IMAGE =
   "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80";
 
+const BLOG_CARD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+
 type AuthorLike = {
   username: string;
   name?: string | null;
@@ -27,7 +33,6 @@ export interface BlogCardItem {
   snippet: string;
   author: {
     name: string;
-    avatarUrl: string | null;
   };
   tags: string[];
   imageUrl: string;
@@ -48,6 +53,23 @@ export function getAuthorDisplayName(author: AuthorLike) {
   return normalizedName || author.username;
 }
 
+export function formatBlogCardDate(publishedAt: Date | string) {
+  const dateValue =
+    publishedAt instanceof Date ? publishedAt : new Date(publishedAt);
+
+  if (Number.isNaN(dateValue.getTime())) {
+    return null;
+  }
+
+  return BLOG_CARD_DATE_FORMATTER.format(dateValue).toUpperCase();
+}
+
+export function formatBlogCardTag(tag: string) {
+  const normalizedTag = tag.trim().replace(/^#+/, "").replace(/\s+/g, "_");
+
+  return `#${normalizedTag.toUpperCase()}`;
+}
+
 export function mapPostToBlogCardItem(post: PostLike): BlogCardItem {
   const plainTextBody = stripHtml(post.body);
 
@@ -59,7 +81,6 @@ export function mapPostToBlogCardItem(post: PostLike): BlogCardItem {
       (plainTextBody.length > 150 ? "..." : ""),
     author: {
       name: getAuthorDisplayName(post.author),
-      avatarUrl: post.author.avatarUrl ?? null,
     },
     tags: post.tags.map((tag) => tag.name),
     imageUrl: post.imageUrl || DEFAULT_BLOG_CARD_IMAGE,

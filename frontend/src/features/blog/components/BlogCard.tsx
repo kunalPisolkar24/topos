@@ -1,25 +1,16 @@
 import type React from "react";
-import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Clock, ArrowRight } from "lucide-react";
-
-interface BlogCardProps {
-  imageUrl: string;
-  title: string;
-  snippet: string;
-  author: {
-    name: string;
-    avatarUrl: string | null;
-  };
-  tags: string[];
-  id: string;
-  publishedAt: Date | string;
-}
+import { Card } from "@/components/ui/card";
+import {
+  DEFAULT_BLOG_CARD_IMAGE,
+  formatBlogCardDate,
+  formatBlogCardTag,
+  type BlogCardItem,
+} from "@/lib/content";
 
 const MAX_VISIBLE_TAGS = 3;
+
+type BlogCardProps = BlogCardItem;
 
 export const BlogCard: React.FC<BlogCardProps> = ({
   imageUrl,
@@ -32,101 +23,74 @@ export const BlogCard: React.FC<BlogCardProps> = ({
 }) => {
   const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
   const remainingTagsCount = tags.length - MAX_VISIBLE_TAGS;
-
-  let timeAgo = "just now";
-  try {
-    if (
-      publishedAt &&
-      publishedAt instanceof Date &&
-      !isNaN(publishedAt.getTime())
-    ) {
-      timeAgo = formatDistanceToNow(publishedAt, { addSuffix: true });
-    } else if (typeof publishedAt === "string") {
-      const dateObj = new Date(publishedAt);
-      if (!isNaN(dateObj.getTime())) {
-        timeAgo = formatDistanceToNow(dateObj, { addSuffix: true });
-      }
-    }
-  } catch (error) {
-    console.error("Error formatting date:", publishedAt, error);
-  }
+  const formattedDate = formatBlogCardDate(publishedAt);
+  const authorName = author.name.trim() || "Unknown Author";
+  const publishedAtValue = publishedAt;
 
   return (
-    <Link to={`/blog/${id}`} className="block group">
-      <Card className="overflow-hidden border-zinc-800 bg-zinc-950 transition-all duration-300 hover:bg-zinc-900 hover:shadow-xl hover:shadow-zinc-900/20">
-        <div className="flex flex-col sm:flex-row md:h-[300px]">
-          <div className="relative h-48 w-full overflow-hidden sm:h-auto sm:w-2/5 sm:order-2">
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent opacity-60 sm:hidden"></div>
-            <img
-              src={imageUrl}
-              alt={title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-              onError={(e) =>
-                (e.currentTarget.src =
-                  "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80")
-              }
-            />
-          </div>
+    <Link
+      to={`/blog/${id}`}
+      className="group block focus-visible:outline-none"
+      aria-label={`Open blog post: ${title}`}
+    >
+      <Card className="gap-0 bg-surface-lowest py-0 transition-colors duration-200 group-hover:bg-surface-low group-focus-visible:bg-surface-low group-focus-visible:ring-primary">
+        <div className="grid min-w-0 gap-0 md:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.95fr)]">
+          <div className="flex min-w-0 flex-col justify-between px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <h2 className="line-clamp-3 text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.035em] text-foreground sm:text-[1.8rem]">
+                  {title}
+                </h2>
+                <p className="line-clamp-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:line-clamp-4 sm:text-[0.95rem]">
+                  {snippet}
+                </p>
+              </div>
 
-          <CardContent className="flex flex-1 flex-col justify-between p-5 sm:order-1 sm:p-6">
-            <div className="mb-4">
-              <h2 className="mb-2 line-clamp-2 text-xl font-bold text-zinc-100 transition-colors duration-300 group-hover:text-zinc-50 sm:text-2xl">
-                {title}
-              </h2>
-              <p className="line-clamp-3 text-sm text-zinc-400 sm:line-clamp-4">
-                {snippet}
-              </p>
-            </div>
-
-            <div className="mb-4 flex flex-wrap gap-2">
-              {visibleTags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border-zinc-700"
-                >
-                  {tag}
-                </Badge>
-              ))}
-              {remainingTagsCount > 0 && (
-                <Badge
-                  variant="outline"
-                  className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300"
-                >
-                  +{remainingTagsCount} more
-                </Badge>
+              {visibleTags.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary/90">
+                  {visibleTags.map((tag) => (
+                    <span key={tag}>{formatBlogCardTag(tag)}</span>
+                  ))}
+                  {remainingTagsCount > 0 && (
+                    <span className="text-muted-foreground">
+                      +{remainingTagsCount} MORE
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
-            <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8 border border-zinc-700">
-                  <AvatarImage
-                    src={author.avatarUrl || undefined}
-                    alt={author.name}
+            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className="size-2.5 shrink-0 border border-primary/45 bg-primary-container/80"
+              />
+              <span className="text-foreground/90">{authorName}</span>
+              {formattedDate ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-px bg-outline-variant/30"
                   />
-                  <AvatarFallback className="bg-zinc-800 text-zinc-300">
-                    {author.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium text-zinc-300">
-                    {author.name}
-                  </span>
-                  <div className="flex items-center text-xs text-zinc-500">
-                    <Clock className="mr-1 h-3 w-3" />
-                    {timeAgo}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center text-sm font-medium text-zinc-400 transition-colors group-hover:text-zinc-300">
-                Read More
-                <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </div>
+                  <time dateTime={publishedAtValue}>{formattedDate}</time>
+                </>
+              ) : null}
             </div>
-          </CardContent>
+          </div>
+
+          <div className="relative min-h-[220px] bg-surface-low">
+            <img
+              src={imageUrl}
+              alt={title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={(event) => {
+                if (event.currentTarget.src !== DEFAULT_BLOG_CARD_IMAGE) {
+                  event.currentTarget.src = DEFAULT_BLOG_CARD_IMAGE;
+                }
+              }}
+            />
+          </div>
         </div>
       </Card>
     </Link>
