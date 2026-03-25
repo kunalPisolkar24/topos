@@ -1,6 +1,7 @@
 import type React from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { getBlogCardImageSources } from "@/lib/cloudinary";
 import {
   DEFAULT_BLOG_CARD_IMAGE,
   formatBlogCardDate,
@@ -26,6 +27,8 @@ export const BlogCard: React.FC<BlogCardProps> = ({
   const formattedDate = formatBlogCardDate(publishedAt);
   const authorName = author.name.trim() || "Unknown Author";
   const publishedAtValue = publishedAt;
+  const blogCardImage = getBlogCardImageSources(imageUrl);
+  const fallbackImage = getBlogCardImageSources(DEFAULT_BLOG_CARD_IMAGE);
 
   return (
     <Link
@@ -34,25 +37,60 @@ export const BlogCard: React.FC<BlogCardProps> = ({
       aria-label={`Open blog post: ${title}`}
     >
       <Card className="gap-0 bg-surface-lowest py-0 transition-colors duration-200 group-hover:bg-surface-low group-focus-visible:bg-surface-low group-focus-visible:ring-primary">
-        <div className="grid min-w-0 gap-0 md:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.95fr)]">
-          <div className="flex min-w-0 flex-col justify-between px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+        <div className="grid min-w-0 gap-0 md:h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
+          <div
+            data-slot="blog-card-image-frame"
+            className="relative aspect-[8/5] bg-surface-low md:col-start-2 md:row-start-1 md:h-full md:aspect-auto"
+          >
+            <img
+              src={blogCardImage.src}
+              srcSet={blogCardImage.srcSet}
+              sizes={blogCardImage.sizes}
+              alt={title}
+              className="h-full w-full object-cover"
+              width={blogCardImage.width}
+              height={blogCardImage.height}
+              decoding="async"
+              loading="lazy"
+              data-slot="blog-card-image"
+              onError={(event) => {
+                if (event.currentTarget.src !== fallbackImage.src) {
+                  event.currentTarget.src = fallbackImage.src;
+                  event.currentTarget.sizes = fallbackImage.sizes;
+                  if (fallbackImage.srcSet) {
+                    event.currentTarget.srcset = fallbackImage.srcSet;
+                  } else {
+                    event.currentTarget.removeAttribute("srcset");
+                  }
+                }
+              }}
+            />
+          </div>
+
+          <div
+            data-slot="blog-card-content"
+            className="flex min-w-0 flex-col gap-4 px-4 py-5 sm:px-5 sm:py-6 lg:px-6 lg:py-6 md:col-start-1 md:row-start-1 md:justify-center md:gap-4.5"
+          >
             <div className="space-y-4">
-              <div className="space-y-3">
-                <h2 className="line-clamp-3 text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.035em] text-foreground sm:text-[1.8rem]">
+              <div className="space-y-3.5">
+                <h2
+                  data-slot="blog-card-title"
+                  className="line-clamp-2 text-[1.3rem] font-semibold leading-[1.12] tracking-[-0.028em] text-foreground sm:text-[1.5rem] lg:text-[1.65rem]"
+                >
                   {title}
                 </h2>
-                <p className="line-clamp-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:line-clamp-4 sm:text-[0.95rem]">
+                <p className="line-clamp-3 max-w-3xl text-[0.95rem] leading-7 tracking-[0.01em] text-muted-foreground sm:text-[1rem]">
                   {snippet}
                 </p>
               </div>
 
               {visibleTags.length > 0 && (
-                <div className="flex flex-wrap gap-x-3 gap-y-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary/90">
+                <div className="flex flex-wrap gap-x-3 gap-y-2.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-primary">
                   {visibleTags.map((tag) => (
                     <span key={tag}>{formatBlogCardTag(tag)}</span>
                   ))}
                   {remainingTagsCount > 0 && (
-                    <span className="text-muted-foreground">
+                    <span className="text-muted-foreground/90">
                       +{remainingTagsCount} MORE
                     </span>
                   )}
@@ -60,10 +98,10 @@ export const BlogCard: React.FC<BlogCardProps> = ({
               )}
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
               <span
                 aria-hidden="true"
-                className="size-2.5 shrink-0 border border-primary/45 bg-primary-container/80"
+                className="size-2.5 shrink-0 border border-primary/75 bg-primary/20"
               />
               <span className="text-foreground/90">{authorName}</span>
               {formattedDate ? (
@@ -76,20 +114,6 @@ export const BlogCard: React.FC<BlogCardProps> = ({
                 </>
               ) : null}
             </div>
-          </div>
-
-          <div className="relative min-h-[220px] bg-surface-low">
-            <img
-              src={imageUrl}
-              alt={title}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              onError={(event) => {
-                if (event.currentTarget.src !== DEFAULT_BLOG_CARD_IMAGE) {
-                  event.currentTarget.src = DEFAULT_BLOG_CARD_IMAGE;
-                }
-              }}
-            />
           </div>
         </div>
       </Card>
