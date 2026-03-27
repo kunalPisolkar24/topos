@@ -95,8 +95,12 @@ describe("StickyNavbar", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByText("shamu22")).toBeInTheDocument();
     expect(screen.getByText("shamu22@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /account/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /log out/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /account/i })).toHaveClass(
+      "interactive-hover-primary",
+    );
+    expect(screen.getByRole("menuitem", { name: /log out/i })).toHaveClass(
+      "interactive-hover-destructive",
+    );
     expect(screen.queryByText(/member access/i)).not.toBeInTheDocument();
   });
 });

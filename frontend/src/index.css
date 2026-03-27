@@ -163,6 +163,66 @@
 }
 
 @layer utilities {
+  .interactive-hover-primary {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .interactive-hover-primary:hover,
+  .interactive-hover-primary:focus-visible,
+  .interactive-hover-primary[aria-expanded="true"],
+  .interactive-hover-primary[data-highlighted],
+  .interactive-hover-primary[data-selected="true"],
+  .interactive-hover-primary[data-state="open"] {
+    border-color: rgb(var(--primary) / 0.45);
+    background-color: rgb(var(--primary-container) / 0.8);
+    color: rgb(var(--primary-foreground));
+    box-shadow: inset 0 0 0 1px rgb(var(--primary-fixed-dim) / 0.95);
+  }
+
+  .interactive-hover-structural {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease,
+      ring-color 150ms ease;
+  }
+
+  .interactive-hover-structural:hover,
+  .interactive-hover-structural:focus-visible,
+  .interactive-hover-structural[data-highlighted],
+  .interactive-hover-structural[data-selected="true"],
+  .interactive-hover-structural[data-state="open"] {
+    background-color: rgb(var(--primary-container) / 0.2);
+    box-shadow:
+      inset 0 0 0 1px rgb(var(--primary) / 0.38),
+      0 0 0 1px rgb(var(--primary-fixed-dim) / 0.88);
+  }
+
+  .interactive-hover-destructive {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .interactive-hover-destructive:hover,
+  .interactive-hover-destructive:focus-visible,
+  .interactive-hover-destructive[aria-expanded="true"],
+  .interactive-hover-destructive[data-highlighted],
+  .interactive-hover-destructive[data-selected="true"],
+  .interactive-hover-destructive[data-state="open"] {
+    border-color: rgb(var(--destructive) / 0.45);
+    background-color: rgb(var(--destructive));
+    color: rgb(var(--destructive-foreground));
+    box-shadow: inset 0 0 0 1px rgb(var(--destructive) / 0.65);
+  }
+
   .pt-app-navbar {
     padding-top: var(--app-navbar-height);
   }

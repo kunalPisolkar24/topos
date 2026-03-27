@@ -36,7 +36,10 @@ export const BlogCard: React.FC<BlogCardProps> = ({
       className="group block focus-visible:outline-none"
       aria-label={`Open blog post: ${title}`}
     >
-      <Card className="gap-0 bg-surface-lowest py-0 transition-colors duration-200 group-hover:bg-surface-low group-focus-visible:bg-surface-low group-focus-visible:ring-primary">
+      <Card
+        data-interactive="true"
+        className="gap-0 bg-surface-lowest py-0 group-focus-visible:bg-primary-container/20 group-focus-visible:[box-shadow:inset_0_0_0_1px_rgb(var(--primary)/0.38),0_0_0_1px_rgb(var(--primary-fixed-dim)/0.88)]"
+      >
         <div className="grid min-w-0 gap-0 md:h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
           <div
             data-slot="blog-card-image-frame"

@@ -54,6 +54,9 @@ describe("BlogCard", () => {
     expect(screen.queryByText(/min read/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/ago/i)).not.toBeInTheDocument();
     expect(container.querySelector('[data-slot="avatar"]')).toBeNull();
+    expect(container.querySelector('[data-slot="card"]')).toHaveClass(
+      "interactive-hover-structural",
+    );
     expect(title).toHaveClass("line-clamp-2");
     expect(imageFrame).toHaveClass("md:col-start-2");
     expect(content).toHaveClass("md:col-start-1");

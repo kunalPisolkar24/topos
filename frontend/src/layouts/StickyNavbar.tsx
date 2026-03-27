@@ -39,7 +39,7 @@ const accountNavigation = {
 
 const stackedMenuActionClassName = cn(
   buttonVariants({ variant: "ghost", size: "lg" }),
-  "w-full justify-start border border-outline-variant/20 bg-surface-lowest px-4 hover:border-primary/45 hover:bg-primary-container/80 hover:text-primary-foreground focus-visible:border-primary/45 focus-visible:bg-primary-container/80 focus-visible:text-primary-foreground",
+  "w-full justify-start border-outline-variant/20 bg-surface-lowest px-4",
 );
 
 const stackedMenuDestructiveClassName = cn(
@@ -49,7 +49,7 @@ const stackedMenuDestructiveClassName = cn(
 
 const dropdownMenuActionClassName = cn(
   stackedMenuActionClassName,
-  "cursor-pointer data-[highlighted]:border-primary/45 data-[highlighted]:bg-primary-container/80 data-[highlighted]:text-primary-foreground",
+  "cursor-pointer",
 );
 
 const dropdownMenuDestructiveClassName = cn(
@@ -140,7 +140,7 @@ const AccountTriggerButton = forwardRef<
         type="button"
         variant="ghost"
         className={cn(
-          "h-auto w-auto rounded-full border border-primary/45 bg-transparent p-0.5 hover:border-primary/70 hover:bg-transparent focus-visible:ring-primary-container",
+          "h-auto w-auto rounded-full border border-primary/45 bg-transparent p-0.5 hover:bg-transparent focus-visible:ring-primary-container",
           className,
         )}
         aria-label={ariaLabel}

@@ -5,19 +5,19 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-none border border-transparent bg-clip-padding font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] whitespace-nowrap transition-colors outline-none select-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary-container active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-none border border-transparent bg-clip-padding font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] whitespace-nowrap outline-none select-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary-container active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90 [a]:hover:bg-primary/90",
         outline:
-          "border-outline-variant/20 bg-surface-lowest text-foreground hover:bg-surface-low hover:text-foreground aria-expanded:bg-surface-low aria-expanded:text-foreground",
+          "interactive-hover-primary border-outline-variant/20 bg-surface-lowest text-foreground",
         secondary:
-          "border-outline-variant/20 bg-surface-low text-secondary-foreground hover:bg-surface-high aria-expanded:bg-surface-high aria-expanded:text-secondary-foreground",
+          "interactive-hover-primary border-outline-variant/20 bg-surface-low text-secondary-foreground",
         ghost:
-          "text-foreground hover:bg-surface-low hover:text-foreground aria-expanded:bg-surface-low aria-expanded:text-foreground",
+          "interactive-hover-primary bg-transparent text-foreground",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/20",
+          "interactive-hover-destructive bg-destructive text-destructive-foreground focus-visible:border-destructive focus-visible:ring-destructive/20",
         link: "border-transparent bg-transparent p-0 text-primary underline-offset-4 hover:text-primary/80 hover:underline",
       },
       size: {

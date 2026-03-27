@@ -142,7 +142,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     event.preventDefault();
                     handlePageChange(currentPage - 1);
                   }}
-                  className="text-muted-foreground hover:bg-surface-low hover:text-foreground"
+                  className="border-outline-variant/20 bg-surface-lowest text-muted-foreground"
                 />
               )}
             </PaginationItem>
@@ -155,10 +155,10 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     handlePageChange(index + 1);
                   }}
                   isActive={currentPage === index + 1}
-                  className={`hover:bg-surface-low hover:text-foreground ${
+                  className={`${
                     currentPage === index + 1
-                      ? "border-outline-variant/20 bg-surface-lowest text-foreground"
-                      : "text-muted-foreground"
+                      ? "border-primary/45 bg-primary-container/80 text-primary-foreground [box-shadow:inset_0_0_0_1px_rgb(var(--primary-fixed-dim)/0.95)]"
+                      : "border-outline-variant/20 bg-surface-lowest text-muted-foreground"
                   }`}
                 >
                   {index + 1}
@@ -173,7 +173,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
                     event.preventDefault();
                     handlePageChange(currentPage + 1);
                   }}
-                  className="text-muted-foreground hover:bg-surface-low hover:text-foreground"
+                  className="border-outline-variant/20 bg-surface-lowest text-muted-foreground"
                 />
               )}
             </PaginationItem>
