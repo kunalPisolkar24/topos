@@ -8,7 +8,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { type ContentTag } from "@/graphql/content-documents";
 import { useSearchSuggestions, type SearchMode } from "../hooks/use-search-suggestions";
 import { TagSuggestions } from "./TagSuggestions";
@@ -75,27 +74,33 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       ref={commandWrapperRef}
       className="mx-auto mt-16 w-full max-w-3xl px-4 sm:mt-20 sm:px-6"
     >
-      <Card className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-lg">
-        <div className="flex items-center gap-1 border-b border-zinc-800 bg-zinc-900/30 p-2">
-          <Button
-            variant={searchMode === "tags" ? "secondary" : "ghost"}
+      <Card className="overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest shadow-none">
+        <div className="flex items-center gap-1 border-b border-outline-variant/20 bg-transparent p-1.5 px-2">
+          <button
             onClick={() => setSearchMode("tags")}
-            className="h-8 px-3 text-sm"
+            className={`flex items-center gap-2 px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
+              searchMode === "tags"
+                ? "bg-surface-high text-foreground"
+                : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
+            }`}
           >
-            <Hash className="mr-2 h-4 w-4" /> Tags
-          </Button>
-          <Button
-            variant={searchMode === "posts" ? "secondary" : "ghost"}
+            <Hash className="h-3.5 w-3.5" /> Tags
+          </button>
+          <button
             onClick={() => setSearchMode("posts")}
-            className="h-8 px-3 text-sm"
+            className={`flex items-center gap-2 px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
+              searchMode === "posts"
+                ? "bg-surface-high text-foreground"
+                : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
+            }`}
           >
-            <BookText className="mr-2 h-4 w-4" /> Posts
-          </Button>
+            <BookText className="h-3.5 w-3.5" /> Posts
+          </button>
         </div>
         <div className="relative">
           <Command shouldFilter={false} className="bg-transparent">
             <div className="flex items-center px-3">
-              <Search className="mr-2 h-4 w-4 shrink-0 text-zinc-400" />
+              <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
               <CommandInput
                 placeholder={
                   searchMode === "tags"
@@ -115,20 +120,20 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     }
                   }, 150)
                 }
-                className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                className="flex h-12 w-full rounded-none bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList>
               {showCommandList && (
                 <>
                   {isLoading && (
-                    <div className="flex items-center justify-center py-6 text-sm text-zinc-400">
+                    <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       <span>Searching...</span>
                     </div>
                   )}
                   {noResults && (
-                    <CommandEmpty className="py-6 text-center text-sm text-zinc-400">
+                    <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
                       No results found for "{debouncedQuery}".
                     </CommandEmpty>
                   )}

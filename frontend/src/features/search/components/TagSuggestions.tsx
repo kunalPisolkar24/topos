@@ -18,9 +18,9 @@ export const TagSuggestions: React.FC<TagSuggestionsProps> = ({ tags, onSelect }
           key={tag.id}
           onSelect={() => onSelect(tag)}
           value={tag.name}
-          className="cursor-pointer"
+          className="interactive-hover-structural mb-1 cursor-pointer rounded-none text-sm font-medium"
         >
-          <Hash className="mr-2 h-3 w-3" /> {tag.name}
+          <Hash className="mr-2 h-3.5 w-3.5 text-muted-foreground" /> {tag.name}
         </CommandItem>
       ))}
     </CommandGroup>
