@@ -75,10 +75,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       className="mx-auto mt-16 w-full max-w-3xl px-4 sm:mt-20 sm:px-6"
     >
       <Card className="overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest shadow-none">
-        <div className="flex items-center gap-1 border-b border-outline-variant/20 bg-transparent p-1.5 px-2">
+        <div className="flex items-center gap-1 border-b border-outline-variant/20 bg-transparent px-2 py-1">
           <button
             onClick={() => setSearchMode("tags")}
-            className={`flex items-center gap-2 px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
+            className={`flex items-center gap-2 px-3 py-1 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
               searchMode === "tags"
                 ? "bg-surface-high text-foreground"
                 : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
@@ -98,10 +98,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </button>
         </div>
         <div className="relative">
-          <Command shouldFilter={false} className="bg-transparent">
-            <div className="flex items-center px-3">
-              <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <Command shouldFilter={false} className="bg-transparent p-0">
+            <div className="flex items-center gap-2 px-3">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <CommandInput
+                showIcon={false}
                 placeholder={
                   searchMode === "tags"
                     ? "Search tags..."
@@ -120,7 +121,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     }
                   }, 150)
                 }
-                className="flex h-12 w-full rounded-none bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="flex h-11 w-full rounded-none border-none bg-transparent py-2.5 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList>
