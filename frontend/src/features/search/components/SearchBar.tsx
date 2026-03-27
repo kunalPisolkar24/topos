@@ -20,6 +20,25 @@ interface SearchBarProps {
 
 const TAG_SEARCH_LIMIT = 6;
 const POST_SEARCH_LIMIT = 4;
+const IDLE_COMMAND_VALUE_PREFIX = "__search-idle__";
+
+type InteractionMode = "idle" | "pointer" | "keyboard";
+
+const createIdleCommandValue = (token: number) =>
+  `${IDLE_COMMAND_VALUE_PREFIX}-${token}`;
+
+const isKeyboardNavigationKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const vimNavigationKey =
+    event.ctrlKey && ["j", "k", "n", "p"].includes(event.key.toLowerCase());
+
+  return (
+    vimNavigationKey ||
+    event.key === "ArrowDown" ||
+    event.key === "ArrowUp" ||
+    event.key === "Home" ||
+    event.key === "End"
+  );
+};
 
 export const SearchBar: React.FC<SearchBarProps> = ({
   onTagSelect,
@@ -27,9 +46,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const navigate = useNavigate();
   const commandWrapperRef = useRef<HTMLDivElement>(null);
+  const interactionModeRef = useRef<InteractionMode>("idle");
+  const idleValueCounterRef = useRef(0);
   const [searchMode, setSearchMode] = useState<SearchMode>("tags");
   const [searchQuery, setSearchQuery] = useState("");
   const [inputIsFocused, setInputIsFocused] = useState(false);
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>("idle");
+  const [activeItemValue, setActiveItemValue] = useState(() =>
+    createIdleCommandValue(idleValueCounterRef.current),
+  );
 
   const { tags, posts, totalPosts, isLoading, debouncedQuery } = useSearchSuggestions({
     query: searchQuery,
@@ -39,16 +64,44 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     postLimit: POST_SEARCH_LIMIT,
   });
 
+  const resultsSignature =
+    searchMode === "tags"
+      ? tags.map((tag) => tag.id).join("|")
+      : posts.map((post) => post.id).join("|");
+
+  useEffect(() => {
+    idleValueCounterRef.current += 1;
+    interactionModeRef.current = "idle";
+    setInteractionMode("idle");
+    setActiveItemValue(createIdleCommandValue(idleValueCounterRef.current));
+  }, [debouncedQuery, inputIsFocused, resultsSignature, searchMode, searchQuery, totalPosts]);
+
   useEffect(() => {
     if (currentFilterTag === null) {
       setSearchQuery("");
     }
   }, [currentFilterTag]);
 
+  const updateInteractionMode = (nextMode: InteractionMode) => {
+    if (interactionModeRef.current === nextMode) {
+      return;
+    }
+
+    interactionModeRef.current = nextMode;
+    setInteractionMode(nextMode);
+  };
+
+  const resetActiveItem = () => {
+    idleValueCounterRef.current += 1;
+    updateInteractionMode("idle");
+    setActiveItemValue(createIdleCommandValue(idleValueCounterRef.current));
+  };
+
   const handleSelectTag = (tag: ContentTag) => {
     onTagSelect(tag.name);
     setSearchQuery("");
     setInputIsFocused(false);
+    resetActiveItem();
     (document.activeElement as HTMLElement | null)?.blur();
   };
 
@@ -56,6 +109,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     navigate(`/blog/${postId}`);
     setSearchQuery("");
     setInputIsFocused(false);
+    resetActiveItem();
   };
 
   const handleSeeAllResults = () => {
@@ -63,7 +117,54 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (trimmedQuery) {
       navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
       setInputIsFocused(false);
+      resetActiveItem();
     }
+  };
+
+  const handleCommandValueChange = (nextValue: string) => {
+    if (!nextValue) {
+      resetActiveItem();
+      return;
+    }
+
+    if (interactionModeRef.current === "idle") {
+      resetActiveItem();
+      return;
+    }
+
+    setActiveItemValue(nextValue);
+  };
+
+  const handleCommandKeyDownCapture = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (!isKeyboardNavigationKey(event)) {
+      return;
+    }
+
+    updateInteractionMode("keyboard");
+  };
+
+  const handleCommandListPointerMoveCapture = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    if (!event.target.closest("[cmdk-item]")) {
+      return;
+    }
+
+    updateInteractionMode("pointer");
+  };
+
+  const handleCommandListPointerLeave = () => {
+    if (interactionModeRef.current !== "pointer") {
+      return;
+    }
+
+    resetActiveItem();
   };
 
   const showCommandList = inputIsFocused && searchQuery.trim() !== "";
@@ -74,11 +175,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       ref={commandWrapperRef}
       className="mx-auto mt-16 w-full max-w-3xl px-4 sm:mt-20 sm:px-6"
     >
-      <Card className="overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest shadow-none">
-        <div className="flex items-center gap-1 border-b border-outline-variant/20 bg-transparent px-2 py-1">
+      <Card className="gap-0 overflow-hidden rounded-none border-0 bg-surface-lowest py-0 shadow-none">
+        <div className="flex items-center gap-0.5 border-b border-outline-variant/20 bg-transparent px-0 py-0">
           <button
             onClick={() => setSearchMode("tags")}
-            className={`flex items-center gap-2 px-3 py-1 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
+            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none sm:px-3.5 ${
               searchMode === "tags"
                 ? "bg-surface-high text-foreground"
                 : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
@@ -88,7 +189,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </button>
           <button
             onClick={() => setSearchMode("posts")}
-            className={`flex items-center gap-2 px-3 py-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.05em] focus:outline-none ${
+            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none sm:px-3.5 ${
               searchMode === "posts"
                 ? "bg-surface-high text-foreground"
                 : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
@@ -98,8 +199,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </button>
         </div>
         <div className="relative">
-          <Command shouldFilter={false} className="bg-transparent p-0">
-            <div className="flex items-center gap-2 px-3">
+          <Command
+            shouldFilter={false}
+            value={activeItemValue}
+            onValueChange={handleCommandValueChange}
+            onKeyDownCapture={handleCommandKeyDownCapture}
+            className="bg-transparent p-0"
+          >
+            <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <CommandInput
                 showIcon={false}
@@ -118,23 +225,29 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                       !commandWrapperRef.current.contains(document.activeElement)
                     ) {
                       setInputIsFocused(false);
+                      resetActiveItem();
                     }
                   }, 150)
                 }
-                className="flex h-11 w-full rounded-none border-none bg-transparent py-2.5 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground"
+                className="flex h-10 w-full rounded-none border-none bg-transparent py-0 text-[0.95rem] text-foreground shadow-none outline-none placeholder:text-muted-foreground sm:h-11"
               />
             </div>
-            <CommandList>
+            <CommandList
+              data-interaction-mode={interactionMode}
+              onPointerMoveCapture={handleCommandListPointerMoveCapture}
+              onPointerLeave={handleCommandListPointerLeave}
+              className="pb-1"
+            >
               {showCommandList && (
                 <>
                   {isLoading && (
-                    <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center px-3 py-5 text-sm text-muted-foreground sm:px-4">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       <span>Searching...</span>
                     </div>
                   )}
                   {noResults && (
-                    <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                    <CommandEmpty className="px-3 py-5 text-center text-sm text-muted-foreground sm:px-4">
                       No results found for "{debouncedQuery}".
                     </CommandEmpty>
                   )}
