@@ -1,8 +1,9 @@
 import type React from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Trash2, Edit3 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -15,6 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 interface Author {
   id: string;
@@ -46,64 +48,109 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
   isDeleteDialogOpen,
   setIsDeleteDialogOpen,
 }) => {
+  const [bioExpanded, setBioExpanded] = useState(false);
   const authorInitial = (author.name || author.username).charAt(0).toUpperCase();
+  const hasLongBio = (author.bio?.length ?? 0) > 120;
 
   return (
-    <aside className="w-full lg:w-1/3 lg:max-w-xs xl:max-w-sm">
-      <Card className="sticky top-20 shadow-lg bg-zinc-900/20 border-zinc-800">
-        <CardHeader className="text-center">
-          <Link 
-            to={isAuthor ? "/profile" : `/user/${author.id}`} 
-            className="group inline-block"
-          >
-            <Avatar className="w-24 h-24 mx-auto mb-4 border-2 border-zinc-700 group-hover:border-zinc-500 transition-colors">
-              <AvatarImage src={author.avatarUrl || undefined} alt={author.name || author.username} />
-              <AvatarFallback className="text-4xl bg-zinc-800 text-zinc-300">{authorInitial}</AvatarFallback>
-            </Avatar>
-          </Link>
-          <CardTitle className="mb-1 break-words text-xl text-zinc-100 [overflow-wrap:anywhere]">
-            {author.name || author.username}
-          </CardTitle>
-          <p className="break-all text-sm text-zinc-400">{author.email}</p>
-        </CardHeader>
-        <CardContent className="pt-6 border-t border-zinc-800">
-          <h3 className="font-semibold mb-2 text-zinc-200">About Author</h3>
-          <p className="mb-6 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
-            {author.bio || <span className="italic">No bio provided.</span>}
-          </p>
-          
-          {isAuthor && !isEditing && (
-            <div className="flex flex-col space-y-3">
-              <Button 
-                variant="outline" 
-                onClick={onEdit} 
-                className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+    <aside className="w-full lg:w-80 xl:w-96 shrink-0">
+      <Card className="sticky top-24 bg-surface-lowest gap-0 p-0">
+        <CardHeader className="items-center text-center px-6 pt-6 pb-4">
+          {isAuthor ? (
+            <Link to="/profile" className="group inline-block">
+              <Avatar
+                size="lg"
+                className="mx-auto mb-4 ring-1 ring-primary/45 transition-shadow group-hover:ring-primary"
               >
-                <Edit3 size={16} className="mr-2" /> Update Blog
+                <AvatarImage src={author.avatarUrl || undefined} alt={author.name || author.username} />
+                <AvatarFallback className="bg-primary-container text-primary-foreground font-mono text-sm uppercase tracking-wider">
+                  {authorInitial}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : (
+            <Avatar
+              size="lg"
+              className="mx-auto mb-4"
+            >
+              <AvatarImage src={author.avatarUrl || undefined} alt={author.name || author.username} />
+              <AvatarFallback className="bg-muted text-muted-foreground font-mono text-sm uppercase tracking-wider">
+                {authorInitial}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          <h2 className="text-xl font-semibold text-foreground tracking-[-0.02em] break-words [overflow-wrap:anywhere]">
+            {author.name || author.username}
+          </h2>
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted-foreground break-all">
+            {author.email}
+          </p>
+        </CardHeader>
+
+        <CardContent className="px-6 pb-6 space-y-6">
+          <div className="space-y-3">
+            <h3 className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary">
+              About Author
+            </h3>
+            <div className="text-sm text-muted-foreground leading-relaxed">
+              {author.bio ? (
+                <>
+                  <p className={cn(
+                    "whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+                    !bioExpanded && hasLongBio && "line-clamp-3"
+                  )}>
+                    {author.bio}
+                  </p>
+                  {hasLongBio && (
+                    <button
+                      type="button"
+                      onClick={() => setBioExpanded((prev) => !prev)}
+                      className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {bioExpanded ? "Show less" : "Show more"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <span className="italic">No bio provided.</span>
+              )}
+            </div>
+          </div>
+
+          {isAuthor && !isEditing && (
+            <div className="flex flex-col gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={onEdit}
+                className="w-full"
+              >
+                <Edit3 size={16} className="mr-2" />
+                Update Blog
               </Button>
-              
+
               <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="destructive" 
-                    className="w-full bg-red-900 hover:bg-red-800" 
+                  <Button
+                    variant="destructive"
+                    className="w-full"
                     disabled={isDeleting}
                   >
-                    <Trash2 size={16} className="mr-2" /> Delete Blog
+                    <Trash2 size={16} className="mr-2" />
+                    Delete Blog
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+                <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-zinc-100">Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-zinc-400">
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
                       This will permanently delete your blog post. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300">Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={onDelete} 
-                      className="bg-red-900 hover:bg-red-800 text-white" 
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={onDelete}
                       disabled={isDeleting}
                     >
                       {isDeleting ? "Deleting..." : "Continue"}
