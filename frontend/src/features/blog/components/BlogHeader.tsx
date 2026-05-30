@@ -1,5 +1,4 @@
 import type React from "react";
-import { Clock } from "lucide-react";
 
 interface BlogHeaderProps {
   title: string;
@@ -8,21 +7,23 @@ interface BlogHeaderProps {
   updatedAt: string;
 }
 
-export const BlogHeader: React.FC<BlogHeaderProps> = ({ 
-  title, 
-  imageUrl, 
-  createdAt, 
-  updatedAt 
+export const BlogHeader: React.FC<BlogHeaderProps> = ({
+  title,
+  imageUrl,
+  createdAt,
+  updatedAt,
 }) => {
-  const formatDate = (date: string) => 
-    new Date(date).toLocaleDateString(undefined, {
-      year: "numeric", month: "long", day: "numeric",
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
 
   return (
     <>
       {imageUrl && (
-        <div className="mb-8 rounded-xl overflow-hidden shadow-lg border border-zinc-900">
+        <div className="mb-8 ring-1 ring-outline-variant/20 overflow-hidden">
           <img
             src={imageUrl}
             alt={title}
@@ -30,9 +31,14 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
           />
         </div>
       )}
-      <h1 className="text-3xl lg:text-5xl font-bold mb-4 text-zinc-100">{title}</h1>
-      <div className="flex items-center space-x-2 text-xs text-zinc-400 mb-6">
-        <Clock className="h-4 w-4" />
+      <h1 className="text-3xl lg:text-5xl font-bold mb-4 text-foreground tracking-[-0.02em]">
+        {title}
+      </h1>
+      <div className="flex items-center gap-3 mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 bg-primary"
+        />
         <span>Published on {formatDate(createdAt)}</span>
         {createdAt !== updatedAt && (
           <span>(Updated on {formatDate(updatedAt)})</span>
