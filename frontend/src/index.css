@@ -256,8 +256,7 @@ html, body {
   font-size: 13px;
 }
 
-.blog-title-input,
-.view-blog-title {
+.blog-title-input {
   font-family: 'Merriweather', serif;
 }
 
@@ -409,11 +408,6 @@ html, body {
   height: auto;
   margin-top: 1.5em;
   margin-bottom: 1.5em;
-  border-radius: var(--radius);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-.dark .quill-content-view img {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
 .quill-content-view iframe {
@@ -422,13 +416,7 @@ html, body {
   max-width: 720px;
   aspect-ratio: 16 / 9;
   margin: 1.5em auto;
-  border-radius: var(--radius);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   border: none;
-}
-
-.dark .quill-content-view iframe {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
 .ql-container.ql-snow {
