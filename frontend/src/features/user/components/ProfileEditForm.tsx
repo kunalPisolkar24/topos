@@ -25,9 +25,12 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
   onCancel,
 }) => {
   return (
-    <div className="mt-8 w-full space-y-4 text-left">
+    <div className="mt-8 w-full space-y-5 text-left">
       <div className="space-y-2">
-        <label htmlFor="name" className="text-sm font-medium text-zinc-300">
+        <label
+          htmlFor="name"
+          className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+        >
           Display Name
         </label>
         <Input
@@ -36,9 +39,9 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
           value={formData.name}
           onChange={onFormChange}
           maxLength={PROFILE_NAME_MAX_LENGTH}
-          className="border-zinc-700 bg-zinc-800/50 text-zinc-100 placeholder:text-zinc-500"
+          className="bg-surface-lowest text-base font-medium tracking-[-0.02em]"
         />
-        <div className="flex items-center justify-between text-xs text-zinc-500">
+        <div className="flex items-center justify-between font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
           <span>Up to {PROFILE_NAME_MAX_LENGTH} characters</span>
           <span>
             {getCharacterCount(formData.name)}/{PROFILE_NAME_MAX_LENGTH}
@@ -46,7 +49,10 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
         </div>
       </div>
       <div className="space-y-2">
-        <label htmlFor="bio" className="text-sm font-medium text-zinc-300">
+        <label
+          htmlFor="bio"
+          className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+        >
           Bio / About
         </label>
         <Textarea
@@ -55,10 +61,10 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
           value={formData.bio}
           onChange={onFormChange}
           maxLength={PROFILE_BIO_MAX_LENGTH}
-          className="min-h-[100px] w-full rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500"
+          className="min-h-32 w-full bg-surface-lowest leading-7"
           rows={3}
         />
-        <div className="flex items-center justify-between text-xs text-zinc-500">
+        <div className="flex items-center justify-between font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
           <span>Up to {PROFILE_BIO_MAX_LENGTH} characters</span>
           <span>
             {getCharacterCount(formData.bio)}/{PROFILE_BIO_MAX_LENGTH}
@@ -69,14 +75,12 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
         <Button
           onClick={onCancel}
           variant="outline"
-          className="border-zinc-700 text-zinc-300"
         >
           Cancel
         </Button>
         <Button
           onClick={onSave}
           disabled={isSaving}
-          className="bg-zinc-50 text-zinc-950 hover:bg-zinc-200"
         >
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isSaving ? "Saving..." : "Save Changes"}
