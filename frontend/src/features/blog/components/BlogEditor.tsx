@@ -54,18 +54,21 @@ export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
     ];
 
     return (
-      <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-zinc-100 flex items-center">
-            <FileText className="mr-2 h-5 w-5 text-zinc-400" />
-            Blog Content
+      <Card className="gap-0 bg-surface-lowest py-0">
+        <CardHeader className="bg-surface-low p-4 sm:p-5">
+          <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+            04 // Body
+          </p>
+          <CardTitle className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-[-0.04em] text-foreground">
+            <FileText className="h-5 w-5 text-primary" aria-hidden="true" />
+            Long-form Editor
           </CardTitle>
-          <p className="text-sm text-zinc-400">
-            Write your blog content using the rich text editor
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            Structure the article with headings, lists, links, and embedded media.
           </p>
         </CardHeader>
-        <CardContent>
-          <div className="blog-content-editor-wrapper rounded-lg overflow-hidden border border-zinc-700">
+        <CardContent className="p-4 sm:p-5">
+          <div className="blog-content-editor-wrapper overflow-hidden ring-1 ring-outline-variant/20">
             <ReactQuill
               ref={ref}
               theme="snow"
