@@ -13,37 +13,70 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
   createdAt,
   updatedAt,
 }) => {
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const formatDate = (date: string) => {
+    const dateValue = new Date(date);
+    const isValidDate = !Number.isNaN(dateValue.getTime());
+
+    return {
+      machine: isValidDate ? dateValue.toISOString() : date,
+      display: isValidDate
+        ? dateValue.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : date,
+    };
+  };
+
+  const publishedDate = formatDate(createdAt);
+  const updatedDate = formatDate(updatedAt);
+  const wasUpdated = createdAt !== updatedAt;
 
   return (
-    <>
+    <header className="relative overflow-hidden bg-surface-low ring-1 ring-outline-variant/20">
       {imageUrl && (
-        <div className="mb-8 ring-1 ring-outline-variant/20 overflow-hidden">
+        <div className="relative h-[18rem] overflow-hidden sm:h-[24rem] lg:h-[30rem]">
           <img
             src={imageUrl}
             alt={title}
-            className="w-full h-auto max-h-[400px] object-cover"
+            className="h-full w-full object-cover opacity-80 saturate-[0.82]"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(var(--surface))_0%,rgb(var(--surface)/0.76)_32%,rgb(var(--surface)/0.22)_72%,rgb(var(--surface)/0.86)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_18%,rgb(var(--primary-container)/0.52),transparent_32%)]" />
+          <div
+            className="absolute inset-0 opacity-30 [background-image:linear-gradient(to_right,rgb(var(--outline-variant)/0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgb(var(--outline-variant)/0.12)_1px,transparent_1px)] [background-size:4rem_4rem]"
+            aria-hidden="true"
           />
         </div>
       )}
-      <h1 className="text-3xl lg:text-5xl font-bold mb-4 text-foreground tracking-[-0.02em]">
-        {title}
-      </h1>
-      <div className="flex items-center gap-3 mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground">
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0 bg-primary"
-        />
-        <span>Published on {formatDate(createdAt)}</span>
-        {createdAt !== updatedAt && (
-          <span>(Updated on {formatDate(updatedAt)})</span>
-        )}
+
+      <div className={imageUrl ? "relative -mt-20 p-4 sm:p-6 lg:p-8" : "p-4 sm:p-6 lg:p-8"}>
+        <div className="bg-surface-lowest p-5 ring-1 ring-outline-variant/20 sm:p-7 lg:p-8">
+          <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+            Article // Topos
+          </p>
+          <h1 className="mt-4 max-w-5xl break-words text-4xl font-semibold leading-none tracking-[-0.055em] text-foreground [overflow-wrap:anywhere] md:text-6xl lg:text-7xl">
+            {title}
+          </h1>
+          <div className="mt-6 flex flex-wrap gap-2 font-mono text-[0.625rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            <time
+              dateTime={publishedDate.machine}
+              className="bg-surface-low px-3 py-2 ring-1 ring-outline-variant/20"
+            >
+              Published {publishedDate.display}
+            </time>
+            {wasUpdated && (
+              <time
+                dateTime={updatedDate.machine}
+                className="bg-primary-container px-3 py-2 text-primary-foreground"
+              >
+                Updated {updatedDate.display}
+              </time>
+            )}
+          </div>
+        </div>
       </div>
-    </>
+    </header>
   );
 };
