@@ -28,30 +28,40 @@ export const AIDraftGenerator: React.FC<AIDraftGeneratorProps> = ({
   onToggleSummary,
 }) => {
   return (
-    <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-zinc-100 flex items-center">
-          <Sparkles className="mr-2 h-5 w-5 text-zinc-400" />
-          AI Draft Generator
+    <Card className="gap-0 bg-surface-lowest py-0">
+      <CardHeader className="bg-primary-container p-4 text-primary-foreground sm:p-5">
+        <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary-foreground/80">
+          02 // Assisted Draft
+        </p>
+        <CardTitle className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-[-0.04em]">
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+          Generate from a brief
         </CardTitle>
-        <p className="text-sm text-zinc-400">
-          Generate a full draft from a prompt. Summary is saved but hidden by default.
+        <p className="max-w-2xl text-sm leading-6 text-primary-foreground/70">
+          Optional accelerator. Generated output replaces the current title, body, and tags.
         </p>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="p-4 sm:p-5">
+        <div className="space-y-5">
+          <label
+            htmlFor="draftPrompt"
+            className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+          >
+            Draft prompt
+          </label>
           <Textarea
+            id="draftPrompt"
             value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            placeholder="Describe the post you want to generate..."
-            className="min-h-[120px] bg-zinc-900/40 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+            onChange={(event) => onPromptChange(event.target.value)}
+            placeholder="Describe the reader, argument, structure, and constraints..."
+            className="min-h-32 bg-surface-lowest leading-7"
           />
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <Button
               type="button"
               onClick={onGenerate}
               disabled={isGenerating || !canGenerate}
-              className="bg-zinc-300 hover:bg-zinc-400 text-zinc-900"
+              className="sm:w-auto"
             >
               {isGenerating ? "Generating..." : "Generate Draft"}
             </Button>
@@ -60,7 +70,7 @@ export const AIDraftGenerator: React.FC<AIDraftGeneratorProps> = ({
               variant="outline"
               onClick={onClear}
               disabled={!prompt && !summary}
-              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              className="sm:w-auto"
             >
               Clear Prompt
             </Button>
@@ -71,19 +81,23 @@ export const AIDraftGenerator: React.FC<AIDraftGeneratorProps> = ({
                 type="button"
                 variant="outline"
                 onClick={onToggleSummary}
-                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
               >
                 {isSummaryVisible ? "Hide Summary" : "View Summary"}
               </Button>
               {isSummaryVisible && (
-                <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-4">
-                  <p className="text-sm text-zinc-200 whitespace-pre-wrap">{summary}</p>
+                <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20">
+                  <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
+                    Generated Summary
+                  </p>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground">
+                    {summary}
+                  </p>
                 </div>
               )}
             </div>
           )}
-          <p className="text-xs text-zinc-500">
-            A longer prompt produces better results. Generating a draft will replace current content.
+          <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
+            Minimum useful prompt: topic + audience + angle + constraints.
           </p>
         </div>
       </CardContent>
