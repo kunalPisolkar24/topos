@@ -33,11 +33,21 @@ const ViewBlogPage: React.FC = () => {
 
   if (!blog) {
     return (
-      <div className="min-h-screen bg-surface">
+      <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
-        <div className="container mx-auto px-4 sm:px-6 lg:px-10 pb-12 pt-app-navbar-offset text-center font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground">
-          Blog post not found.
-        </div>
+        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl bg-surface-low p-6 ring-1 ring-outline-variant/20 sm:p-8">
+            <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+              Missing Article
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-foreground">
+              Blog post not found.
+            </h1>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              The requested post may have been deleted or moved.
+            </p>
+          </div>
+        </main>
       </div>
     );
   }
@@ -45,53 +55,72 @@ const ViewBlogPage: React.FC = () => {
   const isAuthor = currentUser?.id === blog.author.id;
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
-      <div className="container mx-auto px-4 sm:px-6 lg:px-10 pb-12 pt-app-navbar-offset">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <main className="flex-1 min-w-0">
-            {isEditing ? (
-              <BlogEditForm
-                blog={blog}
-                onCancel={() => setIsEditing(false)}
-                onComplete={() => {
-                  setIsEditing(false);
-                  refetch();
-                }}
-              />
-            ) : (
-              <>
-                <BlogHeader
-                  title={blog.title}
-                  imageUrl={blog.imageUrl}
-                  createdAt={blog.createdAt}
-                  updatedAt={blog.updatedAt}
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          {isEditing ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
+              <section className="min-w-0">
+                <BlogEditForm
+                  blog={blog}
+                  onCancel={() => setIsEditing(false)}
+                  onComplete={() => {
+                    setIsEditing(false);
+                    refetch();
+                  }}
                 />
-                <BlogBody body={blog.body} tags={blog.tags} />
-                <div className="mt-10 pt-6">
-                  <AISummaryDialog
-                    summary={blog.summary}
-                    summaryStatus={blog.summaryStatus}
-                    isOpen={isSummaryDialogOpen}
-                    onOpenChange={setIsSummaryDialogOpen}
-                  />
-                </div>
-              </>
-            )}
-          </main>
+              </section>
+              <BlogAuthorSidebar
+                author={blog.author}
+                isAuthor={isAuthor}
+                isEditing={isEditing}
+                onEdit={() => setIsEditing(true)}
+                onDelete={confirmDelete}
+                isDeleting={isDeleting}
+                isDeleteDialogOpen={isDeleteDialogOpen}
+                setIsDeleteDialogOpen={setIsDeleteDialogOpen}
+              />
+            </div>
+          ) : (
+            <>
+              <BlogHeader
+                title={blog.title}
+                imageUrl={blog.imageUrl}
+                createdAt={blog.createdAt}
+                updatedAt={blog.updatedAt}
+              />
+              <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
+                <section className="min-w-0 space-y-6">
+                  <BlogBody body={blog.body} tags={blog.tags} />
+                  <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20 sm:p-5">
+                    <p className="mb-4 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+                      Reading Utility
+                    </p>
+                    <AISummaryDialog
+                      summary={blog.summary}
+                      summaryStatus={blog.summaryStatus}
+                      isOpen={isSummaryDialogOpen}
+                      onOpenChange={setIsSummaryDialogOpen}
+                    />
+                  </div>
+                </section>
 
-          <BlogAuthorSidebar
-            author={blog.author}
-            isAuthor={isAuthor}
-            isEditing={isEditing}
-            onEdit={() => setIsEditing(true)}
-            onDelete={confirmDelete}
-            isDeleting={isDeleting}
-            isDeleteDialogOpen={isDeleteDialogOpen}
-            setIsDeleteDialogOpen={setIsDeleteDialogOpen}
-          />
+                <BlogAuthorSidebar
+                  author={blog.author}
+                  isAuthor={isAuthor}
+                  isEditing={isEditing}
+                  onEdit={() => setIsEditing(true)}
+                  onDelete={confirmDelete}
+                  isDeleting={isDeleting}
+                  isDeleteDialogOpen={isDeleteDialogOpen}
+                  setIsDeleteDialogOpen={setIsDeleteDialogOpen}
+                />
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };
