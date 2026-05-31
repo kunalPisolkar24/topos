@@ -1,10 +1,9 @@
 import type React from "react";
-import { X, Tag } from "lucide-react";
+import { Sparkles, Tag, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -41,70 +40,79 @@ export const BlogTagSection: React.FC<BlogTagSectionProps> = ({
   canGenerateTags,
 }) => {
   return (
-    <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-zinc-100 flex items-center">
-          <Tag className="mr-2 h-5 w-5 text-zinc-400" />
-          Tags
+    <Card className="gap-0 bg-surface-lowest py-0">
+      <CardHeader className="bg-surface-low p-4 sm:p-5">
+        <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+          05 // Metadata
+        </p>
+        <CardTitle className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-[-0.04em] text-foreground">
+          <Tag className="h-5 w-5 text-primary" aria-hidden="true" />
+          Topic Tags
         </CardTitle>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          Tags are discovery signals. Keep them specific and reusable.
+        </p>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2 mb-4 min-h-[2.5rem]">
+      <CardContent className="p-4 sm:p-5">
+        <div className="mb-4 flex min-h-12 flex-wrap gap-2 bg-surface-low p-3 ring-1 ring-outline-variant/20">
           {tags.length > 0 ? (
             tags.map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
-                className="px-3 py-1.5 text-sm bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+                className="h-8 gap-2 bg-primary-container px-3 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-primary-foreground"
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => onRemoveTag(tag)}
-                  className="ml-2 text-zinc-400 hover:text-red-400 transition-colors"
+                  className="text-primary-foreground/70 transition-colors hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  aria-label={`Remove ${tag} tag`}
                 >
-                  <X size={14} />
+                  <X size={14} aria-hidden="true" />
                 </button>
               </Badge>
             ))
           ) : (
-            <p className="text-sm text-zinc-500 py-2">No tags added yet.</p>
+            <p className="py-2 text-sm text-muted-foreground">No tags added yet.</p>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                <Tag className="mr-2 h-4 w-4" />
+              <Button variant="outline">
+                <Tag className="h-4 w-4" />
                 Add Tags
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800">
+            <DialogContent className="bg-surface-lowest ring-outline-variant/20 sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle className="text-zinc-100">Add a new tag</DialogTitle>
-                <DialogDescription className="text-zinc-400">Enter a new tag for your post.</DialogDescription>
+                <DialogTitle className="text-xl font-semibold tracking-[-0.04em] text-foreground">
+                  Add a new tag
+                </DialogTitle>
+                <DialogDescription>
+                  Enter a topic label for this post.
+                </DialogDescription>
               </DialogHeader>
               <div className="py-4">
                 <Input
                   placeholder="Enter tag name"
                   value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  className="bg-zinc-900 border-zinc-700 text-zinc-100"
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onAddTag())}
+                  onChange={(event) => setNewTag(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), onAddTag())}
                 />
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-outline-variant/20 bg-surface-low">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setIsDialogOpen(false);
                     setNewTag("");
                   }}
-                  className="border-zinc-700 text-zinc-300"
                 >
                   Cancel
                 </Button>
-                <Button onClick={onAddTag} className="bg-zinc-300 hover:bg-zinc-400">
+                <Button onClick={onAddTag}>
                   Add Tag
                 </Button>
               </DialogFooter>
@@ -115,9 +123,8 @@ export const BlogTagSection: React.FC<BlogTagSectionProps> = ({
             variant="outline"
             onClick={onGenerateTags}
             disabled={isGeneratingTags || !canGenerateTags}
-            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
           >
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
             {isGeneratingTags ? "Generating..." : "Generate Tags"}
           </Button>
         </div>
