@@ -24,24 +24,33 @@ export const BlogBody: React.FC<BlogBodyProps> = ({ body, tags }) => {
   });
 
   return (
-    <>
-      <div
-        className="prose prose-lg dark:prose-invert max-w-none mb-8 quill-content-view"
-        dangerouslySetInnerHTML={{ __html: cleanBody }}
-      />
+    <article className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-8">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="h-2 w-2 bg-primary" aria-hidden="true" />
+        <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+          Body
+        </p>
+      </div>
+      <div className="bg-surface p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-8">
+        <div
+          className="quill-content-view prose prose-lg dark:prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: cleanBody }}
+        />
+      </div>
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-2.5 mb-10 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-primary">
+        <div className="mt-6 flex flex-wrap gap-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em]">
           {tags.map((tag) => (
-            <span
+            <button
+              type="button"
               key={tag.id}
-              className="cursor-pointer hover:text-primary/80 transition-colors"
+              className="interactive-hover-primary border border-outline-variant/20 bg-primary-container px-3 py-2 text-primary-foreground"
               onClick={() => navigate(`/search?q=${encodeURIComponent(tag.name)}`)}
             >
               {tag.name}
-            </span>
+            </button>
           ))}
         </div>
       )}
-    </>
+    </article>
   );
 };
