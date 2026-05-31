@@ -3,55 +3,69 @@ import { Card } from "@/components/ui/card";
 
 export const ViewBlogPageSkeleton: React.FC = () => {
   return (
-    <div className="min-h-screen bg-surface">
-      <Skeleton className="h-[var(--app-navbar-height)] w-full fixed top-0 left-0 z-50 bg-surface-low border-b border-outline-variant/20" />
+    <div className="min-h-screen bg-surface text-foreground">
+      <Skeleton className="fixed left-0 top-0 z-50 h-[var(--app-navbar-height)] w-full rounded-none bg-surface-low" />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-10 pb-12 pt-app-navbar-offset">
-        <Skeleton className="mb-8 h-[250px] sm:h-[300px] md:h-[400px] w-full bg-surface-low" />
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="bg-surface-low ring-1 ring-outline-variant/20">
+            <Skeleton className="h-[18rem] w-full rounded-none bg-surface-lowest sm:h-[24rem] lg:h-[30rem]" />
+            <div className="p-4 sm:p-6 lg:p-8">
+              <div className="bg-surface-lowest p-5 ring-1 ring-outline-variant/20 sm:p-7 lg:p-8">
+                <Skeleton className="h-3 w-36 rounded-none bg-primary/35" />
+                <Skeleton className="mt-5 h-14 w-11/12 rounded-none bg-surface-low md:h-20" />
+                <Skeleton className="mt-3 h-14 w-3/5 rounded-none bg-surface-low md:h-20" />
+                <div className="mt-6 flex gap-2">
+                  <Skeleton className="h-8 w-36 rounded-none bg-surface-low" />
+                  <Skeleton className="h-8 w-32 rounded-none bg-primary/30" />
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <main className="flex-1 space-y-6">
-            <Skeleton className="h-10 w-3/4 bg-surface-low" />
-            <Skeleton className="h-4 w-1/3 bg-surface-lowest" />
-            <div className="space-y-3">
-              <Skeleton className="h-5 w-full bg-surface-lowest" />
-              <Skeleton className="h-5 w-full bg-surface-lowest" />
-              <Skeleton className="h-5 w-5/6 bg-surface-lowest" />
-              <Skeleton className="h-5 w-3/4 bg-surface-lowest" />
-              <Skeleton className="h-5 w-full bg-surface-lowest" />
-              <Skeleton className="h-5 w-2/3 bg-surface-lowest" />
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-2">
-              <Skeleton className="h-5 w-20 bg-surface-low" />
-              <Skeleton className="h-5 w-24 bg-surface-low" />
-              <Skeleton className="h-5 w-16 bg-surface-low" />
-            </div>
-            <div className="mt-10 pt-6">
-              <Skeleton className="h-10 w-full sm:w-40 bg-surface-lowest" />
-            </div>
-          </main>
+          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
+            <section className="space-y-6">
+              <div className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-8">
+                <Skeleton className="h-3 w-20 rounded-none bg-primary/35" />
+                <div className="mt-8 space-y-3">
+                  <Skeleton className="h-5 w-full rounded-none bg-surface-low" />
+                  <Skeleton className="h-5 w-full rounded-none bg-surface-low" />
+                  <Skeleton className="h-5 w-5/6 rounded-none bg-surface-low" />
+                  <Skeleton className="h-5 w-3/4 rounded-none bg-surface-low" />
+                  <Skeleton className="h-5 w-full rounded-none bg-surface-low" />
+                  <Skeleton className="h-5 w-2/3 rounded-none bg-surface-low" />
+                </div>
+                <div className="mt-8 flex flex-wrap gap-2">
+                  <Skeleton className="h-8 w-20 rounded-none bg-primary/30" />
+                  <Skeleton className="h-8 w-24 rounded-none bg-primary/30" />
+                  <Skeleton className="h-8 w-16 rounded-none bg-primary/30" />
+                </div>
+              </div>
+              <Skeleton className="h-24 w-full rounded-none bg-surface-low" />
+            </section>
 
-          <aside className="w-full lg:w-80 shrink-0">
-            <Card className="sticky top-24 bg-surface-lowest gap-4 p-6">
-              <div className="flex flex-col items-center">
-                <Skeleton className="w-24 h-24 rounded-full bg-surface-low ring-1 ring-outline-variant/20" />
-                <Skeleton className="mt-4 h-6 w-3/4 bg-surface-low" />
-                <Skeleton className="mt-2 h-4 w-1/2 bg-surface-lowest" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-1/3 bg-surface-low" />
-                <Skeleton className="h-4 w-full bg-surface-lowest" />
-                <Skeleton className="h-4 w-5/6 bg-surface-lowest" />
-                <Skeleton className="h-4 w-3/4 bg-surface-lowest" />
-              </div>
-              <div className="flex flex-col gap-3 pt-2">
-                <Skeleton className="h-10 w-full bg-surface-low" />
-                <Skeleton className="h-10 w-full bg-surface-lowest" />
-              </div>
-            </Card>
-          </aside>
+            <aside className="w-full shrink-0 lg:w-80 xl:w-96">
+              <Card className="sticky top-app-navbar-offset gap-0 bg-surface-low py-0">
+                <div className="p-4 sm:p-5">
+                  <Skeleton className="h-3 w-28 rounded-none bg-primary/35" />
+                  <div className="mt-4 flex items-start gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full bg-surface-lowest" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-6 w-3/4 rounded-none bg-surface-lowest" />
+                      <Skeleton className="mt-2 h-3 w-1/2 rounded-none bg-surface-lowest" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
+                  <Skeleton className="h-16 w-full rounded-none bg-surface-lowest" />
+                  <Skeleton className="h-40 w-full rounded-none bg-surface-lowest" />
+                  <Skeleton className="h-10 w-full rounded-none bg-surface-lowest" />
+                </div>
+              </Card>
+            </aside>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
