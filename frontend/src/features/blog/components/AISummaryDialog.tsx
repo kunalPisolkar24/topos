@@ -27,9 +27,9 @@ export const AISummaryDialog: React.FC<AISummaryDialogProps> = ({
   const renderContent = () => {
     if (summary && (summaryStatus === "COMPLETED" || (!summaryStatus && summary))) {
       return (
-        <div className="max-h-[60vh] overflow-y-auto py-2 my-2 pr-3 -mr-1">
-          <div className="bg-surface-lowest ring-1 ring-outline-variant/20 p-4">
-            <p className="whitespace-pre-wrap text-base sm:text-lg text-justify leading-relaxed text-foreground">
+        <div className="-mr-1 my-2 max-h-[60vh] overflow-y-auto pr-3">
+          <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20">
+            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground sm:text-base">
               {summary}
             </p>
           </div>
@@ -39,14 +39,14 @@ export const AISummaryDialog: React.FC<AISummaryDialogProps> = ({
 
     if (summaryStatus === "PENDING") {
       return (
-        <div className="py-4 my-2">
-          <div className="bg-surface-lowest ring-1 ring-outline-variant/20 p-4 flex items-center gap-3">
-            <Clock className="h-5 w-5 shrink-0 text-primary" />
+        <div className="my-2 py-2">
+          <div className="flex items-center gap-3 bg-surface-low p-4 ring-1 ring-outline-variant/20">
+            <Clock className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             <div>
-              <h3 className="text-base sm:text-lg font-medium text-foreground">
+              <h3 className="font-medium text-foreground">
                 Summary in Progress
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-1 text-sm text-muted-foreground">
                 The AI summary is being generated. Please check back in a few moments.
               </p>
             </div>
@@ -56,18 +56,18 @@ export const AISummaryDialog: React.FC<AISummaryDialogProps> = ({
     }
 
     return (
-      <div className="py-4 my-2">
-          <div className="bg-surface-lowest ring-1 ring-outline-variant/20 p-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 shrink-0 text-muted-foreground" />
-            <div>
-              <h3 className="text-base sm:text-lg font-medium text-foreground">
-                Summary Unavailable
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                The AI summary for this post is not available.
-              </p>
-            </div>
+      <div className="my-2 py-2">
+        <div className="flex items-center gap-3 bg-surface-low p-4 ring-1 ring-outline-variant/20">
+          <AlertCircle className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div>
+            <h3 className="font-medium text-foreground">
+              Summary Unavailable
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The AI summary for this post is not available.
+            </p>
           </div>
+        </div>
       </div>
     );
   };
@@ -79,19 +79,22 @@ export const AISummaryDialog: React.FC<AISummaryDialogProps> = ({
           variant="outline"
           className="w-full sm:w-auto"
         >
-          <Sparkles size={16} className="mr-2" />
+          <Sparkles size={16} />
           View AI Summary
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent className="w-[90vw] max-w-xl md:max-w-2xl">
-        <AlertDialogHeader className="pb-1 pt-2 px-6">
-          <AlertDialogTitle className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-muted-foreground shrink-0" />
+      <AlertDialogContent className="w-[90vw] max-w-xl bg-surface-lowest p-0 ring-outline-variant/20 md:max-w-2xl">
+        <AlertDialogHeader className="items-start px-5 pt-5 text-left sm:px-6 sm:pt-6">
+          <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+            AI Summary
+          </p>
+          <AlertDialogTitle className="flex items-center gap-2 text-xl font-semibold tracking-[-0.04em] sm:text-2xl">
+            <Sparkles className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             AI-Generated Summary
           </AlertDialogTitle>
         </AlertDialogHeader>
-        <div className="pb-2 px-6">{renderContent()}</div>
-        <AlertDialogFooter className="px-6 py-4">
+        <div className="px-5 pb-2 sm:px-6">{renderContent()}</div>
+        <AlertDialogFooter className="border-outline-variant/20 bg-surface-low px-5 py-4 sm:px-6">
           <AlertDialogCancel>Close</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
