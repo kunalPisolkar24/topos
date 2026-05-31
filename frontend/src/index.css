@@ -230,6 +230,10 @@
   .pt-app-navbar-offset {
     padding-top: var(--app-navbar-offset);
   }
+
+  .top-app-navbar-offset {
+    top: var(--app-navbar-offset);
+  }
 }
 
 html, body {
