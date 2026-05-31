@@ -20,50 +20,71 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
   inputRef,
 }) => {
   return (
-    <Card className="bg-zinc-900/20 border-zinc-800 shadow-lg">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-zinc-100 flex items-center">
-          <ImageIcon className="mr-2 h-5 w-5 text-zinc-400" />
+    <Card className="gap-0 bg-surface-lowest py-0">
+      <CardHeader className="bg-surface-low p-4 sm:p-5">
+        <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+          03 // Cover Asset
+        </p>
+        <CardTitle className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-[-0.04em] text-foreground">
+          <ImageIcon className="h-5 w-5 text-primary" aria-hidden="true" />
           Featured Image
         </CardTitle>
-        <p className="text-sm text-zinc-400">Recommended size: 600x400</p>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          Required for publication cards. Use a wide, quiet image that supports the headline.
+        </p>
       </CardHeader>
-      <CardContent>
-        <div
-          className="flex justify-center items-center px-6 pt-5 pb-6 border-2 border-dashed border-zinc-700 rounded-xl cursor-pointer h-64 bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
+      <CardContent className="p-4 sm:p-5">
+        <button
+          type="button"
+          className="interactive-hover-primary flex min-h-72 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-5 text-left"
           onClick={() => inputRef.current?.click()}
         >
-          <div className="space-y-2 text-center">
+          <div className="w-full space-y-4">
             {preview ? (
-              <img src={preview} alt="Card preview" className="mx-auto h-48 object-contain rounded-lg" />
+              <div className="bg-surface-lowest p-2 ring-1 ring-outline-variant/20">
+                <img
+                  src={preview}
+                  alt="Card preview"
+                  className="h-56 w-full object-cover"
+                />
+              </div>
             ) : (
-              <UploadCloud className="mx-auto h-12 w-12 text-zinc-400" />
+              <div className="flex h-56 w-full items-center justify-center bg-surface-lowest ring-1 ring-outline-variant/20">
+                <UploadCloud className="h-12 w-12 text-primary" aria-hidden="true" />
+              </div>
             )}
-            <div className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-300 hover:text-zinc-100 transition-colors">
-                {cardImage ? "Change image" : "Upload an image"}
+            <div>
+              <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-foreground">
+                {cardImage ? "Change image" : "Upload cover image"}
               </span>
-              <input
-                type="file"
-                className="sr-only"
-                accept="image/*"
-                ref={inputRef}
-                onChange={onFileChange}
-              />
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Recommended ratio: 3:2 or wider. JPG, PNG, and WebP work best.
+              </p>
             </div>
-            {cardImage && <p className="text-xs text-zinc-400 mt-1">{cardImage.name}</p>}
+            {cardImage && (
+              <p className="break-all font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
+                {cardImage.name}
+              </p>
+            )}
           </div>
-        </div>
+        </button>
+        <input
+          type="file"
+          className="sr-only"
+          accept="image/*"
+          ref={inputRef}
+          onChange={onFileChange}
+        />
         {cardImageUrl && (
-          <div className="mt-3 p-3 bg-green-900/20 border border-green-800/50 rounded-lg">
-            <div className="text-sm text-green-300 flex items-center">
-              <ImageIcon size={16} className="mr-2" />
+          <div className="mt-3 bg-primary-container p-3 text-primary-foreground">
+            <div className="flex items-center text-sm">
+              <ImageIcon size={16} className="mr-2" aria-hidden="true" />
               Image uploaded successfully
             </div>
           </div>
         )}
         {isUploading && (
-          <div className="mt-3 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300">
+          <div className="mt-3 bg-surface-low p-3 text-sm text-muted-foreground ring-1 ring-outline-variant/20">
             Uploading card image...
           </div>
         )}
