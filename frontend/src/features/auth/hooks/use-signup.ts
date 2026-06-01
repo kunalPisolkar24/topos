@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { SignupDocument } from "@/shared/graphql/generated/graphql";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionActions } from "@/entities/session";
 import { type ChangeEvent } from "react";
 import { sanitizeUsernameInput } from "@/entities/user";

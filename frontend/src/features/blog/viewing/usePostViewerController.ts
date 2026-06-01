@@ -8,7 +8,7 @@ import {
   type PostQueryVariables,
 } from "@/shared/graphql/content-documents";
 import { getGraphQLErrorMessage } from "@/shared/api";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/shared/ui/hooks/useToast";
 
 type LoadedPost = NonNullable<PostQuery["post"]>;
 

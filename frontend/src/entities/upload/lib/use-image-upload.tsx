@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/shared/ui/hooks/useToast";
 import { env } from "@/shared/config/env";
 import {
   cloudinaryImageProvider,

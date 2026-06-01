@@ -7,7 +7,7 @@ import {
   PostsByTagDocument,
   PostsDocument,
 } from "@/shared/graphql/content-documents";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/shared/ui/hooks/useToast";
 import { mapPostToBlogCardItem } from "@/entities/post/lib";
 import { PagePagination } from "@/widgets";
 
