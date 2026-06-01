@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { BlogCard } from "./BlogCard";
-import { BlogCardSkeleton } from "@/components/skeletons";
+import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   PostsByTagDocument,

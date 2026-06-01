@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StickyNavbar } from "@/widgets";
 import { BlogList } from "@/features/blog";
 import { SearchBar } from "@/features/search";
-import { ErrorBoundary } from "@/components/utils";
+import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";

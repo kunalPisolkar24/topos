@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
 import { PagePagination, StickyNavbar } from "@/widgets";
 import { BlogCard } from "@/features/blog";
-import { BlogCardSkeleton } from "@/components/skeletons";
+import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { SearchPostsDocument } from "@/shared/graphql/content-documents";
 import { buildSearchPagination, mapPostToBlogCardItem } from "@/entities/post/lib";
 

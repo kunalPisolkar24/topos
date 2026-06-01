@@ -4,7 +4,7 @@ import type React from "react";
 import { Sparkles } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { StickyNavbar } from "@/widgets";
-import { ViewBlogPageSkeleton } from "@/components/skeletons";
+import { ViewBlogPageSkeleton } from "@/shared/ui/feedback";
 import {
   usePostViewerController,
   BlogEditForm,

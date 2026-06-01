@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BlogCardSkeleton } from "@/components/skeletons";
+import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { BlogCard } from "@/features/blog";
 import type { BlogCardItem } from "@/entities/post/lib";
 import { PagePagination } from "@/widgets";

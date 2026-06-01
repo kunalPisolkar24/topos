@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { LoadingSpinner } from "@/components/utils";
+import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { useSessionStore } from "@/entities/session";
 
 export function PublicOnlyRoute({ children }: PropsWithChildren) {

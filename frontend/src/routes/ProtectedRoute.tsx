@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { LoadingSpinner } from "@/components/utils";
+import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { useSessionStore } from "@/entities/session";
 
 export function ProtectedRoute({ children }: PropsWithChildren) {
