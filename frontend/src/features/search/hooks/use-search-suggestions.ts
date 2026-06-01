@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import {
   SearchPostsDocument,
-  TagsDocument,
   type ContentTag,
 } from "@/shared/graphql/content-documents";
 import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/entities/post/lib";
+import { tagRepository } from "@/entities/tag";
 
 export type SearchMode = "tags" | "posts";
 
@@ -62,14 +62,13 @@ export const useSearchSuggestions = ({
       setIsLoading(true);
       try {
         if (mode === "tags") {
-          const { data } = await client.query({
-            query: TagsDocument,
-            variables: { query: trimmedQuery, limit: tagLimit },
-            fetchPolicy: "no-cache",
+          const fetched = await tagRepository.searchTagsOnce(client, {
+            query: trimmedQuery,
+            limit: tagLimit,
           });
 
           if (requestId !== requestSequenceRef.current) return;
-          setTags(data?.tags ?? []);
+          setTags(fetched);
           setPosts([]);
           setTotalPosts(0);
         } else {
