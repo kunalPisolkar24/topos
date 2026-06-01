@@ -12,7 +12,7 @@ import {
   BlogHeader,
   BlogBody,
 } from "@/features/blog";
-import { useCurrentUser } from "@/features/auth";
+import { useCurrentUser } from "@/entities/session";
 
 const ViewBlogPage: React.FC = () => {
   const { user: currentUser } = useCurrentUser();

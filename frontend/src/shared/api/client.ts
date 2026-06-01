@@ -6,53 +6,49 @@ import {
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { onError } from "@apollo/client/link/error";
 import { setContext } from "@apollo/client/link/context";
-import { env } from "@/lib/env";
+import { buildApolloCache } from "./policies";
 import {
   buildAuthHeaders,
   hasUnauthorizedGraphQLError,
   hasUnauthorizedNetworkError,
-} from "@/shared/api/links/auth";
-import { handleUnauthorizedSession, registerApolloClient } from "@/shared/api/links/unauthorized";
-import { buildApolloCache } from "@/shared/api/policies";
-import { useSessionStore } from "@/stores/session-store";
+} from "./links/auth";
 
-const authLink = setContext((_, { headers }) => {
-  const token = useSessionStore.getState().token;
+export interface ApolloClientDependencies {
+  uri: string;
+  getToken: () => string | null;
+  onUnauthorized: () => void | Promise<void>;
+}
 
-  return {
-    headers: {
-      ...headers,
-      ...buildAuthHeaders(token),
-    },
-  };
-});
+export const createApolloClient = (
+  deps: ApolloClientDependencies,
+): ApolloClient => {
+  const authLink = setContext((_, { headers }) => ({
+    headers: { ...headers, ...buildAuthHeaders(deps.getToken()) },
+  }));
 
-const errorLink = onError(({ error }) => {
-  if (CombinedGraphQLErrors.is(error)) {
-    if (hasUnauthorizedGraphQLError(error.errors)) {
-      void handleUnauthorizedSession();
+  const errorLink = onError(({ error }) => {
+    if (CombinedGraphQLErrors.is(error)) {
+      if (hasUnauthorizedGraphQLError(error.errors)) {
+        void deps.onUnauthorized();
+      }
+      return;
     }
-    return;
-  }
 
-  if (
-    hasUnauthorizedNetworkError(
-      error as { statusCode?: number; status?: number } | null,
-    )
-  ) {
-    void handleUnauthorizedSession();
-  }
-});
+    if (
+      hasUnauthorizedNetworkError(
+        error as { statusCode?: number; status?: number } | null,
+      )
+    ) {
+      void deps.onUnauthorized();
+    }
+  });
 
-export const apolloClient = new ApolloClient({
-  link: from([
-    errorLink,
-    authLink,
-    new HttpLink({
-      uri: env.VITE_GRAPHQL_URL,
-    }),
-  ]),
-  cache: buildApolloCache(),
-});
-
-registerApolloClient(apolloClient);
+  return new ApolloClient({
+    link: from([
+      errorLink,
+      authLink,
+      new HttpLink({ uri: deps.uri }),
+    ]),
+    cache: buildApolloCache(),
+  });
+};

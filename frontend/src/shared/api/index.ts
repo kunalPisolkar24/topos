@@ -1,4 +1,5 @@
-export { apolloClient } from "./client";
+export { createApolloClient, type ApolloClientDependencies } from "./client";
+export { buildApolloCache } from "./policies";
 export {
   buildAuthHeaders,
   hasUnauthorizedGraphQLError,

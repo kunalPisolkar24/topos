@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { LoadingSpinner } from "@/components/utils";
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore } from "@/entities/session";
 
 export function PublicOnlyRoute({ children }: PropsWithChildren) {
   const status = useSessionStore((state) => state.status);

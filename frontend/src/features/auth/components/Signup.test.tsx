@@ -6,7 +6,7 @@ import {
   USERNAME_MAX_LENGTH,
   sanitizeUsernameInput,
 } from "@/entities/user";
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore } from "@/entities/session";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { Signup } from "./Signup";

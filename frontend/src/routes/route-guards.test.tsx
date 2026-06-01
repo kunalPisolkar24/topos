@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { renderWithProviders } from "@/test/render-with-providers";
-import { sessionStoreActions } from "@/stores/session-store";
+import { sessionStoreActions } from "@/entities/session";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicOnlyRoute } from "./PublicOnlyRoute";
 

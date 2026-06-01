@@ -2,7 +2,7 @@ import { HttpResponse, graphql } from "msw";
 import userEvent from "@testing-library/user-event";
 import { screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore } from "@/entities/session";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { Signin } from "./Signin";

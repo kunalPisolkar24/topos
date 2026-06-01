@@ -4,7 +4,7 @@ import {
   type MeQuery,
   type UserCoreFragment,
 } from "@/shared/graphql/generated/graphql";
-import { sessionStoreActions } from "@/stores/session-store";
+import { sessionStoreActions } from "../store/session-store";
 
 let bootstrapPromise: Promise<void> | null = null;
 
@@ -29,22 +29,18 @@ export function authenticateSession(
   writeCurrentUserToCache(client, user);
 }
 
-export async function logoutSession(
-  client: ApolloClient,
-) {
+export async function logoutSession(client: ApolloClient) {
   sessionStoreActions.markAnonymous();
   await client.clearStore();
 }
 
-export function bootstrapSession(
-  client: ApolloClient,
-) {
+export async function handleUnauthorizedSession(client: ApolloClient) {
+  await logoutSession(client);
+}
+
+export function bootstrapSession(client: ApolloClient) {
   if (bootstrapPromise) {
     return bootstrapPromise;
-  }
-
-  if (sessionStoreActions === undefined) {
-    return Promise.resolve();
   }
 
   bootstrapPromise = (async () => {

@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { LoadingSpinner } from "@/components/utils";
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore } from "@/entities/session";
 
 export function ProtectedRoute({ children }: PropsWithChildren) {
   const location = useLocation();

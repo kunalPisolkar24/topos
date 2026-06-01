@@ -1,29 +1,17 @@
 import { create } from "zustand";
 import {
-  clearSessionToken,
-  loadSessionToken,
-  saveSessionToken,
-} from "@/lib/session-storage";
+  initialSessionState,
+  localStorageSessionAdapter,
+  type SessionSnapshot,
+} from "../model/session";
 
-export type AuthStatus = "anonymous" | "hydrating" | "authenticated";
-
-type SessionSnapshot = {
-  token: string | null;
-  status: AuthStatus;
-  hasHydrated: boolean;
-};
-
-const initialSessionState: SessionSnapshot = {
-  token: null,
-  status: "hydrating",
-  hasHydrated: false,
-};
+const sessionStorage = localStorageSessionAdapter;
 
 export const useSessionStore = create<SessionSnapshot>(() => initialSessionState);
 
 export const sessionStoreActions = {
   initializeFromStorage() {
-    const token = loadSessionToken();
+    const token = sessionStorage.load();
 
     if (!token) {
       useSessionStore.setState({
@@ -43,7 +31,7 @@ export const sessionStoreActions = {
   },
 
   markAuthenticated(token: string) {
-    saveSessionToken(token);
+    sessionStorage.save(token);
     useSessionStore.setState({
       token,
       status: "authenticated",
@@ -52,7 +40,7 @@ export const sessionStoreActions = {
   },
 
   markAnonymous() {
-    clearSessionToken();
+    sessionStorage.clear();
     useSessionStore.setState({
       token: null,
       status: "anonymous",
@@ -61,7 +49,7 @@ export const sessionStoreActions = {
   },
 
   resetForTests() {
-    clearSessionToken();
+    sessionStorage.clear();
     useSessionStore.setState(initialSessionState);
   },
 };

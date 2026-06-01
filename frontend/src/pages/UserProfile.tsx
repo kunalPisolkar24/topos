@@ -5,7 +5,7 @@ import { Camera, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/features/auth";
+import { useCurrentUser } from "@/entities/session";
 import { StickyNavbar } from "@/layouts";
 import { 
   useUserProfile,

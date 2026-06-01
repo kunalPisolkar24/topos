@@ -11,7 +11,7 @@ import {
 } from "@/entities/user";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
-import { sessionStoreActions } from "@/stores/session-store";
+import { sessionStoreActions } from "@/entities/session";
 import UserProfile from "./UserProfile";
 
 describe("UserProfile", () => {

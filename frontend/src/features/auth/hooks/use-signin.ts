@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SigninDocument } from "@/shared/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionActions } from "@/features/auth/hooks/use-session-actions";
+import { useSessionActions } from "@/entities/session";
 import { signinSchema, type SigninFormValues } from "@/schemas/auth/signin.schema";
 
 export const useSignin = () => {

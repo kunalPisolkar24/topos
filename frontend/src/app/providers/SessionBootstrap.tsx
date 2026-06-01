@@ -1,6 +1,6 @@
 import { type PropsWithChildren, useEffect } from "react";
 import { useApolloClient } from "@apollo/client/react";
-import { bootstrapSession } from "@/lib/auth/session";
+import { bootstrapSession } from "@/entities/session";
 
 export function SessionBootstrap({ children }: PropsWithChildren) {
   const client = useApolloClient();
