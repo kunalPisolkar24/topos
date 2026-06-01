@@ -1,19 +1,14 @@
 import type React from "react";
-import { UploadCloud, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useRef } from "react";
+import { CheckCircle2, Circle, FileText, ImageIcon, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BlogEditor } from "./BlogEditor";
+import { 
+  BlogEditor,
+  BlogTitleSection,
+  FeaturedImageSection,
+  BlogTagSection,
+} from "@/features/blog";
 import { useEditBlog } from "@/features/blog/hooks/use-edit-blog";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 interface BlogEditFormProps {
   blog: any;
@@ -26,127 +21,157 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
   onCancel,
   onComplete,
 }) => {
-  const { state, setters, handlers } = useEditBlog(blog, onComplete);
+  const { state, setters, handlers, refs } = useEditBlog(blog, onComplete);
+  const cardImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Parse plain text content for validation checklist
+  const contentText = state.editContent
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const titleReady = state.editTitle.trim().length > 0;
+  const contentReady = contentText.length > 0;
+  const imageReady = Boolean(state.editCardImage || state.editCardImageUrl || state.editCardImagePreview);
+
+  const saveDisabled = state.isUploadingCardImage || state.isUpdating;
+  const saveLabel = state.isUploadingCardImage
+    ? "Uploading..."
+    : state.isUpdating
+      ? "Saving..."
+      : "Save Changes";
 
   return (
     <form
       onSubmit={handlers.handleUpdate}
-      className="space-y-8 bg-surface-lowest ring-1 ring-outline-variant/20 p-6 sm:p-8"
+      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]"
     >
-      <div>
-        <label htmlFor="editBlogTitle" className="block text-sm font-medium text-foreground mb-2">
-          Edit Title
-        </label>
-        <Input
-          id="editBlogTitle"
-          type="text"
-          placeholder="Enter title for the blog"
+      <div className="space-y-6">
+        <BlogTitleSection
           value={state.editTitle}
-          onChange={(e) => setters.setEditTitle(e.target.value)}
-          className="text-2xl font-bold h-auto py-4"
-          required
+          onChange={setters.setEditTitle}
         />
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Blog Card Image
-        </label>
-        <div
-          className="mt-1 flex justify-center items-center px-6 pt-5 pb-6 border-2 border-dashed border-outline-variant/20 bg-surface-low hover:bg-surface-high transition-colors cursor-pointer h-60"
-          onClick={() => document.getElementById("editCardImageUpload")?.click()}
-        >
-          <div className="space-y-1 text-center">
-            {state.editCardImagePreview ? (
-              <img
-                src={state.editCardImagePreview}
-                alt="Card preview"
-                className="mx-auto h-40 object-contain"
-              />
-            ) : (
-              <UploadCloud className="mx-auto h-10 w-10 text-muted-foreground" />
-            )}
-            <div className="text-sm text-muted-foreground">
-              <span className="relative font-medium text-foreground hover:text-foreground/80">
-                {state.editCardImage ? "Change image" : state.editCardImageUrl ? "Change image" : "Upload an image"}
-              </span>
-              <input
-                id="editCardImageUpload"
-                type="file"
-                className="sr-only"
-                accept="image/*"
-                onChange={handlers.handleCardImageChange}
-              />
-            </div>
-            {state.editCardImage && (
-              <p className="text-xs text-muted-foreground mt-1">{state.editCardImage.name}</p>
-            )}
-          </div>
-        </div>
-        {state.isUploadingCardImage && (
-          <p className="text-sm text-muted-foreground mt-2">Uploading card image...</p>
-        )}
-      </div>
+        <FeaturedImageSection
+          preview={state.editCardImagePreview}
+          cardImage={state.editCardImage}
+          cardImageUrl={state.editCardImageUrl}
+          isUploading={state.isUploadingCardImage}
+          onFileChange={handlers.handleCardImageChange}
+          inputRef={cardImageInputRef}
+        />
 
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Edit Content
-        </label>
         <BlogEditor
+          ref={refs.quillRef}
           value={state.editContent}
           onChange={setters.setEditContent}
-          placeholder="Write your masterpiece here..."
+          onImageUpload={handlers.richTextimageHandler}
+        />
+
+        <BlogTagSection
+          tags={state.editTags}
+          onRemoveTag={handlers.handleRemoveTag}
+          isDialogOpen={state.isDialogOpen}
+          setIsDialogOpen={setters.setIsDialogOpen}
+          newTag={state.editNewTag}
+          setNewTag={setters.setEditNewTag}
+          onAddTag={handlers.handleAddTag}
+          onGenerateTags={handlers.handleGenerateTags}
+          isGeneratingTags={state.isGeneratingTags}
+          canGenerateTags={state.canGenerateTags}
         />
       </div>
 
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-2">Edit Tags</h3>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {state.editTags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="px-3 py-1">
-              {tag}
-              <button type="button" onClick={() => handlers.handleRemoveTag(tag)} className="ml-2 text-xs hover:text-destructive">
-                <X size={12} />
-              </button>
-            </Badge>
-          ))}
-        </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Add Tag
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Tag</DialogTitle>
-              <DialogDescription>Enter the tag name.</DialogDescription>
-            </DialogHeader>
-            <Input
-              placeholder="Enter tag name"
-              value={state.editNewTag}
-              onChange={(e) => setters.setEditNewTag(e.target.value)}
-              className="mb-4"
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handlers.handleAddTag())}
+      <aside className="lg:sticky lg:top-app-navbar-offset lg:self-start">
+        <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20 sm:p-5">
+          <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
+            Revision Stack
+          </p>
+          <div className="mt-5 space-y-2">
+            <PublishChecklistItem
+              icon={FileText}
+              label="Title"
+              detail={titleReady ? "Ready" : "Required"}
+              complete={titleReady}
             />
-            <DialogFooter>
-              <Button type="button" onClick={handlers.handleAddTag}>Add</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <PublishChecklistItem
+              icon={ImageIcon}
+              label="Cover"
+              detail={imageReady ? "Selected" : "Required"}
+              complete={imageReady}
+            />
+            <PublishChecklistItem
+              icon={FileText}
+              label="Body"
+              detail={contentReady ? `${contentText.length} chars` : "Required"}
+              complete={contentReady}
+            />
+            <PublishChecklistItem
+              icon={Tags}
+              label="Tags"
+              detail={`${state.editTags.length} added`}
+              complete={state.editTags.length > 0}
+            />
+          </div>
 
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={state.isUploadingCardImage || state.isUpdating}
-        >
-          {state.isUpdating ? "Saving..." : "Save Changes"}
-        </Button>
-      </div>
+          <div className="mt-5 bg-surface-lowest p-4 ring-1 ring-outline-variant/20">
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
+              Revision Rule
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              All post fields are validated prior to save. Changes are instantly published.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-3">
+            <Button
+              type="submit"
+              disabled={saveDisabled}
+              className="w-full"
+            >
+              {saveLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </aside>
     </form>
   );
 };
+
+interface PublishChecklistItemProps {
+  icon: React.ElementType;
+  label: string;
+  detail: string;
+  complete: boolean;
+}
+
+const PublishChecklistItem: React.FC<PublishChecklistItemProps> = ({
+  icon: Icon,
+  label,
+  detail,
+  complete,
+}) => (
+  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
+    <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+    <div className="min-w-0">
+      <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+    {complete ? (
+      <CheckCircle2 className="h-4 w-4 text-primary" aria-label="Complete" />
+    ) : (
+      <Circle className="h-4 w-4 text-muted-foreground" aria-label="Incomplete" />
+    )}
+  </div>
+);
