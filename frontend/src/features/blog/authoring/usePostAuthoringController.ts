@@ -16,7 +16,7 @@ import {
   updatePostSchema,
   type CreatePostFormValues,
   type UpdatePostFormValues,
-} from "@/schemas/blog/post.schema";
+} from "@/features/blog/authoring/model/post.schema";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useImageUpload } from "@/entities/upload";
 import {

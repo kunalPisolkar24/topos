@@ -7,7 +7,7 @@ import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionActions } from "@/entities/session";
 import { type ChangeEvent } from "react";
 import { sanitizeUsernameInput } from "@/entities/user";
-import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";
+import { signupSchema, type SignupFormValues } from "@/features/auth/model/signup.schema";
 
 export const useSignup = () => {
   const { toast } = useToast();

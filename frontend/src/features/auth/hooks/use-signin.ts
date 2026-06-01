@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { SigninDocument } from "@/shared/graphql/generated/graphql";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionActions } from "@/entities/session";
-import { signinSchema, type SigninFormValues } from "@/schemas/auth/signin.schema";
+import { signinSchema, type SigninFormValues } from "@/features/auth/model/signin.schema";
 
 export const useSignin = () => {
   const { toast } = useToast();
