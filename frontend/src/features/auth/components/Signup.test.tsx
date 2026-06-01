@@ -5,7 +5,7 @@ import { Route, Routes } from "react-router-dom";
 import {
   USERNAME_MAX_LENGTH,
   sanitizeUsernameInput,
-} from "@/lib/user-input";
+} from "@/entities/user";
 import { useSessionStore } from "@/stores/session-store";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";

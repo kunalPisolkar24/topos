@@ -12,7 +12,7 @@ export interface ProfileUpdatePayload {
   bio?: string | null;
 }
 
-const CONTROL_CHARACTERS_PATTERN = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
+const CONTROL_CHARACTERS_PATTERN = /[\u{0000}-\u{0008}\u{000B}-\u{001F}\u{007F}]/gu;
 const COLLAPSIBLE_WHITESPACE_PATTERN = /\s+/g;
 const EXTRA_NEWLINES_PATTERN = /\n{3,}/g;
 

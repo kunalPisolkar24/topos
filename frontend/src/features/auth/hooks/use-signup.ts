@@ -6,7 +6,7 @@ import { SignupDocument } from "@/shared/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/features/auth/hooks/use-session-actions";
 import { type ChangeEvent } from "react";
-import { sanitizeUsernameInput } from "@/lib/user-input";
+import { sanitizeUsernameInput } from "@/entities/user";
 import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";
 
 export const useSignup = () => {

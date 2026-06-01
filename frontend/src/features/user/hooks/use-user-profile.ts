@@ -9,7 +9,7 @@ import {
   sanitizeProfileBioInput,
   buildProfileUpdatePayload,
   type EditableProfileFormData,
-} from "@/lib/user-input";
+} from "@/entities/user";
 
 export const useUserProfile = (currentUser: any) => {
   const { toast } = useToast();

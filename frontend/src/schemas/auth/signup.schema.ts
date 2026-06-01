@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { USERNAME_MAX_LENGTH, sanitizeUsernameInput } from "@/lib/user-input";
+import { USERNAME_MAX_LENGTH, sanitizeUsernameInput } from "@/entities/user";
 
 export const signupSchema = z
   .object({

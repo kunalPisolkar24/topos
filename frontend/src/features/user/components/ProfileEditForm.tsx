@@ -7,7 +7,7 @@ import {
   PROFILE_NAME_MAX_LENGTH,
   PROFILE_BIO_MAX_LENGTH,
   getCharacterCount,
-} from "@/lib/user-input";
+} from "@/entities/user";
 
 interface ProfileEditFormProps {
   formData: { name: string; bio: string };

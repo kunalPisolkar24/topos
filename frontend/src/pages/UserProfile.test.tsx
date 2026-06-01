@@ -8,7 +8,7 @@ import {
   sanitizeProfileBio,
   sanitizeProfileBioInput,
   sanitizeProfileName,
-} from "@/lib/user-input";
+} from "@/entities/user";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { sessionStoreActions } from "@/stores/session-store";
