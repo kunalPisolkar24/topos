@@ -2,9 +2,9 @@ import { DEFAULT_BLOG_CARD_IMAGE } from "@/entities/post/lib";
 import {
   getBlogCardImageSources,
   getCloudinaryTransformedImageUrl,
-} from "./cloudinary";
+} from "./blog-card-image";
 
-describe("cloudinary image delivery helpers", () => {
+describe("blog-card-image delivery helpers", () => {
   it("transforms Cloudinary upload URLs with delivery-time resizing", () => {
     expect(
       getCloudinaryTransformedImageUrl(

@@ -1,7 +1,7 @@
 import type React from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { getBlogCardImageSources } from "@/lib/cloudinary";
+import { getBlogCardImageSources } from "@/entities/upload";
 import {
   DEFAULT_BLOG_CARD_IMAGE,
   formatBlogCardDate,

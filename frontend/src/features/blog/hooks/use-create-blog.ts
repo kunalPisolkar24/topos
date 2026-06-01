@@ -11,7 +11,7 @@ import {
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { createPostSchema } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
-import { useImageUpload } from "@/hooks/use-image-upload";
+import { useImageUpload } from "@/entities/upload";
 
 const MIN_TAG_TITLE_LENGTH = 5;
 const MIN_TAG_BODY_LENGTH = 80;

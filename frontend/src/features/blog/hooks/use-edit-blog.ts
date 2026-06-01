@@ -3,7 +3,7 @@ import { useMutation } from "@apollo/client/react";
 import { UpdatePostDocument, GenerateTagsDocument, type UpdatePostInput } from "@/shared/graphql/content-documents";
 import { updatePostSchema, type UpdatePostFormValues } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
-import { useImageUpload } from "@/hooks/use-image-upload";
+import { useImageUpload } from "@/entities/upload";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { z } from "zod";
 import type ReactQuill from "react-quill";

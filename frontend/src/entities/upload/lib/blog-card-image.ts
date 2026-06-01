@@ -1,8 +1,3 @@
-import axios from "axios";
-
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 const CLOUDINARY_UPLOAD_PATH = "/image/upload/";
 
 const BLOG_CARD_IMAGE_VARIANTS = [
@@ -10,6 +5,7 @@ const BLOG_CARD_IMAGE_VARIANTS = [
   { width: 720, height: 450 },
   { width: 960, height: 600 },
 ] as const;
+
 const DEFAULT_BLOG_CARD_IMAGE_VARIANT = BLOG_CARD_IMAGE_VARIANTS[1];
 
 const BLOG_CARD_IMAGE_SIZES =
@@ -28,10 +24,9 @@ export type ResponsiveImageSources = {
   height: number;
 };
 
-function isCloudinaryUploadUrl(imageUrl: string) {
+const isCloudinaryUploadUrl = (imageUrl: string) => {
   try {
     const parsedUrl = new URL(imageUrl);
-
     return (
       /(^|\.)res\.cloudinary\.com$/i.test(parsedUrl.hostname) &&
       parsedUrl.pathname.includes(CLOUDINARY_UPLOAD_PATH)
@@ -39,12 +34,12 @@ function isCloudinaryUploadUrl(imageUrl: string) {
   } catch {
     return false;
   }
-}
+};
 
-export function getCloudinaryTransformedImageUrl(
+export const getCloudinaryTransformedImageUrl = (
   imageUrl: string,
   { width, height }: CloudinaryDeliverySize,
-) {
+) => {
   if (!isCloudinaryUploadUrl(imageUrl)) {
     return imageUrl;
   }
@@ -68,9 +63,11 @@ export function getCloudinaryTransformedImageUrl(
     `${beforeUploadPath}${CLOUDINARY_UPLOAD_PATH}${transformSegment}${afterUploadPath}`;
 
   return parsedUrl.toString();
-}
+};
 
-export function getBlogCardImageSources(imageUrl: string): ResponsiveImageSources {
+export const getBlogCardImageSources = (
+  imageUrl: string,
+): ResponsiveImageSources => {
   if (!isCloudinaryUploadUrl(imageUrl)) {
     return {
       src: imageUrl,
@@ -93,26 +90,4 @@ export function getBlogCardImageSources(imageUrl: string): ResponsiveImageSource
     width: DEFAULT_BLOG_CARD_IMAGE_VARIANT.width,
     height: DEFAULT_BLOG_CARD_IMAGE_VARIANT.height,
   };
-}
-
-export const uploadToCloudinary = async (file: File): Promise<string> => {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-    throw new Error("Cloudinary configuration is missing. Please check your environment variables.");
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-  const response = await axios.post(CLOUDINARY_URL, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-
-  if (!response.data.secure_url) {
-    throw new Error("Failed to get secure URL from Cloudinary response.");
-  }
-
-  return response.data.secure_url;
 };
