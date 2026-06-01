@@ -7,8 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/entities/session";
 import { StickyNavbar } from "@/layouts";
-import { 
-  useUserProfile,
+import {
+  useProfileEditorController,
   useUserPosts,
   ProfileBanner,
   ProfileViewInfo,
@@ -21,7 +21,9 @@ const DEFAULT_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f4
 const UserProfile: React.FC = () => {
   const { user: currentUser, loading: isUserLoading } = useCurrentUser();
   
-  const { state: profileState, handlers: profileHandlers } = useUserProfile(currentUser);
+  const { state: profileState, handlers: profileHandlers } = useProfileEditorController({
+    currentUser,
+  });
   const {
     blogs: userBlogs,
     loading: isPostsLoading,
