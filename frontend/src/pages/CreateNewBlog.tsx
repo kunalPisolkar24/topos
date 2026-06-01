@@ -16,10 +16,12 @@ const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs } = usePostAuthoringController({
     mode: "create",
   });
-  const { contentText } = state;
-  const titleReady = state.title.trim().length > 0;
-  const contentReady = contentText.length > 0;
-  const imageReady = Boolean(state.cardImage || state.cardImageUrl || state.cardImagePreview);
+  const {
+    contentText,
+    isTitleReady: titleReady,
+    isContentReady: contentReady,
+    isCoverImageReady: imageReady,
+  } = state;
 
   return (
     <div className="min-h-screen bg-surface text-foreground">

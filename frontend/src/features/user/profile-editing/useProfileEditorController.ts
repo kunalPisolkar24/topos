@@ -28,6 +28,11 @@ export interface ProfileEditorState {
   isSaving: boolean;
   avatarFile: File | null;
   bannerFile: File | null;
+  displayName: string;
+  profileInitial: string;
+  avatarSrc: string | null;
+  bannerSrc: string | null;
+  hasUnsavedProfileChanges: boolean;
 }
 
 export interface ProfileEditorHandlers {
@@ -189,6 +194,21 @@ export const useProfileEditorController = ({
     setBannerFile(null);
   };
 
+  const displayName =
+    currentUser?.name ||
+    currentUser?.username ||
+    "Workspace member";
+  const profileInitial = (
+    currentUser?.name?.charAt(0) ??
+    currentUser?.username?.charAt(0) ??
+    currentUser?.email?.charAt(0) ??
+    "U"
+  ).toUpperCase();
+  const avatarSrc = avatarPreview ?? currentUser?.avatarUrl ?? null;
+  const bannerSrc = bannerPreview ?? currentUser?.bannerUrl ?? null;
+  const hasUnsavedProfileChanges =
+    avatarFile !== null || bannerFile !== null;
+
   return {
     state: {
       isEditingProfile,
@@ -198,6 +218,11 @@ export const useProfileEditorController = ({
       isSaving,
       avatarFile,
       bannerFile,
+      displayName,
+      profileInitial,
+      avatarSrc,
+      bannerSrc,
+      hasUnsavedProfileChanges,
     },
     handlers: {
       setIsEditingProfile,

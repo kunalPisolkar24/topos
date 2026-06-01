@@ -66,6 +66,9 @@ export interface PostAuthoringState {
   isGeneratingPost: boolean;
   canGeneratePost: boolean;
   contentText: string;
+  isTitleReady: boolean;
+  isContentReady: boolean;
+  isCoverImageReady: boolean;
 }
 
 export interface PostAuthoringHandlers {
@@ -501,6 +504,11 @@ export const usePostAuthoringController = ({
       isGeneratingPost,
       canGeneratePost,
       contentText,
+      isTitleReady: title.trim().length > 0,
+      isContentReady: contentText.length > 0,
+      isCoverImageReady: Boolean(
+        cardImage || cardImageUrl || cardImagePreview,
+      ),
     },
     setters: {
       setTitle,
