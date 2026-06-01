@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/command";
 import { Card } from "@/components/ui/card";
 import { type ContentTag } from "@/shared/graphql/content-documents";
-import { useSearchSuggestions, type SearchMode } from "../hooks/use-search-suggestions";
+import { useSearchSuggestionsController, type SearchMode } from "../suggestions";
 import { TagSuggestions } from "./TagSuggestions";
 import { PostSuggestions } from "./PostSuggestions";
 
@@ -56,7 +56,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     createIdleCommandValue(idleValueCounterRef.current),
   );
 
-  const { tags, posts, totalPosts, isLoading, debouncedQuery } = useSearchSuggestions({
+  const { tags, posts, totalPosts, isLoading, debouncedQuery } = useSearchSuggestionsController({
     query: searchQuery,
     mode: searchMode,
     isFocused: inputIsFocused,

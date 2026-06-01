@@ -6,7 +6,7 @@ import { renderWithProviders } from "@/test/render-with-providers";
 import { SearchBar } from "./SearchBar";
 import { PostSuggestions } from "./PostSuggestions";
 import { TagSuggestions } from "./TagSuggestions";
-import { useSearchSuggestions } from "../hooks/use-search-suggestions";
+import { useSearchSuggestionsController } from "../suggestions";
 
 const mockNavigate = vi.fn();
 
@@ -21,9 +21,16 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("../hooks/use-search-suggestions", () => ({
-  useSearchSuggestions: vi.fn(),
-}));
+vi.mock("../suggestions", async () => {
+  const actual = await vi.importActual<typeof import("../suggestions")>(
+    "../suggestions",
+  );
+
+  return {
+    ...actual,
+    useSearchSuggestionsController: vi.fn(),
+  };
+});
 
 class ResizeObserverMock {
   disconnect = vi.fn();
@@ -54,7 +61,7 @@ const postSuggestions = [
 
 describe("SearchBar", () => {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-  const mockUseSearchSuggestions = vi.mocked(useSearchSuggestions);
+  const mockUseSearchSuggestions = vi.mocked(useSearchSuggestionsController);
 
   beforeAll(() => {
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);

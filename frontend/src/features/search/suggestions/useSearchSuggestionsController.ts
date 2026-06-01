@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import {
   SearchPostsDocument,
+  type ContentPostCard,
   type ContentTag,
 } from "@/shared/graphql/content-documents";
 import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/entities/post/lib";
@@ -16,7 +17,7 @@ export interface SearchPostSuggestion {
   authorName: string;
 }
 
-interface UseSearchSuggestionsProps {
+interface UseSearchSuggestionsControllerProps {
   query: string;
   mode: SearchMode;
   isFocused: boolean;
@@ -24,23 +25,40 @@ interface UseSearchSuggestionsProps {
   postLimit?: number;
 }
 
-export const useSearchSuggestions = ({
+export interface SearchSuggestionsState {
+  tags: ContentTag[];
+  posts: SearchPostSuggestion[];
+  totalPosts: number;
+  isLoading: boolean;
+  debouncedQuery: string;
+}
+
+const DEBOUNCE_MS = 500;
+
+const toPostSuggestion = (post: ContentPostCard): SearchPostSuggestion => ({
+  id: post.id,
+  title: post.title,
+  imageUrl: post.imageUrl ?? DEFAULT_BLOG_CARD_IMAGE,
+  authorName: getAuthorDisplayName(post.author),
+});
+
+export const useSearchSuggestionsController = ({
   query,
   mode,
   isFocused,
   tagLimit = 6,
   postLimit = 4,
-}: UseSearchSuggestionsProps) => {
+}: UseSearchSuggestionsControllerProps): SearchSuggestionsState => {
   const client = useApolloClient();
   const requestSequenceRef = useRef(0);
   const [debouncedQuery, setDebouncedQuery] = useState(query);
-  const [tags, setTags] = useState<ContentTag[]>([]);
+  const [tags, setTags] = useState<SearchSuggestionsState["tags"]>([]);
   const [posts, setPosts] = useState<SearchPostSuggestion[]>([]);
   const [totalPosts, setTotalPosts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 500);
+    const timer = setTimeout(() => setDebouncedQuery(query), DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -79,17 +97,12 @@ export const useSearchSuggestions = ({
           });
 
           if (requestId !== requestSequenceRef.current) return;
-          const hits = data?.searchPosts?.hits ?? [];
-          setPosts(hits.map((post: any) => ({
-            id: post.id,
-            title: post.title,
-            imageUrl: post.imageUrl || DEFAULT_BLOG_CARD_IMAGE,
-            authorName: getAuthorDisplayName(post.author),
-          })));
+          const hits: ContentPostCard[] = data?.searchPosts?.hits ?? [];
+          setPosts(hits.map(toPostSuggestion));
           setTotalPosts(data?.searchPosts?.total ?? 0);
           setTags([]);
         }
-      } catch (error) {
+      } catch {
         if (requestId !== requestSequenceRef.current) return;
         setTags([]);
         setPosts([]);
@@ -101,8 +114,8 @@ export const useSearchSuggestions = ({
       }
     };
 
-    fetchSuggestions();
-  }, [client, debouncedQuery, isFocused, mode, tagLimit, postLimit]);
+    void fetchSuggestions();
+  }, [client, debouncedQuery, isFocused, mode, postLimit, tagLimit]);
 
   return {
     tags,
