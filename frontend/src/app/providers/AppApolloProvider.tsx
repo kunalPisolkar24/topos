@@ -3,7 +3,7 @@ import type { ApolloClient } from "@apollo/client";
 import type { PropsWithChildren } from "react";
 import { useRef } from "react";
 import { createApolloClient } from "@/shared/api";
-import { env } from "@/lib/env";
+import { env } from "@/shared/config/env";
 import {
   handleUnauthorizedSession,
   useSessionStore,

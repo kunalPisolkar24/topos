@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCurrentUser, useSessionActions } from "@/entities/session";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/cn";
 import { useSessionStore } from "@/entities/session";
 
 const authoringNavigation = {

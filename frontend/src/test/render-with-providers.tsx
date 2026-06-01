@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { render } from "@testing-library/react";
 import type { ApolloClient } from "@apollo/client";
 import { createApolloClient } from "@/shared/api";
-import { env } from "@/lib/env";
+import { env } from "@/shared/config/env";
 
 type RenderOptions = {
   route?: string;

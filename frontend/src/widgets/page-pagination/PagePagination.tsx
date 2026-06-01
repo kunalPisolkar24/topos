@@ -6,7 +6,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/cn";
 
 export type PagePaginationAlign = "start" | "center" | "end";
 
