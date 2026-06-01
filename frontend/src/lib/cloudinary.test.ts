@@ -1,4 +1,4 @@
-import { DEFAULT_BLOG_CARD_IMAGE } from "@/lib/content";
+import { DEFAULT_BLOG_CARD_IMAGE } from "@/entities/post/lib";
 import {
   getBlogCardImageSources,
   getCloudinaryTransformedImageUrl,

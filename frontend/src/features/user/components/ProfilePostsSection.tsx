@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/pagination";
 import { BlogCardSkeleton } from "@/components/skeletons";
 import { BlogCard } from "@/features/blog";
-import type { BlogCardItem } from "@/lib/content";
+import type { BlogCardItem } from "@/entities/post/lib";
 
 interface ProfilePostsSectionProps {
   blogs: BlogCardItem[];

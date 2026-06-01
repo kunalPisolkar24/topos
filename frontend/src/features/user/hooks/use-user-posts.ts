@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
 import { MyPostsDocument } from "@/shared/graphql/content-documents";
-import { mapPostToBlogCardItem } from "@/lib/content";
+import { mapPostToBlogCardItem } from "@/entities/post/lib";
 
 export const useUserPosts = (userId: string | undefined, postsPerPage = 3) => {
   const [currentPage, setCurrentPage] = useState(1);

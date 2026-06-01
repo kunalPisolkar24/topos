@@ -5,7 +5,7 @@ import {
   TagsDocument,
   type ContentTag,
 } from "@/shared/graphql/content-documents";
-import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/lib/content";
+import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/entities/post/lib";
 
 export type SearchMode = "tags" | "posts";
 

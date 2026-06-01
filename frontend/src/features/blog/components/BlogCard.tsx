@@ -7,7 +7,7 @@ import {
   formatBlogCardDate,
   formatBlogCardTag,
   type BlogCardItem,
-} from "@/lib/content";
+} from "@/entities/post/lib";
 
 const MAX_VISIBLE_TAGS = 3;
 
