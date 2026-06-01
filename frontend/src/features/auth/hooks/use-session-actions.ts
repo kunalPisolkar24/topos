@@ -1,5 +1,5 @@
 import { useApolloClient } from "@apollo/client/react";
-import { type UserCoreFragment } from "@/graphql/generated/graphql";
+import { type UserCoreFragment } from "@/shared/graphql/generated/graphql";
 import {
   authenticateSession,
   logoutSession,

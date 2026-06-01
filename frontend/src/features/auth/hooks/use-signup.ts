@@ -2,7 +2,7 @@ import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { SignupDocument } from "@/graphql/generated/graphql";
+import { SignupDocument } from "@/shared/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionActions } from "@/features/auth/hooks/use-session-actions";
 import { type ChangeEvent } from "react";

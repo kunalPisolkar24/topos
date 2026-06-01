@@ -12,7 +12,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { SearchPostsDocument } from "@/graphql/content-documents";
+import { SearchPostsDocument } from "@/shared/graphql/content-documents";
 import { buildSearchPagination, mapPostToBlogCardItem } from "@/lib/content";
 
 const SEARCH_RESULTS_PAGE_SIZE = 6;

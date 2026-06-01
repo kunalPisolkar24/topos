@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CreatePostInput } from "@/graphql/content-documents";
+import type { CreatePostInput } from "@/shared/graphql/content-documents";
 
 export const createPostSchema: z.ZodType<CreatePostInput> = z.object({
   title: z.string().trim().min(1, "Title is required"),

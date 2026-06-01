@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { 
   PostDocument, 
   DeletePostDocument 
-} from "@/graphql/content-documents";
+} from "@/shared/graphql/content-documents";
 import { useToast } from "@/hooks/use-toast";
 import { getGraphQLErrorMessage } from "@/shared/api";
 

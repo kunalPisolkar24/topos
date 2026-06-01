@@ -3,7 +3,7 @@ import {
   MeDocument,
   type MeQuery,
   type UserCoreFragment,
-} from "@/graphql/generated/graphql";
+} from "@/shared/graphql/generated/graphql";
 import { sessionStoreActions } from "@/stores/session-store";
 
 let bootstrapPromise: Promise<void> | null = null;

@@ -6,9 +6,9 @@ const config: CodegenConfig = {
     "../services/content/graph/schema.graphqls",
     "../services/search/schema.graphql",
   ],
-  documents: ["src/**/*.{graphql,ts,tsx}", "!src/graphql/generated/**/*"],
+  documents: ["src/**/*.{graphql,ts,tsx}", "!src/shared/graphql/generated/**/*"],
   generates: {
-    "./src/graphql/generated/": {
+    "./src/shared/graphql/generated/": {
       preset: "client",
       presetConfig: {
         fragmentMasking: false,

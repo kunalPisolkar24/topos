@@ -8,7 +8,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Card } from "@/components/ui/card";
-import { type ContentTag } from "@/graphql/content-documents";
+import { type ContentTag } from "@/shared/graphql/content-documents";
 import { useSearchSuggestions, type SearchMode } from "../hooks/use-search-suggestions";
 import { TagSuggestions } from "./TagSuggestions";
 import { PostSuggestions } from "./PostSuggestions";

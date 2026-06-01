@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
-import { MyPostsDocument } from "@/graphql/content-documents";
+import { MyPostsDocument } from "@/shared/graphql/content-documents";
 import { mapPostToBlogCardItem } from "@/lib/content";
 
 export const useUserPosts = (userId: string | undefined, postsPerPage = 3) => {

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useMutation } from "@apollo/client/react";
-import { UpdatePostDocument, GenerateTagsDocument, type UpdatePostInput } from "@/graphql/content-documents";
+import { UpdatePostDocument, GenerateTagsDocument, type UpdatePostInput } from "@/shared/graphql/content-documents";
 import { updatePostSchema, type UpdatePostFormValues } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";

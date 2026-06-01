@@ -14,7 +14,7 @@ import {
 import {
   PostsByTagDocument,
   PostsDocument,
-} from "@/graphql/content-documents";
+} from "@/shared/graphql/content-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mapPostToBlogCardItem } from "@/lib/content";
 

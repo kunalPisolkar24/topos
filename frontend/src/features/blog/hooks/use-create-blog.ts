@@ -7,7 +7,7 @@ import {
   CreatePostDocument,
   GeneratePostContentDocument,
   GenerateTagsDocument,
-} from "@/graphql/content-documents";
+} from "@/shared/graphql/content-documents";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { createPostSchema } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";

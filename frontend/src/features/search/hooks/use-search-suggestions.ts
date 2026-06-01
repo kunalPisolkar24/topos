@@ -4,7 +4,7 @@ import {
   SearchPostsDocument,
   TagsDocument,
   type ContentTag,
-} from "@/graphql/content-documents";
+} from "@/shared/graphql/content-documents";
 import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/lib/content";
 
 export type SearchMode = "tags" | "posts";

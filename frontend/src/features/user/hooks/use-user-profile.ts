@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useMutation } from "@apollo/client/react";
-import { UpdateProfileDocument } from "@/graphql/generated/graphql";
+import { UpdateProfileDocument } from "@/shared/graphql/generated/graphql";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import {

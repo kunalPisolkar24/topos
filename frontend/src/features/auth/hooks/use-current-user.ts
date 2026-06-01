@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client/react";
-import { MeDocument } from "@/graphql/generated/graphql";
+import { MeDocument } from "@/shared/graphql/generated/graphql";
 import { useSessionStore } from "@/stores/session-store";
 
 export function useCurrentUser() {
