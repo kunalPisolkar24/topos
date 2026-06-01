@@ -1,7 +1,6 @@
 import {
   ApolloClient,
   HttpLink,
-  InMemoryCache,
   from,
 } from "@apollo/client";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
@@ -14,6 +13,7 @@ import {
   hasUnauthorizedNetworkError,
 } from "@/shared/api/links/auth";
 import { handleUnauthorizedSession, registerApolloClient } from "@/shared/api/links/unauthorized";
+import { buildApolloCache } from "@/shared/api/policies";
 import { useSessionStore } from "@/stores/session-store";
 
 const authLink = setContext((_, { headers }) => {
@@ -52,55 +52,7 @@ export const apolloClient = new ApolloClient({
       uri: env.VITE_GRAPHQL_URL,
     }),
   ]),
-  cache: new InMemoryCache({
-    typePolicies: {
-      Post: {
-        keyFields: ["id"],
-      },
-      Tag: {
-        keyFields: ["id"],
-      },
-      SearchResult: {
-        keyFields: false,
-      },
-      User: {
-        keyFields: ["id"],
-        fields: {
-          posts: {
-            keyArgs: ["page", "limit"],
-            merge: false,
-          },
-        },
-      },
-      Query: {
-        fields: {
-          me: {
-            merge: false,
-          },
-          post: {
-            keyArgs: ["id"],
-            merge: false,
-          },
-          posts: {
-            keyArgs: ["page", "limit"],
-            merge: false,
-          },
-          postsByTag: {
-            keyArgs: ["tag", "page", "limit"],
-            merge: false,
-          },
-          searchPosts: {
-            keyArgs: ["query", "page", "limit"],
-            merge: false,
-          },
-          tags: {
-            keyArgs: ["query", "limit"],
-            merge: false,
-          },
-        },
-      },
-    },
-  }),
+  cache: buildApolloCache(),
 });
 
 registerApolloClient(apolloClient);
