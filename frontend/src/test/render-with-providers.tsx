@@ -2,7 +2,7 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { render } from "@testing-library/react";
 import { ApolloProvider } from "@apollo/client/react";
 import { MemoryRouter } from "react-router-dom";
-import { apolloClient } from "@/lib/apollo/client";
+import { apolloClient } from "@/shared/api";
 
 type RenderOptions = {
   route?: string;

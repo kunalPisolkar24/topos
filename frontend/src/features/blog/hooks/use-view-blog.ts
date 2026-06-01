@@ -6,7 +6,7 @@ import {
   DeletePostDocument 
 } from "@/graphql/content-documents";
 import { useToast } from "@/hooks/use-toast";
-import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
+import { getGraphQLErrorMessage } from "@/shared/api";
 
 export const useViewBlog = () => {
   const { id } = useParams<{ id: string }>();

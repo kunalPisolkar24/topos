@@ -4,7 +4,7 @@ import { UpdatePostDocument, GenerateTagsDocument, type UpdatePostInput } from "
 import { updatePostSchema, type UpdatePostFormValues } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
-import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { z } from "zod";
 import type ReactQuill from "react-quill";
 

@@ -8,7 +8,7 @@ import {
   GeneratePostContentDocument,
   GenerateTagsDocument,
 } from "@/graphql/content-documents";
-import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { createPostSchema } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";

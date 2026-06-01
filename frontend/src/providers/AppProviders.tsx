@@ -4,7 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { ErrorBoundary } from "@/components/utils";
 import { ThemeProvider } from "@/components/utils/theme-provider";
-import { apolloClient } from "@/lib/apollo/client";
+import { apolloClient } from "@/shared/api";
 import { SessionBootstrap } from "./SessionBootstrap";
 
 export function AppProviders({ children }: PropsWithChildren) {

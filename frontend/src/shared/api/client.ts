@@ -12,8 +12,8 @@ import {
   buildAuthHeaders,
   hasUnauthorizedGraphQLError,
   hasUnauthorizedNetworkError,
-} from "@/lib/apollo/auth";
-import { handleUnauthorizedSession, registerApolloClient } from "./unauthorized";
+} from "@/shared/api/links/auth";
+import { handleUnauthorizedSession, registerApolloClient } from "@/shared/api/links/unauthorized";
 import { useSessionStore } from "@/stores/session-store";
 
 const authLink = setContext((_, { headers }) => {
