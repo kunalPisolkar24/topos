@@ -4,19 +4,12 @@ import { BlogCard } from "./BlogCard";
 import { BlogCardSkeleton } from "@/components/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   PostsByTagDocument,
   PostsDocument,
 } from "@/shared/graphql/content-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mapPostToBlogCardItem } from "@/entities/post/lib";
+import { PagePagination } from "@/widgets";
 
 interface BlogListProps {
   filterTag?: string;
@@ -131,55 +124,13 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
         ))}
       </div>
 
-      {totalPages > 1 && (
-        <Pagination className="mt-10">
-          <PaginationContent>
-            <PaginationItem>
-              {currentPage > 1 && (
-                <PaginationPrevious
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    handlePageChange(currentPage - 1);
-                  }}
-                  className="border-outline-variant/20 bg-surface-lowest text-muted-foreground"
-                />
-              )}
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, index) => (
-              <PaginationItem key={index}>
-                <PaginationLink
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    handlePageChange(index + 1);
-                  }}
-                  isActive={currentPage === index + 1}
-                  className={`${
-                    currentPage === index + 1
-                      ? "border-primary/45 bg-primary-container/80 text-primary-foreground [box-shadow:inset_0_0_0_1px_rgb(var(--primary-fixed-dim)/0.95)]"
-                      : "border-outline-variant/20 bg-surface-lowest text-muted-foreground"
-                  }`}
-                >
-                  {index + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              {currentPage < totalPages && (
-                <PaginationNext
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    handlePageChange(currentPage + 1);
-                  }}
-                  className="border-outline-variant/20 bg-surface-lowest text-muted-foreground"
-                />
-              )}
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+      <div className="mt-10">
+        <PagePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
+      </div>
     </div>
   );
 };

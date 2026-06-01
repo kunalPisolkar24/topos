@@ -1,17 +1,9 @@
 import React, { useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
-import { StickyNavbar } from "@/widgets";
+import { PagePagination, StickyNavbar } from "@/widgets";
 import { BlogCard } from "@/features/blog";
 import { BlogCardSkeleton } from "@/components/skeletons";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { SearchPostsDocument } from "@/shared/graphql/content-documents";
 import { buildSearchPagination, mapPostToBlogCardItem } from "@/entities/post/lib";
 
@@ -65,55 +57,6 @@ const SearchResultsPage: React.FC = () => {
     }
   };
 
-  const renderPagination = () => {
-    if (paginationInfo.totalPages <= 1) {
-      return null;
-    }
-
-    return (
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            {paginationInfo.currentPage > 1 && (
-              <PaginationPrevious
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(paginationInfo.currentPage - 1);
-                }}
-              />
-            )}
-          </PaginationItem>
-          {Array.from({ length: paginationInfo.totalPages }, (_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(index + 1);
-                }}
-                isActive={paginationInfo.currentPage === index + 1}
-              >
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            {paginationInfo.currentPage < paginationInfo.totalPages && (
-              <PaginationNext
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(paginationInfo.currentPage + 1);
-                }}
-              />
-            )}
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-zinc-900/20">
       <StickyNavbar />
@@ -146,7 +89,13 @@ const SearchResultsPage: React.FC = () => {
                 No posts found matching your query.
               </p>
             )}
-            <div className="mt-12">{renderPagination()}</div>
+            <div className="mt-12">
+              <PagePagination
+                currentPage={paginationInfo.currentPage}
+                totalPages={paginationInfo.totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         )}
       </main>
