@@ -1,8 +1,9 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useMemo, useRef, type MutableRefObject } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ResponsiveRichTextToolbar } from "./ResponsiveRichTextToolbar";
 
 interface BlogEditorProps {
   value: string;
@@ -12,46 +13,54 @@ interface BlogEditorProps {
 }
 
 export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
-  ({ value, onChange, onImageUpload, placeholder = "Write your masterpiece here..." }, ref) => {
+  (
+    {
+      value,
+      onChange,
+      onImageUpload,
+      placeholder = "Write your masterpiece here...",
+    },
+    forwardedRef,
+  ) => {
     const modules = useMemo(
       () => ({
-        toolbar: {
-          container: [
-            [{ header: [1, 2, 3, 4, 5, 6, false] }],
-            ["bold", "italic", "underline", "strike"],
-            [{ list: "ordered" }, { list: "bullet" }],
-            [{ indent: "-1" }, { indent: "+1" }],
-            [{ align: [] }],
-            ["link", "image", "video"],
-            ["blockquote", "code-block"],
-            [{ color: [] }, { background: [] }],
-            ["clean"],
-          ],
-          handlers: onImageUpload ? { image: onImageUpload } : {},
-        },
+        toolbar: false,
         clipboard: { matchVisual: false },
       }),
-      [onImageUpload]
+      [],
     );
 
-    const formats = [
-      "header",
-      "bold",
-      "italic",
-      "underline",
-      "strike",
-      "list",
-      "bullet",
-      "indent",
-      "align",
-      "link",
-      "image",
-      "video",
-      "blockquote",
-      "code-block",
-      "color",
-      "background",
-    ];
+    const formats = useMemo(
+      () => [
+        "header",
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "list",
+        "bullet",
+        "indent",
+        "align",
+        "link",
+        "image",
+        "video",
+        "blockquote",
+        "code-block",
+        "color",
+        "background",
+      ],
+      [],
+    );
+
+    const localRef = useRef<ReactQuill | null>(null);
+    const toolbarRef = useMemo<MutableRefObject<ReactQuill | null>>(
+      () =>
+        typeof forwardedRef === "object" &&
+        forwardedRef !== null
+          ? (forwardedRef as MutableRefObject<ReactQuill | null>)
+          : localRef,
+      [forwardedRef],
+    );
 
     return (
       <Card className="gap-0 bg-surface-lowest py-0">
@@ -69,8 +78,19 @@ export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
         </CardHeader>
         <CardContent className="p-4 sm:p-5">
           <div className="blog-content-editor-wrapper overflow-hidden ring-1 ring-outline-variant/20">
+            <ResponsiveRichTextToolbar
+              quillRef={toolbarRef}
+              onImageUpload={onImageUpload}
+            />
             <ReactQuill
-              ref={ref}
+              ref={(node) => {
+                localRef.current = node;
+                if (typeof forwardedRef === "function") {
+                  forwardedRef(node);
+                } else if (forwardedRef && typeof forwardedRef === "object") {
+                  (forwardedRef as MutableRefObject<ReactQuill | null>).current = node;
+                }
+              }}
               theme="snow"
               value={value}
               onChange={onChange}
@@ -83,7 +103,7 @@ export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
         </CardContent>
       </Card>
     );
-  }
+  },
 );
 
 BlogEditor.displayName = "BlogEditor";
