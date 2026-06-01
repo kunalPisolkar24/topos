@@ -1,11 +1,25 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useMutation } from "@apollo/client/react";
-import { UpdatePostDocument, type UpdatePostInput } from "@/graphql/content-documents";
+import { UpdatePostDocument, GenerateTagsDocument, type UpdatePostInput } from "@/graphql/content-documents";
 import { updatePostSchema, type UpdatePostFormValues } from "@/schemas/blog/post.schema";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import { getGraphQLErrorMessage } from "@/lib/apollo/error-message";
 import { z } from "zod";
+import type ReactQuill from "react-quill";
+
+const MIN_TAG_TITLE_LENGTH = 5;
+const MIN_TAG_BODY_LENGTH = 80;
+
+const toPlainText = (value: string) =>
+  value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeTags = (values: string[]) =>
+  Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
 export const useEditBlog = (blog: any, onComplete: () => void) => {
   const { toast } = useToast();
@@ -16,11 +30,20 @@ export const useEditBlog = (blog: any, onComplete: () => void) => {
   const [editCardImage, setEditCardImage] = useState<File | null>(null);
   const [editCardImageUrl, setEditCardImageUrl] = useState<string | null>(blog?.imageUrl || null);
   const [editCardImagePreview, setEditCardImagePreview] = useState<string | null>(blog?.imageUrl || null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const quillRef = useRef<ReactQuill>(null);
 
   const { upload: uploadCardImage, isUploading: isUploadingCardImage } = useImageUpload();
+  const { upload: uploadRichTextImage, isUploading: isUploadingRichText } = useImageUpload();
+
   const [updatePost, { loading: isUpdating }] = useMutation(UpdatePostDocument, {
     refetchQueries: ["Posts", "PostsByTag", "MyPosts", "SearchPosts"],
   });
+  const [generateTags, { loading: isGeneratingTags }] = useMutation(GenerateTagsDocument);
+
+  const contentText = toPlainText(editContent);
+  const canGenerateTags = editTitle.trim().length >= MIN_TAG_TITLE_LENGTH && contentText.length >= MIN_TAG_BODY_LENGTH;
 
   const handleCardImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -90,12 +113,81 @@ export const useEditBlog = (blog: any, onComplete: () => void) => {
     if (trimmed && !editTags.includes(trimmed)) {
       setEditTags([...editTags, trimmed]);
       setEditNewTag("");
+      setIsDialogOpen(false);
+    } else if (!trimmed) {
+      toast({ title: "Empty Tag", description: "Tag cannot be empty.", variant: "destructive" });
+    } else {
+      toast({ title: "Duplicate Tag", description: "This tag has already been added.", variant: "destructive" });
     }
   };
 
   const handleRemoveTag = (tag: string) => {
     setEditTags(editTags.filter((t) => t !== tag));
   };
+
+  const handleGenerateTags = async () => {
+    if (!canGenerateTags) {
+      toast({
+        title: "Not Enough Content",
+        description: "Add a longer title and more content before generating tags.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data } = await generateTags({
+        variables: {
+          title: editTitle.trim(),
+          body: contentText,
+        },
+      });
+
+      const generated = normalizeTags(data?.generateTags ?? []);
+      if (generated.length === 0) {
+        toast({
+          title: "No Tags Generated",
+          description: "Try adding more context and generate again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setEditTags(normalizeTags([...editTags, ...generated]));
+      toast({
+        title: "Tags Generated",
+        description: `Added ${generated.length} tag${generated.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Tag Generation Failed",
+        description: getGraphQLErrorMessage(error, "Unable to generate tags right now."),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const richTextimageHandler = useCallback(async () => {
+    const input = document.createElement("input");
+    input.setAttribute("type", "file");
+    input.setAttribute("accept", "image/*");
+    input.click();
+    input.onchange = async () => {
+      if (input.files && input.files.length > 0) {
+        const file = input.files[0];
+        const imageUrl = await uploadRichTextImage(file);
+        
+        if (imageUrl) {
+          const quill = quillRef.current?.getEditor();
+          if (quill) {
+            const range = quill.getSelection(true);
+            quill.insertEmbed(range.index, "image", imageUrl);
+            quill.setSelection(range.index + 1, 0);
+          }
+        }
+      }
+    };
+  }, [uploadRichTextImage]);
 
   return {
     state: {
@@ -107,7 +199,11 @@ export const useEditBlog = (blog: any, onComplete: () => void) => {
       editCardImageUrl,
       editCardImagePreview,
       isUploadingCardImage,
+      isUploadingRichText,
       isUpdating,
+      isDialogOpen,
+      isGeneratingTags,
+      canGenerateTags,
     },
     setters: {
       setEditTitle,
@@ -116,12 +212,18 @@ export const useEditBlog = (blog: any, onComplete: () => void) => {
       setEditNewTag,
       setEditCardImageUrl,
       setEditCardImagePreview,
+      setIsDialogOpen,
     },
     handlers: {
       handleCardImageChange,
       handleUpdate,
       handleAddTag,
       handleRemoveTag,
+      handleGenerateTags,
+      richTextimageHandler,
+    },
+    refs: {
+      quillRef,
     }
   };
 };
