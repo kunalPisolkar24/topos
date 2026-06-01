@@ -10,7 +10,7 @@ import {
   UpdatePostDocument,
   type UpdatePostInput,
 } from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage } from "@/shared/api";
+import { getGraphQLErrorMessage, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import {
   createPostSchema,
   updatePostSchema,
@@ -102,7 +102,7 @@ export interface PostAuthoringController {
   };
 };
 
-const REFETCH_POST_LISTS = ["Posts", "PostsByTag", "MyPosts", "SearchPosts"];
+const REFETCH_POST_LISTS = POST_LIST_QUERY_NAMES;
 
 export const usePostAuthoringController = ({
   mode,

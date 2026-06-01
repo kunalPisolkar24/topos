@@ -7,7 +7,7 @@ import {
   type PostQuery,
   type PostQueryVariables,
 } from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage } from "@/shared/api";
+import { getGraphQLErrorMessage, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 
 type LoadedPost = NonNullable<PostQuery["post"]>;
@@ -35,7 +35,7 @@ export interface PostViewerController {
   refetch: () => void;
 }
 
-const REFETCH_POST_LISTS = ["Posts", "PostsByTag", "MyPosts", "SearchPosts"];
+const REFETCH_POST_LISTS = POST_LIST_QUERY_NAMES;
 
 export const usePostViewerController = (
   postId: string | undefined,

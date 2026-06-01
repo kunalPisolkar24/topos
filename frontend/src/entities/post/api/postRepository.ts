@@ -31,8 +31,7 @@ import {
   type UpdatePostMutation,
   type UpdatePostMutationVariables,
 } from "@/shared/graphql/content-documents";
-
-const REFETCH_POST_LISTS = ["Posts", "PostsByTag", "MyPosts", "SearchPosts"];
+import { POST_LIST_QUERY_NAMES } from "@/shared/api/refetchLists";
 
 export const postRepository = {
   list({ page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
@@ -68,21 +67,21 @@ export const postRepository = {
   useCreate() {
     return useMutation<CreatePostMutation, CreatePostMutationVariables>(
       CreatePostDocument,
-      { refetchQueries: REFETCH_POST_LISTS },
+      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
   useUpdate() {
     return useMutation<UpdatePostMutation, UpdatePostMutationVariables>(
       UpdatePostDocument,
-      { refetchQueries: REFETCH_POST_LISTS },
+      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
   useDelete() {
     return useMutation<DeletePostMutation, DeletePostMutationVariables>(
       DeletePostDocument,
-      { refetchQueries: REFETCH_POST_LISTS },
+      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
