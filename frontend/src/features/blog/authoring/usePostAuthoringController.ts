@@ -1,32 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type ReactQuill from "react-quill";
-import { useMutation } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
-import {
-  CreatePostDocument,
-  GeneratePostContentDocument,
-  GenerateTagsDocument,
-  UpdatePostDocument,
-  type UpdatePostInput,
-} from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage, POST_LIST_QUERY_NAMES } from "@/shared/api";
-import {
-  createPostSchema,
-  updatePostSchema,
-  type CreatePostFormValues,
-  type UpdatePostFormValues,
-} from "@/features/blog/authoring/model/post.schema";
 import { useToast } from "@/shared/ui/hooks/useToast";
-import { useImageUpload } from "@/entities/upload";
+import { toPlainText } from "@/entities/post/lib";
 import {
-  MIN_PROMPT_LENGTH,
-  MIN_TAG_BODY_LENGTH,
-  MIN_TAG_TITLE_LENGTH,
-  normalizeTags,
-  toPlainText,
-} from "@/entities/post/lib";
-import { reportZodIssues } from "./lib/post-validation";
+  isSubmitInFlight,
+  submitLabel as deriveSubmitLabel,
+  type PostAuthoringSubmitState,
+} from "./model/submit-state";
+import { usePostAIDraft } from "./hooks/usePostAIDraft";
+import { usePostImageUploader } from "./hooks/usePostImageUploader";
+import { usePostTagInput } from "./hooks/usePostTagInput";
+import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
 
 export type PostAuthoringMode = "create" | "edit";
 
@@ -60,6 +45,7 @@ export interface PostAuthoringState {
   canGenerateTags: boolean;
   isSubmitting: boolean;
   submitLabel: string;
+  submit: PostAuthoringSubmitState;
   postPrompt: string;
   generatedSummary: string | null;
   isSummaryVisible: boolean;
@@ -100,9 +86,7 @@ export interface PostAuthoringController {
     quillRef: React.MutableRefObject<ReactQuill | null>;
     cardImageInputRef: React.MutableRefObject<HTMLInputElement | null>;
   };
-};
-
-const REFETCH_POST_LISTS = POST_LIST_QUERY_NAMES;
+}
 
 export const usePostAuthoringController = ({
   mode,
@@ -115,354 +99,40 @@ export const usePostAuthoringController = ({
 
   const [title, setTitle] = useState(post?.title ?? "");
   const [content, setContent] = useState(post?.body ?? "");
-  const [cardImage, setCardImage] = useState<File | null>(null);
-  const [cardImageUrl, setCardImageUrl] = useState<string | null>(
-    post?.imageUrl ?? null,
-  );
-  const [cardImagePreview, setCardImagePreview] = useState<string | null>(
-    post?.imageUrl ?? null,
-  );
-  const [tags, setTags] = useState<string[]>(
-    post?.tags.map((tag) => tag.name) ?? [],
-  );
-  const [newTag, setNewTag] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [postPrompt, setPostPrompt] = useState("");
-  const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
-  const [isSummaryVisible, setIsSummaryVisible] = useState(false);
-
-  const quillRef = useRef<ReactQuill>(null);
-  const cardImageInputRef = useRef<HTMLInputElement>(null);
-
-  const [createPost, { loading: isCreatingPost }] = useMutation(
-    CreatePostDocument,
-    { refetchQueries: REFETCH_POST_LISTS },
-  );
-  const [updatePost, { loading: isUpdating }] = useMutation(
-    UpdatePostDocument,
-    { refetchQueries: REFETCH_POST_LISTS },
-  );
-  const [generateTags, { loading: isGeneratingTags }] = useMutation(
-    GenerateTagsDocument,
-  );
-  const [generatePostContent, { loading: isGeneratingPost }] = useMutation(
-    GeneratePostContentDocument,
-  );
-
-  const { upload: uploadCardImage, isUploading: isUploadingCardImage } =
-    useImageUpload();
-  const { upload: uploadRichTextImage, isUploading: isUploadingRichText } =
-    useImageUpload();
 
   const contentText = useMemo(() => toPlainText(content), [content]);
+  const cardImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  const canGenerateTags =
-    title.trim().length >= MIN_TAG_TITLE_LENGTH &&
-    contentText.length >= MIN_TAG_BODY_LENGTH;
-  const canGeneratePost = postPrompt.trim().length >= MIN_PROMPT_LENGTH;
+  const tagInput = usePostTagInput({
+    initialTags: post?.tags.map((tag) => tag.name) ?? [],
+    title,
+    contentText,
+  });
 
-  const isSubmitting = isUploadingCardImage || isCreatingPost || isUpdating;
+  const imageUploader = usePostImageUploader({
+    initialImageUrl: post?.imageUrl ?? null,
+    isEdit,
+  });
 
-  const submitLabel = isUploadingCardImage
-    ? "Uploading..."
-    : isCreatingPost
-      ? "Publishing..."
-      : isUpdating
-        ? "Saving..."
-        : isEdit
-          ? "Save Changes"
-          : "Publish Post";
+  const aiDraft = usePostAIDraft({
+    onTitleChange: setTitle,
+    onContentChange: setContent,
+    onTagsChange: tagInput.replaceTags,
+  });
 
-  const handleCardImageChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setCardImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCardImagePreview(
-        typeof reader.result === "string" ? reader.result : null,
-      );
-    };
-    reader.readAsDataURL(file);
-    if (!isEdit) {
-      setCardImageUrl(null);
-    }
-  };
-
-  const uploadCardImageToCloudinary = async (): Promise<string | null> => {
-    if (!cardImage) {
-      toast({
-        title: "No Card Image",
-        description: "Please select an image for the blog card.",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const secureUrl = await uploadCardImage(cardImage, {
-      loadingTitle: "Uploading Card Image...",
-      successTitle: "Card Image Uploaded",
-      errorTitle: "Card Image Upload Failed",
-    });
-
-    if (secureUrl) {
-      setCardImageUrl(secureUrl);
-    }
-    return secureUrl;
-  };
-
-  const richTextimageHandler = useCallback(async () => {
-    const input = document.createElement("input");
-    input.setAttribute("type", "file");
-    input.setAttribute("accept", "image/*");
-    input.click();
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const imageUrl = await uploadRichTextImage(file);
-      if (!imageUrl) return;
-      const quill = quillRef.current?.getEditor();
-      if (!quill) return;
-      const range = quill.getSelection(true);
-      quill.insertEmbed(range.index, "image", imageUrl);
-      quill.setSelection(range.index + 1, 0);
-    };
-  }, [uploadRichTextImage]);
-
-  const handleGenerateTags = async () => {
-    if (!canGenerateTags) {
-      toast({
-        title: "Not Enough Content",
-        description:
-          "Add a longer title and more content before generating tags.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data } = await generateTags({
-        variables: { title: title.trim(), body: contentText },
-      });
-      const generated = normalizeTags(data?.generateTags ?? []);
-
-      if (generated.length === 0) {
-        toast({
-          title: "No Tags Generated",
-          description: "Try adding more context and generate again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setTags(normalizeTags([...tags, ...generated]));
-      toast({
-        title: "Tags Generated",
-        description: `Added ${generated.length} tag${generated.length === 1 ? "" : "s"}.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Tag Generation Failed",
-        description: getGraphQLErrorMessage(
-          error,
-          "Unable to generate tags right now.",
-        ),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleGeneratePost = async () => {
-    if (!canGeneratePost) {
-      toast({
-        title: "Prompt Too Short",
-        description: "Provide a longer prompt to generate a full draft.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data } = await generatePostContent({
-        variables: { prompt: postPrompt.trim() },
-      });
-
-      const generated = data?.generatePostContent;
-      if (!generated?.title || !generated?.body) {
-        toast({
-          title: "Incomplete Draft",
-          description: "The generated draft is missing required content.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setTitle(generated.title);
-      setContent(generated.body);
-      setTags(normalizeTags(generated.tags ?? []));
-      setGeneratedSummary(generated.summary ?? null);
-      setIsSummaryVisible(false);
-      toast({
-        title: "Draft Generated",
-        description: "Title, content, and tags have been updated.",
-      });
-    } catch (error) {
-      toast({
-        title: "Post Generation Failed",
-        description: getGraphQLErrorMessage(
-          error,
-          "Unable to generate a draft right now.",
-        ),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAddTag = () => {
-    const trimmed = newTag.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setNewTag("");
-      setIsDialogOpen(false);
-      return;
-    }
-    if (!trimmed) {
-      toast({
-        title: "Empty Tag",
-        description: "Tag cannot be empty.",
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({
-      title: "Duplicate Tag",
-      description: "This tag has already been added.",
-      variant: "destructive",
-    });
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter((tag) => tag !== tagToRemove));
-  };
-
-  const handleCreateSubmit = async (
-    event: React.FormEvent,
-  ): Promise<void> => {
-    event.preventDefault();
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle || !contentText) {
-      toast({
-        title: "Missing Information",
-        description: "Title and content are required.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    let finalCardImageUrl = cardImageUrl;
-    if (cardImage && !finalCardImageUrl) {
-      finalCardImageUrl = await uploadCardImageToCloudinary();
-      if (!finalCardImageUrl) return;
-    }
-
-    if (!finalCardImageUrl) {
-      toast({
-        title: "Missing Card Image",
-        description: "Please upload a card image for the blog.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const candidate: CreatePostFormValues = {
-      title: trimmedTitle,
-      body: content,
-      summary: generatedSummary?.trim() || undefined,
-      tags,
-      imageUrl: finalCardImageUrl,
-    };
-
-    try {
-      const parsed = createPostSchema.parse(candidate);
-      await createPost({ variables: { input: parsed } });
-      toast({ title: "Blog Created", description: "Successfully created." });
-      navigate("/");
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        reportZodIssues(toast, error.issues);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: getGraphQLErrorMessage(
-          error,
-          "Failed to create blog post.",
-        ),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEditSubmit = async (
-    event: React.FormEvent,
-  ): Promise<void> => {
-    event.preventDefault();
-    if (!post) return;
-
-    let finalImageUrl = cardImageUrl;
-    if (cardImage) {
-      const uploadedUrl = await uploadCardImage(cardImage, {
-        loadingTitle: "Uploading featured image...",
-        successTitle: "Image uploaded",
-      });
-      if (!uploadedUrl) return;
-      finalImageUrl = uploadedUrl;
-    }
-
-    const originalTagNames = post.tags.map((tag) => tag.name);
-    const updateData: Partial<UpdatePostFormValues> = {};
-    if (title !== post.title) updateData.title = title;
-    if (content !== post.body) updateData.body = content;
-    if (JSON.stringify(tags) !== JSON.stringify(originalTagNames)) {
-      updateData.tags = tags;
-    }
-    if (finalImageUrl !== post.imageUrl) updateData.imageUrl = finalImageUrl;
-
-    if (Object.keys(updateData).length === 0) {
-      toast({ title: "No Changes", description: "No changes detected." });
-      onComplete?.();
-      return;
-    }
-
-    try {
-      const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
-      await updatePost({ variables: { id: post.id, input: parsedInput } });
-      toast({ title: "Success", description: "Post updated successfully." });
-      onComplete?.();
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        reportZodIssues(toast, error.issues);
-        return;
-      }
-      toast({
-        title: "Update Failed",
-        description: getGraphQLErrorMessage(
-          error,
-          "Could not update post.",
-        ),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSubmit = async (
-    event: React.FormEvent,
-  ): Promise<void> => {
-    if (isEdit) return handleEditSubmit(event);
-    return handleCreateSubmit(event);
-  };
+  const submitController = usePostAuthoringSubmit({
+    mode,
+    post,
+    title,
+    content,
+    contentText,
+    imageFile: imageUploader.file,
+    imageUrl: imageUploader.url,
+    tags: tagInput.tags,
+    summary: aiDraft.summary,
+    uploadCardImage: () => imageUploader.uploadCardImage(),
+    onComplete,
+  });
 
   const handleCancel = () => {
     if (isEdit) {
@@ -473,66 +143,59 @@ export const usePostAuthoringController = ({
     navigate("/");
   };
 
-  const clearAIDraft = () => {
-    setPostPrompt("");
-    setGeneratedSummary(null);
-    setIsSummaryVisible(false);
-  };
-
-  const toggleSummary = () => setIsSummaryVisible((value) => !value);
-
   return {
     state: {
       mode,
       title,
       content,
-      cardImage,
-      cardImageUrl,
-      cardImagePreview,
-      isUploadingCardImage,
-      isUploadingRichText,
-      tags,
-      newTag,
-      isDialogOpen,
-      isGeneratingTags,
-      canGenerateTags,
-      isSubmitting,
-      submitLabel,
-      postPrompt,
-      generatedSummary,
-      isSummaryVisible,
-      isGeneratingPost,
-      canGeneratePost,
+      cardImage: imageUploader.file,
+      cardImageUrl: imageUploader.url,
+      cardImagePreview: imageUploader.preview,
+      isUploadingCardImage: imageUploader.isCardUploading,
+      isUploadingRichText: imageUploader.isRichTextUploading,
+      tags: tagInput.tags,
+      newTag: tagInput.newTag,
+      isDialogOpen: tagInput.isDialogOpen,
+      isGeneratingTags: tagInput.isGenerating,
+      canGenerateTags: tagInput.canGenerate,
+      isSubmitting: isSubmitInFlight(submitController.submit),
+      submitLabel: deriveSubmitLabel(submitController.submit, isEdit),
+      submit: submitController.submit,
+      postPrompt: aiDraft.prompt,
+      generatedSummary: aiDraft.summary,
+      isSummaryVisible: aiDraft.isSummaryVisible,
+      isGeneratingPost: aiDraft.isGenerating,
+      canGeneratePost: aiDraft.canGenerate,
       contentText,
       isTitleReady: title.trim().length > 0,
       isContentReady: contentText.length > 0,
       isCoverImageReady: Boolean(
-        cardImage || cardImageUrl || cardImagePreview,
+        imageUploader.file || imageUploader.url || imageUploader.preview,
       ),
     },
     setters: {
       setTitle,
       setContent,
-      setNewTag,
-      setIsDialogOpen,
-      setPostPrompt,
-      setGeneratedSummary,
-      setIsSummaryVisible,
+      setNewTag: tagInput.setNewTag,
+      setIsDialogOpen: tagInput.setIsDialogOpen,
+      setPostPrompt: aiDraft.setPrompt,
+      setGeneratedSummary: aiDraft.setSummary,
+      setIsSummaryVisible: aiDraft.setIsSummaryVisible,
     },
     handlers: {
-      handleCardImageChange,
-      handleGenerateTags,
-      handleAddTag,
-      handleRemoveTag,
-      handleSubmit,
+      handleCardImageChange: imageUploader.handleFileChange,
+      handleGenerateTags: tagInput.generateTags,
+      handleAddTag: tagInput.addTag,
+      handleRemoveTag: tagInput.removeTag,
+      handleSubmit: submitController.handleSubmit,
       handleCancel,
-      handleGeneratePost,
-      richTextimageHandler,
-      clearAIDraft,
-      toggleSummary,
+      handleGeneratePost: aiDraft.generate,
+      richTextimageHandler: imageUploader.richTextImageHandler,
+      clearAIDraft: aiDraft.clear,
+      toggleSummary: aiDraft.toggleSummary,
     },
     refs: {
-      quillRef,
+      quillRef: imageUploader.quillRef,
       cardImageInputRef,
     },
   };
