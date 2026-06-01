@@ -4,8 +4,8 @@ import type React from "react";
 import { CheckCircle2, Circle, FileText, ImageIcon, Sparkles, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StickyNavbar } from "@/layouts";
-import { 
-  useCreateBlog,
+import {
+  usePostAuthoringController,
   BlogEditor,
   BlogTitleSection,
   AIDraftGenerator,
@@ -14,21 +14,13 @@ import {
 } from "@/features/blog";
 
 const CreateNewBlog: React.FC = () => {
-  const { state, setters, handlers, refs } = useCreateBlog();
-  const contentText = state.content
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const { state, setters, handlers, refs } = usePostAuthoringController({
+    mode: "create",
+  });
+  const { contentText } = state;
   const titleReady = state.title.trim().length > 0;
   const contentReady = contentText.length > 0;
   const imageReady = Boolean(state.cardImage || state.cardImageUrl || state.cardImagePreview);
-  const publishDisabled = state.isUploadingCardImage || state.isCreatingPost;
-  const publishLabel = state.isUploadingCardImage
-    ? "Uploading..."
-    : state.isCreatingPost
-      ? "Publishing..."
-      : "Publish Post";
 
   return (
     <div className="min-h-screen bg-surface text-foreground">
@@ -74,14 +66,10 @@ const CreateNewBlog: React.FC = () => {
                 onGenerate={handlers.handleGeneratePost}
                 isGenerating={state.isGeneratingPost}
                 canGenerate={state.canGeneratePost}
-                onClear={() => {
-                  setters.setPostPrompt("");
-                  setters.setGeneratedSummary(null);
-                  setters.setIsSummaryVisible(false);
-                }}
+                onClear={handlers.clearAIDraft}
                 summary={state.generatedSummary}
                 isSummaryVisible={state.isSummaryVisible}
-                onToggleSummary={() => setters.setIsSummaryVisible(!state.isSummaryVisible)}
+                onToggleSummary={handlers.toggleSummary}
               />
 
               <FeaturedImageSection
@@ -158,10 +146,10 @@ const CreateNewBlog: React.FC = () => {
                 <div className="mt-5 grid gap-3">
                   <Button
                     type="submit"
-                    disabled={publishDisabled}
+                    disabled={state.isSubmitting}
                     className="w-full"
                   >
-                    {publishLabel}
+                    {state.submitLabel}
                   </Button>
                   <Button
                     type="button"
