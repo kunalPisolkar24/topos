@@ -6,7 +6,7 @@ import {
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { onError } from "@apollo/client/link/error";
 import { setContext } from "@apollo/client/link/context";
-import { buildApolloCache } from "./policies";
+import { buildApolloCache } from "./apollo/cache";
 import {
   buildAuthHeaders,
   hasUnauthorizedGraphQLError,

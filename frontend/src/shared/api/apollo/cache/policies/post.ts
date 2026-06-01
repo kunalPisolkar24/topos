@@ -1,5 +1,4 @@
-import type { FieldPolicy } from "@apollo/client";
-import { InMemoryCache } from "@apollo/client";
+import type { FieldPolicy, TypePolicy } from "@apollo/client";
 
 interface PaginatedPosts {
   __typename?: "PaginatedPosts";
@@ -17,7 +16,7 @@ const paginatedPostListKeyArgs = (args: Record<string, unknown> | null) => {
   return `tag:${String(tag)}|page:${String(page)}|limit:${String(limit)}`;
 };
 
-const mergePaginatedPostLists = (
+export const mergePaginatedPostLists = (
   existing: unknown,
   incoming: unknown,
   { args }: { args: Record<string, unknown> | null },
@@ -58,48 +57,21 @@ const paginatedPostListPolicy = (): FieldPolicy => ({
   merge: mergePaginatedPostLists,
 });
 
-const buildPostFieldPolicy = (): FieldPolicy => ({
+const postFieldPolicy = (): FieldPolicy => ({
   keyArgs: ["id"],
   merge: false,
 });
 
-export const buildApolloCache = () => {
-  return new InMemoryCache({
-    typePolicies: {
-      Post: {
-        keyFields: ["id"],
-      },
-      Tag: {
-        keyFields: ["id"],
-      },
-      SearchResult: {
-        keyFields: false,
-      },
-      User: {
-        keyFields: ["id"],
-        fields: {
-          posts: {
-            keyArgs: ["page", "limit"],
-            merge: mergePaginatedPostLists,
-          },
-        },
-      },
-      Query: {
-        fields: {
-          me: { merge: false },
-          post: buildPostFieldPolicy(),
-          posts: paginatedPostListPolicy(),
-          postsByTag: paginatedPostListPolicy(),
-          searchPosts: {
-            keyArgs: ["query", ["page"], ["limit"]],
-            merge: false,
-          },
-          tags: {
-            keyArgs: ["query", "limit"],
-            merge: false,
-          },
-        },
-      },
-    },
-  });
+export const postTypePolicy: TypePolicy = {
+  keyFields: ["id"],
+};
+
+export const postQueryFieldPolicies: Record<string, FieldPolicy> = {
+  post: postFieldPolicy(),
+  posts: paginatedPostListPolicy(),
+  postsByTag: paginatedPostListPolicy(),
+  searchPosts: {
+    keyArgs: ["query", ["page"], ["limit"]],
+    merge: false,
+  },
 };
