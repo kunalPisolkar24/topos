@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/entities/session";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar } from "@/widgets";
 import {
   useProfileEditorController,
   useUserPosts,

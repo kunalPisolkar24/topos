@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar } from "@/widgets";
 import { BlogCard } from "@/features/blog";
 import { BlogCardSkeleton } from "@/components/skeletons";
 import {

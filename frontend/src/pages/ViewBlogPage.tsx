@@ -3,17 +3,17 @@
 import type React from "react";
 import { Sparkles } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar } from "@/widgets";
 import { ViewBlogPageSkeleton } from "@/components/skeletons";
 import {
   usePostViewerController,
-  BlogAuthorSidebar,
   BlogEditForm,
   AISummaryDialog,
   BlogHeader,
   BlogBody,
   type PostForEditing,
 } from "@/features/blog";
+import { BlogAuthorSidebar } from "@/widgets";
 import { useCurrentUser } from "@/entities/session";
 
 const ViewBlogPage: React.FC = () => {

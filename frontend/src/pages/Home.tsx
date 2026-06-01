@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar } from "@/widgets";
 import { BlogList } from "@/features/blog";
 import { SearchBar } from "@/features/search";
 import { ErrorBoundary } from "@/components/utils";

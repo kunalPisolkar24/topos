@@ -2,8 +2,8 @@ import type React from "react";
 import { useRef } from "react";
 import { CheckCircle2, Circle, FileText, ImageIcon, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BlogEditor } from "@/widgets";
 import {
-  BlogEditor,
   BlogTitleSection,
   FeaturedImageSection,
   BlogTagSection,

@@ -3,10 +3,9 @@
 import type React from "react";
 import { CheckCircle2, Circle, FileText, ImageIcon, Sparkles, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar, BlogEditor } from "@/widgets";
 import {
   usePostAuthoringController,
-  BlogEditor,
   BlogTitleSection,
   AIDraftGenerator,
   FeaturedImageSection,

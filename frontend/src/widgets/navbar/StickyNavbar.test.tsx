@@ -1,7 +1,7 @@
 import { HttpResponse, graphql } from "msw";
 import userEvent from "@testing-library/user-event";
 import { screen } from "@testing-library/react";
-import { StickyNavbar } from "@/layouts";
+import { StickyNavbar } from "./StickyNavbar";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { sessionStoreActions } from "@/entities/session";
