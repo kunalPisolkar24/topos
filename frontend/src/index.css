@@ -414,7 +414,7 @@ html, body {
 }
 
 .quill-content-view {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: break-word;
 }
 
