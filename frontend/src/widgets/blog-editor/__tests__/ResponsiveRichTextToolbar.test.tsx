@@ -226,4 +226,37 @@ describe("ResponsiveRichTextToolbar", () => {
 
     expect(quill.format).toHaveBeenCalledWith("header", 2);
   });
+
+  it("does not steal focus from sibling inputs when the editor selection changes", async () => {
+    const quill = createMockQuill();
+    quill.getSelection.mockReturnValue(null);
+    render(<ResponsiveRichTextToolbar quillRef={makeRef(quill)} />);
+
+    quill.focus.mockClear();
+    quill.getFormat.mockClear();
+
+    await act(async () => {
+      quill.__emit("selection-change");
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
+    });
+
+    expect(quill.focus).not.toHaveBeenCalled();
+    expect(quill.getFormat).not.toHaveBeenCalledWith();
+  });
+
+  it("reads format state at the current selection range, not via the focusing default", async () => {
+    const quill = createMockQuill();
+    quill.getSelection.mockReturnValue({ index: 3, length: 7 });
+    render(<ResponsiveRichTextToolbar quillRef={makeRef(quill)} />);
+
+    quill.getFormat.mockClear();
+
+    await act(async () => {
+      quill.__emit("text-change");
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
+    });
+
+    expect(quill.getFormat).toHaveBeenCalledWith(3, 7);
+    expect(quill.focus).not.toHaveBeenCalled();
+  });
 });

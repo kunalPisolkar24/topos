@@ -112,8 +112,14 @@ const INITIAL_STATE: FormatState = {
   background: "",
 };
 
-function readFormatState(quill: Quill): FormatState {
-  const formats = quill.getFormat() as Record<string, unknown>;
+function readFormatState(
+  quill: Quill,
+  range: { index: number; length: number },
+): FormatState {
+  const formats = quill.getFormat(range.index, range.length) as Record<
+    string,
+    unknown
+  >;
   const header = formats.header;
   const indent = Number(formats.indent ?? 0);
 
@@ -133,12 +139,52 @@ function readFormatState(quill: Quill): FormatState {
   };
 }
 
+function isSameFormatState(prev: FormatState, next: FormatState): boolean {
+  return (
+    prev.bold === next.bold &&
+    prev.italic === next.italic &&
+    prev.underline === next.underline &&
+    prev.list === next.list &&
+    prev.blockquote === next.blockquote &&
+    prev.codeBlock === next.codeBlock &&
+    prev.header === next.header &&
+    prev.align === next.align &&
+    prev.indent === next.indent &&
+    prev.color === next.color &&
+    prev.background === next.background
+  );
+}
+
+function commitFormatState(
+  prev: FormatState,
+  editor: Quill,
+  range: { index: number; length: number },
+): FormatState {
+  const next = readFormatState(editor, range);
+  return isSameFormatState(prev, next) ? prev : next;
+}
+
 function getEditor(quillRef: MutableRefObject<ReactQuill | null>): Quill | null {
   const instance = quillRef.current;
   if (!instance) return null;
   if (typeof instance.getEditor !== "function") return null;
   const editor = instance.getEditor();
   return editor ?? null;
+}
+
+function getCurrentRange(editor: Quill): { index: number; length: number } | null {
+  if (typeof editor.getSelection !== "function") return null;
+  const range = editor.getSelection();
+  if (!range) return null;
+  if (typeof range.index !== "number" || typeof range.length !== "number") {
+    return null;
+  }
+  return range;
+}
+
+function focusIfNeeded(editor: Quill): void {
+  if (typeof editor.hasFocus === "function" && editor.hasFocus()) return;
+  editor.focus();
 }
 
 export interface ResponsiveRichTextToolbarProps {
@@ -159,7 +205,9 @@ export function ResponsiveRichTextToolbar({
     const editor = getEditor(quillRef);
     if (!editor) return;
     editorRef.current = editor;
-    setState(readFormatState(editor));
+    const range = getCurrentRange(editor);
+    if (!range) return;
+    setState((prev) => commitFormatState(prev, editor, range));
   }, [quillRef]);
 
   const scheduleRefresh = useCallback(() => {
@@ -176,7 +224,10 @@ export function ResponsiveRichTextToolbar({
       const editor = getEditor(quillRef);
       if (!editor) return false;
       editorRef.current = editor;
-      setState(readFormatState(editor));
+      const range = getCurrentRange(editor);
+      if (range) {
+        setState((prev) => commitFormatState(prev, editor, range));
+      }
       editor.on("selection-change", scheduleRefresh);
       editor.on("text-change", scheduleRefresh);
       return true;
@@ -202,9 +253,10 @@ export function ResponsiveRichTextToolbar({
     (format: string, value: unknown) => {
       const editor = editorRef.current ?? getEditor(quillRef);
       if (!editor) return;
-      editor.focus();
+      focusIfNeeded(editor);
       editor.format(format, value);
-      setState(readFormatState(editor));
+      const range = getCurrentRange(editor) ?? { index: 0, length: 0 };
+      setState((prev) => commitFormatState(prev, editor, range));
     },
     [quillRef],
   );
@@ -212,24 +264,26 @@ export function ResponsiveRichTextToolbar({
   const removeFormat = useCallback(() => {
     const editor = editorRef.current ?? getEditor(quillRef);
     if (!editor) return;
-    editor.focus();
+    focusIfNeeded(editor);
     editor.removeFormat(0, editor.getLength());
-    setState(readFormatState(editor));
+    const range = getCurrentRange(editor) ?? { index: 0, length: 0 };
+    setState((prev) => commitFormatState(prev, editor, range));
   }, [quillRef]);
 
   const applyLink = useCallback(() => {
     const editor = editorRef.current ?? getEditor(quillRef);
     if (!editor) return;
-    editor.focus();
+    focusIfNeeded(editor);
     const tooltip = editor.getModule("tooltip") as
       | { editLink?: () => void }
       | undefined;
     if (tooltip?.editLink) {
       tooltip.editLink();
-      setState(readFormatState(editor));
+      const range = getCurrentRange(editor) ?? { index: 0, length: 0 };
+      setState((prev) => commitFormatState(prev, editor, range));
       return;
     }
-    const range = editor.getSelection();
+    const range = getCurrentRange(editor);
     if (!range) return;
     const value = window.prompt("Enter link URL", "https://");
     if (value === null) return;
@@ -238,7 +292,7 @@ export function ResponsiveRichTextToolbar({
     } else {
       editor.format("link", value);
     }
-    setState(readFormatState(editor));
+    setState((prev) => commitFormatState(prev, editor, range));
   }, [quillRef]);
 
   const cycleAlignment = useCallback(() => {
@@ -248,9 +302,10 @@ export function ResponsiveRichTextToolbar({
       (entry) => entry.value === state.align,
     );
     const next = ALIGNMENT_CYCLE[(currentIndex + 1) % ALIGNMENT_CYCLE.length];
-    editor.focus();
+    focusIfNeeded(editor);
     editor.format("align", next.value === "" ? false : next.value);
-    setState(readFormatState(editor));
+    const range = getCurrentRange(editor) ?? { index: 0, length: 0 };
+    setState((prev) => commitFormatState(prev, editor, range));
   }, [quillRef, state.align]);
 
   const handleImage = useCallback(() => {
