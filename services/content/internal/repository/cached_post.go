@@ -201,3 +201,63 @@ func (r *cachedPostRepo) invalidate(ctx context.Context, id string) error {
 	monitoring.RecordCacheDel()
 	return nil
 }
+
+func (r *cachedPostRepo) deleteByPattern(ctx context.Context, pattern string) error {
+	keys, err := r.scanKeys(ctx, pattern)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	if err := r.redis.Del(ctx, keys...).Err(); err != nil {
+		logger.Error("Critical: Failed to invalidate list cache", "pattern", pattern, "error", err)
+		return fmt.Errorf("failed to invalidate list cache %q: %w", pattern, err)
+	}
+	monitoring.RecordCacheDel()
+	return nil
+}
+
+func (r *cachedPostRepo) scanKeys(ctx context.Context, pattern string) ([]string, error) {
+	var (
+		cursor  uint64
+		keys    []string
+		batch   []string
+		iterErr error
+	)
+	for {
+		batch, cursor, iterErr = r.redis.Scan(ctx, cursor, pattern, 100).Result()
+		if iterErr != nil {
+			return nil, fmt.Errorf("failed to scan keys for pattern %q: %w", pattern, iterErr)
+		}
+		keys = append(keys, batch...)
+		if cursor == 0 {
+			break
+		}
+	}
+	return keys, nil
+}
+
+func (r *cachedPostRepo) invalidateAllLists(ctx context.Context) error {
+	return r.deleteByPattern(ctx, "posts:all:*")
+}
+
+func (r *cachedPostRepo) invalidateAuthorAndTagLists(ctx context.Context, authorID string, tags []string) error {
+	if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:author:%s:*", authorID)); err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:tag:%s:*", tag)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
