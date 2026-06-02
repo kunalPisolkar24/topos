@@ -82,7 +82,7 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
               </Avatar>
             )}
             <div className="min-w-0">
-              <h2 className="break-words text-xl font-semibold tracking-[-0.04em] text-foreground [overflow-wrap:anywhere]">
+              <h2 className="break-words text-xl font-semibold tracking-[-0.04em] text-foreground">
                 {author.name || author.username}
               </h2>
               <p className="mt-1 break-all font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted-foreground">
@@ -112,7 +112,7 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
                 <>
                   <p
                     className={cn(
-                      "whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+                      "whitespace-pre-wrap break-words",
                       !bioExpanded && hasLongBio && "line-clamp-4",
                     )}
                   >

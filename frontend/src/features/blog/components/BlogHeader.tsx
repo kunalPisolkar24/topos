@@ -56,7 +56,7 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
             Article // Topos
           </p>
-          <h1 className="mt-4 max-w-5xl text-balance break-words text-2xl font-semibold leading-[1.05] tracking-[-0.025em] text-foreground [overflow-wrap:anywhere] sm:text-3xl md:text-4xl lg:text-5xl">
+          <h1 className="mt-4 max-w-5xl text-balance break-words text-2xl font-semibold leading-[1.05] tracking-[-0.025em] text-foreground sm:text-3xl md:text-4xl lg:text-5xl">
             {title}
           </h1>
           <div className="mt-6 flex flex-wrap gap-2 font-mono text-[0.625rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
