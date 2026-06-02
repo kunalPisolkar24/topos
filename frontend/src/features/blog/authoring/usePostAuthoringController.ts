@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import type ReactQuill from "react-quill";
+import type ReactQuill from "react-quill-new";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { toPlainText } from "@/entities/post/lib";

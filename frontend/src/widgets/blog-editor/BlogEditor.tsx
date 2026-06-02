@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useMemo, useRef, type MutableRefObject } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import { FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveRichTextToolbar } from "./ResponsiveRichTextToolbar";

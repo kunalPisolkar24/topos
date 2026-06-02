@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type ReactQuill from "react-quill";
+import type ReactQuill from "react-quill-new";
 import { useImageUpload } from "@/entities/upload";
 import { useToast } from "@/shared/ui/hooks/useToast";
 
