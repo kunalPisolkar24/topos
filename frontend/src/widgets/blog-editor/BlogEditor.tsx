@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useRef, type MutableRefObject } from "react";
+import { forwardRef, useCallback, useMemo, useRef, type MutableRefObject } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { FileText } from "lucide-react";
@@ -53,12 +53,15 @@ export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
     );
 
     const localRef = useRef<ReactQuill | null>(null);
-    const toolbarRef = useMemo<MutableRefObject<ReactQuill | null>>(
-      () =>
-        typeof forwardedRef === "object" &&
-        forwardedRef !== null
-          ? (forwardedRef as MutableRefObject<ReactQuill | null>)
-          : localRef,
+    const setQuillRef = useCallback(
+      (node: ReactQuill | null) => {
+        localRef.current = node;
+        if (typeof forwardedRef === "function") {
+          forwardedRef(node);
+        } else if (forwardedRef && typeof forwardedRef === "object") {
+          (forwardedRef as MutableRefObject<ReactQuill | null>).current = node;
+        }
+      },
       [forwardedRef],
     );
 
@@ -79,25 +82,17 @@ export const BlogEditor = forwardRef<ReactQuill, BlogEditorProps>(
         <CardContent className="p-4 sm:p-5">
           <div className="blog-content-editor-wrapper overflow-hidden ring-1 ring-outline-variant/20">
             <ResponsiveRichTextToolbar
-              quillRef={toolbarRef}
+              quillRef={localRef}
               onImageUpload={onImageUpload}
             />
             <ReactQuill
-              ref={(node) => {
-                localRef.current = node;
-                if (typeof forwardedRef === "function") {
-                  forwardedRef(node);
-                } else if (forwardedRef && typeof forwardedRef === "object") {
-                  (forwardedRef as MutableRefObject<ReactQuill | null>).current = node;
-                }
-              }}
+              ref={setQuillRef}
               theme="snow"
               value={value}
               onChange={onChange}
               modules={modules}
               formats={formats}
               placeholder={placeholder}
-              bounds=".blog-content-editor-wrapper"
             />
           </div>
         </CardContent>
