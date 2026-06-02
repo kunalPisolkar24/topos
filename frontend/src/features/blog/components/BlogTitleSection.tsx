@@ -33,7 +33,7 @@ export const BlogTitleSection: React.FC<BlogTitleSectionProps> = ({ value, onCha
           placeholder="Write a clear, specific headline..."
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="mt-2 h-auto bg-surface-lowest px-4 py-4 text-2xl font-semibold leading-tight tracking-[-0.04em] placeholder:text-muted-foreground md:text-3xl"
+          className="blog-title-input mt-2 h-auto bg-surface-lowest px-4 py-4 text-2xl font-semibold leading-tight tracking-[-0.04em] placeholder:text-muted-foreground md:text-3xl"
           required
         />
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
