@@ -82,7 +82,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
                 >
                   {title}
                 </h2>
-                <p className="line-clamp-3 max-w-3xl text-[0.95rem] leading-7 tracking-[0.01em] text-muted-foreground sm:text-[1rem]">
+                <p className="line-clamp-3 max-w-3xl min-w-0 break-words text-[0.95rem] leading-7 tracking-[0.01em] text-muted-foreground sm:text-[1rem]">
                   {snippet}
                 </p>
               </div>
