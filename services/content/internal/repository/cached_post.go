@@ -96,10 +96,11 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		if res.Err != nil {
 			return nil, res.Err
 		}
-		if res.Val == nil {
+		post, ok := res.Val.(*domain.Post)
+		if !ok || post == nil {
 			return nil, mongo.ErrNoDocuments
 		}
-		return res.Val.(*domain.Post), nil
+		return post, nil
 	}
 }
 
@@ -110,9 +111,13 @@ func (r *cachedPostRepo) findByIDInternal(ctx context.Context, key, id string) (
 			if setErr := r.redis.Set(context.Background(), key, notFoundMarker, notFoundTTL).Err(); setErr == nil {
 				monitoring.RecordCacheSet()
 			}
-			return nil, nil
+			return nil, mongo.ErrNoDocuments
 		}
 		return nil, err
+	}
+
+	if post == nil {
+		return nil, mongo.ErrNoDocuments
 	}
 
 	if data, marshalErr := json.Marshal(post); marshalErr == nil {
