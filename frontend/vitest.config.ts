@@ -24,5 +24,22 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/test/setup.ts",
     css: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/main.tsx",
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.spec.{ts,tsx}",
+        "src/test/**",
+        "src/graphql/generated/**",
+        "src/**/types.ts",
+        "src/**/index.ts",
+        "src/**/*.d.ts",
+        "src/vite-env.d.ts",
+      ],
+    },
   },
 });
