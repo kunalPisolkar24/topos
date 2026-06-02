@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func newTestRedis() (*miniredis.Miniredis, *redis.Client) {
@@ -67,6 +69,56 @@ func TestCachedPostRepo_FindByID(t *testing.T) {
 		inCache, err := mr.Get("post:" + postID)
 		assert.NoError(t, err)
 		assert.Contains(t, inCache, "Cached Title")
+
+		fallbackMock.AssertExpectations(t)
+	})
+
+	t.Run("CacheMiss_NotFound_ReturnsErrNoDocuments", func(t *testing.T) {
+		mr.FlushAll()
+
+		fallbackMock := new(mocks.PostRepository)
+		fallbackMock.On("FindByID", mock.Anything, postID).Return(nil, mongo.ErrNoDocuments)
+
+		repo := NewCachedPostRepository(fallbackMock, rdb)
+
+		got, err := repo.FindByID(ctx, postID)
+
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, mongo.ErrNoDocuments))
+
+		cached, getErr := mr.Get("post:" + postID)
+		assert.NoError(t, getErr)
+		assert.Equal(t, "NF", cached)
+
+		fallbackMock.AssertExpectations(t)
+	})
+
+	t.Run("CacheHit_NotFoundMarker_ReturnsErrNoDocuments", func(t *testing.T) {
+		mr.FlushAll()
+		_ = mr.Set("post:"+postID, "NF")
+
+		fallbackMock := new(mocks.PostRepository)
+		repo := NewCachedPostRepository(fallbackMock, rdb)
+
+		got, err := repo.FindByID(ctx, postID)
+
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, mongo.ErrNoDocuments))
+		fallbackMock.AssertNotCalled(t, "FindByID")
+	})
+
+	t.Run("CacheMiss_FallbackReturnsNilNil_ReturnsErrNoDocuments", func(t *testing.T) {
+		mr.FlushAll()
+
+		fallbackMock := new(mocks.PostRepository)
+		fallbackMock.On("FindByID", mock.Anything, postID).Return(nil, nil)
+
+		repo := NewCachedPostRepository(fallbackMock, rdb)
+
+		got, err := repo.FindByID(ctx, postID)
+
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, mongo.ErrNoDocuments))
 
 		fallbackMock.AssertExpectations(t)
 	})
