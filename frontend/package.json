@@ -37,6 +37,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.71.2",
+    "quill": "2.0.2",
     "react-quill-new": "3.7.0",
     "react-router-dom": "^6.26.1",
     "shadcn": "^4.0.5",
