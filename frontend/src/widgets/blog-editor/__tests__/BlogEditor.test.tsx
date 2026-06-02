@@ -1,7 +1,7 @@
 import { forwardRef, createRef } from "react";
 import { render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type ReactQuill from "react-quill";
+import type ReactQuill from "react-quill-new";
 import { BlogEditor } from "../BlogEditor";
 
 class ResizeObserverMock {
@@ -10,7 +10,7 @@ class ResizeObserverMock {
   unobserve = vi.fn();
 }
 
-vi.mock("react-quill", () => {
+vi.mock("react-quill-new", () => {
   const ReactQuillMock = forwardRef<
     HTMLDivElement,
     { onChange?: (value: string) => void }

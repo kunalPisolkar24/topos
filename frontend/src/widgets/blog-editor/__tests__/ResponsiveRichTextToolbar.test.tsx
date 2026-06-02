@@ -2,7 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { MutableRefObject } from "react";
-import type ReactQuill from "react-quill";
+import type ReactQuill from "react-quill-new";
 import { ResponsiveRichTextToolbar } from "../ResponsiveRichTextToolbar";
 
 class ResizeObserverMock {

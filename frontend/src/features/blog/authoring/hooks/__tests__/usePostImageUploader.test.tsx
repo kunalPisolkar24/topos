@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type React from "react";
-import type ReactQuill from "react-quill";
+import type ReactQuill from "react-quill-new";
 
 const uploadMock = vi.fn();
 const richTextUploadMock = vi.fn();
