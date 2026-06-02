@@ -7,7 +7,7 @@ import {
   UpdatePostDocument,
   type UpdatePostInput,
 } from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage, POST_LIST_QUERY_NAMES } from "@/shared/api";
+import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import {
   createPostSchema,
@@ -82,12 +82,8 @@ export const usePostAuthoringSubmit = ({
   const client = useApolloClient();
   const [submit, dispatch] = useReducer(reducer, { kind: "idle" });
 
-  const [createPost] = useMutation(CreatePostDocument, {
-    refetchQueries: POST_LIST_QUERY_NAMES,
-  });
-  const [updatePost] = useMutation(UpdatePostDocument, {
-    refetchQueries: POST_LIST_QUERY_NAMES,
-  });
+  const [createPost] = useMutation(CreatePostDocument);
+  const [updatePost] = useMutation(UpdatePostDocument);
 
   const handleCreateSubmit = useCallback(
     async (event: React.FormEvent) => {
@@ -134,7 +130,7 @@ export const usePostAuthoringSubmit = ({
         const parsed = createPostSchema.parse(candidate);
         dispatch({ type: "beginCreate" });
         await createPost({ variables: { input: parsed } });
-        await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
+        await refreshPostListQueries(client);
         toast({ title: "Blog Created", description: "Successfully created." });
         dispatch({ type: "resolveIdle" });
         navigate("/");
@@ -206,7 +202,7 @@ export const usePostAuthoringSubmit = ({
         const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
         dispatch({ type: "beginUpdate" });
         await updatePost({ variables: { id: post.id, input: parsedInput } });
-        await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
+        await refreshPostListQueries(client);
         toast({ title: "Success", description: "Post updated successfully." });
         dispatch({ type: "resolveIdle" });
         onComplete?.();

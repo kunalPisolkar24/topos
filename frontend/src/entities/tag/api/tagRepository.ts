@@ -13,7 +13,7 @@ export interface SearchTagsParams {
 }
 
 export const tagRepository = {
-  search({ query, limit = 6, skip }: SearchTagsParams = { query: "" }) {
+  useSearch({ query, limit = 6, skip }: SearchTagsParams = { query: "" }) {
     return useQuery<TagsQuery, TagsQueryVariables>(TagsDocument, {
       variables: { query, limit },
       skip: skip ?? query.length === 0,

@@ -3,42 +3,84 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ApolloProvider } from "@apollo/client/react";
 import { MemoryRouter } from "react-router-dom";
+import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
+import { PostDocument, PostsDocument } from "@/shared/graphql/content-documents";
 import { usePostViewerController } from "../usePostViewerController";
 
 const noopUnauthorized = async () => {};
+const postListVariables = { page: 1, limit: 6 };
+const postVariables = { id: "abc" };
+
+const loadedPost = {
+  __typename: "Post" as const,
+  id: "abc",
+  title: "Some post",
+  body: "<p>body</p>",
+  slug: "some-post",
+  imageUrl: "https://x/y.png",
+  summary: null,
+  summaryStatus: "READY",
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+  author: {
+    __typename: "User" as const,
+    id: "u1",
+    username: "alice",
+    email: "alice@x.com",
+    name: "Alice",
+    bio: null,
+    avatarUrl: null,
+  },
+  tags: [],
+};
+
+const staleListPost = {
+  __typename: "Post" as const,
+  id: "abc",
+  title: "Some post",
+  body: "<p>body</p>",
+  imageUrl: "https://x/y.png",
+  createdAt: "2024-01-01T00:00:00Z",
+  author: {
+    __typename: "User" as const,
+    id: "u1",
+    username: "alice",
+    name: "Alice",
+    avatarUrl: null,
+  },
+  tags: [],
+};
+
+const writeStalePostsCache = (client: ApolloClient) => {
+  client.writeQuery({
+    query: PostsDocument,
+    variables: postListVariables,
+    data: {
+      posts: {
+        __typename: "PaginatedPosts",
+        posts: [staleListPost],
+        totalPages: 1,
+        currentPage: 1,
+        totalPosts: 1,
+      },
+    },
+  });
+};
+
+const hasCacheRecord = (client: ApolloClient, id: string) =>
+  Object.prototype.hasOwnProperty.call(client.cache.extract(false), id);
 
 describe("usePostViewerController", () => {
-  it("refetches post list queries after a successful delete", async () => {
+  it("refreshes post list queries and invalidates stale post cache after a successful delete", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
       graphqlApi.query("Post", () =>
         HttpResponse.json({
           data: {
-            post: {
-              __typename: "Post",
-              id: "abc",
-              title: "Some post",
-              body: "<p>body</p>",
-              slug: "some-post",
-              imageUrl: "https://x/y.png",
-              summary: null,
-              summaryStatus: "READY",
-              createdAt: "2024-01-01T00:00:00Z",
-              updatedAt: "2024-01-01T00:00:00Z",
-              author: {
-                __typename: "User",
-                id: "u1",
-                username: "alice",
-                email: "alice@x.com",
-                name: "Alice",
-                bio: null,
-                avatarUrl: null,
-              },
-              tags: [],
-            },
+            post: loadedPost,
           },
         }),
       ),
@@ -53,6 +95,7 @@ describe("usePostViewerController", () => {
       onUnauthorized: noopUnauthorized,
     });
     const refetchSpy = vi.spyOn(localClient, "refetchQueries");
+    writeStalePostsCache(localClient);
 
     const localWrapper = ({ children }: { children: ReactNode }) => (
       <ApolloProvider client={localClient}>
@@ -69,6 +112,26 @@ describe("usePostViewerController", () => {
       expect(result.current.state.kind).toBe("ready");
     });
 
+    const postCacheId = localClient.cache.identify({
+      __typename: "Post",
+      id: "abc",
+    });
+    if (!postCacheId) throw new Error("Post cache id missing");
+
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).not.toBeNull();
+    expect(
+      localClient.readQuery({
+        query: PostDocument,
+        variables: postVariables,
+      }),
+    ).not.toBeNull();
+    expect(hasCacheRecord(localClient, postCacheId)).toBe(true);
+
     await act(async () => {
       await result.current.deletePost();
     });
@@ -76,5 +139,18 @@ describe("usePostViewerController", () => {
     expect(refetchSpy).toHaveBeenCalledWith({
       include: [...POST_LIST_QUERY_NAMES],
     });
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).toBeNull();
+    expect(
+      localClient.readQuery({
+        query: PostDocument,
+        variables: postVariables,
+      }),
+    ).toBeNull();
+    expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
   });
 });

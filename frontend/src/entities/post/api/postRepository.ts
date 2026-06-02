@@ -34,21 +34,21 @@ import {
 import { POST_LIST_QUERY_NAMES } from "@/shared/api/refetchLists";
 
 export const postRepository = {
-  list({ page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
+  useList({ page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
     return useQuery<PostsQuery, PostsQueryVariables>(PostsDocument, {
       variables: { page, limit },
       notifyOnNetworkStatusChange: true,
     });
   },
 
-  listByTag(tag: string, { page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
+  useListByTag(tag: string, { page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
     return useQuery<PostsByTagQuery, PostsByTagQueryVariables>(PostsByTagDocument, {
       variables: { tag, page, limit },
       notifyOnNetworkStatusChange: true,
     });
   },
 
-  search(query: string, page = 1, limit = 6) {
+  useSearch(query: string, page = 1, limit = 6) {
     return useQuery<SearchPostsQuery, SearchPostsQueryVariables>(SearchPostsDocument, {
       variables: { query, page, limit },
       skip: query.length === 0,
@@ -56,7 +56,7 @@ export const postRepository = {
     });
   },
 
-  get(id: string) {
+  useGet(id: string) {
     return useQuery<PostQuery, PostQueryVariables>(PostDocument, {
       variables: { id },
       skip: !id,

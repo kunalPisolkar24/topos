@@ -7,7 +7,7 @@ import {
   type PostQuery,
   type PostQueryVariables,
 } from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage, POST_LIST_QUERY_NAMES } from "@/shared/api";
+import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 
 type LoadedPost = NonNullable<PostQuery["post"]>;
@@ -35,8 +35,6 @@ export interface PostViewerController {
   refetch: () => void;
 }
 
-const REFETCH_POST_LISTS = POST_LIST_QUERY_NAMES;
-
 export const usePostViewerController = (
   postId: string | undefined,
 ): PostViewerController => {
@@ -62,10 +60,7 @@ export const usePostViewerController = (
     return () => stopPolling();
   }, [data?.post?.summaryStatus, startPolling, stopPolling]);
 
-  const [deletePost, { loading: isDeleting }] = useMutation(
-    DeletePostDocument,
-    { refetchQueries: REFETCH_POST_LISTS },
-  );
+  const [deletePost, { loading: isDeleting }] = useMutation(DeletePostDocument);
 
   useEffect(() => {
     if (!error) return;
@@ -81,7 +76,7 @@ export const usePostViewerController = (
     if (!postId) return;
     try {
       await deletePost({ variables: { id: postId } });
-      await client.refetchQueries({ include: REFETCH_POST_LISTS });
+      await refreshPostListQueries(client, { postId });
       toast({
         title: "Blog Deleted",
         description: "Successfully deleted.",

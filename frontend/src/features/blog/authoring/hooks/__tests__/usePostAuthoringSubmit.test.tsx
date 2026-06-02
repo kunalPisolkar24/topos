@@ -7,6 +7,7 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
+import { PostsDocument } from "@/shared/graphql/content-documents";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
 const noopUnauthorized = async () => {};
@@ -39,6 +40,49 @@ const baseArgs = {
   tags: ["alpha"],
   summary: null as string | null,
   uploadCardImage: () => Promise.resolve<string | null>("https://x/y.png"),
+};
+
+const postListVariables = { page: 1, limit: 6 };
+
+const buildPaginatedPosts = (id: string) => ({
+  __typename: "PaginatedPosts" as const,
+  posts: [
+    {
+      __typename: "Post" as const,
+      id,
+      title: `Post ${id}`,
+      body: "<p>body</p>",
+      imageUrl: "https://x/y.png",
+      createdAt: "2024-01-01T00:00:00Z",
+      author: {
+        __typename: "User" as const,
+        id: "author-1",
+        username: "alice",
+        name: "Alice",
+        avatarUrl: null,
+      },
+      tags: [
+        {
+          __typename: "Tag" as const,
+          id: "tag-1",
+          name: "alpha",
+        },
+      ],
+    },
+  ],
+  totalPages: 1,
+  currentPage: 1,
+  totalPosts: 1,
+});
+
+const writeStalePostsCache = (client: ApolloClient, id: string) => {
+  client.writeQuery({
+    query: PostsDocument,
+    variables: postListVariables,
+    data: {
+      posts: buildPaginatedPosts(id),
+    },
+  });
 };
 
 describe("usePostAuthoringSubmit", () => {
@@ -298,7 +342,7 @@ describe("usePostAuthoringSubmit", () => {
     expect(result.current.submit).toEqual({ kind: "idle" });
   });
 
-  it("refetches post list queries after a successful create", async () => {
+  it("refreshes post list queries and invalidates stale feed cache after a successful create", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
       graphqlApi.mutation("CreatePost", () =>
@@ -314,6 +358,14 @@ describe("usePostAuthoringSubmit", () => {
       onUnauthorized: noopUnauthorized,
     });
     const refetchSpy = vi.spyOn(localClient, "refetchQueries");
+    writeStalePostsCache(localClient, "stale-create");
+
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).not.toBeNull();
 
     const localWrapper = ({ children }: { children: ReactNode }) => (
       <ApolloProvider client={localClient}>
@@ -335,9 +387,15 @@ describe("usePostAuthoringSubmit", () => {
     expect(refetchSpy).toHaveBeenCalledWith({
       include: [...POST_LIST_QUERY_NAMES],
     });
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).toBeNull();
   });
 
-  it("refetches post list queries after a successful update", async () => {
+  it("refreshes post list queries and invalidates stale feed cache after a successful update", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
       graphqlApi.mutation("UpdatePost", () =>
@@ -353,6 +411,14 @@ describe("usePostAuthoringSubmit", () => {
       onUnauthorized: noopUnauthorized,
     });
     const refetchSpy = vi.spyOn(localClient, "refetchQueries");
+    writeStalePostsCache(localClient, "stale-update");
+
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).not.toBeNull();
 
     const localWrapper = ({ children }: { children: ReactNode }) => (
       <ApolloProvider client={localClient}>
@@ -387,5 +453,11 @@ describe("usePostAuthoringSubmit", () => {
     expect(refetchSpy).toHaveBeenCalledWith({
       include: [...POST_LIST_QUERY_NAMES],
     });
+    expect(
+      localClient.readQuery({
+        query: PostsDocument,
+        variables: postListVariables,
+      }),
+    ).toBeNull();
   });
 });

@@ -12,15 +12,27 @@ export interface ProfileUpdatePayload {
   bio?: string | null;
 }
 
-const CONTROL_CHARACTERS_PATTERN = /[\u{0000}-\u{0008}\u{000B}-\u{001F}\u{007F}]/gu;
 const COLLAPSIBLE_WHITESPACE_PATTERN = /\s+/g;
 const EXTRA_NEWLINES_PATTERN = /\n{3,}/g;
+
+const isDisallowedControlCharacter = (value: string) => {
+  const codePoint = value.codePointAt(0);
+  if (codePoint === undefined) return false;
+
+  return (
+    codePoint === 0x7f ||
+    (codePoint >= 0x00 && codePoint <= 0x08) ||
+    (codePoint >= 0x0b && codePoint <= 0x1f)
+  );
+};
 
 const clampCharacters = (value: string, maxLength: number) =>
   Array.from(value).slice(0, maxLength).join("");
 
 const normalizeText = (value: string) =>
-  value.replace(/\r\n?/g, "\n").replace(CONTROL_CHARACTERS_PATTERN, "");
+  Array.from(value.replace(/\r\n?/g, "\n"))
+    .filter((character) => !isDisallowedControlCharacter(character))
+    .join("");
 
 const normalizeSingleLineText = (value: string) =>
   normalizeText(value).replace(COLLAPSIBLE_WHITESPACE_PATTERN, " ").trim();
