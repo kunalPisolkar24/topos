@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import {
   DeletePostDocument,
@@ -42,6 +42,7 @@ export const usePostViewerController = (
 ): PostViewerController => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const client = useApolloClient();
   const [view, setView] = useState<PostViewerView>("reading");
   const [dialog, setDialog] = useState<PostViewerDialog>("closed");
 
@@ -80,6 +81,7 @@ export const usePostViewerController = (
     if (!postId) return;
     try {
       await deletePost({ variables: { id: postId } });
+      await client.refetchQueries({ include: REFETCH_POST_LISTS });
       toast({
         title: "Blog Deleted",
         description: "Successfully deleted.",
