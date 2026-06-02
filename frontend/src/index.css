@@ -264,6 +264,12 @@ html, body {
   font-family: 'Merriweather', serif;
 }
 
+.blog-draft-input {
+  font-family: 'Merriweather', serif;
+  letter-spacing: 0.2px;
+  line-height: 1.75;
+}
+
 .prose {
   font-family: 'Merriweather', serif;
   color: rgb(var(--foreground));
@@ -433,11 +439,11 @@ html, body {
 }
 
 .ql-editor {
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Merriweather', serif;
   min-height: 400px;
   font-size: 1rem;
-  letter-spacing: -0.01em;
-  line-height: 1.75;
+  letter-spacing: 0.2px;
+  line-height: 1.8;
   padding: 20px;
 }
 
@@ -445,7 +451,7 @@ html, body {
   color: rgb(var(--muted-foreground));
   font-style: normal;
   left: 20px;
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Merriweather', serif;
 }
 
 .ql-snow .ql-tooltip {
@@ -489,11 +495,11 @@ html, body {
 }
 
 .ql-editor {
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Merriweather', serif;
   min-height: 400px;
   font-size: 1rem;
-  letter-spacing: -0.01em;
-  line-height: 1.75;
+  letter-spacing: 0.2px;
+  line-height: 1.8;
   padding: 20px;
 }
 
@@ -501,7 +507,7 @@ html, body {
   color: rgb(var(--muted-foreground));
   font-style: normal;
   left: 20px;
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Merriweather', serif;
 }
 
 .ql-toolbar.ql-snow {
@@ -665,7 +671,7 @@ html, body {
   .ql-editor {
     min-height: 300px;
     font-size: 0.9rem;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     line-height: 1.7;
     padding: 12px 14px;
   }
