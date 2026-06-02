@@ -6,8 +6,7 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
-import type ReactQuill from "react-quill-new";
-import Quill from "quill";
+import ReactQuill, { Quill } from "react-quill-new";
 import {
   AlignCenter,
   AlignJustify,
