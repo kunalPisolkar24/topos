@@ -72,10 +72,10 @@ export const BlogCard: React.FC<BlogCardProps> = ({
 
           <div
             data-slot="blog-card-content"
-            className="flex min-w-0 flex-col gap-4 px-4 py-5 sm:px-5 sm:py-6 lg:px-6 lg:py-6 md:col-start-1 md:row-start-1 md:justify-center md:gap-4.5"
+            className="flex min-w-0 flex-col gap-3 px-5 py-5 sm:px-6 sm:py-6 md:col-start-1 md:row-start-1 md:gap-4"
           >
-            <div className="space-y-4">
-              <div className="space-y-3.5">
+            <div className="space-y-3">
+              <div className="space-y-2">
                 <h2
                   data-slot="blog-card-title"
                   className="line-clamp-2 text-[1.3rem] font-semibold leading-[1.12] tracking-[-0.028em] text-foreground sm:text-[1.5rem] lg:text-[1.65rem]"
@@ -101,7 +101,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
               <span
                 aria-hidden="true"
                 className="size-2.5 shrink-0 border border-primary/75 bg-primary/20"
