@@ -413,11 +413,32 @@ html, body {
   background-color: rgb(var(--muted));
 }
 
-.quill-content-view img {
+.quill-content-view {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.quill-content-view img,
+.quill-content-view video,
+.quill-content-view svg,
+.quill-content-view table {
   max-width: 100%;
+}
+
+.quill-content-view img {
   height: auto;
   margin-top: 1.5em;
   margin-bottom: 1.5em;
+}
+
+.quill-content-view table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.quill-content-view pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .quill-content-view iframe {
@@ -659,6 +680,8 @@ html, body {
   }
 
   .quill-content-view img,
+  .quill-content-view video,
+  .quill-content-view svg,
   .quill-content-view iframe {
     margin-top: 1em;
     margin-bottom: 1em;

@@ -33,7 +33,7 @@ export const BlogBody: React.FC<BlogBodyProps> = ({ body, tags }) => {
       </div>
       <div className="bg-surface p-4 ring-1 ring-outline-variant/20 sm:p-5 lg:p-6">
         <div
-          className="quill-content-view prose prose-lg dark:prose-invert max-w-none"
+          className="quill-content-view prose prose-lg dark:prose-invert max-w-none min-w-0 overflow-hidden break-words"
           dangerouslySetInnerHTML={{ __html: cleanBody }}
         />
       </div>
