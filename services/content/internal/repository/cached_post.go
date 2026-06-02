@@ -36,7 +36,17 @@ func NewCachedPostRepository(fallback domain.PostRepository, redis *redis.Client
 }
 
 func (r *cachedPostRepo) Create(ctx context.Context, post *domain.Post) (*domain.Post, error) {
-	return r.fallback.Create(ctx, post)
+	created, err := r.fallback.Create(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, created.AuthorID, created.Tags); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
@@ -45,6 +55,12 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 		return nil, err
 	}
 	if err := r.invalidate(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, updatedPost.AuthorID, updatedPost.Tags); err != nil {
 		return nil, err
 	}
 	return updatedPost, nil
@@ -59,11 +75,27 @@ func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary s
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
-	err := r.fallback.Delete(ctx, id)
+	existing, err := r.fallback.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
-	return r.invalidate(ctx, id)
+	if existing == nil {
+		return mongo.ErrNoDocuments
+	}
+
+	if err := r.fallback.Delete(ctx, id); err != nil {
+		return err
+	}
+	if err := r.invalidate(ctx, id); err != nil {
+		return err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, existing.AuthorID, existing.Tags); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
