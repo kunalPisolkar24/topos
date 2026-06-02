@@ -84,7 +84,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
 
   if (activeQuery.loading) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[88rem] px-4 py-8 sm:px-5 lg:px-6">
         {sectionHeading}
         <div className="space-y-4">
           {Array.from({ length: itemsPerPage }).map((_, index) => (
@@ -104,7 +104,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
 
   if (totalPosts === 0) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[88rem] px-4 py-8 sm:px-5 lg:px-6">
         {sectionHeading}
         <p className="text-lg text-muted-foreground">
           {filterTag
@@ -116,7 +116,7 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[88rem] px-4 py-8 sm:px-5 lg:px-6">
       {sectionHeading}
       <div className="space-y-4">
         {blogPosts.map((post) => (
