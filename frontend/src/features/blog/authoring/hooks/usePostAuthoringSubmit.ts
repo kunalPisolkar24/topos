@@ -206,6 +206,7 @@ export const usePostAuthoringSubmit = ({
         const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
         dispatch({ type: "beginUpdate" });
         await updatePost({ variables: { id: post.id, input: parsedInput } });
+        await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
         toast({ title: "Success", description: "Post updated successfully." });
         dispatch({ type: "resolveIdle" });
         onComplete?.();
@@ -233,6 +234,7 @@ export const usePostAuthoringSubmit = ({
       uploadCardImage,
       toast,
       updatePost,
+      client,
       onComplete,
     ],
   );

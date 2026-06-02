@@ -336,4 +336,56 @@ describe("usePostAuthoringSubmit", () => {
       include: [...POST_LIST_QUERY_NAMES],
     });
   });
+
+  it("refetches post list queries after a successful update", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.mutation("UpdatePost", () =>
+        HttpResponse.json({
+          data: { updatePost: { __typename: "Post", id: "abc" } },
+        }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+    const refetchSpy = vi.spyOn(localClient, "refetchQueries");
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        usePostAuthoringSubmit({
+          ...baseArgs,
+          mode: "edit",
+          title: "New title",
+          content: "<p>new body</p>",
+          post: {
+            id: "abc",
+            title: "old title",
+            body: "<p>old body</p>",
+            imageUrl: "https://x/y.png",
+            tags: [{ id: "t1", name: "alpha" }],
+          },
+        }),
+      { wrapper: localWrapper },
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: () => {},
+      } as unknown as React.FormEvent);
+    });
+
+    expect(refetchSpy).toHaveBeenCalledWith({
+      include: [...POST_LIST_QUERY_NAMES],
+    });
+  });
 });
