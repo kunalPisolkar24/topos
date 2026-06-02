@@ -176,23 +176,33 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       className="mx-auto mt-16 w-full max-w-3xl px-4 sm:mt-20 sm:px-6"
     >
       <Card className="gap-0 overflow-hidden rounded-none border-0 bg-surface-lowest py-0 shadow-none">
-        <div className="flex items-center gap-0.5 border-b border-outline-variant/20 bg-transparent px-0 py-0">
+        <div
+          role="tablist"
+          aria-label="Search mode"
+          className="flex items-center gap-0.5 bg-surface-low px-0 py-0"
+        >
           <button
+            type="button"
+            role="tab"
+            aria-selected={searchMode === "tags"}
             onClick={() => setSearchMode("tags")}
-            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none sm:px-3.5 ${
+            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
               searchMode === "tags"
-                ? "bg-surface-high text-foreground"
-                : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
+                ? "bg-primary-container text-primary-foreground"
+                : "text-muted-foreground hover:bg-surface-high hover:text-foreground"
             }`}
           >
             <Hash className="h-3.5 w-3.5" /> Tags
           </button>
           <button
+            type="button"
+            role="tab"
+            aria-selected={searchMode === "posts"}
             onClick={() => setSearchMode("posts")}
-            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none sm:px-3.5 ${
+            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
               searchMode === "posts"
-                ? "bg-surface-high text-foreground"
-                : "text-muted-foreground hover:bg-surface-low hover:text-foreground"
+                ? "bg-primary-container text-primary-foreground"
+                : "text-muted-foreground hover:bg-surface-high hover:text-foreground"
             }`}
           >
             <BookText className="h-3.5 w-3.5" /> Posts

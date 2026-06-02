@@ -157,7 +157,7 @@ describe("SearchBar", () => {
       <SearchBar onTagSelect={vi.fn()} currentFilterTag={null} />,
     );
 
-    await user.click(screen.getByRole("button", { name: /posts/i }));
+    await user.click(screen.getByRole("tab", { name: /posts/i }));
 
     const input = screen.getByPlaceholderText(/search post titles & content/i);
 
@@ -206,10 +206,47 @@ describe("SearchBar", () => {
     );
     expect(screen.getByRole("option", { selected: true })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /posts/i }));
+    await user.click(screen.getByRole("tab", { name: /posts/i }));
 
     expect(screen.getByText("Post Suggestions")).toBeInTheDocument();
     expect(screen.queryByRole("option", { selected: true })).not.toBeInTheDocument();
+  });
+
+  it("renders the tablist with tonal lift and marks the active tab with primary-container", () => {
+    renderWithProviders(
+      <SearchBar onTagSelect={vi.fn()} currentFilterTag={null} />,
+    );
+
+    const tablist = screen.getByRole("tablist", { name: /search mode/i });
+    const tagsTab = screen.getByRole("tab", { name: /tags/i });
+    const postsTab = screen.getByRole("tab", { name: /posts/i });
+
+    expect(tablist).toHaveClass("bg-surface-low");
+    expect(tablist).not.toHaveClass("border-b");
+    expect(tagsTab).toHaveAttribute("aria-selected", "true");
+    expect(tagsTab).toHaveClass("bg-primary-container", "text-primary-foreground");
+    expect(postsTab).toHaveAttribute("aria-selected", "false");
+    expect(postsTab).toHaveClass("text-muted-foreground");
+  });
+
+  it("moves the primary-container selected treatment to the Posts tab on click", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <SearchBar onTagSelect={vi.fn()} currentFilterTag={null} />,
+    );
+
+    const tagsTab = screen.getByRole("tab", { name: /tags/i });
+    const postsTab = screen.getByRole("tab", { name: /posts/i });
+
+    expect(tagsTab).toHaveClass("bg-primary-container");
+
+    await user.click(postsTab);
+
+    expect(postsTab).toHaveClass("bg-primary-container", "text-primary-foreground");
+    expect(postsTab).toHaveAttribute("aria-selected", "true");
+    expect(tagsTab).toHaveAttribute("aria-selected", "false");
+    expect(tagsTab).not.toHaveClass("bg-primary-container");
   });
 
   it("applies the tightened heading and tag label styling without trailing row margins", () => {
