@@ -7,6 +7,9 @@ export {
 } from "./links/auth";
 export { getGraphQLErrorMessage } from "./errors";
 export {
+  invalidatePostListCaches,
   POST_LIST_QUERY_NAMES,
+  refreshPostListQueries,
+  type PostListCacheRefreshOptions,
   type PostListQueryName,
 } from "./refetchLists";
