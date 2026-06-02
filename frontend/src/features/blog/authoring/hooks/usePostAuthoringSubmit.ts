@@ -1,6 +1,6 @@
 import { useCallback, useReducer } from "react";
 import { z } from "zod";
-import { useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import {
   CreatePostDocument,
@@ -79,6 +79,7 @@ export const usePostAuthoringSubmit = ({
   const isEdit = mode === "edit";
   const navigate = useNavigate();
   const { toast } = useToast();
+  const client = useApolloClient();
   const [submit, dispatch] = useReducer(reducer, { kind: "idle" });
 
   const [createPost] = useMutation(CreatePostDocument, {
@@ -133,6 +134,7 @@ export const usePostAuthoringSubmit = ({
         const parsed = createPostSchema.parse(candidate);
         dispatch({ type: "beginCreate" });
         await createPost({ variables: { input: parsed } });
+        await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
         toast({ title: "Blog Created", description: "Successfully created." });
         dispatch({ type: "resolveIdle" });
         navigate("/");
@@ -164,6 +166,7 @@ export const usePostAuthoringSubmit = ({
       uploadCardImage,
       toast,
       createPost,
+      client,
       navigate,
     ],
   );

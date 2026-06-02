@@ -5,7 +5,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
-import { createApolloClient } from "@/shared/api";
+import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
@@ -296,5 +296,44 @@ describe("usePostAuthoringSubmit", () => {
 
     expect(onComplete).toHaveBeenCalled();
     expect(result.current.submit).toEqual({ kind: "idle" });
+  });
+
+  it("refetches post list queries after a successful create", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.mutation("CreatePost", () =>
+        HttpResponse.json({
+          data: { createPost: { __typename: "Post", id: "1" } },
+        }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+    const refetchSpy = vi.spyOn(localClient, "refetchQueries");
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result } = renderHook(
+      () => usePostAuthoringSubmit({ ...baseArgs, mode: "create" }),
+      { wrapper: localWrapper },
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: () => {},
+      } as unknown as React.FormEvent);
+    });
+
+    expect(refetchSpy).toHaveBeenCalledWith({
+      include: [...POST_LIST_QUERY_NAMES],
+    });
   });
 });
