@@ -28,7 +28,7 @@ const ViewBlogPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
-        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
           <div className="mx-auto max-w-3xl bg-surface-low p-6 ring-1 ring-outline-variant/20 sm:p-8">
             <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
               Missing Article
@@ -61,8 +61,8 @@ const ViewBlogPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
-      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[88rem]">
           {isEditView ? (
             <>
               <header className="relative overflow-hidden bg-surface-low p-5 ring-1 ring-outline-variant/20 sm:p-8 lg:p-10 mb-6">
