@@ -7,12 +7,17 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
-import { PostDocument, PostsDocument } from "@/shared/graphql/content-documents";
+import {
+  MyPostsDocument,
+  PostDocument,
+  PostsDocument,
+} from "@/shared/graphql/content-documents";
 import { usePostViewerController } from "../usePostViewerController";
 
 const noopUnauthorized = async () => {};
 const postListVariables = { page: 1, limit: 6 };
 const postVariables = { id: "abc" };
+const myPostsVariables = { page: 1, limit: 3 };
 
 const loadedPost = {
   __typename: "Post" as const,
@@ -65,6 +70,26 @@ const writeStalePostsCache = (client: ApolloClient) => {
         totalPages: 1,
         currentPage: 1,
         totalPosts: 1,
+      },
+    },
+  });
+};
+
+const writeStaleMyPostsCache = (client: ApolloClient) => {
+  client.writeQuery({
+    query: MyPostsDocument,
+    variables: myPostsVariables,
+    data: {
+      me: {
+        __typename: "User",
+        id: "u1",
+        posts: {
+          __typename: "PaginatedPosts",
+          posts: [staleListPost],
+          totalPages: 1,
+          currentPage: 1,
+          totalPosts: 1,
+        },
       },
     },
   });
@@ -152,5 +177,67 @@ describe("usePostViewerController", () => {
       }),
     ).toBeNull();
     expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
+  });
+
+  it("evicts the me.posts profile cache after a successful delete", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.query("Post", () =>
+        HttpResponse.json({
+          data: {
+            post: loadedPost,
+          },
+        }),
+      ),
+      graphqlApi.mutation("DeletePost", () =>
+        HttpResponse.json({ data: { deletePost: true } }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+    writeStaleMyPostsCache(localClient);
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/blog/abc"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result } = renderHook(
+      () => usePostViewerController("abc"),
+      { wrapper: localWrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("ready");
+    });
+
+    const userCacheId = localClient.cache.identify({
+      __typename: "User",
+      id: "u1",
+    });
+    if (!userCacheId) throw new Error("User cache id missing");
+
+    expect(
+      localClient.readQuery({
+        query: MyPostsDocument,
+        variables: myPostsVariables,
+      }),
+    ).not.toBeNull();
+
+    await act(async () => {
+      await result.current.deletePost();
+    });
+
+    expect(
+      localClient.readQuery({
+        query: MyPostsDocument,
+        variables: myPostsVariables,
+      }),
+    ).toBeNull();
   });
 });
