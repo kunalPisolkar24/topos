@@ -1,6 +1,9 @@
 export const DEFAULT_BLOG_CARD_IMAGE =
   "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80";
 
+export const BLOG_CARD_SNIPPET_MAX_CHARS = 120;
+export const BLOG_CARD_SNIPPET_ELLIPSIS = "...";
+
 const BLOG_CARD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "2-digit",
@@ -70,15 +73,27 @@ export function formatBlogCardTag(tag: string) {
   return `#${normalizedTag.toUpperCase()}`;
 }
 
+export function truncateSnippet(text: string, maxChars: number): string {
+  const trimmed = text.trim();
+
+  if (trimmed.length === 0 || trimmed.length <= maxChars) {
+    return trimmed;
+  }
+
+  const window = trimmed.slice(0, maxChars);
+  const lastWhitespace = window.search(/\s\S*$/);
+
+  const cutPoint = lastWhitespace > 0 ? lastWhitespace : maxChars;
+  return `${window.slice(0, cutPoint).trimEnd()}${BLOG_CARD_SNIPPET_ELLIPSIS}`;
+}
+
 export function mapPostToBlogCardItem(post: PostLike): BlogCardItem {
   const plainTextBody = stripHtml(post.body);
 
   return {
     id: post.id,
     title: post.title,
-    snippet:
-      plainTextBody.substring(0, 150) +
-      (plainTextBody.length > 150 ? "..." : ""),
+    snippet: truncateSnippet(plainTextBody, BLOG_CARD_SNIPPET_MAX_CHARS),
     author: {
       name: getAuthorDisplayName(post.author),
     },

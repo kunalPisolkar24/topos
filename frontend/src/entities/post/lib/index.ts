@@ -1,4 +1,6 @@
 export {
+  BLOG_CARD_SNIPPET_ELLIPSIS,
+  BLOG_CARD_SNIPPET_MAX_CHARS,
   buildSearchPagination,
   DEFAULT_BLOG_CARD_IMAGE,
   formatBlogCardDate,
@@ -6,6 +8,7 @@ export {
   getAuthorDisplayName,
   mapPostToBlogCardItem,
   stripHtml,
+  truncateSnippet,
   type BlogCardItem,
 } from "./blog-card";
 export {
