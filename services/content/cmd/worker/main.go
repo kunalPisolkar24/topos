@@ -51,6 +51,11 @@ func main() {
 		logger.Error("Failed to connect to AI Service", "error", err)
 		return
 	}
+	defer func() {
+		if err := aiClient.Close(); err != nil {
+			logger.Error("Failed to close AI client", "error", err)
+		}
+	}()
 
 	database := mongoClient.Database(cfg.DbName)
 	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), redisClient)

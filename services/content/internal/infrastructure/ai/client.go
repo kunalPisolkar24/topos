@@ -175,6 +175,10 @@ func newGRPCAIClient(url string, dialTimeout time.Duration) (domain.AIService, e
 	}, nil
 }
 
+func (c *resilientAIClient) Close() error {
+	return c.primary.Close()
+}
+
 func (c *resilientAIClient) GenerateSummary(ctx context.Context, content string) (string, error) {
 	if c.cb.canProceed() {
 		summary, err := c.primary.GenerateSummary(ctx, content)

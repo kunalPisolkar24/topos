@@ -24,6 +24,10 @@ func NewNoopAIClient() domain.AIService {
 	return &noopAIClient{}
 }
 
+func (c *noopAIClient) Close() error {
+	return nil
+}
+
 func (c *noopAIClient) GenerateSummary(_ context.Context, content string) (string, error) {
 	summary := truncateText(normalizeWhitespace(content), 240)
 	if summary == "" {
