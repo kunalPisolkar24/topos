@@ -310,4 +310,23 @@ describe("SearchBar", () => {
       screen.getByText("Riding the Rails of the 19th Century"),
     ).toHaveClass("text-[0.97rem]");
   });
+
+  it("renders the See All button when totalPosts exceeds limit", () => {
+    const onSeeAll = vi.fn();
+    renderWithProviders(
+      <Command shouldFilter={false}>
+        <CommandList>
+          <PostSuggestions
+            posts={postSuggestions}
+            totalPosts={postSuggestions.length + 5}
+            limit={postSuggestions.length}
+            onSelect={vi.fn()}
+            onSeeAll={onSeeAll}
+          />
+        </CommandList>
+      </Command>,
+    );
+
+    expect(screen.getByText(`See all ${postSuggestions.length + 5} results`)).toBeInTheDocument();
+  });
 });
