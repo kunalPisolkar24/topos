@@ -20,3 +20,6 @@ htmlcov
 .vscode
 .idea
 src/generated
+.venv
+dist
+*.egg-info

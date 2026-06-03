@@ -13,3 +13,4 @@ htmlcov
 .idea
 *.log
 src/generated
+.venv
