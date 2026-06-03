@@ -12,7 +12,7 @@ import {
 } from "@/shared/graphql/content-documents";
 
 import { buildApolloCache } from "../index";
-import { mergePaginatedPostLists, paginatedPostListKeyArgs, postQueryFieldPolicies } from "../policies/post";
+import { mergePaginatedPostLists, paginatedPostListKeyArgs } from "../policies/post";
 import { invalidatePostListCaches } from "../../../refetchLists";
 
 const buildList = (page: number, ids: Array<string | number>) => ({

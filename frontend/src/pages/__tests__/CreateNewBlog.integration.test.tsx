@@ -3,7 +3,7 @@ import { HttpResponse, graphql } from "msw";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
-import { renderWithProviders, type RenderOptions } from "@/test/render-with-providers";
+import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { sessionStoreActions } from "@/entities/session";
 import CreateNewBlog from "../CreateNewBlog";
