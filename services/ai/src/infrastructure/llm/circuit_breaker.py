@@ -21,6 +21,10 @@ class CircuitBreaker:
     def state(self) -> str:
         return self._state
 
+    @property
+    def is_rate_limited(self) -> bool:
+        return time.monotonic() < self._rate_limit_until
+
     async def can_proceed(self) -> bool:
         async with self._lock:
             if time.monotonic() < self._rate_limit_until:

@@ -4,7 +4,7 @@ import httpx
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 from src.infrastructure.llm.lightning_client import LightningClient
-from src.core.exceptions import LLMProviderError
+from src.core.exceptions import LLMProviderError, RateLimitError
 from src.config.settings import settings
 
 @pytest.fixture
@@ -85,6 +85,17 @@ async def test_generate_completion_network_error(client):
         await client.generate_completion("sys", "user")
     
     assert "Failed to communicate" in str(exc.value)
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_generate_completion_rate_limit_raises_rate_limit_error(client):
+    route = respx.post(settings.LIGHTNING_AI_URL).mock(return_value=httpx.Response(429))
+
+    with pytest.raises(RateLimitError) as exc:
+        await client.generate_completion("sys", "user")
+
+    assert route.call_count == 1
+    assert "rate limit" in str(exc.value).lower()
 
 @pytest.mark.asyncio
 @respx.mock

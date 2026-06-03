@@ -60,6 +60,8 @@ class LightningClient(LLMProvider):
             self._gauge_task = None
 
     async def is_healthy(self) -> bool:
+        if self._cb.is_rate_limited:
+            return False
         return await self._cb.can_proceed()
 
     async def close(self):
@@ -98,6 +100,8 @@ class LightningClient(LLMProvider):
     async def generate_completion(self, system_prompt: str, user_content: str) -> str:
         if not await self._cb.can_proceed():
             CIRCUIT_BREAKER_REJECTED.labels(provider="lightning").inc()
+            if self._cb.is_rate_limited:
+                raise RateLimitError("AI provider rate limit exceeded")
             raise LLMProviderError("AI provider is currently unavailable (circuit breaker open)")
 
         payload = {
