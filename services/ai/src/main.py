@@ -67,7 +67,8 @@ async def serve():
         logger.exception("Server crashed")
         raise
     finally:
-        logger.info("Shutting down HTTP client...")
+        logger.info("Shutting down LLM client and HTTP client...")
+        await llm_provider.close()
         await http_client.aclose()
 
 if __name__ == "__main__":

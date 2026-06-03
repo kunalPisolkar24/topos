@@ -6,7 +6,15 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from src.config.settings import settings
 from src.core.interfaces.llm_provider import LLMProvider
 from src.core.exceptions import LLMProviderError
-from src.infrastructure.monitoring.metrics import LLM_PROVIDER_LATENCY, LLM_TOKEN_ERROR_COUNT
+from src.infrastructure.monitoring.metrics import (
+    LLM_PROVIDER_LATENCY,
+    LLM_TOKEN_ERROR_COUNT,
+    CIRCUIT_BREAKER_STATE,
+    CIRCUIT_BREAKER_REJECTED,
+)
+from src.infrastructure.llm.circuit_breaker import CircuitBreaker
+
+_STATE_MAP = {"closed": 0, "half-open": 1, "open": 2}
 
 def _is_retryable(exception: BaseException) -> bool:
     if isinstance(exception, httpx.RequestError):
@@ -25,6 +33,19 @@ class LightningClient(LLMProvider):
         }
         self.model = settings.LIGHTNING_MODEL
         self.logger = logging.getLogger(__name__)
+        self._cb = CircuitBreaker()
+        try:
+            self._gauge_task = asyncio.get_running_loop().create_task(self._update_gauge_loop())
+        except RuntimeError:
+            self._gauge_task = None
+
+    async def close(self):
+        if self._gauge_task is not None:
+            self._gauge_task.cancel()
+            try:
+                await self._gauge_task
+            except asyncio.CancelledError:
+                pass
 
     @retry(
         stop=stop_after_attempt(3),
@@ -42,7 +63,19 @@ class LightningClient(LLMProvider):
         response.raise_for_status()
         return response.json()
 
+    async def _update_gauge_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(5)
+                CIRCUIT_BREAKER_STATE.labels(provider="lightning").set(_STATE_MAP[self._cb.state])
+            except asyncio.CancelledError:
+                return
+
     async def generate_completion(self, system_prompt: str, user_content: str) -> str:
+        if not await self._cb.can_proceed():
+            CIRCUIT_BREAKER_REJECTED.labels(provider="lightning").inc()
+            raise LLMProviderError("AI provider is currently unavailable (circuit breaker open)")
+
         payload = {
             "model": self.model,
             "messages": [
@@ -57,6 +90,7 @@ class LightningClient(LLMProvider):
         record_latency = True
         try:
             data = await self._make_request(payload)
+            await self._cb.record_success()
             return data['choices'][0]['message']['content']
 
         except asyncio.CancelledError:
@@ -65,16 +99,19 @@ class LightningClient(LLMProvider):
             raise
 
         except httpx.HTTPStatusError as e:
+            await self._cb.record_failure()
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="http_status").inc()
             self.logger.error(f"Provider returned status {e.response.status_code}", extra={"status_code": e.response.status_code})
             raise LLMProviderError(f"Provider returned {e.response.status_code}") from e
 
         except httpx.RequestError as e:
+            await self._cb.record_failure()
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="network").inc()
             self.logger.error(f"Network error communicating with provider: {str(e)}")
             raise LLMProviderError("Failed to communicate with AI provider") from e
 
         except (KeyError, IndexError, TypeError) as e:
+            await self._cb.record_failure()
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="parsing").inc()
             self.logger.error(f"Unexpected response structure: {str(e)}")
             raise LLMProviderError("Invalid response format from provider") from e

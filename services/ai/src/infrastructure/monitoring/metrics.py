@@ -28,3 +28,15 @@ ACTIVE_REQUESTS = Gauge(
     'grpc_active_requests',
     'Number of requests currently being processed'
 )
+
+CIRCUIT_BREAKER_STATE = Gauge(
+    'llm_circuit_breaker_state',
+    'Circuit breaker state: 0=closed, 1=half-open, 2=open',
+    ['provider']
+)
+
+CIRCUIT_BREAKER_REJECTED = Counter(
+    'llm_circuit_breaker_rejected_total',
+    'Requests rejected by circuit breaker',
+    ['provider']
+)
