@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache } from "@apollo/client";
+import { ApolloClient } from "@apollo/client";
 import {
   bootstrapSession,
   authenticateSession,
@@ -10,15 +10,13 @@ import {
 import { sessionStoreActions } from "../store/session-store";
 import { MeDocument } from "@/shared/graphql/generated/graphql";
 
-function createMockClient(overrides?: Partial<ApolloClient<InMemoryCache>>) {
-  const cache = new InMemoryCache();
+function createMockClient(overrides?: Partial<ApolloClient>) {
   return {
     query: vi.fn(),
     clearStore: vi.fn().mockResolvedValue(undefined),
     writeQuery: vi.fn(),
-    cache,
     ...overrides,
-  } as unknown as ApolloClient<InMemoryCache>;
+  } as unknown as ApolloClient;
 }
 
 const mockUser = {
@@ -97,7 +95,7 @@ describe("session", () => {
         query: vi.fn().mockResolvedValue({
           data: { me: mockUser },
         }),
-      } as Partial<ApolloClient<InMemoryCache>> as ApolloClient<InMemoryCache>);
+      } as Partial<ApolloClient> as ApolloClient);
 
       await bootstrapSession(client);
 
@@ -114,7 +112,7 @@ describe("session", () => {
       const client = createMockClient({
         query: vi.fn().mockRejectedValue(new Error("Network error")),
         clearStore: vi.fn().mockResolvedValue(undefined),
-      } as Partial<ApolloClient<InMemoryCache>> as ApolloClient<InMemoryCache>);
+      } as Partial<ApolloClient> as ApolloClient);
 
       await bootstrapSession(client);
 
@@ -129,7 +127,7 @@ describe("session", () => {
           data: { me: null },
         }),
         clearStore: vi.fn().mockResolvedValue(undefined),
-      } as Partial<ApolloClient<InMemoryCache>> as ApolloClient<InMemoryCache>);
+      } as Partial<ApolloClient> as ApolloClient);
 
       await bootstrapSession(client);
 
@@ -143,7 +141,7 @@ describe("session", () => {
       });
       const client = createMockClient({
         query: queryFn,
-      } as Partial<ApolloClient<InMemoryCache>> as ApolloClient<InMemoryCache>);
+      } as Partial<ApolloClient> as ApolloClient);
 
       const p1 = bootstrapSession(client);
       const p2 = bootstrapSession(client);

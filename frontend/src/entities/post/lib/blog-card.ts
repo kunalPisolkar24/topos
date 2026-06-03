@@ -38,8 +38,8 @@ export interface BlogCardItem {
     name: string;
   };
   tags: string[];
-  imageUrl: string;
-  publishedAt: string;
+  imageUrl: string | null;
+  publishedAt: string | null;
 }
 
 export function stripHtml(html: string) {

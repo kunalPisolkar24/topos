@@ -14,6 +14,7 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n": typeof types.ForceNetworkDocument,
     "\n  fragment PostCardFields on Post {\n    id\n    title\n    body\n    imageUrl\n    createdAt\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": typeof types.PostCardFieldsFragmentDoc,
     "\n  fragment PostDetailFields on Post {\n    id\n    title\n    body\n    slug\n    imageUrl\n    summary\n    summaryStatus\n    createdAt\n    updatedAt\n    author {\n      id\n      username\n      email\n      name\n      bio\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": typeof types.PostDetailFieldsFragmentDoc,
     "\n  fragment PaginatedPostFields on PaginatedPosts {\n    posts {\n      ...PostCardFields\n    }\n    totalPages\n    currentPage\n    totalPosts\n  }\n  \n": typeof types.PaginatedPostFieldsFragmentDoc,
@@ -35,6 +36,7 @@ type Documents = {
     "mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": typeof types.UpdateProfileDocument,
 };
 const documents: Documents = {
+    "\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n": types.ForceNetworkDocument,
     "\n  fragment PostCardFields on Post {\n    id\n    title\n    body\n    imageUrl\n    createdAt\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": types.PostCardFieldsFragmentDoc,
     "\n  fragment PostDetailFields on Post {\n    id\n    title\n    body\n    slug\n    imageUrl\n    summary\n    summaryStatus\n    createdAt\n    updatedAt\n    author {\n      id\n      username\n      email\n      name\n      bio\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": types.PostDetailFieldsFragmentDoc,
     "\n  fragment PaginatedPostFields on PaginatedPosts {\n    posts {\n      ...PostCardFields\n    }\n    totalPages\n    currentPage\n    totalPosts\n  }\n  \n": types.PaginatedPostFieldsFragmentDoc,
@@ -70,6 +72,10 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -6,7 +6,9 @@ const networkQuery = gql`
   query ForceNetwork {
     __typename
     posts {
-      id
+      posts {
+        id
+      }
     }
   }
 `;

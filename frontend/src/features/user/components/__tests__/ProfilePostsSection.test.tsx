@@ -68,7 +68,7 @@ describe("ProfilePostsSection", () => {
       snippet: "Hello world",
       author: { name: "Author" },
       tags: ["tech"],
-      imageUrl: null,
+      imageUrl: "https://example.com/img.jpg",
       publishedAt: "2024-01-01",
     };
 

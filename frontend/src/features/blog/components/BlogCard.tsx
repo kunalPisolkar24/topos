@@ -24,10 +24,10 @@ export const BlogCard: React.FC<BlogCardProps> = ({
 }) => {
   const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
   const remainingTagsCount = tags.length - MAX_VISIBLE_TAGS;
-  const formattedDate = formatBlogCardDate(publishedAt);
+  const formattedDate = publishedAt ? formatBlogCardDate(publishedAt) : null;
   const authorName = author.name.trim() || "Unknown Author";
   const publishedAtValue = publishedAt;
-  const blogCardImage = getBlogCardImageSources(imageUrl);
+  const blogCardImage = getBlogCardImageSources(imageUrl ?? DEFAULT_BLOG_CARD_IMAGE);
   const fallbackImage = getBlogCardImageSources(DEFAULT_BLOG_CARD_IMAGE);
 
   return (
@@ -113,7 +113,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
                     aria-hidden="true"
                     className="h-3 w-px bg-outline-variant/30"
                   />
-                  <time dateTime={publishedAtValue}>{formattedDate}</time>
+                  <time dateTime={publishedAtValue ?? undefined}>{formattedDate}</time>
                 </>
               ) : null}
             </div>

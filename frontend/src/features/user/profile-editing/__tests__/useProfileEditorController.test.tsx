@@ -48,6 +48,7 @@ const mockUser: UserCoreFragment = {
   avatarUrl: "https://example.com/avatar.png",
   bannerUrl: "https://example.com/banner.png",
   bio: "Hello world",
+  createdAt: "2024-01-01T00:00:00.000Z",
 };
 
 function renderProfileEditor(currentUser: UserCoreFragment | null = mockUser) {
@@ -75,7 +76,7 @@ describe("useProfileEditorController", () => {
   });
 
   it("uses email when name and username are absent", () => {
-    const user = { ...mockUser, name: null, username: null };
+    const user = { ...mockUser, name: null, username: "" };
     const { result } = renderProfileEditor(user as UserCoreFragment);
     expect(result.current.state.displayName).toBe("Workspace member");
   });

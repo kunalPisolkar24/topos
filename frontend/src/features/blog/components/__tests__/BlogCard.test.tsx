@@ -110,7 +110,7 @@ describe("BlogCard", () => {
         snippet="A post without a published date."
         author={{ name: "Author" }}
         tags={[]}
-        imageUrl={null}
+        imageUrl="https://example.com/img.jpg"
         publishedAt={null}
       />,
     );
@@ -127,7 +127,7 @@ describe("BlogCard", () => {
         snippet="A post without tags."
         author={{ name: "Author" }}
         tags={[]}
-        imageUrl={null}
+        imageUrl="https://example.com/img.jpg"
         publishedAt="2024-01-01T00:00:00.000Z"
       />,
     );
