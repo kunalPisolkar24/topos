@@ -3,7 +3,7 @@ import logging
 import asyncio
 from src.generated import ai_service_pb2, ai_service_pb2_grpc
 from src.usecases.content_logic import ContentLogic
-from src.core.exceptions import LLMProviderError, DataParsingError
+from src.core.exceptions import LLMProviderError, RateLimitError, DataParsingError
 from src.config.settings import settings
 
 _MAX_TEXT_LENGTH = 100_000
@@ -33,6 +33,9 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except TimeoutError:
             self.logger.warning("GenerateSummary timed out")
             await context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "Request timed out")
+        except RateLimitError as e:
+            self.logger.warning("Summary generation rate limited", extra={"retry_after": e.retry_after})
+            await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, "AI provider rate limit exceeded")
         except LLMProviderError as e:
             self.logger.error(f"Summary generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
@@ -63,6 +66,9 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except DataParsingError as e:
             self.logger.warning(f"Tags parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
+        except RateLimitError as e:
+            self.logger.warning("Tags generation rate limited", extra={"retry_after": e.retry_after})
+            await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, "AI provider rate limit exceeded")
         except LLMProviderError as e:
             self.logger.error(f"Tags generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
@@ -93,6 +99,9 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except DataParsingError as e:
             self.logger.warning(f"Post parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
+        except RateLimitError as e:
+            self.logger.warning("Post generation rate limited", extra={"retry_after": e.retry_after})
+            await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, "AI provider rate limit exceeded")
         except LLMProviderError as e:
             self.logger.error(f"Post generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
