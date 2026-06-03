@@ -3,7 +3,8 @@ from prometheus_client import Counter, Histogram, Gauge
 GRPC_REQUEST_LATENCY = Histogram(
     'grpc_request_duration_seconds',
     'Time spent processing gRPC requests',
-    ['method', 'status']
+    ['method', 'status'],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120]
 )
 
 GRPC_REQUEST_COUNT = Counter(
@@ -15,7 +16,8 @@ GRPC_REQUEST_COUNT = Counter(
 LLM_PROVIDER_LATENCY = Histogram(
     'llm_provider_duration_seconds',
     'Time spent waiting for LLM provider response',
-    ['provider', 'endpoint']
+    ['provider', 'endpoint'],
+    buckets=[1, 2, 5, 10, 30, 60, 120]
 )
 
 LLM_TOKEN_ERROR_COUNT = Counter(
