@@ -24,13 +24,11 @@ lint:
 	poetry run flake8 src
 
 test-coverage:
-	poetry run pytest tests -v --cov=src --cov-report=term-missing --asyncio-mode=auto
+	PYTHONPATH=. poetry run pytest tests -v --cov=src --cov-report=term-missing --asyncio-mode=auto
 
 test:
-	poetry run pytest tests -v \
+	PYTHONPATH=. poetry run pytest tests -v \
 		--cov=src \
 		--cov-report=term-missing \
 		--cov-fail-under=80 \
-		--cov-ignore=src/generated \
-		--cov-ignore=src/main.py \
 		--asyncio-mode=auto
