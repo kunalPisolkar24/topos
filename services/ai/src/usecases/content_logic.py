@@ -10,8 +10,6 @@ from src.usecases.prompts import Prompts
 from src.core.domain.models import GeneratedPost
 from src.core.exceptions import DataParsingError, AIServiceException
 
-_MAX_TAGS_BODY_LENGTH = 3_000
-
 class ContentLogic:
     def __init__(self, llm_provider: LLMProvider, sanitizer: SanitizerInterface | None = None):
         self.llm = llm_provider
@@ -28,7 +26,7 @@ class ContentLogic:
 
     async def generate_tags(self, title: str, body: str) -> List[str]:
         clean_body = self.cleaner.clean_html(body)
-        content = f"Title: {title}\nBody: {clean_body[:_MAX_TAGS_BODY_LENGTH]}"
+        content = f"Title: {title}\nBody: {clean_body}"
         
         raw_response = await self.llm.generate_completion(Prompts.TAGS_SYSTEM, content)
         json_str = self.cleaner.extract_json_block(raw_response)

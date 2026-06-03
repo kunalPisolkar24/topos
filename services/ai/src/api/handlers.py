@@ -9,6 +9,7 @@ from src.config.settings import settings
 _MAX_TEXT_LENGTH = 100_000
 _MAX_TITLE_LENGTH = 500
 _MAX_BODY_LENGTH = 100_000
+_MAX_TAGS_BODY_LENGTH = 3_000
 _MAX_PROMPT_LENGTH = 5_000
 _HANDLER_TIMEOUT_SECONDS = settings.LLM_HANDLER_TIMEOUT
 
@@ -44,9 +45,12 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Title exceeds maximum length of {_MAX_TITLE_LENGTH}")
         if len(request.body) > _MAX_BODY_LENGTH:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Body exceeds maximum length of {_MAX_BODY_LENGTH}")
+        body = request.body[:_MAX_TAGS_BODY_LENGTH]
+        if len(request.body) > _MAX_TAGS_BODY_LENGTH:
+            self.logger.warning("Body truncated for tag generation", "original_length", len(request.body))
         try:
             tags = await asyncio.wait_for(
-                self.logic.generate_tags(request.title, request.body),
+                self.logic.generate_tags(request.title, body),
                 timeout=_HANDLER_TIMEOUT_SECONDS
             )
             return ai_service_pb2.TagsResponse(tags=tags)
