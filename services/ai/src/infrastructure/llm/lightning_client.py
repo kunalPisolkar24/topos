@@ -2,11 +2,18 @@ import httpx
 import logging
 import time
 import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from src.config.settings import settings
 from src.core.interfaces.llm_provider import LLMProvider
 from src.core.exceptions import LLMProviderError
 from src.infrastructure.monitoring.metrics import LLM_PROVIDER_LATENCY, LLM_TOKEN_ERROR_COUNT
+
+def _is_retryable(exception: BaseException) -> bool:
+    if isinstance(exception, httpx.RequestError):
+        return True
+    if isinstance(exception, httpx.HTTPStatusError):
+        return exception.response.status_code >= 500
+    return False
 
 class LightningClient(LLMProvider):
     def __init__(self, http_client: httpx.AsyncClient):
@@ -22,15 +29,11 @@ class LightningClient(LLMProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+        retry=retry_if_exception(_is_retryable),
         reraise=True
     )
     
     async def _make_request(self, payload: dict) -> dict:
-        """
-        Internal method to execute the HTTP request with retry logic.
-        Retries ONLY occur on network errors or bad HTTP status codes.
-        """
         response = await self.client.post(
             self.url,
             headers=self.headers,

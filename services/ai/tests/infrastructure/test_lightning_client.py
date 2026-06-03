@@ -52,13 +52,29 @@ async def test_generate_completion_retry_logic(client):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_generate_completion_api_error(client):
-    respx.post(settings.LIGHTNING_AI_URL).mock(return_value=httpx.Response(401))
+async def test_generate_completion_client_error_not_retried(client):
+    route = respx.post(settings.LIGHTNING_AI_URL).mock(return_value=httpx.Response(401))
 
     with pytest.raises(LLMProviderError) as exc:
         await client.generate_completion("sys", "user")
     
     assert "401" in str(exc.value)
+    assert route.call_count == 1
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_generate_completion_server_error_retried(client):
+    route = respx.post(settings.LIGHTNING_AI_URL).mock(
+        side_effect=[
+            httpx.Response(502),
+            httpx.Response(503),
+            httpx.Response(200, json={"choices": [{"message": {"content": "Recovered"}}]})
+        ]
+    )
+
+    result = await client.generate_completion("sys", "user")
+    assert result == "Recovered"
+    assert route.call_count == 3
 
 @pytest.mark.asyncio
 @respx.mock
