@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -12,10 +13,10 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -99,12 +100,18 @@ func main() {
 		}
 	}()
 
-	go w.Start(ctx)
+	var workerWg sync.WaitGroup
+	workerWg.Add(1)
+	go func() {
+		defer workerWg.Done()
+		w.Start(ctx)
+	}()
 
 	<-stop
 
 	logger.Info("Shutting down worker...")
 	cancel()
+	workerWg.Wait()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()

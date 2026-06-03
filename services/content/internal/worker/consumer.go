@@ -3,11 +3,13 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -15,6 +17,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/segmentio/kafka-go"
+	"golang.org/x/sync/semaphore"
 )
 
 type Worker struct {
@@ -23,7 +26,11 @@ type Worker struct {
 	aiService   domain.AIService
 	producer    domain.EventProducer
 	dlqTopic    string
+	sem         *semaphore.Weighted
+	wg          sync.WaitGroup
 }
+
+const maxConcurrentWorkers = 10
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
 
@@ -44,7 +51,7 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 			Brokers:  brokers,
 			GroupID:  groupID,
 			Topic:    topics[0],
-			MinBytes: 1,
+			MinBytes: 10e3,
 			MaxBytes: 10e6,
 			MaxWait:  2 * time.Second,
 			Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
@@ -59,7 +66,7 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 			Brokers:     brokers,
 			GroupID:     groupID,
 			GroupTopics: topics,
-			MinBytes:    1,
+			MinBytes:    10e3,
 			MaxBytes:    10e6,
 			MaxWait:     2 * time.Second,
 			Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
@@ -79,6 +86,7 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 		aiService:   aiService,
 		producer:    producer,
 		dlqTopic:    dlqTopic,
+		sem:         semaphore.NewWeighted(maxConcurrentWorkers),
 	}, nil
 }
 
@@ -86,64 +94,75 @@ func (w *Worker) Start(ctx context.Context) {
 	logger.Info("Starting Kafka Consumer Worker")
 
 	for {
+		m, err := w.reader.FetchMessage(ctx)
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+				break
+			}
+			logger.Error("Failed to fetch message", "error", err)
+			continue
+		}
+
+		if err := w.sem.Acquire(ctx, 1); err != nil {
+			break
+		}
+
+		w.wg.Add(1)
+		go func(msg kafka.Message) {
+			defer w.wg.Done()
+			defer w.sem.Release(1)
+
+			w.processWithRetries(ctx, msg)
+		}(m)
+	}
+
+	w.wg.Wait()
+	logger.Info("Worker context cancelled, stopping...")
+}
+
+func (w *Worker) processWithRetries(ctx context.Context, m kafka.Message) {
+	var processErr error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		processErr = w.processMessage(ctx, m)
+		if processErr == nil {
+			break
+		}
+		logger.Warn("Failed to process message, retrying",
+			"error", processErr,
+			"attempt", attempt,
+			"maxRetries", maxRetries,
+			"offset", m.Offset,
+			"partition", m.Partition,
+		)
 		select {
 		case <-ctx.Done():
-			logger.Info("Worker context cancelled, stopping...")
 			return
-		default:
-			m, err := w.reader.FetchMessage(ctx)
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				logger.Error("Failed to fetch message", "error", err)
-				continue
+		case <-time.After(time.Duration(attempt) * 2 * time.Second):
+		}
+	}
+
+	if processErr != nil {
+		logger.Error("Message processing failed after all retries. Sending to DLQ.",
+			"error", processErr,
+			"offset", m.Offset,
+			"partition", m.Partition,
+			"dlqTopic", w.dlqTopic,
+		)
+
+		if w.producer != nil {
+			if dlqErr := w.producer.PublishDeadLetter(ctx, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
+				logger.Error("Failed to publish to DLQ", "error", dlqErr)
+				return
 			}
+		}
 
-			var processErr error
-			maxRetries := 3
-			for attempt := 1; attempt <= maxRetries; attempt++ {
-				processErr = w.processMessage(ctx, m)
-				if processErr == nil {
-					break
-				}
-				logger.Warn("Failed to process message, retrying",
-					"error", processErr,
-					"attempt", attempt,
-					"maxRetries", maxRetries,
-					"offset", m.Offset,
-					"partition", m.Partition,
-				)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Duration(attempt) * 2 * time.Second):
-				}
-			}
-
-			if processErr != nil {
-				logger.Error("Message processing failed after all retries. Sending to DLQ.",
-					"error", processErr,
-					"offset", m.Offset,
-					"partition", m.Partition,
-					"dlqTopic", w.dlqTopic,
-				)
-
-				if w.producer != nil {
-					if dlqErr := w.producer.PublishDeadLetter(ctx, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
-						logger.Error("Failed to publish to DLQ", "error", dlqErr)
-						continue
-					}
-				}
-
-				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
-					logger.Error("Failed to commit message after DLQ", "error", commitErr)
-				}
-			} else {
-				if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
-					logger.Error("Failed to commit message", "error", commitErr)
-				}
-			}
+		if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
+			logger.Error("Failed to commit message after DLQ", "error", commitErr)
+		}
+	} else {
+		if commitErr := w.reader.CommitMessages(ctx, m); commitErr != nil {
+			logger.Error("Failed to commit message", "error", commitErr)
 		}
 	}
 }

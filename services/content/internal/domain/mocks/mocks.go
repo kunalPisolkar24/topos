@@ -150,3 +150,8 @@ func (m *AIService) GeneratePost(ctx context.Context, prompt string) (*domain.Ge
 	}
 	return args.Get(0).(*domain.GeneratedPost), args.Error(1)
 }
+
+func (m *AIService) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
