@@ -4,3 +4,7 @@ class LLMProvider(ABC):
     @abstractmethod
     async def generate_completion(self, system_prompt: str, user_content: str) -> str:
         pass
+
+    @abstractmethod
+    async def is_healthy(self) -> bool:
+        pass

@@ -5,7 +5,6 @@ import grpc
 import httpx
 from prometheus_client import start_http_server
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from grpc_health.v1.health import HealthServicer
 from src.config.settings import settings
 from src.api.handlers import AIHandler
 from src.generated import ai_service_pb2_grpc
@@ -14,6 +13,21 @@ from src.infrastructure.logging.config import setup_logging
 from src.infrastructure.monitoring.interceptors import PrometheusInterceptor
 from src.usecases.content_logic import ContentLogic
 from src.utils.sanitizer import Sanitizer
+
+
+class AIHealthServicer(health_pb2_grpc.HealthServicer):
+    def __init__(self, llm_provider: LightningClient):
+        self._llm_provider = llm_provider
+
+    async def Check(self, request, context):
+        try:
+            healthy = await asyncio.wait_for(self._llm_provider.is_healthy(), timeout=5.0)
+        except (asyncio.TimeoutError, Exception):
+            healthy = False
+        if healthy:
+            return health_pb2.HealthCheckResponse(status=health_pb2.HealthCheckResponse.SERVING)
+        return health_pb2.HealthCheckResponse(status=health_pb2.HealthCheckResponse.NOT_SERVING)
+
 
 async def serve():
     setup_logging()
@@ -42,9 +56,8 @@ async def serve():
         
         ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
         
-        health_servicer = HealthServicer()
+        health_servicer = AIHealthServicer(llm_provider)
         health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
-        health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
 
         listen_addr = f"[::]:{settings.PORT}"
         server.add_insecure_port(listen_addr)

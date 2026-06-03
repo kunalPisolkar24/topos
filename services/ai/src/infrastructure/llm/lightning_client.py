@@ -39,6 +39,9 @@ class LightningClient(LLMProvider):
         except RuntimeError:
             self._gauge_task = None
 
+    async def is_healthy(self) -> bool:
+        return await self._cb.can_proceed()
+
     async def close(self):
         if self._gauge_task is not None:
             self._gauge_task.cancel()
