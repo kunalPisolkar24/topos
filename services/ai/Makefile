@@ -1,6 +1,5 @@
 .PHONY: install generate run clean lint test
-.PHONY: load-test-server load-test-install
-.PHONY: load-test-summary load-test-tags load-test-post load-test-mixed
+.PHONY: load-test build-load-test-image load-test-stop
 
 # --- Python targets ---
 
@@ -37,54 +36,37 @@ test:
 		--cov-fail-under=80 \
 		--asyncio-mode=auto
 
-# --- Load testing targets ---
+# --- Load testing (Docker only, no host installs) ---
 
-# Overridable parameters
 RPS ?= 10
 DURATION ?= 30s
 VUS ?= 5
-TARGET ?= localhost:50051
-USE_DOCKER ?= false
-K6_IMAGE ?= grafana/k6:latest
+SCRIPT ?= mixed
 
-load-test-server:
-	LOAD_TEST_MODE=true poetry run python -m src.main
+build-load-test-image:
+	docker build -t topos-ai-service .
 
-load-test-install:
-	which k6 || (echo "Installing k6..." && curl -s https://dl.k6.io/install.sh | bash)
-
-define k6_command
-$(if $(filter true,$(USE_DOCKER)), \
-	docker run --rm --network host \
-		-v "$$(PWD)/load-tests:/load-tests" \
+load-test: build-load-test-image
+	docker network create load-test-net 2>/dev/null || true
+	docker rm -f ai-service 2>/dev/null || true
+	docker run -d --rm --name ai-service \
+		--network load-test-net \
+		-e LOAD_TEST_MODE=true \
+		topos-ai-service
+	sleep 3
+	docker run --rm --network load-test-net \
 		-e PROTO_DIR=/load-tests/proto \
-		-e TARGET=$(TARGET) \
-		-e VUS=$(VUS) \
-		-e DURATION=$(DURATION) \
-		-e RPS=$(RPS) \
-		$(K6_IMAGE) run \
-		--vus $(VUS) --duration $(DURATION) \
-		--rps $(RPS) \
-		/load-tests/k6/$(1).js, \
-	k6 run \
-		-e PROTO_DIR=load-tests/proto \
-		-e TARGET=$(TARGET) \
-		-e VUS=$(VUS) \
-		-e DURATION=$(DURATION) \
-		-e RPS=$(RPS) \
-		--vus $(VUS) --duration $(DURATION) \
-		--rps $(RPS) \
-		load-tests/k6/$(1).js)
-endef
+		-e TARGET=ai-service:50051 \
+		-e VUS=$(VUS) -e DURATION=$(DURATION) -e RPS=$(RPS) \
+		-v "$(PWD)/load-tests:/load-tests" \
+		grafana/k6:latest run \
+		--vus $(VUS) --duration $(DURATION) --rps $(RPS) \
+		/load-tests/k6/$(SCRIPT).js; \
+		EXIT_CODE=$$?; \
+		docker rm -f ai-service 2>/dev/null || true; \
+		docker network rm load-test-net 2>/dev/null || true; \
+		exit $$EXIT_CODE
 
-load-test-summary:
-	$(call k6_command,generate_summary)
-
-load-test-tags:
-	$(call k6_command,generate_tags)
-
-load-test-post:
-	$(call k6_command,generate_post)
-
-load-test-mixed:
-	$(call k6_command,mixed)
+load-test-stop:
+	docker rm -f ai-service 2>/dev/null || true
+	docker network rm load-test-net 2>/dev/null || true

@@ -55,9 +55,11 @@ class MockLLMProvider(LLMProvider):
             await asyncio.sleep(self.delay_ms / 1000.0)
 
         sp_lower = system_prompt.lower()
-        if "tags" in sp_lower or "keywords" in sp_lower:
+        if "tags" in sp_lower and "json" not in sp_lower:
             return MOCK_TAGS
-        if "content creator" in sp_lower or "blog" in sp_lower:
+        if "blog" in sp_lower:
             return MOCK_POST
+        if "keywords" in sp_lower or "tags" in sp_lower:
+            return MOCK_TAGS
 
         return MOCK_SUMMARY

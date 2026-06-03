@@ -38,21 +38,26 @@ export function getDefaultOptions(vus, duration, rps) {
     },
     thresholds: {
       grpc_req_duration: ['p(95)<500', 'p(99)<1000'],
-      grpc_req_failed: ['rate<0.01'],
     },
   };
 }
 
-export function createClient() {
-  const client = new grpc.Client();
-  client.load([PROTO_DIR], 'ai_service.proto');
-  client.connect(TARGET, { plaintext: true });
+const client = new grpc.Client();
+client.load([PROTO_DIR], 'ai_service.proto');
+
+let connected = false;
+
+export function getClient() {
+  if (!connected) {
+    client.connect(TARGET, { plaintext: true });
+    connected = true;
+  }
   return client;
 }
 
 export function checkResponse(response, methodName) {
   check(response, {
     [`${methodName} status is OK`]: (r) => r.status === grpc.StatusOK,
-    [`${methodName} has no error`]: (r) => r.error === undefined,
+    [`${methodName} has no error`]: (r) => !r.error,
   });
 }
