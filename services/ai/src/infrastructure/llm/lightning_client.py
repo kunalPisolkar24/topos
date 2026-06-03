@@ -54,11 +54,13 @@ class LightningClient(LLMProvider):
         }
 
         start_time = time.perf_counter()
+        record_latency = True
         try:
             data = await self._make_request(payload)
             return data['choices'][0]['message']['content']
 
         except asyncio.CancelledError:
+            record_latency = False
             self.logger.warning("LLM request cancelled by client")
             raise
 
@@ -78,5 +80,6 @@ class LightningClient(LLMProvider):
             raise LLMProviderError("Invalid response format from provider") from e
 
         finally:
-            duration = time.perf_counter() - start_time
-            LLM_PROVIDER_LATENCY.labels(provider="lightning", endpoint="chat/completions").observe(duration)
+            if record_latency:
+                duration = time.perf_counter() - start_time
+                LLM_PROVIDER_LATENCY.labels(provider="lightning", endpoint="chat/completions").observe(duration)

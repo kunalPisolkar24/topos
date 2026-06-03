@@ -1,3 +1,4 @@
+import asyncio
 import time
 import grpc
 from grpc.aio import ServerInterceptor
@@ -20,6 +21,9 @@ class PrometheusInterceptor(ServerInterceptor):
         except grpc.RpcError as e:
             status_code = e.code().name
             raise e
+        except asyncio.CancelledError:
+            status_code = "CANCELLED"
+            raise
         except Exception:
             status_code = "INTERNAL"
             raise
