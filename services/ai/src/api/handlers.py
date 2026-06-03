@@ -5,12 +5,19 @@ from src.generated import ai_service_pb2, ai_service_pb2_grpc
 from src.usecases.content_logic import ContentLogic
 from src.core.exceptions import LLMProviderError, DataParsingError
 
+_MAX_TEXT_LENGTH = 100_000
+_MAX_TITLE_LENGTH = 500
+_MAX_BODY_LENGTH = 100_000
+_MAX_PROMPT_LENGTH = 5_000
+
 class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
     def __init__(self, logic: ContentLogic):
         self.logic = logic
         self.logger = logging.getLogger(__name__)
 
     async def GenerateSummary(self, request, context):
+        if len(request.text) > _MAX_TEXT_LENGTH:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Text exceeds maximum length of {_MAX_TEXT_LENGTH}")
         try:
             summary = await self.logic.generate_summary(request.text)
             return ai_service_pb2.ContentResponse(summary=summary)
@@ -25,6 +32,10 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             await context.abort(grpc.StatusCode.INTERNAL, "Internal service error")
 
     async def GenerateTags(self, request, context):
+        if len(request.title) > _MAX_TITLE_LENGTH:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Title exceeds maximum length of {_MAX_TITLE_LENGTH}")
+        if len(request.body) > _MAX_BODY_LENGTH:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Body exceeds maximum length of {_MAX_BODY_LENGTH}")
         try:
             tags = await self.logic.generate_tags(request.title, request.body)
             return ai_service_pb2.TagsResponse(tags=tags)
@@ -42,6 +53,8 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
             await context.abort(grpc.StatusCode.INTERNAL, "Internal service error")
 
     async def GeneratePost(self, request, context):
+        if len(request.prompt) > _MAX_PROMPT_LENGTH:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Prompt exceeds maximum length of {_MAX_PROMPT_LENGTH}")
         try:
             post = await self.logic.generate_post(request.prompt)
             return ai_service_pb2.PostGenerationResponse(
