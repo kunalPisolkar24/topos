@@ -188,6 +188,8 @@ func (c *resilientAIClient) GenerateSummary(ctx context.Context, content string)
 		}
 		c.cb.recordFailure()
 		logger.Warn("AI summary generation failed, using fallback", "error", err)
+	} else {
+		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
 	}
 	return c.fallback.GenerateSummary(ctx, content)
 }
@@ -201,6 +203,8 @@ func (c *resilientAIClient) GenerateTags(ctx context.Context, title, body string
 		}
 		c.cb.recordFailure()
 		logger.Warn("AI tags generation failed, using fallback", "error", err)
+	} else {
+		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
 	}
 	return c.fallback.GenerateTags(ctx, title, body)
 }
@@ -214,6 +218,8 @@ func (c *resilientAIClient) GeneratePost(ctx context.Context, prompt string) (*d
 		}
 		c.cb.recordFailure()
 		logger.Warn("AI post generation failed, using fallback", "error", err)
+	} else {
+		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
 	}
 	return c.fallback.GeneratePost(ctx, prompt)
 }

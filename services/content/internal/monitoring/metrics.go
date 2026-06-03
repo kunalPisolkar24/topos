@@ -38,6 +38,11 @@ var (
 		Name: "ai_circuit_breaker_state",
 		Help: "Current circuit breaker state for AI service (0=closed, 1=open, 2=half-open)",
 	}, []string{"service"})
+
+	AICircuitBreakerRejected = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ai_circuit_breaker_rejected_total",
+		Help: "Total number of requests rejected by circuit breaker",
+	}, []string{"service"})
 )
 
 const (
