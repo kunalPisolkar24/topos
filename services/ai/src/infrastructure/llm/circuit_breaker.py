@@ -2,6 +2,9 @@ import asyncio
 import logging
 import time
 
+_COOLDOWN_MIN = 60
+_COOLDOWN_MAX = 300
+
 class CircuitBreaker:
     def __init__(self, failure_threshold: int = 5, reset_timeout: float = 30.0):
         self._failure_threshold = failure_threshold
@@ -9,6 +12,8 @@ class CircuitBreaker:
         self._state = "closed"
         self._failure_count = 0
         self._last_failure_time = 0.0
+        self._rate_limit_count = 0
+        self._rate_limit_until = 0.0
         self._lock = asyncio.Lock()
         self._logger = logging.getLogger(__name__)
 
@@ -18,6 +23,8 @@ class CircuitBreaker:
 
     async def can_proceed(self) -> bool:
         async with self._lock:
+            if time.monotonic() < self._rate_limit_until:
+                return False
             if self._state == "closed":
                 return True
             if self._state == "open":
@@ -30,6 +37,7 @@ class CircuitBreaker:
 
     async def record_success(self):
         async with self._lock:
+            self._rate_limit_count = 0
             if self._state == "half-open":
                 self._state = "closed"
                 self._failure_count = 0
@@ -48,3 +56,17 @@ class CircuitBreaker:
                     "Circuit breaker opened after %d consecutive failures",
                     self._failure_count,
                 )
+
+    async def record_rate_limit(self, retry_after: int | None = None):
+        async with self._lock:
+            self._rate_limit_count += 1
+            raw = retry_after or _COOLDOWN_MIN
+            cooldown = raw * (2 ** (self._rate_limit_count - 1))
+            if cooldown < _COOLDOWN_MIN:
+                cooldown = _COOLDOWN_MIN
+            elif cooldown > _COOLDOWN_MAX:
+                cooldown = _COOLDOWN_MAX
+            self._rate_limit_until = time.monotonic() + cooldown
+            self._logger.warning(
+                "Rate limit cooldown %ds (count=%d)", cooldown, self._rate_limit_count,
+            )
