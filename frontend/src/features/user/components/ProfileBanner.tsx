@@ -18,6 +18,11 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
         className="absolute inset-0 h-full w-full bg-cover bg-center opacity-80 saturate-[0.72]"
         style={{ backgroundImage: `url(${bannerUrl})` }}
       />
+
+      {isEditing && (
+        <div className="absolute inset-0 bg-surface/50 backdrop-blur-sm" />
+      )}
+
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(var(--surface))_0%,rgb(var(--surface)/0.86)_34%,rgb(var(--surface)/0.34)_72%,rgb(var(--surface))_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_20%,rgb(var(--primary-container)/0.52),transparent_32%)]" />
       <div
@@ -38,7 +43,7 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
       </div>
 
       {isEditing && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center bg-surface/85 px-4 py-3 backdrop-blur-sm">
+        <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-center px-4 py-4">
           <label
             htmlFor="bannerUpload"
             className="interactive-hover-primary flex cursor-pointer items-center gap-3 border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-foreground"
