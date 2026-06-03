@@ -2,11 +2,6 @@ type ErrorLike = {
   message?: string;
 };
 
-type NetworkErrorLike = {
-  statusCode?: number;
-  status?: number;
-};
-
 export function buildAuthHeaders(token?: string | null) {
   if (!token) {
     return {};
@@ -25,7 +20,7 @@ export function hasUnauthorizedGraphQLError(
   );
 }
 
-export function hasUnauthorizedNetworkError(error?: NetworkErrorLike | null) {
-  const statusCode = error?.statusCode ?? error?.status;
+export function hasUnauthorizedNetworkError(error?: Record<string, unknown> | null) {
+  const statusCode = (error?.statusCode as number | undefined) ?? (error?.status as number | undefined);
   return statusCode === 401 || statusCode === 403;
 }

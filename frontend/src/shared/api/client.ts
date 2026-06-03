@@ -5,6 +5,7 @@ import {
 } from "@apollo/client";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { onError } from "@apollo/client/link/error";
+import { RetryLink } from "@apollo/client/link/retry";
 import { setContext } from "@apollo/client/link/context";
 import { buildApolloCache } from "./apollo/cache";
 import {
@@ -18,6 +19,20 @@ export interface ApolloClientDependencies {
   getToken: () => string | null;
   onUnauthorized: () => void | Promise<void>;
 }
+
+const buildRetryLink = () =>
+  new RetryLink({
+    delay: { initial: 300, max: 3000, jitter: true },
+    attempts: {
+      max: 3,
+      retryIf: (error) => {
+        if (!error) return false;
+        if (hasUnauthorizedNetworkError(error)) return false;
+        if (CombinedGraphQLErrors.is(error) && hasUnauthorizedGraphQLError(error.errors)) return false;
+        return true;
+      },
+    },
+  });
 
 export const createApolloClient = (
   deps: ApolloClientDependencies,
@@ -34,17 +49,14 @@ export const createApolloClient = (
       return;
     }
 
-    if (
-      hasUnauthorizedNetworkError(
-        error as { statusCode?: number; status?: number } | null,
-      )
-    ) {
+    if (hasUnauthorizedNetworkError(error)) {
       void deps.onUnauthorized();
     }
   });
 
   return new ApolloClient({
     link: from([
+      buildRetryLink(),
       errorLink,
       authLink,
       new HttpLink({ uri: deps.uri }),
