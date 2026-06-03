@@ -9,6 +9,7 @@ _MAX_TEXT_LENGTH = 100_000
 _MAX_TITLE_LENGTH = 500
 _MAX_BODY_LENGTH = 100_000
 _MAX_PROMPT_LENGTH = 5_000
+_HANDLER_TIMEOUT_SECONDS = 120
 
 class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
     def __init__(self, logic: ContentLogic):
@@ -19,11 +20,17 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         if len(request.text) > _MAX_TEXT_LENGTH:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Text exceeds maximum length of {_MAX_TEXT_LENGTH}")
         try:
-            summary = await self.logic.generate_summary(request.text)
+            summary = await asyncio.wait_for(
+                self.logic.generate_summary(request.text),
+                timeout=_HANDLER_TIMEOUT_SECONDS
+            )
             return ai_service_pb2.ContentResponse(summary=summary)
         except asyncio.CancelledError:
             self.logger.warning("GenerateSummary request cancelled by client")
             await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+        except TimeoutError:
+            self.logger.warning("GenerateSummary timed out")
+            await context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "Request timed out")
         except LLMProviderError as e:
             self.logger.error(f"Summary generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
@@ -37,11 +44,17 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         if len(request.body) > _MAX_BODY_LENGTH:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Body exceeds maximum length of {_MAX_BODY_LENGTH}")
         try:
-            tags = await self.logic.generate_tags(request.title, request.body)
+            tags = await asyncio.wait_for(
+                self.logic.generate_tags(request.title, request.body),
+                timeout=_HANDLER_TIMEOUT_SECONDS
+            )
             return ai_service_pb2.TagsResponse(tags=tags)
         except asyncio.CancelledError:
             self.logger.warning("GenerateTags request cancelled by client")
             await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+        except TimeoutError:
+            self.logger.warning("GenerateTags timed out")
+            await context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "Request timed out")
         except DataParsingError as e:
             self.logger.warning(f"Tags parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
@@ -56,7 +69,10 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         if len(request.prompt) > _MAX_PROMPT_LENGTH:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"Prompt exceeds maximum length of {_MAX_PROMPT_LENGTH}")
         try:
-            post = await self.logic.generate_post(request.prompt)
+            post = await asyncio.wait_for(
+                self.logic.generate_post(request.prompt),
+                timeout=_HANDLER_TIMEOUT_SECONDS
+            )
             return ai_service_pb2.PostGenerationResponse(
                 title=post.title,
                 body=post.body,
@@ -66,6 +82,9 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except asyncio.CancelledError:
             self.logger.warning("GeneratePost request cancelled by client")
             await context.abort(grpc.StatusCode.CANCELLED, "Request cancelled")
+        except TimeoutError:
+            self.logger.warning("GeneratePost timed out")
+            await context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "Request timed out")
         except DataParsingError as e:
             self.logger.warning(f"Post parsing error: {e}")
             await context.abort(grpc.StatusCode.DATA_LOSS, str(e))
