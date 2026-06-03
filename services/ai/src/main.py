@@ -11,6 +11,7 @@ from src.infrastructure.llm.lightning_client import LightningClient
 from src.infrastructure.logging.config import setup_logging
 from src.infrastructure.monitoring.interceptors import PrometheusInterceptor
 from src.usecases.content_logic import ContentLogic
+from src.utils.sanitizer import Sanitizer
 
 async def serve():
     setup_logging()
@@ -28,7 +29,7 @@ async def serve():
 
     try:
         llm_provider = LightningClient(http_client)
-        content_logic = ContentLogic(llm_provider)
+        content_logic = ContentLogic(llm_provider, Sanitizer())
         handler = AIHandler(content_logic)
 
         interceptors = [PrometheusInterceptor()]

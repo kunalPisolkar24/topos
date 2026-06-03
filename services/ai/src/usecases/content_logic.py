@@ -3,6 +3,7 @@ import logging
 from typing import List
 from pydantic import ValidationError
 from src.core.interfaces.llm_provider import LLMProvider
+from src.core.interfaces.sanitizer import SanitizerInterface
 from src.utils.text_cleaner import TextCleaner
 from src.utils.sanitizer import Sanitizer
 from src.usecases.prompts import Prompts
@@ -10,8 +11,9 @@ from src.core.domain.models import GeneratedPost
 from src.core.exceptions import DataParsingError, AIServiceException
 
 class ContentLogic:
-    def __init__(self, llm_provider: LLMProvider):
+    def __init__(self, llm_provider: LLMProvider, sanitizer: SanitizerInterface | None = None):
         self.llm = llm_provider
+        self.sanitizer = sanitizer or Sanitizer()
         self.cleaner = TextCleaner()
         self.logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class ContentLogic:
         try:
             post = GeneratedPost.model_validate_json(json_str)
             
-            post.body = Sanitizer.clean_post_html(post.body)
+            post.body = self.sanitizer.clean_post_html(post.body)
             
             return post
 

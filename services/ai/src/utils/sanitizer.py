@@ -1,7 +1,8 @@
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
+from src.core.interfaces.sanitizer import SanitizerInterface
 
-class Sanitizer:
+class Sanitizer(SanitizerInterface):
     ALLOWED_TAGS = [
         'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'code', 'div',
         'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'iframe',
