@@ -7,12 +7,21 @@ import type { ApolloClient } from "@apollo/client";
 import { createApolloClient } from "@/shared/api";
 import { env } from "@/shared/config/env";
 
-type RenderOptions = {
+export type RenderOptions = {
   route?: string;
   state?: Record<string, unknown>;
 };
 
 const noopUnauthorized = async () => {};
+
+function parseRoute(route: string): { pathname: string; search?: string } {
+  const idx = route.indexOf("?");
+  if (idx === -1) return { pathname: route };
+  return {
+    pathname: route.slice(0, idx),
+    search: route.slice(idx),
+  };
+}
 
 function Providers({
   children,
@@ -29,7 +38,7 @@ function Providers({
   }
   return (
     <ApolloProvider client={clientRef.current}>
-      <MemoryRouter initialEntries={[{ pathname: route, state }]}>
+      <MemoryRouter initialEntries={[{ ...parseRoute(route), state }]}>
         {children}
       </MemoryRouter>
     </ApolloProvider>
