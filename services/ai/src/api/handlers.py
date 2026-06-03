@@ -4,12 +4,13 @@ import asyncio
 from src.generated import ai_service_pb2, ai_service_pb2_grpc
 from src.usecases.content_logic import ContentLogic
 from src.core.exceptions import LLMProviderError, DataParsingError
+from src.config.settings import settings
 
 _MAX_TEXT_LENGTH = 100_000
 _MAX_TITLE_LENGTH = 500
 _MAX_BODY_LENGTH = 100_000
 _MAX_PROMPT_LENGTH = 5_000
-_HANDLER_TIMEOUT_SECONDS = 120
+_HANDLER_TIMEOUT_SECONDS = settings.LLM_HANDLER_TIMEOUT
 
 class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
     def __init__(self, logic: ContentLogic):

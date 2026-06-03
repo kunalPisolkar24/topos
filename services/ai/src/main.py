@@ -23,7 +23,7 @@ async def serve():
     logger.info(f"Prometheus metrics exposed on port {settings.METRICS_PORT}")
 
     http_client = httpx.AsyncClient(
-        timeout=settings.TIMEOUT_SECONDS,
+        timeout=httpx.Timeout(settings.LLM_REQUEST_TIMEOUT),
         limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
     )
 
