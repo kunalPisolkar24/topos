@@ -32,7 +32,10 @@ class ContentLogic:
         try:
             tags = json.loads(json_str)
             if isinstance(tags, list):
-                return [str(t) for t in tags if isinstance(t, str)]
+                valid_tags = [str(t) for t in tags if isinstance(t, str)]
+                if not valid_tags:
+                    raise ValueError("No valid string tags found in response")
+                return valid_tags
             raise ValueError("Response is not a list")
         except (json.JSONDecodeError, ValueError) as e:
             self.logger.error(f"Tag parsing failed: {e}. Raw: {json_str}")

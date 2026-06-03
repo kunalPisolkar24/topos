@@ -31,6 +31,20 @@ async def test_generate_tags_invalid_json(logic, mock_llm_provider):
         await logic.generate_tags("Title", "Body")
 
 @pytest.mark.asyncio
+async def test_generate_tags_empty_list(logic, mock_llm_provider):
+    mock_llm_provider.generate_completion.return_value = '[1, 2, 3]'
+
+    with pytest.raises(DataParsingError):
+        await logic.generate_tags("Title", "Body")
+
+@pytest.mark.asyncio
+async def test_generate_tags_empty_after_filter(logic, mock_llm_provider):
+    mock_llm_provider.generate_completion.return_value = '[42, true]'
+
+    with pytest.raises(DataParsingError):
+        await logic.generate_tags("Title", "Body")
+
+@pytest.mark.asyncio
 async def test_generate_post_success(logic, mock_llm_provider, valid_post_json):
     mock_llm_provider.generate_completion.return_value = valid_post_json
     result = await logic.generate_post("topic")
