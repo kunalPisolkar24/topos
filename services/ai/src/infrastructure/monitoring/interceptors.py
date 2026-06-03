@@ -2,11 +2,14 @@ import asyncio
 import time
 import grpc
 from grpc.aio import ServerInterceptor
+from src.core.context import trace_id_var, generate_trace_id
 from src.infrastructure.monitoring.metrics import (
     GRPC_REQUEST_LATENCY, 
     GRPC_REQUEST_COUNT, 
     ACTIVE_REQUESTS
 )
+
+_HEALTH_METHOD = "/grpc.health.v1.Health/Check"
 
 class PrometheusInterceptor(ServerInterceptor):
     async def intercept_service(self, continuation, handler_call_details):
@@ -14,7 +17,10 @@ class PrometheusInterceptor(ServerInterceptor):
         start_time = time.perf_counter()
         status_code = "OK"
         
-        ACTIVE_REQUESTS.inc()
+        trace_id_var.set(generate_trace_id())
+        
+        if method_name != _HEALTH_METHOD:
+            ACTIVE_REQUESTS.inc()
         
         try:
             return await continuation(handler_call_details)
@@ -28,8 +34,8 @@ class PrometheusInterceptor(ServerInterceptor):
             status_code = "INTERNAL"
             raise
         finally:
-            duration = time.perf_counter() - start_time
-            ACTIVE_REQUESTS.dec()
+            if method_name != _HEALTH_METHOD:
+                ACTIVE_REQUESTS.dec()
             
             GRPC_REQUEST_LATENCY.labels(
                 method=method_name, 
