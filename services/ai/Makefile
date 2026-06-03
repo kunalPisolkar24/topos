@@ -1,4 +1,7 @@
 .PHONY: install generate run clean lint test
+.PHONY: load-test build-load-test-image load-test-stop
+
+# --- Python targets ---
 
 install:
 	poetry install
@@ -32,3 +35,38 @@ test:
 		--cov-report=term-missing \
 		--cov-fail-under=80 \
 		--asyncio-mode=auto
+
+# --- Load testing (Docker only, no host installs) ---
+
+RPS ?= 10
+DURATION ?= 30s
+VUS ?= 5
+SCRIPT ?= mixed
+
+build-load-test-image:
+	docker build -t topos-ai-service .
+
+load-test: build-load-test-image
+	docker network create load-test-net 2>/dev/null || true
+	docker rm -f ai-service 2>/dev/null || true
+	docker run -d --rm --name ai-service \
+		--network load-test-net \
+		-e LOAD_TEST_MODE=true \
+		topos-ai-service
+	sleep 3
+	docker run --rm --network load-test-net \
+		-e PROTO_DIR=/load-tests/proto \
+		-e TARGET=ai-service:50051 \
+		-e VUS=$(VUS) -e DURATION=$(DURATION) -e RPS=$(RPS) \
+		-v "$(PWD)/load-tests:/load-tests" \
+		grafana/k6:latest run \
+		--vus $(VUS) --duration $(DURATION) --rps $(RPS) \
+		/load-tests/k6/$(SCRIPT).js; \
+		EXIT_CODE=$$?; \
+		docker rm -f ai-service 2>/dev/null || true; \
+		docker network rm load-test-net 2>/dev/null || true; \
+		exit $$EXIT_CODE
+
+load-test-stop:
+	docker rm -f ai-service 2>/dev/null || true
+	docker network rm load-test-net 2>/dev/null || true
