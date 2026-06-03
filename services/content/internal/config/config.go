@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Port            string
+	Environment     string
 	MongoURI        string
 	DbName          string
 	JwtSecret       string
@@ -42,6 +43,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		Port:            getEnv("PORT", "4002"),
+		Environment:     getEnv("APP_ENV", "development"),
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:          getEnv("DB_NAME", "blog_content"),
 		JwtSecret:       getEnv("JWT_SECRET", "secret"),

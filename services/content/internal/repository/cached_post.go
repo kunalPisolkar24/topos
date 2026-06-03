@@ -40,12 +40,8 @@ func (r *cachedPostRepo) Create(ctx context.Context, post *domain.Post) (*domain
 	if err != nil {
 		return nil, err
 	}
-	if err := r.invalidateAllLists(ctx); err != nil {
-		return nil, err
-	}
-	if err := r.invalidateAuthorAndTagLists(ctx, created.AuthorID, created.Tags); err != nil {
-		return nil, err
-	}
+	r.invalidateAllLists(ctx)
+	r.invalidateAuthorAndTagLists(ctx, created.AuthorID, created.Tags)
 	return created, nil
 }
 
@@ -54,15 +50,9 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	if err != nil {
 		return nil, err
 	}
-	if err := r.invalidate(ctx, id); err != nil {
-		return nil, err
-	}
-	if err := r.invalidateAllLists(ctx); err != nil {
-		return nil, err
-	}
-	if err := r.invalidateAuthorAndTagLists(ctx, updatedPost.AuthorID, updatedPost.Tags); err != nil {
-		return nil, err
-	}
+	r.invalidate(ctx, id)
+	r.invalidateAllLists(ctx)
+	r.invalidateAuthorAndTagLists(ctx, updatedPost.AuthorID, updatedPost.Tags)
 	return updatedPost, nil
 }
 
@@ -71,7 +61,8 @@ func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary s
 	if err != nil {
 		return err
 	}
-	return r.invalidate(ctx, id)
+	r.invalidate(ctx, id)
+	return nil
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
@@ -86,15 +77,9 @@ func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
 	if err := r.fallback.Delete(ctx, id); err != nil {
 		return err
 	}
-	if err := r.invalidate(ctx, id); err != nil {
-		return err
-	}
-	if err := r.invalidateAllLists(ctx); err != nil {
-		return err
-	}
-	if err := r.invalidateAuthorAndTagLists(ctx, existing.AuthorID, existing.Tags); err != nil {
-		return err
-	}
+	r.invalidate(ctx, id)
+	r.invalidateAllLists(ctx)
+	r.invalidateAuthorAndTagLists(ctx, existing.AuthorID, existing.Tags)
 	return nil
 }
 
@@ -223,31 +208,30 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 	}
 }
 
-func (r *cachedPostRepo) invalidate(ctx context.Context, id string) error {
+func (r *cachedPostRepo) invalidate(ctx context.Context, id string) {
 	key := fmt.Sprintf("post:%s", id)
 	r.sf.Forget(key)
 	if err := r.redis.Del(ctx, key).Err(); err != nil {
-		logger.Error("Critical: Failed to invalidate cache", "key", key, "error", err)
-		return fmt.Errorf("failed to invalidate cache: %w", err)
+		logger.Error("Cache invalidation failed, continuing", "key", key, "error", err)
+		return
 	}
 	monitoring.RecordCacheDel()
-	return nil
 }
 
-func (r *cachedPostRepo) deleteByPattern(ctx context.Context, pattern string) error {
+func (r *cachedPostRepo) deleteByPattern(ctx context.Context, pattern string) {
 	keys, err := r.scanKeys(ctx, pattern)
 	if err != nil {
-		return err
+		logger.Error("Cache scan failed for invalidation, continuing", "pattern", pattern, "error", err)
+		return
 	}
 	if len(keys) == 0 {
-		return nil
+		return
 	}
 	if err := r.redis.Del(ctx, keys...).Err(); err != nil {
-		logger.Error("Critical: Failed to invalidate list cache", "pattern", pattern, "error", err)
-		return fmt.Errorf("failed to invalidate list cache %q: %w", pattern, err)
+		logger.Error("Cache invalidation by pattern failed, continuing", "pattern", pattern, "error", err)
+		return
 	}
 	monitoring.RecordCacheDel()
-	return nil
 }
 
 func (r *cachedPostRepo) scanKeys(ctx context.Context, pattern string) ([]string, error) {
@@ -270,14 +254,12 @@ func (r *cachedPostRepo) scanKeys(ctx context.Context, pattern string) ([]string
 	return keys, nil
 }
 
-func (r *cachedPostRepo) invalidateAllLists(ctx context.Context) error {
-	return r.deleteByPattern(ctx, "posts:all:*")
+func (r *cachedPostRepo) invalidateAllLists(ctx context.Context) {
+	r.deleteByPattern(ctx, "posts:all:*")
 }
 
-func (r *cachedPostRepo) invalidateAuthorAndTagLists(ctx context.Context, authorID string, tags []string) error {
-	if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:author:%s:*", authorID)); err != nil {
-		return err
-	}
+func (r *cachedPostRepo) invalidateAuthorAndTagLists(ctx context.Context, authorID string, tags []string) {
+	r.deleteByPattern(ctx, fmt.Sprintf("posts:author:%s:*", authorID))
 	seen := make(map[string]struct{}, len(tags))
 	for _, tag := range tags {
 		if tag == "" {
@@ -287,9 +269,6 @@ func (r *cachedPostRepo) invalidateAuthorAndTagLists(ctx context.Context, author
 			continue
 		}
 		seen[tag] = struct{}{}
-		if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:tag:%s:*", tag)); err != nil {
-			return err
-		}
+		r.deleteByPattern(ctx, fmt.Sprintf("posts:tag:%s:*", tag))
 	}
-	return nil
 }

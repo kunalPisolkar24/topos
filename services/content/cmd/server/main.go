@@ -27,6 +27,11 @@ func main() {
 	logger.Init()
 	cfg := config.LoadConfig()
 
+	if cfg.JwtSecret == "secret" && cfg.Environment == "production" {
+		logger.Error("JWT_SECRET is still set to the default value. Refusing to start.")
+		os.Exit(1)
+	}
+
 	mongoClient, err := db.Connect(cfg.MongoURI)
 	if err != nil {
 		logger.Error("Failed to connect to MongoDB", "error", err)
@@ -89,7 +94,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/query", metricsMiddleware(authMiddleware(srv)))
-	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	if cfg.Environment != "production" {
+		mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	}
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := redisClient.Ping(r.Context()).Err(); err != nil {
@@ -102,9 +109,14 @@ func main() {
 
 	logger.Info("Content Service starting", "port", cfg.Port)
 
+	handler := middleware.RecoveryMiddleware(mux)
+
 	server := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: mux,
+		Addr:         ":" + cfg.Port,
+		Handler:      handler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	stop := make(chan os.Signal, 1)
