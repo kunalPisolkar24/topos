@@ -1,171 +1,81 @@
+include:
+  - path: infra/mongo.yml
+  - path: infra/redis.yml
+
 services:
   content-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: content-service
+    container_name: ${CONTENT_SERVICE_CONTAINER}
     restart: unless-stopped
     ports:
-      - "4002:4002"
+      - "${CONTENT_SERVICE_EXT_PORT}:${CONTENT_SERVICE_INT_PORT}"
     environment:
-      - PORT=4002
-      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
-      - DB_NAME=blog_content
-      - JWT_SECRET=my_secret_pass
-      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
-      - KAFKA_TOPIC=posts
-      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
-      - REDIS_MASTER_NAME=mymaster
+      - PORT=${CONTENT_SERVICE_INT_PORT}
+      - MONGO_URI=${CONTENT_MONGO_URI}
+      - DB_NAME=${CONTENT_DB_NAME}
+      - JWT_SECRET=${CONTENT_JWT_SECRET}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
+      - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
+      - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_SERVICE_INT_PORT}/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - app-network
     depends_on:
-      mongo1:
+      content-mongo-1:
         condition: service_healthy
-      redis-master:
-        condition: service_started
-      redis-sentinel-1:
-        condition: service_started
+      content-redis-master:
+        condition: service_healthy
+      content-redis-sentinel-1:
+        condition: service_healthy
 
   content-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: content-worker
+    container_name: ${CONTENT_WORKER_CONTAINER}
     restart: unless-stopped
-    command: ["./content-worker"]
+    command: [ "./content-worker" ]
     ports:
-      - "4003:4002"
+      - "${CONTENT_WORKER_EXT_PORT}:${CONTENT_WORKER_INT_PORT}"
     environment:
-      - PORT=4002
-      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
-      - DB_NAME=blog_content
-      - KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
-      - KAFKA_TOPIC=posts
-      - REDIS_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
-      - REDIS_MASTER_NAME=mymaster
+      - PORT=${CONTENT_WORKER_INT_PORT}
+      - MONGO_URI=${CONTENT_MONGO_URI}
+      - DB_NAME=${CONTENT_DB_NAME}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - REDIS_ADDRS=${CONTENT_REDIS_ADDRS}
+      - REDIS_MASTER_NAME=${CONTENT_REDIS_MASTER_NAME}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
+      - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:4002/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_WORKER_INT_PORT}/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - app-network
     depends_on:
-      mongo1:
+      content-mongo-1:
         condition: service_healthy
-      redis-master:
-        condition: service_started
-      redis-sentinel-1:
-        condition: service_started
-
-  mongo1:
-    image: mongo:7.0
-    container_name: mongo1
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo1_data:/data/db
-    networks:
-      - app-network
-    healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo1:27017'},{_id:1,host:'mongo2:27017'},{_id:2,host:'mongo3:27017'}]}) }" | mongosh --port 27017 --quiet
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 5s
-
-  mongo2:
-    image: mongo:7.0
-    container_name: mongo2
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
-    volumes:
-      - mongo2_data:/data/db
-    networks:
-      - app-network
-
-  mongo3:
-    image: mongo:7.0
-    container_name: mongo3
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
-    volumes:
-      - mongo3_data:/data/db
-    networks:
-      - app-network
-
-  redis-master:
-    image: redis:7.0
-    container_name: redis-master
-    command: redis-server --appendonly yes
-    networks:
-      - app-network
-
-  redis-replica:
-    image: redis:7.0
-    container_name: redis-replica
-    command: redis-server --replicaof redis-master 6379
-    depends_on:
-      - redis-master
-    networks:
-      - app-network
-
-  redis-sentinel-1:
-    image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-1
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - redis-master
-      - redis-replica
-    ports:
-      - "26379:26379"
-    networks:
-      - app-network
-
-  redis-sentinel-2:
-    image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-2
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - redis-master
-      - redis-replica
-    networks:
-      - app-network
-
-  redis-sentinel-3:
-    image: bitnami/redis-sentinel:7.0
-    container_name: redis-sentinel-3
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=mymaster
-      - REDIS_SENTINEL_QUORUM=2
-    depends_on:
-      - redis-master
-      - redis-replica
-    networks:
-      - app-network
+      content-redis-master:
+        condition: service_healthy
+      content-redis-sentinel-1:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
 
 networks:
   app-network:
-    driver: bridge
-
-volumes:
-  mongo1_data:
-  mongo2_data:
-  mongo3_data:
+    external: true
+    name: ${APP_NETWORK}

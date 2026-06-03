@@ -1,12 +1,25 @@
-import { PrismaClient } from '../generated/prisma/client';
+import { PrismaClient, User } from '../generated/prisma/client';
 import { PasswordUtils } from '../utils/password';
 import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
-import { IUserService, PaginationArgs } from './interfaces/user.service.interface';
+import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
 import { metrics } from '../lib/metrics';
 
 export class UserService implements IUserService {
     constructor(private readonly prisma: PrismaClient) { }
+
+    private toUserResponse(user: User): UserResponse {
+        return {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            name: user.name,
+            bio: user.bio,
+            avatarUrl: user.avatarUrl,
+            bannerUrl: user.bannerUrl,
+            createdAt: user.createdAt.toISOString(),
+        };
+    }
 
     private async measureDb<T>(operation: string, fn: () => Promise<T>): Promise<T> {
         const stopTimer = metrics.dbOperations.startTimer({ operation, model: 'User' });
@@ -49,10 +62,7 @@ export class UserService implements IUserService {
         const token = JwtUtils.sign({ id: user.id });
 
         return {
-            user: {
-                ...user,
-                createdAt: user.createdAt.toISOString(),
-            },
+            user: this.toUserResponse(user),
             token,
         };
     }
@@ -76,10 +86,7 @@ export class UserService implements IUserService {
         const token = JwtUtils.sign({ id: user.id });
 
         return {
-            user: {
-                ...user,
-                createdAt: user.createdAt.toISOString(),
-            },
+            user: this.toUserResponse(user),
             token,
         };
     }
@@ -93,10 +100,7 @@ export class UserService implements IUserService {
 
         if (!user) return null;
 
-        return {
-            ...user,
-            createdAt: user.createdAt.toISOString(),
-        };
+        return this.toUserResponse(user);
     }
 
     async findByIds(ids: readonly number[]) {
@@ -110,7 +114,7 @@ export class UserService implements IUserService {
 
         return ids.map(id => {
             const user = userMap.get(id);
-            return user ? { ...user, createdAt: user.createdAt.toISOString() } : null;
+            return user ? this.toUserResponse(user) : null;
         });
     }
 
@@ -124,10 +128,7 @@ export class UserService implements IUserService {
             })
         );
 
-        return users.map(user => ({
-            ...user,
-            createdAt: user.createdAt.toISOString()
-        }));
+        return users.map(user => this.toUserResponse(user));
     }
 
     async updateProfile(userId: number, data: UpdateProfileInput) {
@@ -151,9 +152,6 @@ export class UserService implements IUserService {
             })
         );
 
-        return {
-            ...updatedUser,
-            createdAt: updatedUser.createdAt.toISOString(),
-        };
+        return this.toUserResponse(updatedUser);
     }
 }

@@ -6,15 +6,32 @@ import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../core/interfaces/metrics.interface.js';
 import { PostDocument } from '../../core/entities/post.entity.js';
 
-const PostEventSchema = z.object({
-  PostID: z.string(),
-  Title: z.string(),
-  Body: z.string(),
-  ImageURL: z.string().nullable().optional(),
-  CreatedAt: z.string(),
+const PostEventSchema = z.preprocess((value) => {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  const record = value as Record<string, unknown>;
+  if ('PostID' in record || 'Title' in record || 'Body' in record || 'CreatedAt' in record || 'ImageURL' in record) {
+    return {
+      postId: record.PostID,
+      title: record.Title,
+      body: record.Body,
+      imageUrl: record.ImageURL ?? null,
+      createdAt: record.CreatedAt,
+      slug: record.slug,
+      summary: record.summary
+    };
+  }
+  return value;
+}, z.object({
+  postId: z.string(),
+  title: z.string(),
+  body: z.string(),
+  imageUrl: z.string().nullable().optional(),
+  createdAt: z.string(),
   slug: z.string().optional(),
   summary: z.string().optional()
-});
+}));
 
 export class IngestService {
   constructor(
@@ -50,13 +67,13 @@ export class IngestService {
         const data = parsed.data;
 
         const doc: PostDocument = {
-            postId: data.PostID,
-            title: data.Title,
-            body: data.Body,
+            postId: data.postId,
+            title: data.title,
+            body: data.body,
             summary: data.summary,
             slug: data.slug,
-            imageUrl: data.ImageURL || null,
-            createdAt: data.CreatedAt
+            imageUrl: data.imageUrl || null,
+            createdAt: data.createdAt
         };
 
         docsToUpsert.push(doc);

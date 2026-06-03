@@ -15,6 +15,8 @@ const envSchema = z.object({
   REDIS_MASTER_NAME: z.string().default('mymaster'),
   REDIS_SENTINELS: z.string().optional(),
   REDIS_PASSWORD: z.string().optional(),
+  USER_CACHE_TTL_MS: z.coerce.number().int().positive().default(3600000),
+  USER_MISSING_CACHE_TTL_MS: z.coerce.number().int().positive().default(60000),
 });
 
 export const env = envSchema.parse(process.env);

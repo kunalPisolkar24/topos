@@ -1,11 +1,12 @@
 import { Kafka, Producer, Partitioners } from 'kafkajs';
 import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
 import { DlqMessage } from '../../core/entities/dlq-message.entity.js';
-import { config } from '../../config/index.js';
+import { getWorkerConfig } from '../../config/index.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 
 export class KafkaDlqProducer implements IDlqProducer {
   private producer: Producer;
+  private readonly config = getWorkerConfig();
 
   constructor(kafka: Kafka, private readonly logger: ILogger) {
     this.producer = kafka.producer({
@@ -26,7 +27,7 @@ export class KafkaDlqProducer implements IDlqProducer {
   async publish(message: DlqMessage): Promise<void> {
     try {
       await this.producer.send({
-        topic: config.TOPIC_DLQ,
+        topic: this.config.TOPIC_DLQ,
         messages: [
           {
             key: message.key || 'unknown',

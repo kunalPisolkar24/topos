@@ -1,16 +1,31 @@
 import pino from 'pino';
 import { env } from '../config/env';
 
+const isProduction = env.NODE_ENV === 'production';
+
+const createTransport = () => {
+    if (isProduction) {
+        return undefined;
+    }
+
+    try {
+        require.resolve('pino-pretty');
+        return {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                ignore: 'pid,hostname',
+                translateTime: 'SYS:standard'
+            }
+        };
+    } catch {
+        return undefined;
+    }
+};
+
 export const logger = pino({
-    level: env.NODE_ENV === 'production' ? 'info' : 'debug',
-    transport: env.NODE_ENV !== 'production' ? {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            ignore: 'pid,hostname',
-            translateTime: 'SYS:standard'
-        }
-    } : undefined,
+    level: isProduction ? 'info' : 'debug',
+    transport: createTransport(),
     formatters: {
         level: (label) => {
             return { level: label };
@@ -20,5 +35,5 @@ export const logger = pino({
         paths: ['password', 'token', 'headers.authorization', 'user.password', 'input.password'],
         remove: true
     },
-    base: env.NODE_ENV === 'production' ? undefined : { pid: process.pid, hostname: require('os').hostname() }
+    base: isProduction ? undefined : { pid: process.pid, hostname: require('os').hostname() }
 });

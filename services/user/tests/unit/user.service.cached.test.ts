@@ -28,13 +28,21 @@ describe('CachedUserService', () => {
     });
 
     it('signup should pass through', async () => {
-        await cachedService.signup({} as any);
+        const authResponse = { user: { id: 1 }, token: 'token' } as any;
+        (mockService.signup as any).mockResolvedValue(authResponse);
+
+        await expect(cachedService.signup({} as any)).resolves.toEqual(authResponse);
         expect(mockService.signup).toHaveBeenCalled();
+        expect(mockCache.set).toHaveBeenCalledWith('user:1', authResponse.user, expect.any(Number));
     });
 
     it('signin should pass through', async () => {
-        await cachedService.signin({} as any);
+        const authResponse = { user: { id: 1 }, token: 'token' } as any;
+        (mockService.signin as any).mockResolvedValue(authResponse);
+
+        await expect(cachedService.signin({} as any)).resolves.toEqual(authResponse);
         expect(mockService.signin).toHaveBeenCalled();
+        expect(mockCache.set).toHaveBeenCalledWith('user:1', authResponse.user, expect.any(Number));
     });
 
     describe('findById', () => {
@@ -87,20 +95,21 @@ describe('CachedUserService', () => {
     });
 
     describe('updateProfile', () => {
-        it('should update and invalidate cache', async () => {
+        it('should update and refresh cache', async () => {
             const updatedUser = { id: 1, name: 'New' };
             (mockService.updateProfile as any).mockResolvedValue(updatedUser);
 
             const result = await cachedService.updateProfile(1, { name: 'New' });
             expect(result).toEqual(updatedUser);
-            expect(mockCache.delete).toHaveBeenCalledWith('user:1');
+            expect(mockCache.set).toHaveBeenCalledWith('user:1', updatedUser, expect.any(Number));
         });
 
-        it('should handle cache delete errors', async () => {
+        it('should handle cache write errors by falling back to delete', async () => {
             (mockService.updateProfile as any).mockResolvedValue({ id: 1 });
-            (mockCache.delete as any).mockRejectedValue(new Error('Fail'));
+            (mockCache.set as any).mockRejectedValue(new Error('Fail'));
 
             await expect(cachedService.updateProfile(1, {})).resolves.not.toThrow();
+            expect(mockCache.delete).toHaveBeenCalledWith('user:1');
         });
     });
 

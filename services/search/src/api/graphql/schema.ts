@@ -3,13 +3,8 @@ import { gql } from 'graphql-tag';
 export const typeDefs = gql`
   extend schema @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable"])
 
-  type Post @key(fields: "id") {
+  type Post @key(fields: "id", resolvable: false) {
     id: ID!
-    title: String
-    summary: String
-    slug: String
-    createdAt: String
-    imageUrl: String
   }
 
   type SearchResult @shareable {

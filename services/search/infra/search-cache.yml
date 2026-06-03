@@ -1,7 +1,5 @@
-version: '3.8'
-
 x-redis-common: &redis-common
-  image: bitnami/redis:7.2
+  image: redis:7.2-alpine
   restart: always
   networks:
     - app-network
@@ -18,8 +16,16 @@ x-redis-common: &redis-common
         memory: 256M
 
 x-sentinel-common: &sentinel-common
-  image: bitnami/redis-sentinel:7.2
+  image: redis:7.2-alpine
   restart: always
+  command: >
+    sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+    echo 'sentinel monitor ${SEARCH_REDIS_MASTER_NAME} ${SEARCH_REDIS_MASTER_CONTAINER} 6379 2' >> /tmp/sentinel.conf &&
+    echo 'sentinel down-after-milliseconds ${SEARCH_REDIS_MASTER_NAME} 3000' >> /tmp/sentinel.conf &&
+    echo 'sentinel failover-timeout ${SEARCH_REDIS_MASTER_NAME} 60000' >> /tmp/sentinel.conf &&
+    echo 'sentinel parallel-syncs ${SEARCH_REDIS_MASTER_NAME} 1' >> /tmp/sentinel.conf &&
+    echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+    redis-sentinel /tmp/sentinel.conf"
   networks:
     - app-network
   healthcheck:
@@ -44,63 +50,49 @@ x-sentinel-common: &sentinel-common
 services:
   search-redis-master:
     <<: *redis-common
-    container_name: search-redis-master
-    environment:
-      - REDIS_REPLICATION_MODE=master
-      - ALLOW_EMPTY_PASSWORD=yes
+    container_name: ${SEARCH_REDIS_MASTER_CONTAINER}
+    command: redis-server --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    volumes:
+      - search_redis_master_data:/data
 
   search-redis-replica-1:
     <<: *redis-common
-    container_name: search-redis-replica-1
-    environment:
-      - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=search-redis-master
-      - ALLOW_EMPTY_PASSWORD=yes
+    container_name: ${SEARCH_REDIS_REPLICA_1_CONTAINER}
+    command: redis-server --replicaof ${SEARCH_REDIS_MASTER_CONTAINER} 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    volumes:
+      - search_redis_replica_1_data:/data
     depends_on:
       search-redis-master:
         condition: service_healthy
 
   search-redis-replica-2:
     <<: *redis-common
-    container_name: search-redis-replica-2
-    environment:
-      - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=search-redis-master
-      - ALLOW_EMPTY_PASSWORD=yes
+    container_name: ${SEARCH_REDIS_REPLICA_2_CONTAINER}
+    command: redis-server --replicaof ${SEARCH_REDIS_MASTER_CONTAINER} 6379 --appendonly yes --repl-diskless-load on-empty-db --repl-diskless-sync yes
+    volumes:
+      - search_redis_replica_2_data:/data
     depends_on:
       search-redis-master:
         condition: service_healthy
 
   search-redis-sentinel-1:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-1
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
-      - REDIS_SENTINEL_QUORUM=2
+    container_name: ${SEARCH_REDIS_SENTINEL_1_CONTAINER}
 
   search-redis-sentinel-2:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-2
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
-      - REDIS_SENTINEL_QUORUM=2
+    container_name: ${SEARCH_REDIS_SENTINEL_2_CONTAINER}
 
   search-redis-sentinel-3:
     <<: *sentinel-common
-    container_name: search-redis-sentinel-3
-    environment:
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=3000
-      - REDIS_MASTER_HOST=search-redis-master
-      - REDIS_MASTER_PORT_NUMBER=6379
-      - REDIS_MASTER_SET=searchmaster
-      - REDIS_SENTINEL_QUORUM=2
+    container_name: ${SEARCH_REDIS_SENTINEL_3_CONTAINER}
 
 networks:
   app-network:
     external: true
+    name: ${APP_NETWORK}
+
+volumes:
+  search_redis_master_data:
+  search_redis_replica_1_data:
+  search_redis_replica_2_data:

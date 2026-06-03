@@ -15,10 +15,5 @@ export const resolvers = {
 	},
 	Post: {
 		id: (root: PostDocument) => root.postId,
-		title: (root: PostDocument) => root.title,
-		summary: (root: PostDocument) => root.summary || root.body.substring(0, 150),
-		slug: (root: PostDocument) => root.slug,
-		imageUrl: (root: PostDocument) => root.imageUrl,
-		createdAt: (root: PostDocument) => root.createdAt,
 	},
 };

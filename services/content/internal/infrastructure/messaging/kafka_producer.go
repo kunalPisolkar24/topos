@@ -27,7 +27,7 @@ func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		RequiredAcks: kafka.RequireAll,
-		Compression:  compress.Snappy,
+		Compression:  compress.Gzip,
 		Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
 			logger.Info(fmt.Sprintf("Kafka Producer: "+msg, args...))
 		}),
@@ -52,7 +52,35 @@ func (k *kafkaProducer) PublishPostDeleted(ctx context.Context, id string) error
 		Value: nil,
 		Time:  time.Now(),
 	}
-	return k.writer.WriteMessages(ctx, message)
+	return k.writeMessages(ctx, message)
+}
+
+func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
+	dlqPayload := struct {
+		OriginalTopic string    `json:"originalTopic"`
+		Error         string    `json:"error"`
+		Payload       json.RawMessage `json:"payload"`
+		Timestamp     time.Time `json:"timestamp"`
+	}{
+		OriginalTopic: topic,
+		Error:         err.Error(),
+		Payload:       value,
+		Timestamp:     time.Now(),
+	}
+
+	dlqValue, marshalErr := json.Marshal(dlqPayload)
+	if marshalErr != nil {
+		return fmt.Errorf("failed to marshal dlq payload: %w", marshalErr)
+	}
+
+	message := kafka.Message{
+		Topic: topic + "-dlq",
+		Key:   key,
+		Value: dlqValue,
+		Time:  time.Now(),
+	}
+
+	return k.writeMessages(ctx, message)
 }
 
 func (k *kafkaProducer) Close() error {
@@ -61,11 +89,13 @@ func (k *kafkaProducer) Close() error {
 
 func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
 	payload := domain.PostEventPayload{
-		PostID:     post.ID,
-		Title:      post.Title,
-		Body:       post.Body,
-		ImageURL:   post.ImageUrl,
-		CreatedAt:  post.CreatedAt,
+		PostID:        post.ID,
+		Title:         post.Title,
+		Body:          post.Body,
+		ImageURL:      post.ImageUrl,
+		Summary:       post.Summary,
+		SummaryStatus: post.SummaryStatus,
+		CreatedAt:     post.CreatedAt,
 	}
 
 	value, err := json.Marshal(payload)
@@ -79,5 +109,11 @@ func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
 		Time:  time.Now(),
 	}
 
-	return k.writer.WriteMessages(ctx, message)
+	return k.writeMessages(ctx, message)
+}
+
+func (k *kafkaProducer) writeMessages(ctx context.Context, msgs ...kafka.Message) error {
+	publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return k.writer.WriteMessages(publishCtx, msgs...)
 }

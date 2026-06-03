@@ -25,7 +25,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 		tags = append(tags, input.Tags...)
 	}
 
-	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL)
+	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary)
 	if err != nil {
 		return nil, err
 	}
@@ -42,6 +42,10 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 
 	existingPost, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
+		return nil, errors.New("post not found")
+	}
+
+	if existingPost == nil {
 		return nil, errors.New("post not found")
 	}
 
@@ -71,6 +75,10 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 
 	existingPost, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
+		return false, errors.New("post not found")
+	}
+
+	if existingPost == nil {
 		return false, errors.New("post not found")
 	}
 
@@ -144,6 +152,9 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 	dp, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if dp == nil {
+		return nil, nil
 	}
 	return mapDomainPostToModel(dp), nil
 }

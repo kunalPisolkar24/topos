@@ -1,0 +1,15 @@
+mutation UpdateProfile(
+  $name: String
+  $bio: String
+  $avatarUrl: String
+  $bannerUrl: String
+) {
+  updateProfile(
+    name: $name
+    bio: $bio
+    avatarUrl: $avatarUrl
+    bannerUrl: $bannerUrl
+  ) {
+    ...UserCore
+  }
+}

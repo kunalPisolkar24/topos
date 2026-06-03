@@ -1,6 +1,6 @@
 import { Kafka } from 'kafkajs';
 import express from 'express';
-import { config } from './config/index.js';
+import { getWorkerConfig } from './config/index.js';
 import { PinoLogger } from './infrastructure/logger/pino.logger.js';
 import { ElasticsearchRepository } from './infrastructure/elasticsearch/elasticsearch.repository.js';
 import { PrometheusMetrics } from './infrastructure/monitoring/prometheus.metrics.js';
@@ -10,6 +10,7 @@ import { IngestService } from './worker/services/ingest.service.js';
 import { withRetry } from './utils/retry.util.js';
 
 const start = async () => {
+	const config = getWorkerConfig();
 	const logger = new PinoLogger();
 	const metrics = new PrometheusMetrics();
 	
