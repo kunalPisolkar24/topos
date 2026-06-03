@@ -121,4 +121,20 @@ describe("usePostImageUploader", () => {
     ref.current = { getEditor: vi.fn() } as unknown as ReactQuill;
     expect(result.current.quillRef.current).not.toBeNull();
   });
+
+  it("does not update url when uploadCardImage returns null", async () => {
+    uploadMock.mockResolvedValueOnce(null);
+    const { result } = renderImageUploader({
+      initialImageUrl: "https://x/old.png",
+      isEdit: true,
+    });
+    const file = makeFile("card.png");
+    act(() => {
+      result.current.handleFileChange(makeChangeEvent(file));
+    });
+
+    const url = await result.current.uploadCardImage();
+    expect(url).toBeNull();
+    expect(result.current.url).toBe("https://x/old.png");
+  });
 });

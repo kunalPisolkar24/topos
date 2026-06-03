@@ -1,12 +1,12 @@
 import { HttpResponse, graphql } from "msw";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { BlogList } from "../BlogList";
 
 const graphqlApi = graphql.link("http://localhost:4000/graphql");
 
-const buildPost = () => ({
+const buildPost = (overrides: Record<string, unknown> = {}) => ({
   __typename: "Post" as const,
   id: "post-1",
   title: "Optimizing Neural Network Throughput for Low-Latency Architectures",
@@ -27,6 +27,15 @@ const buildPost = () => ({
       name: "Architecture",
     },
   ],
+  ...overrides,
+});
+
+const buildPostsResponse = (posts: unknown[] = [buildPost()], totalPosts = 1) => ({
+  __typename: "PaginatedPosts",
+  posts,
+  totalPages: Math.ceil(totalPosts / 6),
+  currentPage: 1,
+  totalPosts,
 });
 
 describe("BlogList", () => {
@@ -37,13 +46,7 @@ describe("BlogList", () => {
 
         return HttpResponse.json({
           data: {
-            posts: {
-              __typename: "PaginatedPosts",
-              posts: [buildPost()],
-              totalPages: 1,
-              currentPage: 1,
-              totalPosts: 1,
-            },
+            posts: buildPostsResponse(),
           },
         });
       }),
@@ -60,5 +63,73 @@ describe("BlogList", () => {
         name: /open blog post: optimizing neural network throughput/i,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("renders posts filtered by tag", async () => {
+    server.use(
+      graphqlApi.query("PostsByTag", () =>
+        HttpResponse.json({
+          data: {
+            postsByTag: buildPostsResponse([buildPost({ id: "tagged-post" })]),
+          },
+        }),
+      ),
+    );
+
+    renderWithProviders(<BlogList filterTag="Architecture" />);
+
+    expect(
+      await screen.findByRole("link", {
+        name: /open blog post: optimizing neural network throughput/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows empty state when no posts exist", async () => {
+    server.use(
+      graphqlApi.query("Posts", () =>
+        HttpResponse.json({
+          data: { posts: buildPostsResponse([], 0) },
+        }),
+      ),
+    );
+
+    renderWithProviders(<BlogList />);
+
+    expect(
+      await screen.findByText("No blog posts available yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows tag-specific message when no posts match the filter", async () => {
+    server.use(
+      graphqlApi.query("PostsByTag", () =>
+        HttpResponse.json({
+          data: {
+            postsByTag: buildPostsResponse([], 0),
+          },
+        }),
+      ),
+    );
+
+    renderWithProviders(<BlogList filterTag="UnknownTag" />);
+
+    expect(
+      await screen.findByText(/no posts found for the tag/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows empty state when post query fails", async () => {
+    server.use(
+      graphqlApi.query("Posts", () =>
+        HttpResponse.json({ errors: [{ message: "Server error" }] }),
+      ),
+    );
+
+    renderWithProviders(<BlogList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No blog posts available yet.")).toBeInTheDocument();
+    });
   });
 });

@@ -179,6 +179,65 @@ describe("usePostViewerController", () => {
     expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
   });
 
+  it("shows loading state when post is not yet loaded", () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.query("Post", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        return HttpResponse.json({ data: { post: loadedPost } });
+      }),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/blog/abc"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result } = renderHook(
+      () => usePostViewerController("abc"),
+      { wrapper: localWrapper },
+    );
+
+    expect(result.current.state.kind).toBe("loading");
+  });
+
+  it("shows not-found state when post data is missing", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.query("Post", () =>
+        HttpResponse.json({ data: { post: null } }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/blog/nonexistent"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result } = renderHook(
+      () => usePostViewerController("nonexistent"),
+      { wrapper: localWrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("not-found");
+    });
+  });
+
   it("evicts the me.posts profile cache after a successful delete", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(

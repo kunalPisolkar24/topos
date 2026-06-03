@@ -101,4 +101,118 @@ describe("BlogCard", () => {
     expect(image).toHaveAttribute("src", "https://images.example.com/post-2.jpg");
     expect(image).not.toHaveAttribute("srcset");
   });
+
+  it("renders without published date when publishedAt is null", () => {
+    renderWithProviders(
+      <BlogCard
+        id="post-3"
+        title="No Date Post"
+        snippet="A post without a published date."
+        author={{ name: "Author" }}
+        tags={[]}
+        imageUrl={null}
+        publishedAt={null}
+      />,
+    );
+
+    expect(screen.getByText("Author")).toBeInTheDocument();
+    expect(screen.queryByText("OCT 24, 2023")).not.toBeInTheDocument();
+  });
+
+  it("renders without tags section when tags array is empty", () => {
+    const { container } = renderWithProviders(
+      <BlogCard
+        id="post-4"
+        title="No Tags Post"
+        snippet="A post without tags."
+        author={{ name: "Author" }}
+        tags={[]}
+        imageUrl={null}
+        publishedAt="2024-01-01T00:00:00.000Z"
+      />,
+    );
+
+    expect(
+      container.querySelector('[data-slot="blog-card-content"]')?.querySelector("font-mono"),
+    ).toBeNull();
+  });
+
+  it("does not show +N MORE when 3 or fewer tags", () => {
+    renderWithProviders(
+      <BlogCard
+        id="post-5"
+        title="Few Tags"
+        snippet="A post with 3 or fewer tags."
+        author={{ name: "Author" }}
+        tags={["Tag1", "Tag2", "Tag3"]}
+        imageUrl={null}
+        publishedAt="2024-01-01T00:00:00.000Z"
+      />,
+    );
+
+    expect(screen.queryByText(/MORE/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to default image on image load error", () => {
+    const { container } = renderWithProviders(
+      <BlogCard
+        id="post-6"
+        title="Broken Image"
+        snippet="Post with a broken image."
+        author={{ name: "Author" }}
+        tags={[]}
+        imageUrl="https://broken.example.com/image.jpg"
+        publishedAt="2024-01-01T00:00:00.000Z"
+      />,
+    );
+
+    const img = container.querySelector<HTMLImageElement>('[data-slot="blog-card-image"]');
+    expect(img).toBeInTheDocument();
+
+    const errorEvent = new Event("error", { bubbles: true });
+    img?.dispatchEvent(errorEvent);
+
+    expect(img?.src).not.toBe("https://broken.example.com/image.jpg");
+  });
+
+  it("uses Unknown Author when author name is empty", () => {
+    renderWithProviders(
+      <BlogCard
+        id="post-7"
+        title="No Author Name"
+        snippet="Post without author name."
+        author={{ name: "" }}
+        tags={[]}
+        imageUrl={null}
+        publishedAt={null}
+      />,
+    );
+
+    expect(screen.getByText("Unknown Author")).toBeInTheDocument();
+  });
+
+  it("handles double image error gracefully", () => {
+    const { container } = renderWithProviders(
+      <BlogCard
+        id="post-8"
+        title="Double Error"
+        snippet="Post with image that errors twice."
+        author={{ name: "Author" }}
+        tags={[]}
+        imageUrl="https://broken.example.com/image.jpg"
+        publishedAt={null}
+      />,
+    );
+
+    const img = container.querySelector<HTMLImageElement>('[data-slot="blog-card-image"]');
+    const errorEvent = new Event("error", { bubbles: true });
+
+    img?.dispatchEvent(errorEvent);
+    const srcAfterFirst = img?.src;
+
+    img?.dispatchEvent(errorEvent);
+    const srcAfterSecond = img?.src;
+
+    expect(srcAfterSecond).toBe(srcAfterFirst);
+  });
 });
