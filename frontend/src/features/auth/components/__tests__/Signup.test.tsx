@@ -11,10 +11,11 @@ import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { Signup } from "../Signup";
 
+const graphqlApi = graphql.link("http://localhost:4000/graphql");
+
 describe("Signup", () => {
   it("creates an account and authenticates the session", async () => {
     const user = userEvent.setup();
-    const graphqlApi = graphql.link("http://localhost:4000/graphql");
 
     server.use(
       graphqlApi.mutation("Signup", () =>
@@ -68,6 +69,17 @@ describe("Signup", () => {
     expect(useSessionStore.getState().status).toBe("authenticated");
   });
 
+  it("shows validation errors on empty submit", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Signup />);
+    await user.click(screen.getByRole("button", { name: /sign up/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Please enter a valid email address")).toBeInTheDocument();
+      expect(screen.getByText("Username must be at least 3 characters")).toBeInTheDocument();
+      expect(screen.getByText("Password must be at least 6 characters")).toBeInTheDocument();
+    });
+  });
+
   it("shows client-side validation when passwords do not match", async () => {
     const user = userEvent.setup();
 
@@ -96,7 +108,6 @@ describe("Signup", () => {
 
   it("sanitizes and limits the username before signup submission", async () => {
     const user = userEvent.setup();
-    const graphqlApi = graphql.link("http://localhost:4000/graphql");
     const rawUsername = `  ${"very long username ".repeat(3)}  `;
     const expectedUsername = sanitizeUsernameInput(rawUsername);
     let receivedVariables:
@@ -163,5 +174,92 @@ describe("Signup", () => {
     });
 
     expect(expectedUsername.length).toBeLessThanOrEqual(USERNAME_MAX_LENGTH);
+  });
+
+  it("does not navigate when signup returns empty payload", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      graphqlApi.mutation("Signup", () =>
+        HttpResponse.json({ data: { signup: null } }),
+      ),
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/" element={<div>Home Page</div>} />
+      </Routes>,
+      { route: "/signup" },
+    );
+
+    await user.type(screen.getByLabelText(/email/i), "fail@example.com");
+    await user.type(screen.getByLabelText(/username/i), "fail-user");
+    await user.type(
+      screen.getByLabelText(/^password$/i),
+      "password123",
+    );
+    await user.type(
+      screen.getByLabelText(/confirm password/i),
+      "password123",
+    );
+    await user.click(screen.getByRole("button", { name: /sign up/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+      expect(screen.queryByText("Home Page")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows a loading state while signing up", async () => {
+    const user = userEvent.setup();
+    let resolvePromise: (value: unknown) => void = () => {};
+
+    server.use(
+      graphqlApi.mutation("Signup", async () => {
+        await new Promise((resolve) => { resolvePromise = resolve; });
+        return HttpResponse.json({
+          data: {
+            signup: {
+              __typename: "AuthPayload",
+              token: "loading-token",
+              user: {
+                __typename: "User",
+                id: "5",
+                username: "loading-user",
+                email: "loading@example.com",
+                name: "Loading User",
+                bio: null,
+                avatarUrl: null,
+                bannerUrl: null,
+                createdAt: new Date().toISOString(),
+              },
+            },
+          },
+        });
+      }),
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+      </Routes>,
+      { route: "/signup" },
+    );
+
+    await user.type(screen.getByLabelText(/email/i), "loading@example.com");
+    await user.type(screen.getByLabelText(/username/i), "loading-user");
+    await user.type(
+      screen.getByLabelText(/^password$/i),
+      "password123",
+    );
+    await user.type(
+      screen.getByLabelText(/confirm password/i),
+      "password123",
+    );
+    await user.click(screen.getByRole("button", { name: /sign up/i }));
+
+    expect(screen.getByText("Signing up...")).toBeInTheDocument();
+    resolvePromise({});
   });
 });

@@ -3,7 +3,7 @@ import {
   cloudinaryImageProvider,
   type ImageProvider,
 } from "../image-provider";
-import { uploadImage } from "../upload-image";
+import { imageUploadError, uploadImage } from "../upload-image";
 
 vi.mock("axios", () => ({
   default: {
@@ -109,5 +109,12 @@ describe("uploadImage", () => {
     if (result.ok) return;
     expect(result.error.code).toBe("NETWORK");
     expect(result.error.message).toMatch(/unexpected upload error/);
+  });
+
+  it("imageUploadError handles missing cause", () => {
+    const error = imageUploadError("Something went wrong");
+    expect(error.code).toBe("NETWORK");
+    expect(error.message).toBe("Something went wrong");
+    expect(error.cause).toBeUndefined();
   });
 });
