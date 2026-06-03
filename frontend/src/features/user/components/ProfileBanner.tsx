@@ -38,22 +38,17 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
       </div>
 
       {isEditing && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/85 backdrop-blur-sm">
+        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center bg-surface/85 px-4 py-3 backdrop-blur-sm">
           <label
             htmlFor="bannerUpload"
-            className="interactive-hover-primary flex cursor-pointer items-center gap-3 border border-outline-variant/20 bg-surface-lowest px-5 py-4 text-foreground"
+            className="interactive-hover-primary flex cursor-pointer items-center gap-3 border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-foreground"
           >
-            <div className="flex h-10 w-10 items-center justify-center bg-primary-container text-primary-foreground">
-              <Camera className="h-5 w-5" />
+            <div className="flex h-8 w-8 items-center justify-center bg-primary-container text-primary-foreground">
+              <Camera className="h-4 w-4" />
             </div>
-            <div>
-              <span className="block font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em]">
-                Change Banner
-              </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                Recommended: wide image with quiet contrast
-              </span>
-            </div>
+            <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em]">
+              Change Banner
+            </span>
             <input
               id="bannerUpload"
               type="file"
