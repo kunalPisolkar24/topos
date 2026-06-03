@@ -9,6 +9,7 @@ import { env } from "@/shared/config/env";
 
 type RenderOptions = {
   route?: string;
+  state?: Record<string, unknown>;
 };
 
 const noopUnauthorized = async () => {};
@@ -16,6 +17,7 @@ const noopUnauthorized = async () => {};
 function Providers({
   children,
   route = "/",
+  state,
 }: PropsWithChildren<RenderOptions>) {
   const clientRef = useRef<ApolloClient | null>(null);
   if (clientRef.current === null) {
@@ -27,7 +29,9 @@ function Providers({
   }
   return (
     <ApolloProvider client={clientRef.current}>
-      <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: route, state }]}>
+        {children}
+      </MemoryRouter>
     </ApolloProvider>
   );
 }

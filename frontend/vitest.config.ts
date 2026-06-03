@@ -51,6 +51,12 @@ export default defineConfig({
         "src/features/blog/components/BlogTagSection.tsx",
         "src/features/blog/components/FeaturedImageSection.tsx",
       ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
     },
   },
 });
