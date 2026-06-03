@@ -5,7 +5,7 @@ import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from src.config.settings import settings
 from src.core.interfaces.llm_provider import LLMProvider
-from src.core.exceptions import LLMProviderError
+from src.core.exceptions import LLMProviderError, RateLimitError
 from src.infrastructure.monitoring.metrics import (
     LLM_PROVIDER_LATENCY,
     LLM_TOKEN_ERROR_COUNT,
@@ -22,6 +22,15 @@ def _is_retryable(exception: BaseException) -> bool:
     if isinstance(exception, httpx.HTTPStatusError):
         return exception.response.status_code >= 500
     return False
+
+
+def _parse_retry_after(raw: str | None) -> int | None:
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 def _log_retry(retry_state):
@@ -114,6 +123,12 @@ class LightningClient(LLMProvider):
             raise
 
         except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                retry_after = _parse_retry_after(e.response.headers.get("Retry-After"))
+                await self._cb.record_rate_limit(retry_after)
+                LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="rate_limit").inc()
+                self.logger.warning("Provider rate limited", extra={"retry_after": retry_after})
+                raise RateLimitError("AI provider rate limit exceeded", retry_after=retry_after) from e
             await self._cb.record_failure()
             LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="http_status").inc()
             self.logger.error(f"Provider returned status {e.response.status_code}", extra={"status_code": e.response.status_code})
