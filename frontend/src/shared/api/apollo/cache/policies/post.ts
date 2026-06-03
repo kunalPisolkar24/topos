@@ -8,7 +8,7 @@ interface PaginatedPosts {
   totalPosts: number;
 }
 
-const paginatedPostListKeyArgs = (args: Record<string, unknown> | null) => {
+export const paginatedPostListKeyArgs = (args: Record<string, unknown> | null) => {
   if (!args) return "";
   const page = args.page ?? 1;
   const limit = args.limit ?? "";

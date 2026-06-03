@@ -12,7 +12,7 @@ import {
 } from "@/shared/graphql/content-documents";
 
 import { buildApolloCache } from "../index";
-import { mergePaginatedPostLists } from "../policies/post";
+import { mergePaginatedPostLists, paginatedPostListKeyArgs, postQueryFieldPolicies } from "../policies/post";
 import { invalidatePostListCaches } from "../../../refetchLists";
 
 const buildList = (page: number, ids: Array<string | number>) => ({
@@ -116,6 +116,71 @@ describe("mergePaginatedPostLists", () => {
       args: { page: 1, limit: 2 },
     });
     expect(merged).toEqual(buildList(1, ["a"]));
+  });
+
+  it("returns incoming when posts is not an array", () => {
+    const merged = mergePaginatedPostLists(
+      { __typename: "PaginatedPosts", posts: "not-array", totalPages: 1, currentPage: 1, totalPosts: 0 },
+      buildList(1, ["a"]),
+      { args: { page: 1, limit: 2 } },
+    );
+    expect(merged).toEqual(buildList(1, ["a"]));
+  });
+});
+
+describe("paginatedPostListKeyArgs", () => {
+  it("returns empty string for null args", () => {
+    expect(paginatedPostListKeyArgs(null)).toBe("");
+  });
+
+  it("uses default values when args are missing", () => {
+    const result = paginatedPostListKeyArgs({});
+    expect(result).toContain("tag:");
+    expect(result).toContain("page:1");
+    expect(result).toContain("limit:");
+  });
+
+  it("includes tag in key args", () => {
+    const result = paginatedPostListKeyArgs({ tag: "alpha" });
+    expect(result).toContain("tag:alpha");
+  });
+});
+
+describe("mergePaginatedPostLists edge cases", () => {
+  it("returns incoming for page 0", () => {
+    const merged = mergePaginatedPostLists(buildList(1, ["a"]), buildList(0, ["b"]), {
+      args: { page: 0, limit: 2 },
+    });
+    expect(merged).toEqual(buildList(0, ["b"]));
+  });
+
+  it("handles null incoming with existing", () => {
+    const merged = mergePaginatedPostLists(buildList(1, ["a"]), null, {
+      args: { page: 2, limit: 2 },
+    });
+    expect(merged).toEqual(buildList(1, ["a"]));
+  });
+
+  it("deduplicates items without id field", () => {
+    const existing = {
+      __typename: "PaginatedPosts",
+      posts: [{ __ref: "Post:a", id: "a" }, { __ref: "Post:b" }],
+      totalPages: 5,
+      currentPage: 1,
+      totalPosts: 50,
+    };
+    const incoming = {
+      __typename: "PaginatedPosts",
+      posts: [{ __ref: "Post:b" }, { __ref: "Post:c" }],
+      totalPages: 5,
+      currentPage: 2,
+      totalPosts: 50,
+    };
+    const merged = mergePaginatedPostLists(existing, incoming, {
+      args: { page: 2, limit: 2 },
+    });
+    const list = (merged as { posts: Array<{ __ref: string }> }).posts;
+    expect(list.map((p) => p.__ref)).toEqual(["Post:a", "Post:b", "Post:c"]);
   });
 });
 

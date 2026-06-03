@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { err, isErr, isOk, map, mapErr, ok, unwrapOr } from "../result";
+import { err, flatMap, isErr, isOk, map, mapErr, ok, unwrapOr } from "../result";
 
 describe("Result", () => {
   it("creates ok and err values with discriminants", () => {
@@ -37,5 +37,13 @@ describe("Result", () => {
   it("falls back to default on err", () => {
     expect(unwrapOr(err("x") as unknown as ReturnType<typeof ok<number>>, 99)).toBe(99);
     expect(unwrapOr(ok(7), 99)).toBe(7);
+  });
+
+  it("flatMaps the value when ok and passes through errors", () => {
+    expect(flatMap(ok(3), (v) => ok(v * 2))).toEqual(ok(6));
+    const e = flatMap(err("e") as unknown as ReturnType<typeof ok<number>>, (v) => ok(v * 2));
+    expect(e.ok).toBe(false);
+    if (e.ok) return;
+    expect(e.error).toBe("e");
   });
 });
