@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
+COPY pyproject.toml poetry.lock* ./
+RUN pip install --no-cache-dir poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-root --no-dev --no-interaction
 
 COPY . .
-
-ENV PYTHONPATH=/install/lib/python3.12/site-packages
 
 RUN mkdir -p src/generated && \
     touch src/generated/__init__.py && \
@@ -30,7 +30,7 @@ ENV PYTHONUNBUFFERED=1
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-COPY --from=builder /install /usr/local
+COPY --from=builder /usr/local /usr/local
 COPY --from=builder --chown=appuser:appuser /app/src /app/src
 
 USER appuser
