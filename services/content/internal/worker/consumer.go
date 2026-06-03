@@ -28,6 +28,8 @@ type Worker struct {
 	dlqTopic    string
 	sem         *semaphore.Weighted
 	wg          sync.WaitGroup
+	kafkaBrokers []string
+	kafkaTopic  string
 }
 
 const maxConcurrentWorkers = 10
@@ -80,13 +82,22 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 
 	reader := kafka.NewReader(config)
 
+	topic := ""
+	if len(topics) == 1 {
+		topic = topics[0]
+	} else if len(topics) > 0 {
+		topic = topics[0]
+	}
+
 	return &Worker{
-		reader:      reader,
-		postService: postService,
-		aiService:   aiService,
-		producer:    producer,
-		dlqTopic:    dlqTopic,
-		sem:         semaphore.NewWeighted(maxConcurrentWorkers),
+		reader:       reader,
+		postService:  postService,
+		aiService:    aiService,
+		producer:     producer,
+		dlqTopic:     dlqTopic,
+		sem:          semaphore.NewWeighted(maxConcurrentWorkers),
+		kafkaBrokers: brokers,
+		kafkaTopic:   topic,
 	}, nil
 }
 
@@ -266,6 +277,18 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 
 func (w *Worker) Close() error {
 	return w.reader.Close()
+}
+
+func (w *Worker) Health(ctx context.Context) error {
+	if len(w.kafkaBrokers) == 0 {
+		return fmt.Errorf("no kafka brokers configured")
+	}
+	conn, err := kafka.Dial("tcp", w.kafkaBrokers[0])
+	if err != nil {
+		return fmt.Errorf("kafka broker unreachable: %w", err)
+	}
+	conn.Close()
+	return nil
 }
 
 func stripHtml(input string) string {

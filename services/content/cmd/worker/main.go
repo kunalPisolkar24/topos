@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 func main() {
@@ -79,9 +81,26 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Worker OK"))
+	mux.Handle("/health", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		hctx, hcancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer hcancel()
+
+		if err := mongoClient.Ping(hctx, readpref.Primary()); err != nil {
+			logger.Error("Health check failed: MongoDB", "error", err)
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(rw, "MongoDB: %s", err)
+			return
+		}
+
+		if err := w.Health(hctx); err != nil {
+			logger.Error("Health check failed: Kafka", "error", err)
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(rw, "Kafka: %s", err)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte("Worker OK"))
 	}))
 
 	metricsServer := &http.Server{
