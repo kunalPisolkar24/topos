@@ -4,6 +4,8 @@ import signal
 import grpc
 import httpx
 from prometheus_client import start_http_server
+from grpc_health.v1 import health_pb2, health_pb2_grpc
+from grpc_health.v1.health import HealthServicer
 from src.config.settings import settings
 from src.api.handlers import AIHandler
 from src.generated import ai_service_pb2_grpc
@@ -33,10 +35,17 @@ async def serve():
         handler = AIHandler(content_logic)
 
         interceptors = [PrometheusInterceptor()]
-        server = grpc.aio.server(interceptors=interceptors)
+        server = grpc.aio.server(
+            interceptors=interceptors,
+            maximum_concurrent_rpcs=50
+        )
         
         ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
         
+        health_servicer = HealthServicer()
+        health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+        health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+
         listen_addr = f"[::]:{settings.PORT}"
         server.add_insecure_port(listen_addr)
         
