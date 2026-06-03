@@ -5,17 +5,15 @@ from src.core.interfaces.sanitizer import SanitizerInterface
 class Sanitizer(SanitizerInterface):
     ALLOWED_TAGS = [
         'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'code', 'div',
-        'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'iframe',
+        'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
         'img', 'li', 'ol', 'p', 'pre', 'span', 'strike', 'strong',
         'sub', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
-        'tr', 'u', 'ul', 'video'
+        'tr', 'u', 'ul'
     ]
 
     ALLOWED_ATTRIBUTES = {
         'a': ['href', 'title', 'target', 'rel'],
         'img': ['src', 'alt', 'title', 'width', 'height', 'style'],
-        'iframe': ['src', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen', 'style'],
-        'video': ['src', 'width', 'height', 'controls', 'poster', 'preload', 'style'],
         'table': ['border', 'cellpadding', 'cellspacing', 'style'],
         'td': ['colspan', 'rowspan', 'style'],
         'th': ['colspan', 'rowspan', 'style'],
