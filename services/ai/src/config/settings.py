@@ -1,4 +1,8 @@
+import pathlib
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_env_path = pathlib.Path(__file__).resolve().parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
     PORT: str = "50051"
@@ -10,6 +14,6 @@ class Settings(BaseSettings):
     LLM_HANDLER_TIMEOUT: int = 120
     LOG_LEVEL: str = "INFO"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=_env_path, env_file_encoding="utf-8")
 
 settings = Settings()

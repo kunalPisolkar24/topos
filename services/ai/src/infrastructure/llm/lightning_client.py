@@ -23,6 +23,17 @@ def _is_retryable(exception: BaseException) -> bool:
         return exception.response.status_code >= 500
     return False
 
+
+def _log_retry(retry_state):
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "LLM request failed, retrying",
+        extra={
+            "attempt": retry_state.attempt_number,
+            "error": str(retry_state.outcome.exception()) if retry_state.outcome else None,
+        }
+    )
+
 class LightningClient(LLMProvider):
     def __init__(self, http_client: httpx.AsyncClient):
         self.client = http_client
@@ -54,6 +65,7 @@ class LightningClient(LLMProvider):
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception(_is_retryable),
+        before_sleep=_log_retry,
         reraise=True
     )
     

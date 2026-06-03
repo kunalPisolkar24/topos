@@ -51,14 +51,12 @@ class ContentLogic:
         
         try:
             post = GeneratedPost.model_validate_json(json_str)
-            
-            post.body = self.sanitizer.clean_post_html(post.body)
-            
-            return post
-
         except ValidationError as e:
             self.logger.error(f"Schema Validation Failed: {e.json()}")
             raise DataParsingError("AI response failed schema validation") from e
         except Exception as e:
             self.logger.exception("Unexpected error during post generation")
             raise AIServiceException("An unexpected error occurred during post generation") from e
+
+        post.body = self.sanitizer.clean_post_html(post.body)
+        return post
