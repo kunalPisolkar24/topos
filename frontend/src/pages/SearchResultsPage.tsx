@@ -1,19 +1,11 @@
 import React, { useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
-import { StickyNavbar } from "@/layouts";
+import { PagePagination, StickyNavbar } from "@/widgets";
 import { BlogCard } from "@/features/blog";
-import { BlogCardSkeleton } from "@/components/skeletons";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { SearchPostsDocument } from "@/graphql/content-documents";
-import { buildSearchPagination, mapPostToBlogCardItem } from "@/lib/content";
+import { BlogCardSkeleton } from "@/shared/ui/feedback";
+import { SearchPostsDocument } from "@/shared/graphql/content-documents";
+import { buildSearchPagination, mapPostToBlogCardItem } from "@/entities/post/lib";
 
 const SEARCH_RESULTS_PAGE_SIZE = 6;
 
@@ -65,88 +57,45 @@ const SearchResultsPage: React.FC = () => {
     }
   };
 
-  const renderPagination = () => {
-    if (paginationInfo.totalPages <= 1) {
-      return null;
-    }
-
-    return (
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            {paginationInfo.currentPage > 1 && (
-              <PaginationPrevious
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(paginationInfo.currentPage - 1);
-                }}
-              />
-            )}
-          </PaginationItem>
-          {Array.from({ length: paginationInfo.totalPages }, (_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(index + 1);
-                }}
-                isActive={paginationInfo.currentPage === index + 1}
-              >
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            {paginationInfo.currentPage < paginationInfo.totalPages && (
-              <PaginationNext
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  handlePageChange(paginationInfo.currentPage + 1);
-                }}
-              />
-            )}
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-zinc-900/20">
+    <div className="min-h-screen bg-surface">
       <StickyNavbar />
       <main className="container mx-auto pb-8 pt-app-navbar-offset">
         {loading ? (
-          <div className="m-6 grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-1 lg:mx-auto">
+          <div className="m-6 grid max-w-[88rem] grid-cols-1 gap-8 px-4 sm:px-5 lg:mx-auto lg:px-6">
             {Array.from({ length: 5 }).map((_, index) => (
               <BlogCardSkeleton key={index} />
             ))}
           </div>
         ) : (
           <>
-            <div className="max-w-7xl px-4 lg:mx-auto">
-              <h1 className="mb-2 text-3xl font-bold text-zinc-100">
+            <div className="max-w-[88rem] px-4 sm:px-5 lg:mx-auto lg:px-6">
+              <h1 className="mb-2 text-3xl font-semibold tracking-[-0.02em] text-foreground">
                 Search Results for "{query}"
               </h1>
-              <p className="mb-8 text-zinc-400">
+              <p className="mb-8 text-sm text-muted-foreground">
                 {data?.searchPosts.total ?? 0} posts found.
               </p>
             </div>
 
             {results.length > 0 ? (
-              <div className="m-6 grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-1 lg:mx-auto">
+              <div className="m-6 grid max-w-[88rem] grid-cols-1 gap-8 px-4 sm:px-5 lg:mx-auto lg:px-6">
                 {results.map((post) => (
                   <BlogCard key={post.id} {...post} />
                 ))}
               </div>
             ) : (
-              <p className="mt-16 text-center text-xl text-zinc-400">
+              <p className="mt-16 text-lg text-muted-foreground">
                 No posts found matching your query.
               </p>
             )}
-            <div className="mt-12">{renderPagination()}</div>
+            <div className="mt-12">
+              <PagePagination
+                currentPage={paginationInfo.currentPage}
+                totalPages={paginationInfo.totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         )}
       </main>

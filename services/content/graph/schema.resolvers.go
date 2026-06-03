@@ -45,6 +45,10 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 		return nil, errors.New("post not found")
 	}
 
+	if existingPost == nil {
+		return nil, errors.New("post not found")
+	}
+
 	if existingPost.AuthorID != userID {
 		return nil, errors.New("forbidden")
 	}
@@ -71,6 +75,10 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 
 	existingPost, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
+		return false, errors.New("post not found")
+	}
+
+	if existingPost == nil {
 		return false, errors.New("post not found")
 	}
 
@@ -144,6 +152,9 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 	dp, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if dp == nil {
+		return nil, nil
 	}
 	return mapDomainPostToModel(dp), nil
 }

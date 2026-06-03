@@ -36,7 +36,7 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
   return (
     <header className="relative overflow-hidden bg-surface-low ring-1 ring-outline-variant/20">
       {imageUrl && (
-        <div className="relative h-[18rem] overflow-hidden sm:h-[24rem] lg:h-[30rem]">
+        <div className="relative h-[16rem] overflow-hidden sm:h-[20rem] lg:h-[26rem]">
           <img
             src={imageUrl}
             alt={title}
@@ -51,12 +51,12 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
         </div>
       )}
 
-      <div className={imageUrl ? "relative -mt-20 p-4 sm:p-6 lg:p-8" : "p-4 sm:p-6 lg:p-8"}>
-        <div className="bg-surface-lowest p-5 ring-1 ring-outline-variant/20 sm:p-7 lg:p-8">
+      <div className={imageUrl ? "relative -mt-20 p-4 sm:p-5 lg:p-6" : "p-4 sm:p-5 lg:p-6"}>
+        <div className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-7">
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
             Article // Topos
           </p>
-          <h1 className="mt-4 max-w-5xl break-words text-4xl font-semibold leading-none tracking-[-0.055em] text-foreground [overflow-wrap:anywhere] md:text-6xl lg:text-7xl">
+          <h1 className="mt-4 max-w-5xl text-balance break-words text-2xl font-semibold leading-[1.05] tracking-[-0.025em] text-foreground sm:text-3xl md:text-4xl lg:text-5xl">
             {title}
           </h1>
           <div className="mt-6 flex flex-wrap gap-2 font-mono text-[0.625rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">

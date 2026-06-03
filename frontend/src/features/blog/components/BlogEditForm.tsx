@@ -2,16 +2,17 @@ import type React from "react";
 import { useRef } from "react";
 import { CheckCircle2, Circle, FileText, ImageIcon, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  BlogEditor,
+import { BlogEditor } from "@/widgets";
+import {
   BlogTitleSection,
   FeaturedImageSection,
   BlogTagSection,
+  usePostAuthoringController,
+  type PostForEditing,
 } from "@/features/blog";
-import { useEditBlog } from "@/features/blog/hooks/use-edit-blog";
 
 interface BlogEditFormProps {
-  blog: any;
+  blog: PostForEditing;
   onCancel: () => void;
   onComplete: () => void;
 }
@@ -21,42 +22,35 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
   onCancel,
   onComplete,
 }) => {
-  const { state, setters, handlers, refs } = useEditBlog(blog, onComplete);
+  const { state, setters, handlers, refs } = usePostAuthoringController({
+    mode: "edit",
+    post: blog,
+    onComplete,
+  });
   const cardImageInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse plain text content for validation checklist
-  const contentText = state.editContent
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const titleReady = state.editTitle.trim().length > 0;
+  const { contentText } = state;
+  const titleReady = state.title.trim().length > 0;
   const contentReady = contentText.length > 0;
-  const imageReady = Boolean(state.editCardImage || state.editCardImageUrl || state.editCardImagePreview);
-
-  const saveDisabled = state.isUploadingCardImage || state.isUpdating;
-  const saveLabel = state.isUploadingCardImage
-    ? "Uploading..."
-    : state.isUpdating
-      ? "Saving..."
-      : "Save Changes";
+  const imageReady = Boolean(
+    state.cardImage || state.cardImageUrl || state.cardImagePreview,
+  );
 
   return (
     <form
-      onSubmit={handlers.handleUpdate}
+      onSubmit={handlers.handleSubmit}
       className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]"
     >
       <div className="space-y-6">
         <BlogTitleSection
-          value={state.editTitle}
-          onChange={setters.setEditTitle}
+          value={state.title}
+          onChange={setters.setTitle}
         />
 
         <FeaturedImageSection
-          preview={state.editCardImagePreview}
-          cardImage={state.editCardImage}
-          cardImageUrl={state.editCardImageUrl}
+          preview={state.cardImagePreview}
+          cardImage={state.cardImage}
+          cardImageUrl={state.cardImageUrl}
           isUploading={state.isUploadingCardImage}
           onFileChange={handlers.handleCardImageChange}
           inputRef={cardImageInputRef}
@@ -64,18 +58,18 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
 
         <BlogEditor
           ref={refs.quillRef}
-          value={state.editContent}
-          onChange={setters.setEditContent}
+          value={state.content}
+          onChange={setters.setContent}
           onImageUpload={handlers.richTextimageHandler}
         />
 
         <BlogTagSection
-          tags={state.editTags}
+          tags={state.tags}
           onRemoveTag={handlers.handleRemoveTag}
           isDialogOpen={state.isDialogOpen}
           setIsDialogOpen={setters.setIsDialogOpen}
-          newTag={state.editNewTag}
-          setNewTag={setters.setEditNewTag}
+          newTag={state.newTag}
+          setNewTag={setters.setNewTag}
           onAddTag={handlers.handleAddTag}
           onGenerateTags={handlers.handleGenerateTags}
           isGeneratingTags={state.isGeneratingTags}
@@ -110,8 +104,8 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
             <PublishChecklistItem
               icon={Tags}
               label="Tags"
-              detail={`${state.editTags.length} added`}
-              complete={state.editTags.length > 0}
+              detail={`${state.tags.length} added`}
+              complete={state.tags.length > 0}
             />
           </div>
 
@@ -127,10 +121,10 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
           <div className="mt-5 grid gap-3">
             <Button
               type="submit"
-              disabled={saveDisabled}
+              disabled={state.isSubmitting}
               className="w-full"
             >
-              {saveLabel}
+              {state.submitLabel}
             </Button>
             <Button
               type="button"

@@ -3,9 +3,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Home from "@/pages/Home";
 import SearchResultsPage from "@/pages/SearchResultsPage";
 import ViewBlogPage from "@/pages/ViewBlogPage";
-import { LoadingSpinner } from "@/components/utils";
-import { ProtectedRoute } from "@/routes/ProtectedRoute";
-import { PublicOnlyRoute } from "@/routes/PublicOnlyRoute";
+import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { ProtectedRoute } from "@/app/routing/ProtectedRoute";
+import { PublicOnlyRoute } from "@/app/routing/PublicOnlyRoute";
 
 const Signup = lazy(() =>
   import("@/features/auth").then((module) => ({

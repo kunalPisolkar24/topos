@@ -1,9 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
-import { apolloClient } from "@/lib/apollo/client";
-import { resetSessionBootstrapForTests } from "@/lib/auth/session";
-import { sessionStoreActions } from "@/stores/session-store";
+import {
+  resetSessionBootstrapForTests,
+  sessionStoreActions,
+} from "@/entities/session";
 import { server } from "./server";
 
 beforeAll(() => {
@@ -15,7 +16,6 @@ afterEach(async () => {
   server.resetHandlers();
   sessionStoreActions.resetForTests();
   resetSessionBootstrapForTests();
-  await apolloClient.clearStore();
 });
 
 afterAll(() => {

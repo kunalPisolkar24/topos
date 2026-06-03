@@ -36,7 +36,17 @@ func NewCachedPostRepository(fallback domain.PostRepository, redis *redis.Client
 }
 
 func (r *cachedPostRepo) Create(ctx context.Context, post *domain.Post) (*domain.Post, error) {
-	return r.fallback.Create(ctx, post)
+	created, err := r.fallback.Create(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, created.AuthorID, created.Tags); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
@@ -45,6 +55,12 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 		return nil, err
 	}
 	if err := r.invalidate(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, updatedPost.AuthorID, updatedPost.Tags); err != nil {
 		return nil, err
 	}
 	return updatedPost, nil
@@ -59,11 +75,27 @@ func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary s
 }
 
 func (r *cachedPostRepo) Delete(ctx context.Context, id string) error {
-	err := r.fallback.Delete(ctx, id)
+	existing, err := r.fallback.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
-	return r.invalidate(ctx, id)
+	if existing == nil {
+		return mongo.ErrNoDocuments
+	}
+
+	if err := r.fallback.Delete(ctx, id); err != nil {
+		return err
+	}
+	if err := r.invalidate(ctx, id); err != nil {
+		return err
+	}
+	if err := r.invalidateAllLists(ctx); err != nil {
+		return err
+	}
+	if err := r.invalidateAuthorAndTagLists(ctx, existing.AuthorID, existing.Tags); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
@@ -96,10 +128,11 @@ func (r *cachedPostRepo) FindByID(ctx context.Context, id string) (*domain.Post,
 		if res.Err != nil {
 			return nil, res.Err
 		}
-		if res.Val == nil {
+		post, ok := res.Val.(*domain.Post)
+		if !ok || post == nil {
 			return nil, mongo.ErrNoDocuments
 		}
-		return res.Val.(*domain.Post), nil
+		return post, nil
 	}
 }
 
@@ -110,9 +143,13 @@ func (r *cachedPostRepo) findByIDInternal(ctx context.Context, key, id string) (
 			if setErr := r.redis.Set(context.Background(), key, notFoundMarker, notFoundTTL).Err(); setErr == nil {
 				monitoring.RecordCacheSet()
 			}
-			return nil, nil
+			return nil, mongo.ErrNoDocuments
 		}
 		return nil, err
+	}
+
+	if post == nil {
+		return nil, mongo.ErrNoDocuments
 	}
 
 	if data, marshalErr := json.Marshal(post); marshalErr == nil {
@@ -194,5 +231,65 @@ func (r *cachedPostRepo) invalidate(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to invalidate cache: %w", err)
 	}
 	monitoring.RecordCacheDel()
+	return nil
+}
+
+func (r *cachedPostRepo) deleteByPattern(ctx context.Context, pattern string) error {
+	keys, err := r.scanKeys(ctx, pattern)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	if err := r.redis.Del(ctx, keys...).Err(); err != nil {
+		logger.Error("Critical: Failed to invalidate list cache", "pattern", pattern, "error", err)
+		return fmt.Errorf("failed to invalidate list cache %q: %w", pattern, err)
+	}
+	monitoring.RecordCacheDel()
+	return nil
+}
+
+func (r *cachedPostRepo) scanKeys(ctx context.Context, pattern string) ([]string, error) {
+	var (
+		cursor  uint64
+		keys    []string
+		batch   []string
+		iterErr error
+	)
+	for {
+		batch, cursor, iterErr = r.redis.Scan(ctx, cursor, pattern, 100).Result()
+		if iterErr != nil {
+			return nil, fmt.Errorf("failed to scan keys for pattern %q: %w", pattern, iterErr)
+		}
+		keys = append(keys, batch...)
+		if cursor == 0 {
+			break
+		}
+	}
+	return keys, nil
+}
+
+func (r *cachedPostRepo) invalidateAllLists(ctx context.Context) error {
+	return r.deleteByPattern(ctx, "posts:all:*")
+}
+
+func (r *cachedPostRepo) invalidateAuthorAndTagLists(ctx context.Context, authorID string, tags []string) error {
+	if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:author:%s:*", authorID)); err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		if err := r.deleteByPattern(ctx, fmt.Sprintf("posts:tag:%s:*", tag)); err != nil {
+			return err
+		}
+	}
 	return nil
 }

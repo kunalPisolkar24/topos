@@ -3,7 +3,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { USERNAME_MAX_LENGTH } from "@/lib/user-input";
+import { USERNAME_MAX_LENGTH } from "@/entities/user";
 import { useSignup } from "../hooks/use-signup";
 import { PasswordField } from "./PasswordField";
 import {

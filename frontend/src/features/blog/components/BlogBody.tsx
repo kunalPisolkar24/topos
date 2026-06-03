@@ -24,16 +24,16 @@ export const BlogBody: React.FC<BlogBodyProps> = ({ body, tags }) => {
   });
 
   return (
-    <article className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-8">
+    <article className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-5 lg:p-6">
       <div className="mb-6 flex items-center gap-3">
         <span className="h-2 w-2 bg-primary" aria-hidden="true" />
         <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
           Body
         </p>
       </div>
-      <div className="bg-surface p-4 ring-1 ring-outline-variant/20 sm:p-6 lg:p-8">
+      <div className="bg-surface p-4 ring-1 ring-outline-variant/20 sm:p-5 lg:p-6">
         <div
-          className="quill-content-view prose prose-lg dark:prose-invert max-w-none"
+          className="quill-content-view prose prose-lg dark:prose-invert max-w-none min-w-0 overflow-hidden break-words"
           dangerouslySetInnerHTML={{ __html: cleanBody }}
         />
       </div>

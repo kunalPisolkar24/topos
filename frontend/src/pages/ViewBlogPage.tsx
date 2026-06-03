@@ -2,41 +2,33 @@
 
 import type React from "react";
 import { Sparkles } from "lucide-react";
-import { StickyNavbar } from "@/layouts";
-import { ViewBlogPageSkeleton } from "@/components/skeletons";
-import { 
-  useViewBlog,
-  BlogAuthorSidebar,
+import { useParams } from "react-router-dom";
+import { StickyNavbar } from "@/widgets";
+import { ViewBlogPageSkeleton } from "@/shared/ui/feedback";
+import {
+  usePostViewerController,
   BlogEditForm,
   AISummaryDialog,
   BlogHeader,
   BlogBody,
+  type PostForEditing,
 } from "@/features/blog";
-import { useCurrentUser } from "@/features/auth";
+import { BlogAuthorSidebar } from "@/widgets";
+import { useCurrentUser } from "@/entities/session";
 
 const ViewBlogPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useCurrentUser();
-  const {
-    blog,
-    loading,
-    isEditing,
-    setIsEditing,
-    isDeleting,
-    isDeleteDialogOpen,
-    setIsDeleteDialogOpen,
-    isSummaryDialogOpen,
-    setIsSummaryDialogOpen,
-    confirmDelete,
-    refetch,
-  } = useViewBlog();
+  const { state, setView, setDialog, deletePost, refetch } =
+    usePostViewerController(id);
 
-  if (loading) return <ViewBlogPageSkeleton />;
+  if (state.kind === "loading") return <ViewBlogPageSkeleton />;
 
-  if (!blog) {
+  if (state.kind === "error" || state.kind === "not-found") {
     return (
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
-        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
           <div className="mx-auto max-w-3xl bg-surface-low p-6 ring-1 ring-outline-variant/20 sm:p-8">
             <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
               Missing Article
@@ -53,14 +45,25 @@ const ViewBlogPage: React.FC = () => {
     );
   }
 
-  const isAuthor = currentUser?.id === blog.author.id;
+  const { post, view, dialog, isDeleting } = state;
+  const isAuthor = currentUser?.id === post.author.id;
+  const editingPost: PostForEditing = {
+    id: post.id,
+    title: post.title,
+    body: post.body,
+    imageUrl: post.imageUrl,
+    tags: post.tags,
+  };
+  const isEditView = view === "editing";
+  const summaryOpen = dialog === "summary";
+  const deleteDialogOpen = dialog === "delete";
 
   return (
     <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
-      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          {isEditing ? (
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[88rem]">
+          {isEditView ? (
             <>
               <header className="relative overflow-hidden bg-surface-low p-5 ring-1 ring-outline-variant/20 sm:p-8 lg:p-10 mb-6">
                 <div
@@ -85,10 +88,10 @@ const ViewBlogPage: React.FC = () => {
               </header>
 
               <BlogEditForm
-                blog={blog}
-                onCancel={() => setIsEditing(false)}
+                blog={editingPost}
+                onCancel={() => setView("reading")}
                 onComplete={() => {
-                  setIsEditing(false);
+                  setView("reading");
                   refetch();
                 }}
               />
@@ -96,36 +99,40 @@ const ViewBlogPage: React.FC = () => {
           ) : (
             <>
               <BlogHeader
-                title={blog.title}
-                imageUrl={blog.imageUrl}
-                createdAt={blog.createdAt}
-                updatedAt={blog.updatedAt}
+                title={post.title}
+                imageUrl={post.imageUrl}
+                createdAt={post.createdAt}
+                updatedAt={post.updatedAt}
               />
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
                 <section className="min-w-0 space-y-6">
-                  <BlogBody body={blog.body} tags={blog.tags} />
+                  <BlogBody body={post.body} tags={post.tags} />
                   <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20 sm:p-5">
                     <p className="mb-4 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
                       Reading Utility
                     </p>
                     <AISummaryDialog
-                      summary={blog.summary}
-                      summaryStatus={blog.summaryStatus}
-                      isOpen={isSummaryDialogOpen}
-                      onOpenChange={setIsSummaryDialogOpen}
+                      summary={post.summary}
+                      summaryStatus={post.summaryStatus}
+                      isOpen={summaryOpen}
+                      onOpenChange={(open) =>
+                        setDialog(open ? "summary" : "closed")
+                      }
                     />
                   </div>
                 </section>
 
                 <BlogAuthorSidebar
-                  author={blog.author}
+                  author={post.author}
                   isAuthor={isAuthor}
-                  isEditing={isEditing}
-                  onEdit={() => setIsEditing(true)}
-                  onDelete={confirmDelete}
+                  isEditing={isEditView}
+                  onEdit={() => setView("editing")}
+                  onDelete={deletePost}
                   isDeleting={isDeleting}
-                  isDeleteDialogOpen={isDeleteDialogOpen}
-                  setIsDeleteDialogOpen={setIsDeleteDialogOpen}
+                  isDeleteDialogOpen={deleteDialogOpen}
+                  setIsDeleteDialogOpen={(open) =>
+                    setDialog(open ? "delete" : "closed")
+                  }
                 />
               </div>
             </>

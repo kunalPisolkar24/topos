@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode, SVGProps } from "react";
 import { Waypoints } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/cn";
 
 export const authErrorClassName =
   "font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-destructive";

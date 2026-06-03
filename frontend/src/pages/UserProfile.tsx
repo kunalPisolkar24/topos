@@ -5,31 +5,29 @@ import { Camera, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/features/auth";
-import { StickyNavbar } from "@/layouts";
-import { 
-  useUserProfile,
-  useUserPosts,
+import { useCurrentUser } from "@/entities/session";
+import { StickyNavbar } from "@/widgets";
+import {
+  useProfileEditorController,
+  useUserPostsController,
   ProfileBanner,
   ProfileViewInfo,
   ProfileEditForm,
   ProfilePostsSection,
 } from "@/features/user";
 
-const DEFAULT_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
+const FALLBACK_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
 
 const UserProfile: React.FC = () => {
   const { user: currentUser, loading: isUserLoading } = useCurrentUser();
-  
-  const { state: profileState, handlers: profileHandlers } = useUserProfile(currentUser);
+
+  const { state: profileState, handlers: profileHandlers } = useProfileEditorController({
+    currentUser,
+  });
   const {
-    blogs: userBlogs,
-    loading: isPostsLoading,
-    currentPage,
-    totalPages,
-    totalPosts,
+    state: { blogs: userBlogs, loading: isPostsLoading, currentPage, totalPages, totalPosts },
     handlePageChange,
-  } = useUserPosts(currentUser?.id);
+  } = useUserPostsController({ userId: currentUser?.id });
 
   if (isUserLoading) {
     return (
@@ -82,10 +80,8 @@ const UserProfile: React.FC = () => {
 
   if (!currentUser) return null;
 
-  const bannerSrc = profileState.bannerPreview || currentUser.bannerUrl || DEFAULT_BANNER_URL;
-  const displayName = currentUser.name || currentUser.username;
-  const profileInitial = displayName.charAt(0).toUpperCase();
-  const avatarSrc = profileState.avatarPreview || currentUser.avatarUrl || undefined;
+  const bannerSrc = profileState.bannerSrc || FALLBACK_BANNER_URL;
+  const { displayName, profileInitial, avatarSrc } = profileState;
 
   return (
     <div className="min-h-screen bg-surface text-foreground">

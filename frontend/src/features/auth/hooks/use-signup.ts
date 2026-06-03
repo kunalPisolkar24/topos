@@ -2,12 +2,12 @@ import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { SignupDocument } from "@/graphql/generated/graphql";
-import { useToast } from "@/hooks/use-toast";
-import { useSessionActions } from "@/features/auth/hooks/use-session-actions";
+import { SignupDocument } from "@/shared/graphql/generated/graphql";
+import { useToast } from "@/shared/ui/hooks/useToast";
+import { useSessionActions } from "@/entities/session";
 import { type ChangeEvent } from "react";
-import { sanitizeUsernameInput } from "@/lib/user-input";
-import { signupSchema, type SignupFormValues } from "@/schemas/auth/signup.schema";
+import { sanitizeUsernameInput } from "@/entities/user";
+import { signupSchema, type SignupFormValues } from "@/features/auth/model/signup.schema";
 
 export const useSignup = () => {
   const { toast } = useToast();

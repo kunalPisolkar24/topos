@@ -54,7 +54,7 @@ export const AIDraftGenerator: React.FC<AIDraftGeneratorProps> = ({
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
             placeholder="Describe the reader, argument, structure, and constraints..."
-            className="min-h-32 bg-surface-lowest leading-7"
+            className="blog-draft-input min-h-32 bg-surface-lowest leading-7"
           />
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button

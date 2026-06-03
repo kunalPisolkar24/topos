@@ -14,6 +14,10 @@ func mapTags(tagNames []string) []*model.Tag {
 }
 
 func mapDomainPostToModel(dp *domain.Post) *model.Post {
+	if dp == nil {
+		return nil
+	}
+
 	var summaryStatus *model.SummaryStatus
 	if dp.SummaryStatus != "" {
 		status := model.SummaryStatus(dp.SummaryStatus)
@@ -38,9 +42,15 @@ func mapDomainPostToModel(dp *domain.Post) *model.Post {
 }
 
 func mapDomainPaginatedToModel(pp *domain.PaginatedPosts) *model.PaginatedPosts {
-	var posts []*model.Post
+	if pp == nil {
+		return nil
+	}
+
+	posts := make([]*model.Post, 0, len(pp.Posts))
 	for _, dp := range pp.Posts {
-		posts = append(posts, mapDomainPostToModel(dp))
+		if mapped := mapDomainPostToModel(dp); mapped != nil {
+			posts = append(posts, mapped)
+		}
 	}
 
 	return &model.PaginatedPosts{

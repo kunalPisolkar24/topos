@@ -28,7 +28,7 @@ export const ProfileViewInfo: React.FC<ProfileViewInfoProps> = ({
         <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
           Profile // Identity
         </p>
-        <h1 className="max-w-full break-words text-4xl font-semibold leading-none tracking-[-0.045em] text-foreground [overflow-wrap:anywhere] md:text-6xl">
+        <h1 className="max-w-full break-words text-4xl font-semibold leading-none tracking-[-0.045em] text-foreground md:text-6xl">
           {displayName}
         </h1>
         <div className="flex w-full flex-wrap items-center gap-2">
@@ -46,7 +46,7 @@ export const ProfileViewInfo: React.FC<ProfileViewInfoProps> = ({
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             About
           </p>
-          <p className="mt-3 max-h-48 max-w-2xl overflow-y-auto whitespace-pre-wrap break-words pr-2 text-sm leading-7 text-muted-foreground [overflow-wrap:anywhere] md:text-base">
+          <p className="mt-3 max-h-48 max-w-2xl overflow-y-auto whitespace-pre-wrap break-words pr-2 text-sm leading-7 text-muted-foreground md:text-base">
             {hasBio ? bio : <span className="italic">No bio added yet.</span>}
           </p>
         </div>

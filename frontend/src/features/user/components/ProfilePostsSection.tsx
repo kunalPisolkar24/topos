@@ -3,17 +3,10 @@ import { FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { BlogCardSkeleton } from "@/components/skeletons";
+import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { BlogCard } from "@/features/blog";
-import type { BlogCardItem } from "@/lib/content";
+import type { BlogCardItem } from "@/entities/post/lib";
+import { PagePagination } from "@/widgets";
 
 interface ProfilePostsSectionProps {
   blogs: BlogCardItem[];
@@ -53,57 +46,18 @@ export const ProfilePostsSection: React.FC<ProfilePostsSectionProps> = ({
           <div className="grid grid-cols-1 gap-6">
             {blogs.map((blog) => <BlogCard key={blog.id} {...blog} />)}
           </div>
-          {totalPages > 1 && (
-            <div className="mt-10">
-              <Pagination className="justify-start">
-                <PaginationContent>
-                  <PaginationItem>
-                    {currentPage > 1 && (
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage - 1);
-                        }}
-                        className="text-muted-foreground"
-                      />
-                    )}
-                  </PaginationItem>
-                  {[...Array(totalPages)].map((_, i) => (
-                    <PaginationItem key={i}>
-                      <PaginationLink
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(i + 1);
-                        }}
-                        isActive={currentPage === i + 1}
-                        className={`${
-                          currentPage === i + 1
-                            ? "border-primary/45 bg-primary-container text-primary-foreground"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {i + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    {currentPage < totalPages && (
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage + 1);
-                        }}
-                        className="text-muted-foreground"
-                      />
-                    )}
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+          <div className="mt-10">
+            <PagePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              align="start"
+              previousClassName="text-muted-foreground"
+              nextClassName="text-muted-foreground"
+              activePageClassName="border-primary/45 bg-primary-container text-primary-foreground"
+              inactivePageClassName="text-muted-foreground"
+            />
+          </div>
         </div>
       ) : (
         <Card className="gap-0 bg-surface-lowest py-0">
