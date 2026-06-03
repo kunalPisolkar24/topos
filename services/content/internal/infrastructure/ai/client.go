@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	pb "github.com/kunalPisolkar24/blogapp/services/content/proto/ai"
 	"google.golang.org/grpc"
@@ -32,12 +33,28 @@ type circuitBreaker struct {
 }
 
 func newCircuitBreaker() *circuitBreaker {
-	return &circuitBreaker{
+	cb := &circuitBreaker{
 		state:            stateClosed,
 		failureThreshold: 5,
 		successThreshold: 2,
 		resetTimeout:     30 * time.Second,
 	}
+	monitoring.AICircuitBreakerState.WithLabelValues("ai-service").Set(monitoring.CBClosed)
+	return cb
+}
+
+func (cb *circuitBreaker) setState(s circuitState) {
+	cb.state = s
+	var stateValue float64
+	switch s {
+	case stateClosed:
+		stateValue = monitoring.CBClosed
+	case stateOpen:
+		stateValue = monitoring.CBOpen
+	case stateHalfOpen:
+		stateValue = monitoring.CBHalfOpen
+	}
+	monitoring.AICircuitBreakerState.WithLabelValues("ai-service").Set(stateValue)
 }
 
 func (cb *circuitBreaker) canProceed() bool {
@@ -52,7 +69,7 @@ func (cb *circuitBreaker) canProceed() bool {
 			cb.mu.Lock()
 			defer cb.mu.Unlock()
 			if cb.state == stateOpen {
-				cb.state = stateHalfOpen
+				cb.setState(stateHalfOpen)
 				cb.successCount = 0
 				logger.Info("AI Circuit Breaker entering HALF-OPEN state")
 				return true
@@ -75,7 +92,7 @@ func (cb *circuitBreaker) recordSuccess() {
 	case stateHalfOpen:
 		cb.successCount++
 		if cb.successCount >= cb.successThreshold {
-			cb.state = stateClosed
+			cb.setState(stateClosed)
 			cb.failureCount = 0
 			logger.Info("AI Circuit Breaker reset to CLOSED")
 		}
@@ -94,11 +111,11 @@ func (cb *circuitBreaker) recordFailure() {
 	switch cb.state {
 	case stateClosed:
 		if cb.failureCount >= cb.failureThreshold {
-			cb.state = stateOpen
+			cb.setState(stateOpen)
 			logger.Warn("AI Circuit Breaker TRIPPED to OPEN")
 		}
 	case stateHalfOpen:
-		cb.state = stateOpen
+		cb.setState(stateOpen)
 		logger.Warn("AI Circuit Breaker returned to OPEN from HALF-OPEN")
 	}
 }

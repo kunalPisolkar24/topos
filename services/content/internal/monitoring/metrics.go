@@ -33,6 +33,11 @@ var (
 		Name: "worker_jobs_processed_total",
 		Help: "Total number of worker jobs processed",
 	}, []string{"job_type", "status"})
+
+	AICircuitBreakerState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ai_circuit_breaker_state",
+		Help: "Current circuit breaker state for AI service (0=closed, 1=open, 2=half-open)",
+	}, []string{"service"})
 )
 
 const (
@@ -44,6 +49,12 @@ const (
 	StatusErr   = "error"
 	StatusSkip  = "skipped"
 	JobGenerate = "generate_summary"
+)
+
+const (
+	CBClosed   = 0
+	CBOpen     = 1
+	CBHalfOpen = 2
 )
 
 func RecordCacheHit() {
