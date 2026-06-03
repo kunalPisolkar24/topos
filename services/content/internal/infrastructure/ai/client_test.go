@@ -11,6 +11,8 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -235,4 +237,48 @@ func TestNoopClient_Close(t *testing.T) {
 	client := NewNoopAIClient()
 	err := client.Close()
 	assert.NoError(t, err)
+}
+
+func TestResilientClient_RateLimitDoesNotOpenBreaker(t *testing.T) {
+	primary := new(mockAIService)
+	fallback := new(mockAIService)
+	cb := newCircuitBreaker()
+	cb.failureThreshold = 1
+
+	client := &resilientAIClient{primary: primary, fallback: fallback, cb: cb}
+
+	resourceExhausted := status.Error(codes.ResourceExhausted, "rate limited")
+
+	primary.On("GenerateSummary", mock.Anything, "test").Return("", resourceExhausted)
+	fallback.On("GenerateSummary", mock.Anything, "test").Return("fallback", nil)
+
+	result, err := client.GenerateSummary(context.Background(), "test")
+	assert.NoError(t, err)
+	assert.Equal(t, "fallback", result)
+
+	cb.mu.RLock()
+	assert.Equal(t, stateClosed, cb.state, "breaker should remain closed after rate limit")
+	cb.mu.RUnlock()
+}
+
+func TestResilientClient_UnavailableDoesOpenBreaker(t *testing.T) {
+	primary := new(mockAIService)
+	fallback := new(mockAIService)
+	cb := newCircuitBreaker()
+	cb.failureThreshold = 1
+
+	client := &resilientAIClient{primary: primary, fallback: fallback, cb: cb}
+
+	unavailable := status.Error(codes.Unavailable, "service down")
+
+	primary.On("GenerateSummary", mock.Anything, "test").Return("", unavailable)
+	fallback.On("GenerateSummary", mock.Anything, "test").Return("fallback", nil)
+
+	result, err := client.GenerateSummary(context.Background(), "test")
+	assert.NoError(t, err)
+	assert.Equal(t, "fallback", result)
+
+	cb.mu.RLock()
+	assert.Equal(t, stateOpen, cb.state, "breaker should open after unavailable error")
+	cb.mu.RUnlock()
 }

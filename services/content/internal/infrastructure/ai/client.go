@@ -10,7 +10,9 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	pb "github.com/kunalPisolkar24/blogapp/services/content/proto/ai"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type circuitState int
@@ -175,6 +177,11 @@ func newGRPCAIClient(url string, dialTimeout time.Duration) (domain.AIService, e
 	}, nil
 }
 
+func isRateLimitError(err error) bool {
+	st, ok := status.FromError(err)
+	return ok && st.Code() == codes.ResourceExhausted
+}
+
 func (c *resilientAIClient) Close() error {
 	return c.primary.Close()
 }
@@ -186,7 +193,9 @@ func (c *resilientAIClient) GenerateSummary(ctx context.Context, content string)
 			c.cb.recordSuccess()
 			return summary, nil
 		}
-		c.cb.recordFailure()
+		if !isRateLimitError(err) {
+			c.cb.recordFailure()
+		}
 		logger.Warn("AI summary generation failed, using fallback", "error", err)
 	} else {
 		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
@@ -201,7 +210,9 @@ func (c *resilientAIClient) GenerateTags(ctx context.Context, title, body string
 			c.cb.recordSuccess()
 			return tags, nil
 		}
-		c.cb.recordFailure()
+		if !isRateLimitError(err) {
+			c.cb.recordFailure()
+		}
 		logger.Warn("AI tags generation failed, using fallback", "error", err)
 	} else {
 		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
@@ -216,7 +227,9 @@ func (c *resilientAIClient) GeneratePost(ctx context.Context, prompt string) (*d
 			c.cb.recordSuccess()
 			return post, nil
 		}
-		c.cb.recordFailure()
+		if !isRateLimitError(err) {
+			c.cb.recordFailure()
+		}
 		logger.Warn("AI post generation failed, using fallback", "error", err)
 	} else {
 		monitoring.AICircuitBreakerRejected.WithLabelValues("ai-service").Inc()
