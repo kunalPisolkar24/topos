@@ -85,8 +85,8 @@ describe('Error formatting integration', () => {
 
     it('maps InvalidCredentialsError to INVALID_CREDENTIALS', async () => {
         prismaMock.user.findUnique.mockResolvedValue(null);
-        const { PasswordUtils } = await import('../../src/utils/password');
-        vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(false);
+        const { Argon2PasswordHasher } = await import('../../src/utils/passwordHasher');
+        vi.spyOn(Argon2PasswordHasher.prototype, 'verify').mockResolvedValue(false);
 
         const response = await app.request('/graphql', {
             method: 'POST',

@@ -1,5 +1,5 @@
 import { PrismaClient, User } from '../generated/prisma/client';
-import { PasswordUtils } from '../utils/password';
+import { PasswordHasher, passwordHasher } from '../utils/passwordHasher';
 import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
@@ -12,7 +12,10 @@ import {
 import { toDomainError } from '../errors/prismaError';
 
 export class UserService implements IUserService {
-    constructor(private readonly prisma: PrismaClient) {}
+    constructor(
+        private readonly prisma: PrismaClient,
+        private readonly hasher: PasswordHasher = passwordHasher
+    ) {}
 
     private toUserResponse(user: User): UserResponse {
         return {
@@ -40,7 +43,7 @@ export class UserService implements IUserService {
     }
 
     async signup(data: SignupInput) {
-        const hashedPassword = await PasswordUtils.hash(data.password);
+        const hashedPassword = await this.hasher.hash(data.password);
 
         let user: User;
         try {
@@ -73,14 +76,8 @@ export class UserService implements IUserService {
             })
         );
 
-        const storedHash = user?.password ?? (await PasswordUtils.getDummyHash());
-
-        let valid = false;
-        try {
-            valid = await PasswordUtils.compare(data.password, storedHash);
-        } catch {
-            valid = false;
-        }
+        const storedHash = user?.password ?? (await this.hasher.getDummyHash());
+        const valid = await this.hasher.verify(data.password, storedHash);
 
         if (!user || !valid) {
             throw new InvalidCredentialsError();

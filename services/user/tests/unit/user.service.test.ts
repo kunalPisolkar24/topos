@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserService } from '../../src/services/user.service';
 import { prismaMock } from '../mocks/prisma';
-import { PasswordUtils } from '../../src/utils/password';
+import { PasswordHasher } from '../../src/utils/passwordHasher';
 import { faker } from '@faker-js/faker';
 import { Prisma } from '../../src/generated/prisma/client';
 import {
@@ -31,12 +31,23 @@ function makeUser(overrides: Partial<{ id: number; email: string; username: stri
     } as any;
 }
 
+function makeHasher(overrides: Partial<PasswordHasher> = {}): PasswordHasher {
+    return {
+        hash: vi.fn().mockResolvedValue('hashed_password_mock'),
+        verify: vi.fn().mockResolvedValue(false),
+        getDummyHash: vi.fn().mockResolvedValue('dummy_hash'),
+        ...overrides,
+    };
+}
+
 describe('UserService Unit Tests', () => {
     let userService: UserService;
+    let hasher: PasswordHasher;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        userService = new UserService(prismaMock as any);
+        hasher = makeHasher();
+        userService = new UserService(prismaMock as any, hasher);
     });
 
     describe('signup', () => {
@@ -51,7 +62,7 @@ describe('UserService Unit Tests', () => {
             const userId = faker.number.int();
             const now = new Date();
 
-            vi.spyOn(PasswordUtils, 'hash').mockResolvedValue(hashedPassword);
+            vi.mocked(hasher.hash).mockResolvedValue(hashedPassword);
 
             prismaMock.user.create.mockResolvedValue({
                 id: userId,
@@ -73,7 +84,7 @@ describe('UserService Unit Tests', () => {
         });
 
         it('should throw UserAlreadyExistsError when P2002 is returned', async () => {
-            vi.spyOn(PasswordUtils, 'hash').mockResolvedValue('hashed_password_mock');
+            vi.mocked(hasher.hash).mockResolvedValue('hashed_password_mock');
             prismaMock.user.create.mockRejectedValue(prismaError('P2002'));
 
             await expect(
@@ -86,7 +97,7 @@ describe('UserService Unit Tests', () => {
         });
 
         it('should rethrow non-domain errors from prisma', async () => {
-            vi.spyOn(PasswordUtils, 'hash').mockResolvedValue('hashed_password_mock');
+            vi.mocked(hasher.hash).mockResolvedValue('hashed_password_mock');
             const unexpected = new Error('database down');
             prismaMock.user.create.mockRejectedValue(unexpected);
 
@@ -105,7 +116,7 @@ describe('UserService Unit Tests', () => {
             const userMock = makeUser({ id: 1, email: 'test@test.com' });
 
             prismaMock.user.findUnique.mockResolvedValue(userMock);
-            vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(true);
+            vi.mocked(hasher.verify).mockResolvedValue(true);
 
             const result = await userService.signin({
                 email: userMock.email,
@@ -117,7 +128,7 @@ describe('UserService Unit Tests', () => {
 
         it('should throw InvalidCredentialsError for non-existent user', async () => {
             prismaMock.user.findUnique.mockResolvedValue(null);
-            const compareSpy = vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(false);
+            const verifySpy = vi.mocked(hasher.verify).mockResolvedValue(false);
 
             await expect(
                 userService.signin({
@@ -126,12 +137,12 @@ describe('UserService Unit Tests', () => {
                 })
             ).rejects.toBeInstanceOf(InvalidCredentialsError);
 
-            expect(compareSpy).toHaveBeenCalled();
+            expect(verifySpy).toHaveBeenCalled();
         });
 
         it('should throw InvalidCredentialsError for invalid password', async () => {
             prismaMock.user.findUnique.mockResolvedValue({ password: 'hash' } as any);
-            vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(false);
+            vi.mocked(hasher.verify).mockResolvedValue(false);
 
             await expect(
                 userService.signin({
@@ -143,7 +154,7 @@ describe('UserService Unit Tests', () => {
 
         it('should throw InvalidCredentialsError when stored hash is malformed', async () => {
             prismaMock.user.findUnique.mockResolvedValue({ password: 'not-a-real-hash' } as any);
-            vi.spyOn(PasswordUtils, 'compare').mockRejectedValue(new Error('invalid hash'));
+            vi.mocked(hasher.verify).mockResolvedValue(false);
 
             await expect(
                 userService.signin({

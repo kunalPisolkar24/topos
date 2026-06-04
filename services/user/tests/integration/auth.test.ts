@@ -92,8 +92,8 @@ describe('Auth Integration Tests', () => {
             createdAt: new Date(),
         } as any;
 
-        const { PasswordUtils } = await import('../../src/utils/password');
-        vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(true);
+        const { Argon2PasswordHasher } = await import('../../src/utils/passwordHasher');
+        vi.spyOn(Argon2PasswordHasher.prototype, 'verify').mockResolvedValue(true);
 
         prismaMock.user.findUnique.mockResolvedValue(userMock);
 

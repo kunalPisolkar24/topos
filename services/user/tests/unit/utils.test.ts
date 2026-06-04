@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { JwtUtils } from '../../src/utils/jwt';
-import { PasswordUtils } from '../../src/utils/password';
+import { Argon2PasswordHasher } from '../../src/utils/passwordHasher';
 import jwt from 'jsonwebtoken';
 import { env } from '../../src/config/env';
 
@@ -64,16 +64,23 @@ describe('Utils Tests', () => {
         });
     });
 
-    describe('PasswordUtils', () => {
+    describe('Argon2PasswordHasher', () => {
+        const hasher = new Argon2PasswordHasher();
+
         it('should verify correct password', async () => {
-            const hash = await PasswordUtils.hash('a-strong-password-12');
-            const isValid = await PasswordUtils.compare('a-strong-password-12', hash);
+            const hash = await hasher.hash('a-strong-password-12');
+            const isValid = await hasher.verify('a-strong-password-12', hash);
             expect(isValid).toBe(true);
         });
 
         it('should reject incorrect password', async () => {
-            const hash = await PasswordUtils.hash('a-strong-password-12');
-            const isValid = await PasswordUtils.compare('wrong-password-xx', hash);
+            const hash = await hasher.hash('a-strong-password-12');
+            const isValid = await hasher.verify('wrong-password-xx', hash);
+            expect(isValid).toBe(false);
+        });
+
+        it('should return false for a malformed hash', async () => {
+            const isValid = await hasher.verify('any-password-here', 'not-a-real-hash');
             expect(isValid).toBe(false);
         });
     });
