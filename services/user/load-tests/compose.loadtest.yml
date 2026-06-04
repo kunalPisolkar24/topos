@@ -91,7 +91,7 @@ services:
 
   user-migrate:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       target: migrator
     container_name: loadtest-user-migrate
@@ -105,7 +105,7 @@ services:
 
   user-seed:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       target: seed
     container_name: loadtest-user-seed
@@ -121,7 +121,7 @@ services:
 
   user-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       target: runtime
     container_name: loadtest-user-service
@@ -153,6 +153,7 @@ services:
     image: grafana/k6:latest
     container_name: loadtest-k6
     restart: "no"
+    command: ["run", "--summary-trend-stats=avg,med,p(90),p(95),p(99),max", "/load-tests/k6/${SCRIPT:-mixed}.js"]
     environment:
       TARGET: http://user-service:${USER_SERVICE_INT_PORT:-4001}
       SEED_OUTPUT_DIR: /out
