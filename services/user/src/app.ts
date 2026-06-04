@@ -14,6 +14,7 @@ import { UserService } from './services/user.service';
 import { CachedUserService } from './services/user.service.cached';
 import { formatGraphQLError } from './errors/formatError';
 import { streamGraphQLResponse } from './lib/graphqlResponse';
+import { checkDependencies, withTimeout } from './lib/ready';
 
 export interface AppHandle {
     app: Hono;
@@ -74,6 +75,14 @@ export async function buildApp(): Promise<AppHandle> {
     });
 
     app.get('/health', (c) => c.text('User Service OK'));
+
+    app.get('/ready', async (c) => {
+        const ready = await withTimeout(checkDependencies(prisma, serviceCache), 500);
+        if (ready.ok) {
+            return c.json({ status: 'ready', checks: ready.checks });
+        }
+        return c.json({ status: 'unavailable', checks: ready.checks }, 503);
+    });
 
     return {
         app,
