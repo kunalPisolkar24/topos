@@ -15,6 +15,10 @@ import { CachedUserService } from './services/user.service.cached';
 import { formatGraphQLError } from './errors/formatError';
 import { streamGraphQLResponse } from './lib/graphqlResponse';
 import { checkDependencies, withTimeout } from './lib/ready';
+import { PayloadTooLargeError, isDomainError } from './errors/DomainError';
+import { logger } from './lib/logger';
+
+const GRAPHQL_MAX_BODY_BYTES = 1 * 1024 * 1024;
 
 export interface AppHandle {
     app: Hono;
@@ -30,6 +34,25 @@ export async function buildApp(): Promise<AppHandle> {
 
     app.use('*', requestLogger);
     app.use('*', metricsMiddleware);
+
+    app.onError((error, c) => {
+        if (isDomainError(error)) {
+            logger.warn({
+                msg: 'Request rejected with domain error',
+                code: error.code,
+                message: error.message,
+            });
+            return c.json(
+                { error: { code: error.code, message: error.message } },
+                error.httpStatus as 400 | 401 | 404 | 409 | 413 | 500
+            );
+        }
+        logger.error({
+            msg: 'Unhandled request error',
+            error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+        });
+        return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500);
+    });
 
     const serviceCache = CacheFactory.createServiceCache();
     const apolloCache = CacheFactory.createApolloCache(serviceCache);
@@ -49,6 +72,23 @@ export async function buildApp(): Promise<AppHandle> {
     await server.start();
 
     app.use('/graphql', async (c) => {
+        const contentLengthHeader = c.req.header('content-length');
+        if (contentLengthHeader) {
+            const contentLength = parseInt(contentLengthHeader, 10);
+            if (Number.isFinite(contentLength) && contentLength > GRAPHQL_MAX_BODY_BYTES) {
+                throw new PayloadTooLargeError(
+                    `GraphQL request body exceeds ${GRAPHQL_MAX_BODY_BYTES} bytes`
+                );
+            }
+        }
+
+        const rawBody = await c.req.raw.text();
+        if (Buffer.byteLength(rawBody, 'utf8') > GRAPHQL_MAX_BODY_BYTES) {
+            throw new PayloadTooLargeError(
+                `GraphQL request body exceeds ${GRAPHQL_MAX_BODY_BYTES} bytes`
+            );
+        }
+
         const httpHeaders = new HeaderMap();
         c.req.raw.headers.forEach((value, key) => {
             httpHeaders.set(key, value);
@@ -58,7 +98,7 @@ export async function buildApp(): Promise<AppHandle> {
             method: c.req.method,
             headers: httpHeaders,
             search: new URL(c.req.url).search ?? '',
-            body: await c.req.json().catch(() => ({})),
+            body: rawBody.length > 0 ? JSON.parse(rawBody) : {},
         };
 
         const response = await server.executeHTTPGraphQLRequest({

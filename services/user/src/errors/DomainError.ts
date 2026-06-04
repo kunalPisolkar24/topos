@@ -4,6 +4,7 @@ export type DomainErrorCode =
     | 'USER_NOT_FOUND'
     | 'VALIDATION_ERROR'
     | 'UNAUTHORIZED'
+    | 'PAYLOAD_TOO_LARGE'
     | 'INTERNAL_ERROR';
 
 export abstract class DomainError extends Error {
@@ -50,6 +51,13 @@ export class UnauthorizedError extends DomainError {
     readonly code = 'UNAUTHORIZED' as const;
     constructor(message = 'Authentication required') {
         super(message, 401);
+    }
+}
+
+export class PayloadTooLargeError extends DomainError {
+    readonly code = 'PAYLOAD_TOO_LARGE' as const;
+    constructor(message = 'Request body too large') {
+        super(message, 413);
     }
 }
 
