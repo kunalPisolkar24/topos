@@ -21,6 +21,9 @@ import { logger } from './lib/logger';
 
 const GRAPHQL_MAX_BODY_BYTES = 1 * 1024 * 1024;
 
+const pickString = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.length > 0 ? value : undefined;
+
 export interface AppHandle {
     app: Hono;
     shutdown: () => Promise<void>;
@@ -91,6 +94,15 @@ export async function buildApp(): Promise<AppHandle> {
             );
         }
 
+        const parsedBody = rawBody.length > 0 ? JSON.parse(rawBody) : {};
+        const operationName = pickString(parsedBody?.operationName) ?? 'anonymous';
+        const queryText = pickString(parsedBody?.query) ?? '';
+        const operationKind: 'query' | 'mutation' = queryText.trimStart().startsWith('mutation') ? 'mutation' : 'query';
+        const stopTimer = metrics.graphqlOperationDuration.startTimer({
+            operation: operationName,
+            kind: operationKind,
+        });
+
         const httpHeaders = new HeaderMap();
         c.req.raw.headers.forEach((value, key) => {
             httpHeaders.set(key, value);
@@ -100,15 +112,21 @@ export async function buildApp(): Promise<AppHandle> {
             method: c.req.method,
             headers: httpHeaders,
             search: new URL(c.req.url).search ?? '',
-            body: rawBody.length > 0 ? JSON.parse(rawBody) : {},
+            body: parsedBody,
         };
 
-        const response = await server.executeHTTPGraphQLRequest({
-            httpGraphQLRequest,
-            context: () => createContext(c, userService),
-        });
-
-        return streamGraphQLResponse(response);
+        try {
+            const response = await server.executeHTTPGraphQLRequest({
+                httpGraphQLRequest,
+                context: () => createContext(c, userService),
+            });
+            const httpStatus = response.status ?? 200;
+            stopTimer({ status: httpStatus >= 400 ? 'error' : 'success' });
+            return streamGraphQLResponse(response);
+        } catch (error) {
+            stopTimer({ status: 'error' });
+            throw error;
+        }
     });
 
     app.get('/metrics', async (c) => {
