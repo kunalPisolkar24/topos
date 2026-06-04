@@ -17,9 +17,23 @@ COPY . .
 RUN DATABASE_URL_MIGRATE="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate \
     && npm run build
 
-FROM build AS migrator
+FROM base AS migrator
 
-CMD ["npm", "run", "prisma:migrate:deploy"]
+COPY package.migrator.json ./package.json
+
+RUN npm install --omit=optional --no-audit --no-fund \
+    && rm -rf /app/node_modules/@electric-sql \
+              /app/node_modules/mysql2 \
+              /app/node_modules/postgres \
+              /app/node_modules/@prisma/studio-core/dist/ui \
+              /app/node_modules/@prisma/studio-core/dist/metafile-cjs.json \
+              /app/node_modules/@prisma/studio-core/dist/metafile-esm.json \
+    && npm cache clean --force
+
+COPY prisma.config.ts ./prisma.config.ts
+COPY prisma ./prisma
+
+CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM base AS runtime
 
