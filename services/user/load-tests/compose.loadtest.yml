@@ -19,7 +19,7 @@ x-user-seed-env: &user-seed-env
   JWT_AUDIENCE: ${JWT_AUDIENCE:-topos}
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
   SEED_USER_COUNT: ${SEED_USER_COUNT:-5000}
-  SEED_OUTPUT_DIR: /out
+  SEED_OUTPUT_DIR: /load-tests/seed-k6/seed_data
   NODE_ENV: production
 
 services:
@@ -115,7 +115,7 @@ services:
       user-migrate:
         condition: service_completed_successfully
     volumes:
-      - seed_out:/out
+      - ./k6:/load-tests/seed-k6:rw
     networks:
       - loadtest-net
 
@@ -156,7 +156,6 @@ services:
     command: ["run", "--summary-trend-stats=avg,med,p(90),p(95),p(99),max", "/load-tests/k6/${SCRIPT:-mixed}.js"]
     environment:
       TARGET: http://user-service:${USER_SERVICE_INT_PORT:-4001}
-      SEED_OUTPUT_DIR: /out
       VUS: ${VUS:-20}
       DURATION: ${DURATION:-30s}
       RPS: ${RPS:-50}
@@ -166,7 +165,6 @@ services:
         condition: service_healthy
     volumes:
       - ./k6:/load-tests/k6:ro
-      - seed_out:/out:ro
     networks:
       - loadtest-net
     deploy:
@@ -178,7 +176,6 @@ services:
 
 volumes:
   user_lt_pg_data:
-  seed_out:
 
 networks:
   loadtest-net:

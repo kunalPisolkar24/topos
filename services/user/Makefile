@@ -17,9 +17,13 @@ SVC_MEM   ?= 768M
 K6_MEM    ?= 384M
 
 load-test-build:
+	SCRIPT=$(SCRIPT) RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION) \
+	SEED_USER_COUNT=$(SEED_USER_COUNT) WEIGHTS=$(WEIGHTS) \
+	USER_JWT_SECRET=$(USER_JWT_SECRET) \
+	PG_MEM=$(PG_MEM) REDIS_MEM=$(REDIS_MEM) SVC_MEM=$(SVC_MEM) K6_MEM=$(K6_MEM) \
 	$(COMPOSE) build
 
-load-test:
+load-test: load-test-build
 	@if [ "$(SCRIPT)" = "mixed" ] || [ "$(SCRIPT)" = "users-list" ] || [ "$(SCRIPT)" = "user-by-id" ] || [ "$(SCRIPT)" = "me" ] || [ "$(SCRIPT)" = "signup" ] || [ "$(SCRIPT)" = "signin" ] || [ "$(SCRIPT)" = "signin-then-me" ]; then :; else \
 		echo "unknown SCRIPT=$(SCRIPT). valid: mixed users-list user-by-id me signup signin signin-then-me"; exit 2; \
 	fi
@@ -27,7 +31,11 @@ load-test:
 	SEED_USER_COUNT=$(SEED_USER_COUNT) WEIGHTS=$(WEIGHTS) \
 	USER_JWT_SECRET=$(USER_JWT_SECRET) \
 	PG_MEM=$(PG_MEM) REDIS_MEM=$(REDIS_MEM) SVC_MEM=$(SVC_MEM) K6_MEM=$(K6_MEM) \
-	$(COMPOSE) up --abort-on-container-exit --exit-code-from k6
+	$(COMPOSE) up -d --wait user-postgres user-redis user-migrate user-seed user-service
+	SCRIPT=$(SCRIPT) RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION) \
+	SEED_USER_COUNT=$(SEED_USER_COUNT) WEIGHTS=$(WEIGHTS) \
+	USER_JWT_SECRET=$(USER_JWT_SECRET) \
+	$(COMPOSE) run --rm k6
 	@EXIT=$$?; \
 	$(MAKE) --no-print-directory load-test-stop; \
 	exit $$EXIT
@@ -61,6 +69,7 @@ load-test-stop:
 	SCRIPT=$(SCRIPT) RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION) \
 	SEED_USER_COUNT=$(SEED_USER_COUNT) WEIGHTS=$(WEIGHTS) \
 	USER_JWT_SECRET=$(USER_JWT_SECRET) \
+	PG_MEM=$(PG_MEM) REDIS_MEM=$(REDIS_MEM) SVC_MEM=$(SVC_MEM) K6_MEM=$(K6_MEM) \
 	$(COMPOSE) down -v --remove-orphans
 
 load-test-clean: load-test-stop

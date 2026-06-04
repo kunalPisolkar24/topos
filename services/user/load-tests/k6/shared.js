@@ -1,11 +1,11 @@
 import http from 'k6/http';
-import { check, open } from 'k6';
+import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 import crypto from 'k6/crypto';
 
 const BASE_URL = __ENV.TARGET || 'http://user-service:4001';
 const GRAPHQL_PATH = `${BASE_URL}/graphql`;
-const OUTPUT_DIR = __ENV.SEED_OUTPUT_DIR || '/out';
+const OUTPUT_DIR = 'seed_data';
 
 const HTTP_OK = 200;
 const HTTP_UNAUTHORIZED = 401;
@@ -68,9 +68,12 @@ export const ME_QUERY = `
     }
 `;
 
+const _rawSeedUsers = open(`${OUTPUT_DIR}/users.json`);
+const _rawSeedTokens = open(`${OUTPUT_DIR}/tokens.json`);
+
 export function loadSeed() {
-    const users = JSON.parse(open(`${OUTPUT_DIR}/users.json`));
-    const tokens = JSON.parse(open(`${OUTPUT_DIR}/tokens.json`));
+    const users = JSON.parse(_rawSeedUsers);
+    const tokens = JSON.parse(_rawSeedTokens);
     if (!Array.isArray(users) || users.length === 0) {
         throw new Error(`seed users.json empty or missing at ${OUTPUT_DIR}`);
     }

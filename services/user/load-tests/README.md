@@ -103,19 +103,19 @@ make -C services/user load-test-stop      # stop containers, remove volumes
 make -C services/user load-test-clean    # alias for the same
 ```
 
-All `topos-user-loadtest_*` containers and the `user_lt_pg_data` and
-`seed_out` volumes are removed.
+All `topos-user-loadtest_*` containers and the `user_lt_pg_data` volume are removed.
 
 ## Lifecycle
 
 1. `compose up` starts `user-postgres` and `user-redis` (healthcheck wait)
 2. `user-migrate` runs `prisma migrate deploy` (one-shot)
-3. `user-seed` inserts users, mints JWTs, writes `/out/users.json` and `/out/tokens.json`
+3. `user-seed` inserts users, mints JWTs, writes `users.json` and `tokens.json` to a
+   host bind mount inside the k6 scripts directory (`seed_data/`)
 4. `user-service` starts; `/ready` returns 200 once Prisma + Redis are reachable
-5. `k6` starts, reads `/out/*.json` in `setup()`, runs the chosen scenario
+5. `k6` starts, reads the seed files via `open()` at init context, runs the chosen scenario
 6. k6 exits with non-zero on threshold breach; the Makefile propagates the code
 7. `load-test-stop` tears down all containers and volumes
 
 The seed container is **idempotent**: if `user_lt_pg_data` is retained and
 already holds ≥ `SEED_USER_COUNT` users, the insert is skipped (it still
-rewrites `/out/*.json` from the existing rows).
+rewrites the seed data files from the existing rows).
