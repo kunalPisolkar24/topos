@@ -1,24 +1,16 @@
 import { Hono } from 'hono';
-import { ApolloServer, HeaderMap } from '@apollo/server';
-import { buildSubgraphSchema } from '@apollo/subgraph';
-import { ApolloServerPluginCacheControl } from '@apollo/server/plugin/cacheControl';
-import { KeyvAdapter } from '@apollo/utils.keyvadapter';
-import { typeDefs } from './graphql/schema';
-import { resolvers } from './graphql/resolvers';
+import { HeaderMap } from '@apollo/server';
 import { createContext } from './context';
 import { requestLogger } from './middleware/request-logger';
 import { metricsMiddleware } from './middleware/metrics';
-import { selectCacheBackend } from './lib/cache';
 import { metrics } from './lib/metrics';
 import prisma from './lib/prisma';
-import { UserService } from './services/user.service';
-import { CachedUserService } from './services/user.service.cached';
-import { formatGraphQLError } from './errors/formatError';
 import { streamGraphQLResponse } from './lib/graphqlResponse';
 import { checkDependencies, withTimeout } from './lib/ready';
 import { PayloadTooLargeError, isDomainError } from './errors/DomainError';
 import { logger } from './lib/logger';
 import { OperationKind } from './context';
+import { composeApp } from './composition';
 
 const GRAPHQL_MAX_BODY_BYTES = 1 * 1024 * 1024;
 
@@ -59,23 +51,8 @@ export async function buildApp(): Promise<AppHandle> {
         return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500);
     });
 
-    const cacheBackend = selectCacheBackend();
-    const serviceCache = cacheBackend.create();
-    const apolloCache = cacheBackend.supportsApollo ? new KeyvAdapter(serviceCache) : undefined;
-
-    const baseUserService = new UserService(prisma);
-    const userService = new CachedUserService(baseUserService, serviceCache);
-
-    const server = new ApolloServer({
-        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
-        cache: apolloCache,
-        plugins: [
-            ApolloServerPluginCacheControl({ defaultMaxAge: 0 }),
-        ],
-        formatError: formatGraphQLError,
-    });
-
-    await server.start();
+    const composed = await composeApp({ prisma });
+    const { apolloServer, userService, serviceCache, cacheBackend } = composed;
 
     app.use('/graphql', async (c) => {
         const contentLengthHeader = c.req.header('content-length');
@@ -98,7 +75,11 @@ export async function buildApp(): Promise<AppHandle> {
         const parsedBody = rawBody.length > 0 ? JSON.parse(rawBody) : {};
         const operationName = pickString(parsedBody?.operationName) ?? 'anonymous';
         const queryText = pickString(parsedBody?.query) ?? '';
-        const operationKind: 'query' | 'mutation' = queryText.trimStart().startsWith('mutation') ? 'mutation' : 'query';
+        const operationKind: OperationKind = queryText.trimStart().startsWith('mutation')
+            ? 'mutation'
+            : queryText.trimStart().startsWith('subscription')
+            ? 'subscription'
+            : 'query';
         const stopTimer = metrics.graphqlOperationDuration.startTimer({
             operation: operationName,
             kind: operationKind,
@@ -117,7 +98,7 @@ export async function buildApp(): Promise<AppHandle> {
         };
 
         try {
-            const response = await server.executeHTTPGraphQLRequest({
+            const response = await apolloServer.executeHTTPGraphQLRequest({
                 httpGraphQLRequest,
                 context: () =>
                     createContext(c, userService, {
@@ -151,10 +132,7 @@ export async function buildApp(): Promise<AppHandle> {
 
     return {
         app,
-        shutdown: async () => {
-            await server.stop();
-            await cacheBackend.disconnect(serviceCache);
-        },
+        shutdown: composed.shutdown,
     };
 }
 
