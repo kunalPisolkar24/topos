@@ -18,6 +18,7 @@ import { streamGraphQLResponse } from './lib/graphqlResponse';
 import { checkDependencies, withTimeout } from './lib/ready';
 import { PayloadTooLargeError, isDomainError } from './errors/DomainError';
 import { logger } from './lib/logger';
+import { OperationKind } from './context';
 
 const GRAPHQL_MAX_BODY_BYTES = 1 * 1024 * 1024;
 
@@ -118,7 +119,11 @@ export async function buildApp(): Promise<AppHandle> {
         try {
             const response = await server.executeHTTPGraphQLRequest({
                 httpGraphQLRequest,
-                context: () => createContext(c, userService),
+                context: () =>
+                    createContext(c, userService, {
+                        operationName,
+                        operationKind,
+                    }),
             });
             const httpStatus = response.status ?? 200;
             stopTimer({ status: httpStatus >= 400 ? 'error' : 'success' });
