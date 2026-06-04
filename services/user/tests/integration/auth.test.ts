@@ -47,8 +47,8 @@ describe('Auth Integration Tests', () => {
 
     it('POST /graphql - Signup flow', async () => {
         const payload = {
-            email: faker.internet.email(),
-            username: faker.internet.username(),
+            email: faker.internet.email().toLowerCase(),
+            username: faker.string.alphanumeric({ length: 10, casing: 'lower' }),
             password: 'securePassword123!',
         };
 

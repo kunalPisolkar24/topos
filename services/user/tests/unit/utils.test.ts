@@ -2,9 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { JwtUtils } from '../../src/utils/jwt';
 import { PasswordUtils } from '../../src/utils/password';
 import jwt from 'jsonwebtoken';
+import { env } from '../../src/config/env';
 
 describe('Utils Tests', () => {
     describe('JwtUtils', () => {
+        it('round-trips a valid payload', () => {
+            const token = JwtUtils.sign({ id: 42 });
+            const result = JwtUtils.verify(token);
+            expect(result).not.toBeNull();
+            expect(result?.id).toBe(42);
+        });
+
         it('should return null for invalid token', () => {
             const result = JwtUtils.verify('invalid.token.here');
             expect(result).toBeNull();
@@ -17,18 +25,55 @@ describe('Utils Tests', () => {
             const result = JwtUtils.verify('token');
             expect(result).toBeNull();
         });
+
+        it('should return null when payload id is not a positive integer', () => {
+            const token = jwt.sign({ id: '1' }, env.JWT_SECRET, {
+                algorithm: 'HS256',
+                issuer: env.JWT_ISSUER,
+                audience: env.JWT_AUDIENCE,
+            });
+            expect(JwtUtils.verify(token)).toBeNull();
+        });
+
+        it('should return null when issuer does not match', () => {
+            const token = jwt.sign({ id: 1 }, env.JWT_SECRET, {
+                algorithm: 'HS256',
+                issuer: 'someone-else',
+                audience: env.JWT_AUDIENCE,
+            });
+            expect(JwtUtils.verify(token)).toBeNull();
+        });
+
+        it('should return null when audience does not match', () => {
+            const token = jwt.sign({ id: 1 }, env.JWT_SECRET, {
+                algorithm: 'HS256',
+                issuer: env.JWT_ISSUER,
+                audience: 'someone-else',
+            });
+            expect(JwtUtils.verify(token)).toBeNull();
+        });
+
+        it('should return null for an expired token', () => {
+            const token = jwt.sign({ id: 1 }, env.JWT_SECRET, {
+                algorithm: 'HS256',
+                issuer: env.JWT_ISSUER,
+                audience: env.JWT_AUDIENCE,
+                expiresIn: '-1s',
+            });
+            expect(JwtUtils.verify(token)).toBeNull();
+        });
     });
 
     describe('PasswordUtils', () => {
         it('should verify correct password', async () => {
-            const hash = await PasswordUtils.hash('password');
-            const isValid = await PasswordUtils.compare('password', hash);
+            const hash = await PasswordUtils.hash('a-strong-password-12');
+            const isValid = await PasswordUtils.compare('a-strong-password-12', hash);
             expect(isValid).toBe(true);
         });
 
         it('should reject incorrect password', async () => {
-            const hash = await PasswordUtils.hash('password');
-            const isValid = await PasswordUtils.compare('wrong', hash);
+            const hash = await PasswordUtils.hash('a-strong-password-12');
+            const isValid = await PasswordUtils.compare('wrong-password-xx', hash);
             expect(isValid).toBe(false);
         });
     });

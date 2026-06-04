@@ -7,6 +7,9 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const envSchema = z.object({
   PORT: z.string().default('4001'),
   JWT_SECRET: z.string().min(1),
+  JWT_ISSUER: z.string().default('user-service'),
+  JWT_AUDIENCE: z.string().default('topos'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
   DATABASE_URL: z.string().min(1),
   DATABASE_URL_REPLICA: z.string().optional(),
   DATABASE_URL_MIGRATE: z.string().optional(),
