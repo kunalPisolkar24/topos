@@ -5,9 +5,10 @@ export const requestLogger = async (c: Context, next: Next) => {
     const start = Date.now();
     const { method, url } = c.req;
     const userAgent = c.req.header('user-agent');
-    
+
     const requestId = c.req.header('x-request-id') || crypto.randomUUID();
     c.set('requestId', requestId);
+    c.header('x-request-id', requestId);
 
     logger.info({
         msg: 'Incoming Request',
