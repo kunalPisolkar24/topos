@@ -1,5 +1,6 @@
 import { Context as HonoContext } from 'hono';
 import { JwtUtils, UserPayload } from './utils/jwt';
+import { extractBearerToken } from './utils/authHeader';
 import { IUserService } from './services/interfaces/user.service.interface';
 import { UserLoader, createUserLoader } from './graphql/loaders/user.loader';
 
@@ -12,18 +13,11 @@ export interface GraphQLContext {
 }
 
 export const createContext = async (
-    c: HonoContext, 
+    c: HonoContext,
     userService: IUserService
 ): Promise<GraphQLContext> => {
-    const authHeader = c.req.header('Authorization');
-    let user: UserPayload | null = null;
-
-    if (authHeader) {
-        const token = authHeader.split(' ')[1];
-        if (token) {
-            user = JwtUtils.verify(token);
-        }
-    }
+    const token = extractBearerToken(c.req.header('Authorization'));
+    const user = token ? JwtUtils.verify(token) : null;
 
     return {
         user,
