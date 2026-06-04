@@ -2,12 +2,13 @@ import { Hono } from 'hono';
 import { ApolloServer, HeaderMap } from '@apollo/server';
 import { buildSubgraphSchema } from '@apollo/subgraph';
 import { ApolloServerPluginCacheControl } from '@apollo/server/plugin/cacheControl';
+import { KeyvAdapter } from '@apollo/utils.keyvadapter';
 import { typeDefs } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
 import { requestLogger } from './middleware/request-logger';
 import { metricsMiddleware } from './middleware/metrics';
-import { CacheFactory } from './lib/cache';
+import { selectCacheBackend } from './lib/cache';
 import { metrics } from './lib/metrics';
 import prisma from './lib/prisma';
 import { UserService } from './services/user.service';
@@ -54,8 +55,9 @@ export async function buildApp(): Promise<AppHandle> {
         return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500);
     });
 
-    const serviceCache = CacheFactory.createServiceCache();
-    const apolloCache = CacheFactory.createApolloCache(serviceCache);
+    const cacheBackend = selectCacheBackend();
+    const serviceCache = cacheBackend.create();
+    const apolloCache = cacheBackend.supportsApollo ? new KeyvAdapter(serviceCache) : undefined;
 
     const baseUserService = new UserService(prisma);
     const userService = new CachedUserService(baseUserService, serviceCache);
@@ -128,7 +130,7 @@ export async function buildApp(): Promise<AppHandle> {
         app,
         shutdown: async () => {
             await server.stop();
-            await CacheFactory.disconnect(serviceCache);
+            await cacheBackend.disconnect(serviceCache);
         },
     };
 }
