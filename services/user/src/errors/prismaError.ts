@@ -17,7 +17,7 @@ export function toDomainError(error: unknown): DomainError {
         }
     }
 
-    return new InternalError(error);
+    throw error;
 }
 
 export class InternalError extends DomainError {

@@ -4,9 +4,15 @@ import { JwtUtils } from '../utils/jwt';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
 import { metrics } from '../lib/metrics';
+import {
+    InvalidCredentialsError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
+} from '../errors/DomainError';
+import { toDomainError } from '../errors/prismaError';
 
 export class UserService implements IUserService {
-    constructor(private readonly prisma: PrismaClient) { }
+    constructor(private readonly prisma: PrismaClient) {}
 
     private toUserResponse(user: User): UserResponse {
         return {
@@ -34,30 +40,23 @@ export class UserService implements IUserService {
     }
 
     async signup(data: SignupInput) {
-        const existingUser = await this.measureDb('findFirst', () => 
-            this.prisma.user.findFirst({
-                where: {
-                    OR: [{ email: data.email }, { username: data.username }],
-                },
-            })
-        );
-
-        if (existingUser) {
-            throw new Error('User already exists');
-        }
-
         const hashedPassword = await PasswordUtils.hash(data.password);
 
-        const user = await this.measureDb('create', () => 
-            this.prisma.user.create({
-                data: {
-                    email: data.email,
-                    username: data.username,
-                    password: hashedPassword,
-                    name: data.username,
-                },
-            })
-        );
+        let user: User;
+        try {
+            user = await this.measureDb('create', () =>
+                this.prisma.user.create({
+                    data: {
+                        email: data.email,
+                        username: data.username,
+                        password: hashedPassword,
+                        name: data.username,
+                    },
+                })
+            );
+        } catch (error) {
+            throw toDomainError(error);
+        }
 
         const token = JwtUtils.sign({ id: user.id });
 
@@ -68,19 +67,23 @@ export class UserService implements IUserService {
     }
 
     async signin(data: SigninInput) {
-        const user = await this.measureDb('findUnique', () => 
+        const user = await this.measureDb('findUnique', () =>
             this.prisma.user.findUnique({
                 where: { email: data.email },
             })
         );
 
-        if (!user) {
-            throw new Error('Invalid credentials');
+        const storedHash = user?.password ?? (await PasswordUtils.getDummyHash());
+
+        let valid = false;
+        try {
+            valid = await PasswordUtils.compare(data.password, storedHash);
+        } catch {
+            valid = false;
         }
 
-        const isValid = await PasswordUtils.compare(data.password, user.password);
-        if (!isValid) {
-            throw new Error('Invalid credentials');
+        if (!user || !valid) {
+            throw new InvalidCredentialsError();
         }
 
         const token = JwtUtils.sign({ id: user.id });
@@ -92,7 +95,7 @@ export class UserService implements IUserService {
     }
 
     async findById(id: number) {
-        const user = await this.measureDb('findUnique', () => 
+        const user = await this.measureDb('findUnique', () =>
             this.prisma.user.findUnique({
                 where: { id },
             })
@@ -104,54 +107,57 @@ export class UserService implements IUserService {
     }
 
     async findByIds(ids: readonly number[]) {
-        const users = await this.measureDb('findMany', () => 
+        if (ids.length === 0) {
+            return [];
+        }
+
+        const users = await this.measureDb('findMany', () =>
             this.prisma.user.findMany({
-                where: { id: { in: [...ids] } }
+                where: { id: { in: [...ids] } },
             })
         );
 
-        const userMap = new Map(users.map(user => [user.id, user]));
+        const userMap = new Map(users.map((user) => [user.id, user]));
 
-        return ids.map(id => {
+        return ids.map((id) => {
             const user = userMap.get(id);
             return user ? this.toUserResponse(user) : null;
         });
     }
 
     async findAll({ limit, cursor }: PaginationArgs) {
-        const users = await this.measureDb('findMany', () => 
+        const users = await this.measureDb('findMany', () =>
             this.prisma.user.findMany({
                 take: limit,
                 skip: cursor ? 1 : 0,
                 cursor: cursor ? { id: cursor } : undefined,
-                orderBy: { id: 'desc' }
+                orderBy: { id: 'desc' },
             })
         );
 
-        return users.map(user => this.toUserResponse(user));
+        return users.map((user) => this.toUserResponse(user));
     }
 
     async updateProfile(userId: number, data: UpdateProfileInput) {
-        const user = await this.measureDb('findUnique', () => 
-            this.prisma.user.findUnique({ where: { id: userId } })
-        );
-        
-        if (!user) {
-            throw new Error('User not found');
+        let updatedUser: User;
+        try {
+            updatedUser = await this.measureDb('update', () =>
+                this.prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        name: data.name,
+                        bio: data.bio,
+                        avatarUrl: data.avatarUrl,
+                        bannerUrl: data.bannerUrl,
+                    },
+                })
+            );
+        } catch (error) {
+            throw toDomainError(error);
         }
-
-        const updatedUser = await this.measureDb('update', () => 
-            this.prisma.user.update({
-                where: { id: userId },
-                data: {
-                    name: data.name,
-                    bio: data.bio,
-                    avatarUrl: data.avatarUrl,
-                    bannerUrl: data.bannerUrl,
-                },
-            })
-        );
 
         return this.toUserResponse(updatedUser);
     }
 }
+
+export { UserAlreadyExistsError, UserNotFoundError, InvalidCredentialsError };
