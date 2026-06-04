@@ -1,21 +1,26 @@
 import { Server } from 'node:http';
 import { logger } from './logger';
-import prisma from './prisma';
+
+export interface ShutdownCloser {
+    readonly name: string;
+    readonly close: () => Promise<void>;
+}
 
 export class ShutdownManager {
-    private server: Server;
-    private extraClosers: Array<() => Promise<void>>;
+    private readonly server: Server;
+    private readonly closers: readonly ShutdownCloser[];
     private isShuttingDown = false;
-    private readonly SHUTDOWN_TIMEOUT = 10000;
+    private readonly shutdownTimeoutMs: number;
 
-    constructor(server: Server, extraClosers: Array<() => Promise<void>> = []) {
+    constructor(server: Server, closers: readonly ShutdownCloser[] = [], shutdownTimeoutMs = 10_000) {
         this.server = server;
-        this.extraClosers = extraClosers;
+        this.closers = closers;
+        this.shutdownTimeoutMs = shutdownTimeoutMs;
         this.handleSignal('SIGTERM');
         this.handleSignal('SIGINT');
     }
 
-    private handleSignal(signal: string) {
+    private handleSignal(signal: string): void {
         process.on(signal, async () => {
             if (this.isShuttingDown) return;
             this.isShuttingDown = true;
@@ -25,14 +30,17 @@ export class ShutdownManager {
             const timeout = setTimeout(() => {
                 logger.error({ msg: 'Shutdown timed out, forcing exit' });
                 this.forceExit(1);
-            }, this.SHUTDOWN_TIMEOUT);
+            }, this.shutdownTimeoutMs);
             timeout.unref();
 
             try {
                 await this.closeHttpServer();
-                await this.closeDatabaseConnection();
-                for (const closer of this.extraClosers) {
-                    await closer();
+                for (const closer of this.closers) {
+                    try {
+                        await closer.close();
+                    } catch (error) {
+                        logger.error({ msg: `Closer ${closer.name} failed`, error });
+                    }
                 }
 
                 logger.info({ msg: 'Graceful shutdown completed' });
@@ -60,10 +68,5 @@ export class ShutdownManager {
                 resolve();
             });
         });
-    }
-
-    private async closeDatabaseConnection() {
-        logger.info({ msg: 'Closing database connection' });
-        await prisma.$disconnect();
     }
 }
