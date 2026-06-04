@@ -47,8 +47,8 @@ describe('Auth Integration Tests', () => {
 
     it('POST /graphql - Signup flow', async () => {
         const payload = {
-            email: faker.internet.email(),
-            username: faker.internet.username(),
+            email: faker.internet.email().toLowerCase(),
+            username: faker.string.alphanumeric({ length: 10, casing: 'lower' }),
             password: 'securePassword123!',
         };
 
@@ -92,8 +92,8 @@ describe('Auth Integration Tests', () => {
             createdAt: new Date(),
         } as any;
 
-        const { PasswordUtils } = await import('../../src/utils/password');
-        vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(true);
+        const { Argon2PasswordHasher } = await import('../../src/utils/passwordHasher');
+        vi.spyOn(Argon2PasswordHasher.prototype, 'verify').mockResolvedValue(true);
 
         prismaMock.user.findUnique.mockResolvedValue(userMock);
 

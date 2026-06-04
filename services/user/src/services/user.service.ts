@@ -1,25 +1,23 @@
 import { PrismaClient, User } from '../generated/prisma/client';
-import { PasswordUtils } from '../utils/password';
-import { JwtUtils } from '../utils/jwt';
+import { PasswordHasher, passwordHasher } from '../utils/passwordHasher';
+import { TokenService, tokenService } from '../utils/tokenService';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
 import { metrics } from '../lib/metrics';
+import {
+    InvalidCredentialsError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
+} from '../errors/DomainError';
+import { toDomainError } from '../errors/prismaError';
+import { toUserResponse } from './user.mapper';
 
 export class UserService implements IUserService {
-    constructor(private readonly prisma: PrismaClient) { }
-
-    private toUserResponse(user: User): UserResponse {
-        return {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            name: user.name,
-            bio: user.bio,
-            avatarUrl: user.avatarUrl,
-            bannerUrl: user.bannerUrl,
-            createdAt: user.createdAt.toISOString(),
-        };
-    }
+    constructor(
+        private readonly prisma: PrismaClient,
+        private readonly hasher: PasswordHasher = passwordHasher,
+        private readonly tokens: TokenService = tokenService
+    ) {}
 
     private async measureDb<T>(operation: string, fn: () => Promise<T>): Promise<T> {
         const stopTimer = metrics.dbOperations.startTimer({ operation, model: 'User' });
@@ -34,65 +32,56 @@ export class UserService implements IUserService {
     }
 
     async signup(data: SignupInput) {
-        const existingUser = await this.measureDb('findFirst', () => 
-            this.prisma.user.findFirst({
-                where: {
-                    OR: [{ email: data.email }, { username: data.username }],
-                },
-            })
-        );
+        const hashedPassword = await this.hasher.hash(data.password);
 
-        if (existingUser) {
-            throw new Error('User already exists');
+        let user: User;
+        try {
+            user = await this.measureDb('create', () =>
+                this.prisma.user.create({
+                    data: {
+                        email: data.email,
+                        username: data.username,
+                        password: hashedPassword,
+                        name: data.username,
+                    },
+                })
+            );
+        } catch (error) {
+            throw toDomainError(error);
         }
 
-        const hashedPassword = await PasswordUtils.hash(data.password);
-
-        const user = await this.measureDb('create', () => 
-            this.prisma.user.create({
-                data: {
-                    email: data.email,
-                    username: data.username,
-                    password: hashedPassword,
-                    name: data.username,
-                },
-            })
-        );
-
-        const token = JwtUtils.sign({ id: user.id });
+        const token = this.tokens.sign({ id: user.id });
 
         return {
-            user: this.toUserResponse(user),
+            user: toUserResponse(user),
             token,
         };
     }
 
     async signin(data: SigninInput) {
-        const user = await this.measureDb('findUnique', () => 
+        const user = await this.measureDb('findUnique', () =>
             this.prisma.user.findUnique({
                 where: { email: data.email },
             })
         );
 
-        if (!user) {
-            throw new Error('Invalid credentials');
+        const storedHash = user?.password ?? (await this.hasher.getDummyHash());
+        const valid = await this.hasher.verify(data.password, storedHash);
+
+        if (!user || !valid) {
+            throw new InvalidCredentialsError();
         }
 
-        const isValid = await PasswordUtils.compare(data.password, user.password);
-        if (!isValid) {
-            throw new Error('Invalid credentials');
-        }
-
-        const token = JwtUtils.sign({ id: user.id });
+        const token = this.tokens.sign({ id: user.id });
 
         return {
-            user: this.toUserResponse(user),
+            user: toUserResponse(user),
             token,
         };
     }
 
     async findById(id: number) {
-        const user = await this.measureDb('findUnique', () => 
+        const user = await this.measureDb('findUnique', () =>
             this.prisma.user.findUnique({
                 where: { id },
             })
@@ -100,58 +89,61 @@ export class UserService implements IUserService {
 
         if (!user) return null;
 
-        return this.toUserResponse(user);
+        return toUserResponse(user);
     }
 
     async findByIds(ids: readonly number[]) {
-        const users = await this.measureDb('findMany', () => 
+        if (ids.length === 0) {
+            return [];
+        }
+
+        const users = await this.measureDb('findMany', () =>
             this.prisma.user.findMany({
-                where: { id: { in: [...ids] } }
+                where: { id: { in: [...ids] } },
             })
         );
 
-        const userMap = new Map(users.map(user => [user.id, user]));
+        const userMap = new Map(users.map((user) => [user.id, user]));
 
-        return ids.map(id => {
+        return ids.map((id) => {
             const user = userMap.get(id);
-            return user ? this.toUserResponse(user) : null;
+            return user ? toUserResponse(user) : null;
         });
     }
 
     async findAll({ limit, cursor }: PaginationArgs) {
-        const users = await this.measureDb('findMany', () => 
+        const users = await this.measureDb('findMany', () =>
             this.prisma.user.findMany({
                 take: limit,
                 skip: cursor ? 1 : 0,
                 cursor: cursor ? { id: cursor } : undefined,
-                orderBy: { id: 'desc' }
+                orderBy: { id: 'desc' },
             })
         );
 
-        return users.map(user => this.toUserResponse(user));
+        return users.map((user) => toUserResponse(user));
     }
 
     async updateProfile(userId: number, data: UpdateProfileInput) {
-        const user = await this.measureDb('findUnique', () => 
-            this.prisma.user.findUnique({ where: { id: userId } })
-        );
-        
-        if (!user) {
-            throw new Error('User not found');
+        let updatedUser: User;
+        try {
+            updatedUser = await this.measureDb('update', () =>
+                this.prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        name: data.name,
+                        bio: data.bio,
+                        avatarUrl: data.avatarUrl,
+                        bannerUrl: data.bannerUrl,
+                    },
+                })
+            );
+        } catch (error) {
+            throw toDomainError(error);
         }
 
-        const updatedUser = await this.measureDb('update', () => 
-            this.prisma.user.update({
-                where: { id: userId },
-                data: {
-                    name: data.name,
-                    bio: data.bio,
-                    avatarUrl: data.avatarUrl,
-                    bannerUrl: data.bannerUrl,
-                },
-            })
-        );
-
-        return this.toUserResponse(updatedUser);
+        return toUserResponse(updatedUser);
     }
 }
+
+export { UserAlreadyExistsError, UserNotFoundError, InvalidCredentialsError };

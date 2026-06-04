@@ -4,30 +4,52 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 
 WORKDIR /app
 
-FROM base AS build
+FROM base AS deps
 
 COPY package*.json ./
 
-RUN npm ci
+RUN npm ci --include=dev --no-audit --no-fund
+
+FROM deps AS build
 
 COPY . .
 
 RUN DATABASE_URL_MIGRATE="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate \
     && npm run build
 
-FROM build AS migrator
+FROM base AS migrator
 
-CMD ["npm", "run", "prisma:migrate:deploy"]
+COPY package.migrator.json ./package.json
+
+RUN npm install --omit=optional --no-audit --no-fund \
+    && rm -rf /app/node_modules/@electric-sql \
+              /app/node_modules/mysql2 \
+              /app/node_modules/postgres \
+              /app/node_modules/@prisma/studio-core/dist/ui \
+              /app/node_modules/@prisma/studio-core/dist/metafile-cjs.json \
+              /app/node_modules/@prisma/studio-core/dist/metafile-esm.json \
+    && npm cache clean --force
+
+COPY prisma.config.ts ./prisma.config.ts
+COPY prisma ./prisma
+
+CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM base AS runtime
 
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/package-lock.json ./package-lock.json
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+COPY package*.json ./
 
-RUN npm prune --omit=dev \
+RUN npm ci --omit=dev --no-audit --no-fund \
+    && find /app/node_modules/@prisma/client/runtime \
+        \( -name 'query_compiler_*.mysql.*' \
+        -o -name 'query_compiler_*.sqlite.*' \
+        -o -name 'query_compiler_*.cockroachdb.*' \
+        -o -name 'query_compiler_*.sqlserver.*' \) -delete \
+    && rm -rf /app/node_modules/@prisma/engines \
     && npm cache clean --force
+
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/src/generated/prisma ./src/generated/prisma
 
 ENV NODE_ENV=production
 

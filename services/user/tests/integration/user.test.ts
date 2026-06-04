@@ -17,10 +17,10 @@ describe('User Integration Tests', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         const { createApp } = await import('../../src/app');
-        const { JwtUtils } = await import('../../src/utils/jwt');
-        
+        const { tokenService } = await import('../../src/utils/tokenService');
+
         app = await createApp();
-        jwtToken = JwtUtils.sign({ id: 1 });
+        jwtToken = tokenService.sign({ id: 1 });
     });
 
     const ME_QUERY = `
@@ -157,13 +157,14 @@ describe('User Integration Tests', () => {
         const response = await app.request('/graphql', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 query: UPDATE_PROFILE_MUTATION,
                 variables: { name: 'New' }
             }),
         });
 
         const body = await response.json();
-        expect(body.errors[0].message).toBe('Unauthorized');
+        expect(body.errors[0].message).toBe('Authentication required');
+        expect(body.errors[0].extensions.code).toBe('UNAUTHORIZED');
     });
 });

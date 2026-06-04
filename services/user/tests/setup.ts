@@ -23,11 +23,13 @@ vi.mock('pino', () => {
             info: vi.fn(),
             error: vi.fn(),
             debug: vi.fn(),
+            warn: vi.fn(),
             fatal: vi.fn(),
             child: () => ({
                 info: vi.fn(),
                 error: vi.fn(),
                 debug: vi.fn(),
+                warn: vi.fn(),
                 fatal: vi.fn(),
             }),
         }),
@@ -38,7 +40,10 @@ vi.mock('../src/lib/metrics', () => ({
     metrics: {
         httpRequestDuration: { observe: vi.fn() },
         cacheOperations: { inc: vi.fn() },
-        dbOperations: { 
+        dbOperations: {
+            startTimer: vi.fn().mockReturnValue(() => {}),
+        },
+        graphqlOperationDuration: {
             startTimer: vi.fn().mockReturnValue(() => {}),
         },
         register: {
