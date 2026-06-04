@@ -13,6 +13,7 @@ import { metrics } from './lib/metrics';
 import prisma from './lib/prisma';
 import { UserService } from './services/user.service';
 import { CachedUserService } from './services/user.service.cached';
+import { formatGraphQLError } from './errors/formatError';
 
 export async function createApp() {
     const app = new Hono();
@@ -34,14 +35,7 @@ export async function createApp() {
         plugins: [
             ApolloServerPluginCacheControl({ defaultMaxAge: 0 }),
         ],
-        formatError: (formattedError, error) => {
-            logger.error({
-                msg: 'GraphQL Error',
-                error: formattedError,
-                originalError: error
-            });
-            return formattedError;
-        },
+        formatError: formatGraphQLError,
     });
 
     await server.start();

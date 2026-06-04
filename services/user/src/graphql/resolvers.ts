@@ -1,5 +1,6 @@
 import { GraphQLContext } from '../context';
 import { signupSchema, signinSchema, updateProfileSchema } from '../types';
+import { UnauthorizedError } from '../errors/DomainError';
 
 export const resolvers = {
     Query: {
@@ -28,7 +29,7 @@ export const resolvers = {
         },
         updateProfile: async (_: unknown, args: unknown, context: GraphQLContext) => {
             if (!context.user) {
-                throw new Error('Unauthorized');
+                throw new UnauthorizedError();
             }
             const validated = updateProfileSchema.parse(args);
             return context.userService.updateProfile(context.user.id, validated);
