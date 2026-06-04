@@ -1,20 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
-import { JwtUtils } from '../../src/utils/jwt';
+import { JwtTokenService } from '../../src/utils/tokenService';
 import { Argon2PasswordHasher } from '../../src/utils/passwordHasher';
 import jwt from 'jsonwebtoken';
 import { env } from '../../src/config/env';
 
 describe('Utils Tests', () => {
-    describe('JwtUtils', () => {
+    describe('JwtTokenService', () => {
+        const tokens = new JwtTokenService();
+
         it('round-trips a valid payload', () => {
-            const token = JwtUtils.sign({ id: 42 });
-            const result = JwtUtils.verify(token);
+            const token = tokens.sign({ id: 42 });
+            const result = tokens.verify(token);
             expect(result).not.toBeNull();
             expect(result?.id).toBe(42);
         });
 
         it('should return null for invalid token', () => {
-            const result = JwtUtils.verify('invalid.token.here');
+            const result = tokens.verify('invalid.token.here');
             expect(result).toBeNull();
         });
 
@@ -22,7 +24,7 @@ describe('Utils Tests', () => {
             vi.spyOn(jwt, 'verify').mockImplementation(() => {
                 throw new Error('Boom');
             });
-            const result = JwtUtils.verify('token');
+            const result = tokens.verify('token');
             expect(result).toBeNull();
         });
 
@@ -32,7 +34,7 @@ describe('Utils Tests', () => {
                 issuer: env.JWT_ISSUER,
                 audience: env.JWT_AUDIENCE,
             });
-            expect(JwtUtils.verify(token)).toBeNull();
+            expect(tokens.verify(token)).toBeNull();
         });
 
         it('should return null when issuer does not match', () => {
@@ -41,7 +43,7 @@ describe('Utils Tests', () => {
                 issuer: 'someone-else',
                 audience: env.JWT_AUDIENCE,
             });
-            expect(JwtUtils.verify(token)).toBeNull();
+            expect(tokens.verify(token)).toBeNull();
         });
 
         it('should return null when audience does not match', () => {
@@ -50,7 +52,7 @@ describe('Utils Tests', () => {
                 issuer: env.JWT_ISSUER,
                 audience: 'someone-else',
             });
-            expect(JwtUtils.verify(token)).toBeNull();
+            expect(tokens.verify(token)).toBeNull();
         });
 
         it('should return null for an expired token', () => {
@@ -60,7 +62,7 @@ describe('Utils Tests', () => {
                 audience: env.JWT_AUDIENCE,
                 expiresIn: '-1s',
             });
-            expect(JwtUtils.verify(token)).toBeNull();
+            expect(tokens.verify(token)).toBeNull();
         });
     });
 

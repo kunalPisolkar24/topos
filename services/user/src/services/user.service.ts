@@ -1,6 +1,6 @@
 import { PrismaClient, User } from '../generated/prisma/client';
 import { PasswordHasher, passwordHasher } from '../utils/passwordHasher';
-import { JwtUtils } from '../utils/jwt';
+import { TokenService, tokenService } from '../utils/tokenService';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
 import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
 import { metrics } from '../lib/metrics';
@@ -14,7 +14,8 @@ import { toDomainError } from '../errors/prismaError';
 export class UserService implements IUserService {
     constructor(
         private readonly prisma: PrismaClient,
-        private readonly hasher: PasswordHasher = passwordHasher
+        private readonly hasher: PasswordHasher = passwordHasher,
+        private readonly tokens: TokenService = tokenService
     ) {}
 
     private toUserResponse(user: User): UserResponse {
@@ -61,7 +62,7 @@ export class UserService implements IUserService {
             throw toDomainError(error);
         }
 
-        const token = JwtUtils.sign({ id: user.id });
+        const token = this.tokens.sign({ id: user.id });
 
         return {
             user: this.toUserResponse(user),
@@ -83,7 +84,7 @@ export class UserService implements IUserService {
             throw new InvalidCredentialsError();
         }
 
-        const token = JwtUtils.sign({ id: user.id });
+        const token = this.tokens.sign({ id: user.id });
 
         return {
             user: this.toUserResponse(user),
