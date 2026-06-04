@@ -10,6 +10,7 @@ import {
     UserNotFoundError,
 } from '../errors/DomainError';
 import { toDomainError } from '../errors/prismaError';
+import { toUserResponse } from './user.mapper';
 
 export class UserService implements IUserService {
     constructor(
@@ -17,19 +18,6 @@ export class UserService implements IUserService {
         private readonly hasher: PasswordHasher = passwordHasher,
         private readonly tokens: TokenService = tokenService
     ) {}
-
-    private toUserResponse(user: User): UserResponse {
-        return {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            name: user.name,
-            bio: user.bio,
-            avatarUrl: user.avatarUrl,
-            bannerUrl: user.bannerUrl,
-            createdAt: user.createdAt.toISOString(),
-        };
-    }
 
     private async measureDb<T>(operation: string, fn: () => Promise<T>): Promise<T> {
         const stopTimer = metrics.dbOperations.startTimer({ operation, model: 'User' });
@@ -65,7 +53,7 @@ export class UserService implements IUserService {
         const token = this.tokens.sign({ id: user.id });
 
         return {
-            user: this.toUserResponse(user),
+            user: toUserResponse(user),
             token,
         };
     }
@@ -87,7 +75,7 @@ export class UserService implements IUserService {
         const token = this.tokens.sign({ id: user.id });
 
         return {
-            user: this.toUserResponse(user),
+            user: toUserResponse(user),
             token,
         };
     }
@@ -101,7 +89,7 @@ export class UserService implements IUserService {
 
         if (!user) return null;
 
-        return this.toUserResponse(user);
+        return toUserResponse(user);
     }
 
     async findByIds(ids: readonly number[]) {
@@ -119,7 +107,7 @@ export class UserService implements IUserService {
 
         return ids.map((id) => {
             const user = userMap.get(id);
-            return user ? this.toUserResponse(user) : null;
+            return user ? toUserResponse(user) : null;
         });
     }
 
@@ -133,7 +121,7 @@ export class UserService implements IUserService {
             })
         );
 
-        return users.map((user) => this.toUserResponse(user));
+        return users.map((user) => toUserResponse(user));
     }
 
     async updateProfile(userId: number, data: UpdateProfileInput) {
@@ -154,7 +142,7 @@ export class UserService implements IUserService {
             throw toDomainError(error);
         }
 
-        return this.toUserResponse(updatedUser);
+        return toUserResponse(updatedUser);
     }
 }
 
