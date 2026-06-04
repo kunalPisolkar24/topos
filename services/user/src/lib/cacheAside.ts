@@ -53,8 +53,8 @@ export class CacheAside<TKey, TValue> {
             return [];
         }
 
-        const cached = await Promise.all(ids.map((id) => this.read(id)));
-        const missingFlags = await Promise.all(ids.map((id) => this.readMissing(id)));
+        const cached = await this.readMany(ids);
+        const missingFlags = await this.readManyMissing(ids);
 
         const toFetch: TKey[] = [];
         cached.forEach((cachedValue, index) => {
@@ -147,6 +147,48 @@ export class CacheAside<TKey, TValue> {
             this.logCacheError('read', key, error);
             return false;
         }
+    }
+
+    private async readMany(ids: readonly TKey[]): Promise<(TValue | undefined)[]> {
+        const keys = ids.map((id) => this.userKey(id));
+        if (typeof this.cache.getMany === 'function') {
+            try {
+                const values = (await this.cache.getMany(keys)) as Array<TValue | null | undefined>;
+                values.forEach((value) => {
+                    metrics.cacheOperations.inc({
+                        type: 'read',
+                        status: value !== undefined && value !== null ? 'hit' : 'miss',
+                    });
+                });
+                return values.map((value) =>
+                    value !== undefined && value !== null ? value : undefined
+                );
+            } catch (error) {
+                metrics.cacheOperations.inc({ type: 'read', status: 'error' });
+                this.logCacheError('read', keys.join(','), error);
+                return ids.map(() => undefined);
+            }
+        }
+        return Promise.all(ids.map((id) => this.read(id)));
+    }
+
+    private async readManyMissing(ids: readonly TKey[]): Promise<boolean[]> {
+        const keys = ids.map((id) => this.missingKey(id));
+        if (typeof this.cache.getMany === 'function') {
+            try {
+                const values = (await this.cache.getMany(keys)) as Array<number | null | undefined>;
+                return values.map((value) => {
+                    const hit = value === NEGATIVE_CACHE_MARKER;
+                    metrics.cacheOperations.inc({ type: 'read', status: hit ? 'hit' : 'miss' });
+                    return hit;
+                });
+            } catch (error) {
+                metrics.cacheOperations.inc({ type: 'read', status: 'error' });
+                this.logCacheError('read', keys.join(','), error);
+                return ids.map(() => false);
+            }
+        }
+        return Promise.all(ids.map((id) => this.readMissing(id)));
     }
 
     private async write(id: TKey, value: TValue): Promise<boolean> {
