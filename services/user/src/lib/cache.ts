@@ -4,20 +4,16 @@ import { KeyvAdapter } from '@apollo/utils.keyvadapter';
 import { env } from '../config/env';
 import { logger } from './logger';
 
-export let serviceCache: Keyv;
 const CACHE_NAMESPACE = 'user-service';
 
 export class CacheFactory {
-    static createCache() {
+    static createServiceCache(): Keyv {
         try {
             if (env.REDIS_SENTINELS) {
-                serviceCache = this.createSentinelCache(env.REDIS_SENTINELS);
-                return new KeyvAdapter(serviceCache);
+                return this.createSentinelCache();
             }
-
             if (env.REDIS_URL) {
-                serviceCache = this.createUrlCache(env.REDIS_URL);
-                return new KeyvAdapter(serviceCache);
+                return this.createUrlCache(env.REDIS_URL);
             }
         } catch (error) {
             logger.error({
@@ -25,17 +21,37 @@ export class CacheFactory {
                 error,
             });
         }
-
-        serviceCache = new Keyv();
-        return undefined;
+        return this.createInMemoryCache();
     }
 
-    private static createSentinelCache(rawSentinels: string): Keyv {
-        const sentinelRootNodes = rawSentinels
+    static createApolloCache(serviceCache: Keyv): KeyvAdapter | undefined {
+        const store = (serviceCache as unknown as { store?: { opts?: { uri?: string } } }).store;
+        const uri = store?.opts?.uri;
+        if (!uri) {
+            return undefined;
+        }
+        return new KeyvAdapter(serviceCache);
+    }
+
+    static async disconnect(cache: Keyv | undefined): Promise<void> {
+        if (!cache) {
+            return;
+        }
+        if (typeof cache.disconnect === 'function') {
+            await cache.disconnect();
+        }
+    }
+
+    private static createInMemoryCache(): Keyv {
+        return new Keyv();
+    }
+
+    private static createSentinelCache(): Keyv {
+        const sentinelRootNodes = (env.REDIS_SENTINELS ?? '')
             .split(',')
-            .map(address => address.trim())
+            .map((address) => address.trim())
             .filter(Boolean)
-            .map(address => {
+            .map((address) => {
                 const [host, portText] = address.split(':');
                 const port = Number.parseInt(portText, 10);
 
@@ -76,11 +92,5 @@ export class CacheFactory {
             namespace: CACHE_NAMESPACE,
             useKeyPrefix: false,
         });
-    }
-
-    static async disconnect() {
-        if (serviceCache) {
-            await serviceCache.disconnect();
-        }
     }
 }

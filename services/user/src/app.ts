@@ -7,31 +7,38 @@ import { resolvers } from './graphql/resolvers';
 import { createContext } from './context';
 import { requestLogger } from './middleware/request-logger';
 import { metricsMiddleware } from './middleware/metrics';
-import { logger } from './lib/logger';
-import { CacheFactory, serviceCache } from './lib/cache';
+import { CacheFactory } from './lib/cache';
 import { metrics } from './lib/metrics';
 import prisma from './lib/prisma';
 import { UserService } from './services/user.service';
 import { CachedUserService } from './services/user.service.cached';
 import { formatGraphQLError } from './errors/formatError';
+import { streamGraphQLResponse } from './lib/graphqlResponse';
 
-export async function createApp() {
+export interface AppHandle {
+    app: Hono;
+    shutdown: () => Promise<void>;
+}
+
+export async function createApp(): Promise<Hono> {
+    return (await buildApp()).app;
+}
+
+export async function buildApp(): Promise<AppHandle> {
     const app = new Hono();
 
     app.use('*', requestLogger);
     app.use('*', metricsMiddleware);
 
-    const cacheBackend = CacheFactory.createCache();
+    const serviceCache = CacheFactory.createServiceCache();
+    const apolloCache = CacheFactory.createApolloCache(serviceCache);
 
     const baseUserService = new UserService(prisma);
-    
-    const userService = serviceCache 
-        ? new CachedUserService(baseUserService, serviceCache)
-        : baseUserService;
+    const userService = new CachedUserService(baseUserService, serviceCache);
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
-        cache: cacheBackend,
+        cache: apolloCache,
         plugins: [
             ApolloServerPluginCacheControl({ defaultMaxAge: 0 }),
         ],
@@ -58,18 +65,7 @@ export async function createApp() {
             context: () => createContext(c, userService),
         });
 
-        const responseHeaders: Record<string, string> = {};
-        for (const [key, value] of response.headers) {
-            responseHeaders[key] = value;
-        }
-
-        return new Response(
-            response.body.kind === 'complete' ? response.body.string : '',
-            {
-                status: response.status || 200,
-                headers: responseHeaders,
-            }
-        );
+        return streamGraphQLResponse(response);
     });
 
     app.get('/metrics', async (c) => {
@@ -79,5 +75,12 @@ export async function createApp() {
 
     app.get('/health', (c) => c.text('User Service OK'));
 
-    return app;
+    return {
+        app,
+        shutdown: async () => {
+            await server.stop();
+            await CacheFactory.disconnect(serviceCache);
+        },
+    };
 }
+

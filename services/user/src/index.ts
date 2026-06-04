@@ -7,16 +7,17 @@ import { ShutdownManager } from './lib/shutdown';
 
 const start = async () => {
     try {
-        const app = await createApp();
-        
+        const { buildApp } = await import('./app');
+        const handle = await buildApp();
+
         logger.info(`🚀 User Service running on port ${env.PORT}`);
-        
+
         const server = serve({
-            fetch: app.fetch,
+            fetch: handle.app.fetch,
             port: parseInt(env.PORT),
         });
 
-        new ShutdownManager(server as any);
+        new ShutdownManager(server as any, [handle.shutdown]);
 
     } catch (err) {
         logger.fatal({ msg: 'Failed to start server', err });

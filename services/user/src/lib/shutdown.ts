@@ -1,15 +1,16 @@
 import { Server } from 'node:http';
 import { logger } from './logger';
 import prisma from './prisma';
-import { CacheFactory } from './cache';
 
 export class ShutdownManager {
     private server: Server;
+    private extraClosers: Array<() => Promise<void>>;
     private isShuttingDown = false;
     private readonly SHUTDOWN_TIMEOUT = 10000;
 
-    constructor(server: Server) {
+    constructor(server: Server, extraClosers: Array<() => Promise<void>> = []) {
         this.server = server;
+        this.extraClosers = extraClosers;
         this.handleSignal('SIGTERM');
         this.handleSignal('SIGINT');
     }
@@ -23,22 +24,32 @@ export class ShutdownManager {
 
             const timeout = setTimeout(() => {
                 logger.error({ msg: 'Shutdown timed out, forcing exit' });
-                process.exit(1);
+                this.forceExit(1);
             }, this.SHUTDOWN_TIMEOUT);
+            timeout.unref();
 
             try {
                 await this.closeHttpServer();
                 await this.closeDatabaseConnection();
-                await this.closeCacheConnection();
-                
+                for (const closer of this.extraClosers) {
+                    await closer();
+                }
+
                 logger.info({ msg: 'Graceful shutdown completed' });
                 clearTimeout(timeout);
                 process.exit(0);
             } catch (error) {
                 logger.error({ msg: 'Error during shutdown', error });
-                process.exit(1);
+                clearTimeout(timeout);
+                this.forceExit(1);
             }
         });
+    }
+
+    private forceExit(code: number): never {
+        const socket = (this.server as unknown as { closeAllConnections?: () => void });
+        socket.closeAllConnections?.();
+        process.exit(code);
     }
 
     private closeHttpServer(): Promise<void> {
@@ -54,10 +65,5 @@ export class ShutdownManager {
     private async closeDatabaseConnection() {
         logger.info({ msg: 'Closing database connection' });
         await prisma.$disconnect();
-    }
-
-    private async closeCacheConnection() {
-        logger.info({ msg: 'Closing cache connection' });
-        await CacheFactory.disconnect();
     }
 }

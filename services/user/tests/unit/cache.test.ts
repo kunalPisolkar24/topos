@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CacheFactory } from '../../src/lib/cache';
 
 const mocks = vi.hoisted(() => ({
@@ -21,22 +21,28 @@ describe('CacheFactory', () => {
         mocks.env.REDIS_URL = undefined;
     });
 
-    it('should initialize Sentinel mode when REDIS_SENTINELS is present', () => {
+    it('returns a Keyv instance for service cache (sentinel)', () => {
         mocks.env.REDIS_SENTINELS = 'host:26379';
-        
-        const cache = CacheFactory.createCache();
+        const cache = CacheFactory.createServiceCache();
         expect(cache).toBeDefined();
+        expect(typeof cache.get).toBe('function');
+        expect(typeof cache.set).toBe('function');
     });
 
-    it('should initialize Standard mode when REDIS_URL is present', () => {
+    it('returns a Keyv instance for service cache (url)', () => {
         mocks.env.REDIS_URL = 'redis://localhost:6379';
-
-        const cache = CacheFactory.createCache();
+        const cache = CacheFactory.createServiceCache();
         expect(cache).toBeDefined();
     });
 
-    it('should fallback to Memory when no config present', () => {
-        const cache = CacheFactory.createCache();
-        expect(cache).toBeUndefined();
+    it('returns an in-memory Keyv when no config is set', () => {
+        const cache = CacheFactory.createServiceCache();
+        expect(cache).toBeDefined();
+    });
+
+    it('returns undefined apollo cache for an in-memory service cache', () => {
+        const cache = CacheFactory.createServiceCache();
+        const apolloCache = CacheFactory.createApolloCache(cache);
+        expect(apolloCache).toBeUndefined();
     });
 });
