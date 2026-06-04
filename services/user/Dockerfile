@@ -52,7 +52,18 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/generated/prisma ./src/generated/prisma
 
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=512
 
 EXPOSE 4001
 
 CMD ["npm", "start"]
+
+FROM deps AS seed
+
+COPY --from=build /app/src ./src
+COPY load-tests/seed ./load-tests/seed
+
+ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=512
+
+CMD ["npx", "tsx", "load-tests/seed/seed.ts"]

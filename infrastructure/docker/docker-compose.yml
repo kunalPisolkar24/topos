@@ -45,44 +45,6 @@ services:
     networks:
       - app-network
 
-  summary_api:
-    image: kunalpisolkar/blog-app:distilbart-1.0
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./summary-api:/app
-    networks:
-      - app-network
-
-  summary_worker:
-    build:
-      context: ./summary-worker
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./summary-worker:/app
-    env_file:
-      - ./summary-worker/.env
-    networks:
-      - app-network
-    depends_on:
-      kafka:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-      logstash:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    labels:
-      - co.elastic.logs/enabled=true
-
   elasticsearch_worker:
     build:
       context: ./elasticsearch-worker
