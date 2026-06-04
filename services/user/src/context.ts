@@ -24,7 +24,7 @@ export const createContext = async (
     const token = extractBearerToken(c.req.header('Authorization'));
     const user = token ? tokens.verify(token) : null;
     const requestId = c.get('requestId') ?? c.req.header('x-request-id') ?? crypto.randomUUID();
-    const contextLogger = baseLogger.child({ requestId });
+    const requestLogger = c.get('requestLogger') ?? baseLogger.child({ requestId });
 
     return {
         requestId,
@@ -33,6 +33,6 @@ export const createContext = async (
         loaders: {
             user: createUserLoader(userService)
         },
-        getContextLogger: () => contextLogger,
+        getContextLogger: () => requestLogger,
     };
 };

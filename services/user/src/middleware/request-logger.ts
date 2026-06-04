@@ -1,5 +1,13 @@
 import { Context, Next } from 'hono';
-import { logger } from '../lib/logger';
+import { Logger } from 'pino';
+import { logger as baseLogger } from '../lib/logger';
+
+declare module 'hono' {
+    interface ContextVariableMap {
+        requestId: string;
+        requestLogger: Logger;
+    }
+}
 
 export const requestLogger = async (c: Context, next: Next) => {
     const start = Date.now();
@@ -7,15 +15,17 @@ export const requestLogger = async (c: Context, next: Next) => {
     const userAgent = c.req.header('user-agent');
 
     const requestId = c.req.header('x-request-id') || crypto.randomUUID();
+    const requestBoundLogger = baseLogger.child({ requestId });
+
     c.set('requestId', requestId);
+    c.set('requestLogger', requestBoundLogger);
     c.header('x-request-id', requestId);
 
-    logger.info({
+    requestBoundLogger.info({
         msg: 'Incoming Request',
         method,
         url,
-        requestId,
-        userAgent
+        userAgent,
     });
 
     await next();
@@ -23,12 +33,11 @@ export const requestLogger = async (c: Context, next: Next) => {
     const duration = Date.now() - start;
     const status = c.res.status;
 
-    logger.info({
+    requestBoundLogger.info({
         msg: 'Request Completed',
         method,
         url,
         status,
         duration: `${duration}ms`,
-        requestId
     });
 };
