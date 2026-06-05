@@ -1,34 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mock, MockProxy } from 'vitest-mock-extended';
-import { Kafka, Consumer, EachBatchPayload } from 'kafkajs';
+import { Kafka, EachBatchPayload } from 'kafkajs';
 import { ILogger } from '../../../core/interfaces/logger.interface.js';
+import type { KafkaConfig } from '../kafka.consumer.js';
 
 const consumerMock = {
     connect: vi.fn(),
     disconnect: vi.fn(),
     subscribe: vi.fn(),
-    run: vi.fn()
+    run: vi.fn(),
 };
 
 const kafkaMock = {
-    consumer: vi.fn().mockReturnValue(consumerMock)
+    consumer: vi.fn().mockReturnValue(consumerMock),
 };
 
-vi.mock('../../../config/index.js', () => ({
-    getWorkerConfig: () => ({
-        NODE_ENV: 'test',
-        ELASTICSEARCH_URL: 'http://localhost:9200',
-        ELASTICSEARCH_INDEX: 'test_index',
-        REDIS_SENTINEL_HOSTS: 'localhost:26379',
-        REDIS_MASTER_NAME: 'mymaster',
-        KAFKA_BROKER: 'localhost:9092',
-        KAFKA_CLIENT_ID: 'search-service',
-        KAFKA_GROUP_ID: 'test-group',
-        TOPIC_POSTS: 'posts',
-        TOPIC_DLQ: 'posts.dlq',
-        WORKER_METRICS_PORT: 7091
-    })
-}));
+const kafkaConfig: KafkaConfig = {
+    brokers: ['localhost:9092'],
+    clientId: 'search-service',
+    groupId: 'test-group',
+    topicPosts: 'posts',
+    topicDlq: 'posts.dlq',
+    fromBeginning: true,
+    partitionsConcurrent: 3,
+    sessionTimeoutMs: 30000,
+    heartbeatIntervalMs: 3000,
+};
 
 import { KafkaConsumer } from '../kafka.consumer.js';
 
@@ -37,9 +34,9 @@ describe('KafkaConsumer', () => {
     let logger: MockProxy<ILogger>;
 
     beforeEach(() => {
-        logger = mock<ILogger>();
-        kafkaConsumer = new KafkaConsumer(kafkaMock as unknown as Kafka, logger);
         vi.clearAllMocks();
+        logger = mock<ILogger>();
+        kafkaConsumer = new KafkaConsumer(kafkaMock as unknown as Kafka, kafkaConfig, logger);
     });
 
     describe('connect', () => {
@@ -68,13 +65,15 @@ describe('KafkaConsumer', () => {
 
             expect(consumerMock.subscribe).toHaveBeenCalledWith({
                 topic: 'posts',
-                fromBeginning: true
+                fromBeginning: true,
             });
-            expect(consumerMock.run).toHaveBeenCalledWith(expect.objectContaining({
-                autoCommit: false,
-                eachBatchAutoResolve: false,
-                partitionsConsumedConcurrently: 3
-            }));
+            expect(consumerMock.run).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    autoCommit: false,
+                    eachBatchAutoResolve: false,
+                    partitionsConsumedConcurrently: 3,
+                })
+            );
         });
 
         it('should call handler on batch processing', async () => {
@@ -97,7 +96,44 @@ describe('KafkaConsumer', () => {
             });
 
             await expect(kafkaConsumer.startBatch(handler)).rejects.toThrow('Handler Error');
-            expect(logger.error).toHaveBeenCalledWith('Fatal Batch Error', { error: 'Handler Error' });
+            expect(logger.error).toHaveBeenCalledWith('Fatal Batch Error', {
+                error: 'Handler Error',
+            });
+        });
+    });
+
+    describe('config injection', () => {
+        it('honours fromBeginning=false from config', async () => {
+            const handler = vi.fn();
+            const cfg: KafkaConfig = { ...kafkaConfig, fromBeginning: false };
+            const consumer = new KafkaConsumer(
+                kafkaMock as unknown as Kafka,
+                cfg,
+                logger
+            );
+
+            await consumer.startBatch(handler);
+
+            expect(consumerMock.subscribe).toHaveBeenCalledWith({
+                topic: 'posts',
+                fromBeginning: false,
+            });
+        });
+
+        it('uses partitionsConcurrent from config', async () => {
+            const handler = vi.fn();
+            const cfg: KafkaConfig = { ...kafkaConfig, partitionsConcurrent: 7 };
+            const consumer = new KafkaConsumer(
+                kafkaMock as unknown as Kafka,
+                cfg,
+                logger
+            );
+
+            await consumer.startBatch(handler);
+
+            expect(consumerMock.run).toHaveBeenCalledWith(
+                expect.objectContaining({ partitionsConsumedConcurrently: 7 })
+            );
         });
     });
 });
