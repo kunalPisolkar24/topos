@@ -32,6 +32,7 @@
     "graphql-depth-limit": "^1.1.0",
     "graphql-query-complexity": "^1.1.0",
     "graphql-tag": "^2.12.6",
+    "helmet": "^8.2.0",
     "ioredis": "^5.8.2",
     "jose": "^6.2.3",
     "kafkajs": "^2.2.4",
