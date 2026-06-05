@@ -6,6 +6,8 @@ import type { RedisConfig } from '../redis.cache.js';
 const mockGet = vi.fn();
 const mockSet = vi.fn();
 const mockQuit = vi.fn();
+const mockPing = vi.fn();
+const mockConnect = vi.fn();
 const mockOn = vi.fn();
 const mockOnce = vi.fn();
 let mockStatus = 'ready';
@@ -18,6 +20,8 @@ vi.mock('ioredis', () => {
             get = mockGet;
             set = mockSet;
             quit = mockQuit;
+            ping = mockPing;
+            connect = mockConnect;
             on = (event: string, handler: (err: Error) => void) => {
                 if (event === 'error') {
                     capturedErrorHandler = handler;
@@ -135,37 +139,49 @@ describe('RedisCache', () => {
 
                 await redisCache.connect();
 
-                expect(mockOnce).not.toHaveBeenCalled();
+                expect(mockPing).not.toHaveBeenCalled();
+                expect(mockConnect).not.toHaveBeenCalled();
             });
 
-            it('should wait for ready event when not connected', async () => {
+            it('pings when status is wait or connecting', async () => {
                 mockStatus = 'connecting';
-
-                mockOnce.mockImplementation((event: string, callback: () => void) => {
-                    if (event === 'ready') {
-                        setTimeout(() => callback(), 10);
-                    }
-                    return { once: mockOnce };
-                });
+                mockPing.mockResolvedValue('PONG');
 
                 await redisCache.connect();
 
+                expect(mockPing).toHaveBeenCalled();
                 expect(logger.info).toHaveBeenCalledWith('Redis Connected');
             });
 
-            it('should reject on connection error during connect', async () => {
+            it('rejects when ping fails while connecting', async () => {
                 mockStatus = 'connecting';
-
-                mockOnce.mockImplementation(
-                    (event: string, callback: (err?: Error) => void) => {
-                        if (event === 'error') {
-                            setTimeout(() => callback(new Error('Connection refused')), 10);
-                        }
-                        return { once: mockOnce };
-                    }
-                );
+                mockPing.mockRejectedValue(new Error('Connection refused'));
 
                 await expect(redisCache.connect()).rejects.toThrow('Connection refused');
+                expect(logger.error).toHaveBeenCalledWith(
+                    'Redis ping failed',
+                    expect.objectContaining({ error: 'Connection refused' })
+                );
+            });
+
+            it('calls client.connect when status is end and pings on success', async () => {
+                mockStatus = 'end';
+                mockConnect.mockResolvedValue(undefined);
+                mockPing.mockResolvedValue('PONG');
+
+                await redisCache.connect();
+
+                expect(mockConnect).toHaveBeenCalled();
+                expect(mockPing).toHaveBeenCalled();
+                expect(logger.info).toHaveBeenCalledWith('Redis Connected');
+            });
+
+            it('rejects when ping fails after connect()', async () => {
+                mockStatus = 'end';
+                mockConnect.mockResolvedValue(undefined);
+                mockPing.mockRejectedValue(new Error('Handshake failed'));
+
+                await expect(redisCache.connect()).rejects.toThrow('Handshake failed');
             });
         });
 
@@ -175,6 +191,17 @@ describe('RedisCache', () => {
 
                 expect(mockQuit).toHaveBeenCalled();
                 expect(logger.info).toHaveBeenCalledWith('Redis Disconnected');
+            });
+
+            it('logs and swallows errors from quit', async () => {
+                mockQuit.mockRejectedValue(new Error('Quit failed'));
+
+                await expect(redisCache.disconnect()).resolves.toBeUndefined();
+
+                expect(logger.error).toHaveBeenCalledWith(
+                    'Redis Disconnect Error',
+                    expect.objectContaining({ error: 'Quit failed' })
+                );
             });
         });
     });

@@ -51,17 +51,51 @@ export class RedisCache implements ICacheService {
     }
 
     async connect(): Promise<void> {
-        if (this.client.status === 'ready') return;
-        await new Promise<void>((resolve, reject) => {
-            this.client.once('ready', () => resolve());
-            this.client.once('error', (e) => reject(e));
-        });
+        if (this.client.status === 'ready') {
+            return;
+        }
+        if (this.client.status === 'wait' || this.client.status === 'connecting') {
+            try {
+                await this.client.ping();
+                this.logger.info('Redis Connected');
+            } catch (err: any) {
+                this.logger.error('Redis ping failed', { error: err.message });
+                throw err;
+            }
+            return;
+        }
+        try {
+            await this.client.connect();
+        } catch (err: any) {
+            if (err.message && err.message.includes('already connecting')) {
+                try {
+                    await this.client.ping();
+                    this.logger.info('Redis Connected');
+                    return;
+                } catch (pingErr: any) {
+                    this.logger.error('Redis ping failed', { error: pingErr.message });
+                    throw pingErr;
+                }
+            }
+            this.logger.error('Redis connect failed', { error: err.message });
+            throw err;
+        }
+        try {
+            await this.client.ping();
+        } catch (err: any) {
+            this.logger.error('Redis ping failed', { error: err.message });
+            throw err;
+        }
         this.logger.info('Redis Connected');
     }
 
     async disconnect(): Promise<void> {
-        await this.client.quit();
-        this.logger.info('Redis Disconnected');
+        try {
+            await this.client.quit();
+            this.logger.info('Redis Disconnected');
+        } catch (err: any) {
+            this.logger.error('Redis Disconnect Error', { error: err.message });
+        }
     }
 
     async get(key: string): Promise<string | null> {
