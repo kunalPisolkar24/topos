@@ -13,7 +13,7 @@ x-search-api-env: &search-api-env
   CACHE_DEFAULT_TTL_SECONDS: ${SEARCH_CACHE_DEFAULT_TTL_SECONDS:-120}
   MAX_QUERY_LENGTH: ${SEARCH_MAX_QUERY_LENGTH:-512}
   SHUTDOWN_TIMEOUT_MS: ${SEARCH_SHUTDOWN_TIMEOUT_MS:-15000}
-  LOG_LEVEL: ${SEARCH_LOG_LEVEL:-}
+  LOG_LEVEL: ${SEARCH_LOG_LEVEL:-info}
   SERVICE_NAME: ${SEARCH_SERVICE_NAME:-search-service}
   SERVICE_VERSION: ${SEARCH_SERVICE_VERSION:-0.0.0}
   CORS_ORIGINS: ""
@@ -91,6 +91,7 @@ services:
     image: node:20-alpine
     container_name: loadtest-search-seed
     restart: "no"
+    command: ["node", "/load-tests/seed.mjs"]
     environment: *search-seed-env
     depends_on:
       search-es:
@@ -98,7 +99,6 @@ services:
     volumes:
       - ./seed.mjs:/load-tests/seed.mjs:ro
       - ./k6/seed_data:/load-tests/seed_data:rw
-    working_dir: /load-tests
     networks:
       - loadtest-net
 
@@ -109,14 +109,13 @@ services:
       target: runtime
     container_name: loadtest-search-api
     restart: unless-stopped
+    command: ["npm", "run", "start:api"]
     environment: *search-api-env
     depends_on:
       search-es:
         condition: service_healthy
       search-redis:
         condition: service_healthy
-      search-seed:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:${SEARCH_API_INT_PORT:-4003}/readyz"]
       interval: 5s

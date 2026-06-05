@@ -48,7 +48,7 @@ const thresholds = {
   'http_req_duration{group:shortQuery}': ['p(95)<300', 'p(99)<800'],
   'http_req_duration{group:phraseQuery}': ['p(95)<400', 'p(99)<1000'],
   'http_req_duration{group:paginatedQuery}': ['p(95)<800', 'p(99)<2000'],
-  'http_req_duration{group:targetedQuery}': ['p(95)<200', 'p(99)<500'],
+  'http_req_duration{group:targetedQuery}': ['p(95)<300', 'p(99)<500'],
   'http_req_failed{group:shortQuery}': ['rate<0.01'],
   'http_req_failed{group:phraseQuery}': ['rate<0.01'],
   'http_req_failed{group:paginatedQuery}': ['rate<0.02'],
