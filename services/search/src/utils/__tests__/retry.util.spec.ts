@@ -16,7 +16,7 @@ describe('withRetry', () => {
         vi.clearAllMocks();
     });
 
-    it('should return result on first successful attempt', async () => {
+    it('returns the result on first successful attempt', async () => {
         const fn = vi.fn().mockResolvedValue('success');
 
         const resultPromise = withRetry(fn, logger, { retries: 3, delay: 100 });
@@ -26,7 +26,7 @@ describe('withRetry', () => {
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry on failure and succeed', async () => {
+    it('retries on failure and succeeds', async () => {
         const fn = vi.fn()
             .mockRejectedValueOnce(new Error('Fail 1'))
             .mockResolvedValue('success');
@@ -38,13 +38,13 @@ describe('withRetry', () => {
 
         expect(result).toBe('success');
         expect(fn).toHaveBeenCalledTimes(2);
-        expect(logger.warn).toHaveBeenCalledWith('Operation failed, retrying...', expect.objectContaining({
+        expect(logger.warn).toHaveBeenCalledWith('Operation failed, retrying', expect.objectContaining({
             attempt: 1,
-            maxRetries: 3
+            maxRetries: 3,
         }));
     });
 
-    it('should throw after exhausting retries', async () => {
+    it('throws after exhausting retries', async () => {
         vi.useRealTimers();
         const fn = vi.fn().mockRejectedValue(new Error('Always Fail'));
 
@@ -52,13 +52,18 @@ describe('withRetry', () => {
         expect(fn).toHaveBeenCalledTimes(3);
     });
 
-    it('should apply exponential backoff with factor', async () => {
+    it('applies exponential backoff with factor', async () => {
         const fn = vi.fn()
             .mockRejectedValueOnce(new Error('Fail 1'))
             .mockRejectedValueOnce(new Error('Fail 2'))
             .mockResolvedValue('success');
 
-        const resultPromise = withRetry(fn, logger, { retries: 3, delay: 100, factor: 2 });
+        const resultPromise = withRetry(fn, logger, {
+            retries: 3,
+            delay: 100,
+            factor: 2,
+            jitter: 'none',
+        });
 
         await vi.advanceTimersByTimeAsync(100);
         expect(fn).toHaveBeenCalledTimes(2);
@@ -70,7 +75,7 @@ describe('withRetry', () => {
         expect(result).toBe('success');
     });
 
-    it('should use default options when not provided', async () => {
+    it('uses default options when not provided', async () => {
         const fn = vi.fn().mockResolvedValue('success');
 
         const result = await withRetry(fn, logger);
@@ -78,7 +83,7 @@ describe('withRetry', () => {
         expect(result).toBe('success');
     });
 
-    it('should include error message in retry log', async () => {
+    it('includes error message in retry log', async () => {
         const fn = vi.fn()
             .mockRejectedValueOnce(new Error('Specific Error'))
             .mockResolvedValue('success');
@@ -87,8 +92,87 @@ describe('withRetry', () => {
         await vi.advanceTimersByTimeAsync(100);
         await resultPromise;
 
-        expect(logger.warn).toHaveBeenCalledWith('Operation failed, retrying...', expect.objectContaining({
-            error: 'Specific Error'
+        expect(logger.warn).toHaveBeenCalledWith('Operation failed, retrying', expect.objectContaining({
+            error: 'Specific Error',
         }));
+    });
+
+    it('caps backoff with maxDelay', async () => {
+        const fn = vi.fn()
+            .mockRejectedValueOnce(new Error('a'))
+            .mockRejectedValueOnce(new Error('b'))
+            .mockRejectedValueOnce(new Error('c'))
+            .mockResolvedValue('ok');
+
+        const p = withRetry(fn, logger, {
+            retries: 5,
+            delay: 1000,
+            factor: 10,
+            maxDelay: 1500,
+            jitter: 'none',
+        });
+
+        await vi.advanceTimersByTimeAsync(1500);
+        await vi.advanceTimersByTimeAsync(1500);
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const result = await p;
+        expect(result).toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(4);
+    });
+
+    it('invokes onFailedAttempt for each failed attempt and continues even if it throws', async () => {
+        const onFailedAttempt = vi.fn().mockImplementation(() => {
+            throw new Error('observer boom');
+        });
+        const fn = vi.fn()
+            .mockRejectedValueOnce(new Error('a'))
+            .mockResolvedValue('ok');
+
+        const p = withRetry(fn, logger, {
+            retries: 3,
+            delay: 50,
+            jitter: 'none',
+            onFailedAttempt,
+        });
+        await vi.advanceTimersByTimeAsync(50);
+        const result = await p;
+
+        expect(result).toBe('ok');
+        expect(onFailedAttempt).toHaveBeenCalledTimes(1);
+        expect(onFailedAttempt).toHaveBeenCalledWith(expect.any(Error), 1);
+    });
+
+    it('aborts when the AbortSignal is triggered mid-retry', async () => {
+        vi.useRealTimers();
+        const fn = vi.fn()
+            .mockRejectedValueOnce(new Error('a'))
+            .mockRejectedValueOnce(new Error('b'))
+            .mockResolvedValue('ok');
+
+        const controller = new AbortController();
+        const p = withRetry(fn, logger, {
+            retries: 5,
+            delay: 10,
+            jitter: 'none',
+            signal: controller.signal,
+        });
+
+        await new Promise((r) => setTimeout(r, 5));
+        controller.abort();
+
+        await expect(p).rejects.toThrow('Retry aborted');
+    });
+
+    it('applies full jitter by default (no deterministic delay)', async () => {
+        vi.useRealTimers();
+        const fn = vi.fn()
+            .mockRejectedValueOnce(new Error('a'))
+            .mockResolvedValue('ok');
+
+        const p = withRetry(fn, logger, { retries: 3, delay: 5, factor: 1 });
+        const result = await p;
+
+        expect(result).toBe('ok');
     });
 });

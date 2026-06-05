@@ -51,6 +51,16 @@ describe('PrometheusMetrics', () => {
             metrics.incrementCacheMiss('searchPosts');
             expect(mockCounterInc).toHaveBeenCalled();
         });
+
+        it('should increment cache read error', () => {
+            metrics.incrementCacheReadError('searchPosts');
+            expect(mockCounterInc).toHaveBeenCalled();
+        });
+
+        it('should increment cache write error', () => {
+            metrics.incrementCacheWriteError('searchPosts');
+            expect(mockCounterInc).toHaveBeenCalled();
+        });
     });
 
     describe('search operations', () => {
@@ -108,6 +118,13 @@ describe('PrometheusMetrics', () => {
     describe('DLQ operations', () => {
         it('should increment DLQ count', () => {
             metrics.incrementDlqCount('posts');
+            expect(mockCounterInc).toHaveBeenCalled();
+        });
+    });
+
+    describe('unknown shape events', () => {
+        it('should increment unknown shape count', () => {
+            metrics.incrementUnknownShapeCount('posts');
             expect(mockCounterInc).toHaveBeenCalled();
         });
     });

@@ -6,6 +6,7 @@ import { ISearchIndexer } from '../../../core/interfaces/repository.interface.js
 import { IDlqProducer } from '../../../core/interfaces/message-broker.interface.js';
 import { ILogger } from '../../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../../core/interfaces/metrics.interface.js';
+import { BulkPartialFailureError } from '../../../core/errors/app.error.js';
 
 describe('IngestService', () => {
     let ingestService: IngestService;
@@ -78,8 +79,8 @@ describe('IngestService', () => {
                 Body: 'Body',
                 CreatedAt: '2023-01-01',
                 ImageURL: 'http://example.com/image.jpg',
-                slug: 'test-slug',
-                summary: 'Test summary'
+                Slug: 'test-slug',
+                Summary: 'Test summary'
             };
 
             const payload = createMockPayload([{ value: validDoc }]);
@@ -226,6 +227,111 @@ describe('IngestService', () => {
                 deleted: 0,
                 partition: 0
             }));
+        });
+
+        it('accepts camelCase payloads via passthrough', async () => {
+            const validDoc = {
+                postId: '123',
+                title: 'Title',
+                body: 'Body',
+                createdAt: '2023-01-01',
+                imageUrl: 'http://x.test/a.jpg',
+            };
+
+            const payload = createMockPayload([{ value: validDoc }]);
+
+            await ingestService.processBatch(payload);
+
+            expect(indexer.bulkUpsert).toHaveBeenCalledWith(
+                expect.arrayContaining([
+                    expect.objectContaining({ postId: '123', imageUrl: 'http://x.test/a.jpg' }),
+                ])
+            );
+        });
+
+        it('routes unknown shapes to DLQ and increments unknown_shape metric', async () => {
+            const payload = createMockPayload([{ key: 'k1', value: { foo: 'bar' } }]);
+
+            await ingestService.processBatch(payload);
+
+            expect(metrics.incrementUnknownShapeCount).toHaveBeenCalledWith('posts');
+            expect(dlqProducer.publish).toHaveBeenCalledWith(
+                expect.objectContaining({ key: 'k1', error: expect.stringContaining('Unknown event shape') })
+            );
+            expect(indexer.bulkUpsert).not.toHaveBeenCalled();
+        });
+
+        it('normalizes imageUrl: empty string and non-string values become null', async () => {
+            const payload = createMockPayload([
+                {
+                    value: {
+                        PostID: '1',
+                        Title: 'T',
+                        Body: 'B',
+                        CreatedAt: '2023-01-01',
+                        ImageURL: '   ',
+                    },
+                },
+                {
+                    value: {
+                        PostID: '2',
+                        Title: 'T',
+                        Body: 'B',
+                        CreatedAt: '2023-01-01',
+                        ImageURL: 42,
+                    },
+                },
+            ]);
+
+            await ingestService.processBatch(payload);
+
+            expect(indexer.bulkUpsert).toHaveBeenCalledWith([
+                expect.objectContaining({ postId: '1', imageUrl: null }),
+                expect.objectContaining({ postId: '2', imageUrl: null }),
+            ]);
+        });
+
+        it('routes BulkPartialFailureError ids to DLQ and still advances offset', async () => {
+            const validDoc = {
+                PostID: '1',
+                Title: 'T',
+                Body: 'B',
+                CreatedAt: '2023-01-01',
+            };
+            const payload = createMockPayload([{ value: validDoc }]);
+            indexer.bulkUpsert.mockRejectedValue(
+                new BulkPartialFailureError('partial', {
+                    operation: 'bulk_upsert',
+                    failedIds: [
+                        { id: '1', status: 400, reason: 'mapping conflict' },
+                    ],
+                })
+            );
+
+            await ingestService.processBatch(payload);
+
+            expect(dlqProducer.publish).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    key: '1',
+                    error: 'mapping conflict',
+                })
+            );
+            expect(metrics.incrementDlqCount).toHaveBeenCalledWith('posts');
+            expect(payload.resolveOffset).toHaveBeenCalled();
+        });
+
+        it('does not advance offset when indexer throws a non-partial error', async () => {
+            const validDoc = {
+                PostID: '1',
+                Title: 'T',
+                Body: 'B',
+                CreatedAt: '2023-01-01',
+            };
+            const payload = createMockPayload([{ value: validDoc }]);
+            indexer.bulkUpsert.mockRejectedValue(new Error('connection lost'));
+
+            await expect(ingestService.processBatch(payload)).rejects.toThrow('connection lost');
+            expect(payload.resolveOffset).not.toHaveBeenCalled();
         });
     });
 });

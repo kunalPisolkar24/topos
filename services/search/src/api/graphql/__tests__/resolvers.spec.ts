@@ -19,9 +19,9 @@ describe('GraphQL Resolvers', () => {
             expect(mockSearchService.searchPosts).toHaveBeenCalledWith('test', 1, 10);
         });
 
-        it('should cap limit at 50', async () => {
+        it('passes the raw limit to the service (validation lives in the service)', async () => {
             const mockSearchService = {
-                searchPosts: vi.fn().mockResolvedValue({ hits: [], total: 0 })
+                searchPosts: vi.fn().mockResolvedValue({ hits: [], total: 0 }),
             };
             const context = { searchService: mockSearchService };
 
@@ -31,7 +31,7 @@ describe('GraphQL Resolvers', () => {
                 context as any
             );
 
-            expect(mockSearchService.searchPosts).toHaveBeenCalledWith('test', 1, 50);
+            expect(mockSearchService.searchPosts).toHaveBeenCalledWith('test', 1, 100);
         });
 
         it('should return search results', async () => {

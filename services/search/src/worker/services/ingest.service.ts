@@ -1,123 +1,165 @@
 import { EachBatchPayload } from 'kafkajs';
-import { z } from 'zod';
 import { ISearchIndexer } from '../../core/interfaces/repository.interface.js';
 import { IDlqProducer } from '../../core/interfaces/message-broker.interface.js';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../core/interfaces/metrics.interface.js';
 import { PostDocument } from '../../core/entities/post.entity.js';
+import { BulkPartialFailureError } from '../../core/errors/app.error.js';
+import { PostEventSchema, isPascalShape, toPostDocument } from '../../core/entities/post-event.schema.js';
 
-const PostEventSchema = z.preprocess((value) => {
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-  const record = value as Record<string, unknown>;
-  if ('PostID' in record || 'Title' in record || 'Body' in record || 'CreatedAt' in record || 'ImageURL' in record) {
-    return {
-      postId: record.PostID,
-      title: record.Title,
-      body: record.Body,
-      imageUrl: record.ImageURL ?? null,
-      createdAt: record.CreatedAt,
-      slug: record.slug,
-      summary: record.summary
-    };
-  }
-  return value;
-}, z.object({
-  postId: z.string(),
-  title: z.string(),
-  body: z.string(),
-  imageUrl: z.string().nullable().optional(),
-  createdAt: z.string(),
-  slug: z.string().optional(),
-  summary: z.string().optional()
-}));
+const MAX_BULK_FAILURES_PER_BATCH = 100;
 
 export class IngestService {
-  constructor(
-    private readonly indexer: ISearchIndexer,
-    private readonly dlqProducer: IDlqProducer,
-    private readonly logger: ILogger,
-    private readonly metrics: IMetricsService
-  ) { }
+    constructor(
+        private readonly indexer: ISearchIndexer,
+        private readonly dlqProducer: IDlqProducer,
+        private readonly logger: ILogger,
+        private readonly metrics: IMetricsService
+    ) {}
 
-  async processBatch(payload: EachBatchPayload): Promise<void> {
-    const { batch, resolveOffset, heartbeat, commitOffsetsIfNecessary } = payload;
-    const start = performance.now();
-    
-    const docsToUpsert: PostDocument[] = [];
-    const idsToDelete: string[] = [];
+    async processBatch(payload: EachBatchPayload): Promise<void> {
+        const { batch, resolveOffset, heartbeat, commitOffsetsIfNecessary } = payload;
+        const start = performance.now();
 
-    for (const message of batch.messages) {
-      if (!message.value) {
-        if (message.key) idsToDelete.push(message.key.toString());
-        continue;
-      }
+        const docsToUpsert: PostDocument[] = [];
+        const idsToDelete: string[] = [];
+        let lastSuccessfulOffset: string | null = null;
 
-      try {
-        const rawString = message.value.toString();
-        const eventData = JSON.parse(rawString);
-        
+        for (const message of batch.messages) {
+            const messageOffset = message.offset;
+            const key = message.key?.toString();
+
+            if (!message.value) {
+                if (key) idsToDelete.push(key);
+                lastSuccessfulOffset = messageOffset;
+                continue;
+            }
+
+            const handled = await this.handleMessage(batch.topic, message.value.toString(), key);
+            if (handled) {
+                docsToUpsert.push(handled);
+                lastSuccessfulOffset = messageOffset;
+            }
+        }
+
+        try {
+            if (docsToUpsert.length > 0) {
+                try {
+                    await this.indexer.bulkUpsert(docsToUpsert);
+                } catch (err) {
+                    if (err instanceof BulkPartialFailureError) {
+                        await this.handlePartialBulkFailure(batch.topic, err.meta.failedIds);
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+            if (idsToDelete.length > 0) {
+                try {
+                    await this.indexer.bulkDelete(idsToDelete);
+                } catch (err) {
+                    if (err instanceof BulkPartialFailureError) {
+                        await this.handlePartialBulkFailure(batch.topic, err.meta.failedIds);
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+
+            if (lastSuccessfulOffset !== null) {
+                resolveOffset(lastSuccessfulOffset);
+            }
+            await commitOffsetsIfNecessary();
+            await heartbeat();
+
+            const duration = (performance.now() - start) / 1000;
+            this.metrics.recordWorkerBatch(
+                'success',
+                duration,
+                docsToUpsert.length + idsToDelete.length
+            );
+
+            this.logger.info('Batch Processed', {
+                upserted: docsToUpsert.length,
+                deleted: idsToDelete.length,
+                partition: batch.partition,
+            });
+        } catch (err: any) {
+            const duration = (performance.now() - start) / 1000;
+            this.metrics.recordWorkerBatch('error', duration, 0);
+            this.logger.error('Batch Processing Fatal Error', { error: err.message });
+            throw err;
+        }
+    }
+
+    private async handleMessage(
+        topic: string,
+        raw: string,
+        key: string | undefined
+    ): Promise<PostDocument | null> {
+        let eventData: unknown;
+        try {
+            eventData = JSON.parse(raw);
+        } catch (err: any) {
+            await this.sendToDlq(topic, `Invalid JSON: ${err.message}`, key, raw);
+            return null;
+        }
+
         const parsed = PostEventSchema.safeParse(eventData);
-
         if (!parsed.success) {
-            throw new Error(`Validation failed: ${parsed.error.message}`);
+            if (!isPascalShape(eventData)) {
+                this.metrics.incrementUnknownShapeCount(topic);
+                await this.sendToDlq(
+                    topic,
+                    `Unknown event shape: ${parsed.error.message}`,
+                    key,
+                    raw
+                );
+            } else {
+                await this.sendToDlq(topic, `Validation failed: ${parsed.error.message}`, key, raw);
+            }
+            return null;
         }
 
-        const data = parsed.data;
+        return toPostDocument(parsed.data);
+    }
 
-        const doc: PostDocument = {
-            postId: data.postId,
-            title: data.title,
-            body: data.body,
-            summary: data.summary,
-            slug: data.slug,
-            imageUrl: data.imageUrl || null,
-            createdAt: data.createdAt
-        };
+    private async handlePartialBulkFailure(
+        topic: string,
+        failures: Array<{ id: string; reason?: string; status?: number }>
+    ): Promise<void> {
+        const bounded = failures.slice(0, MAX_BULK_FAILURES_PER_BATCH);
+        this.logger.error('Bulk partial failure - routing to DLQ', {
+            count: failures.length,
+            sample: bounded.slice(0, 5),
+        });
 
-        docsToUpsert.push(doc);
+        for (const failure of bounded) {
+            this.metrics.incrementDlqCount(topic);
+            await this.dlqProducer.publish({
+                originalTopic: topic,
+                failedAt: new Date().toISOString(),
+                error: failure.reason ?? `bulk failure status=${failure.status ?? 'unknown'}`,
+                key: failure.id,
+                payload: null,
+            });
+        }
+    }
 
-      } catch (err: any) {
-        this.logger.error('Message Processing Error - Sending to DLQ', { error: err.message });
-        this.metrics.incrementDlqCount(batch.topic);
+    private async sendToDlq(
+        topic: string,
+        error: string,
+        key: string | undefined,
+        payload: string | null
+    ): Promise<void> {
+        this.logger.error('Message Processing Error - Sending to DLQ', { error });
+        this.metrics.incrementDlqCount(topic);
         await this.dlqProducer.publish({
-            originalTopic: batch.topic,
+            originalTopic: topic,
             failedAt: new Date().toISOString(),
-            error: err.message,
-            key: message.key?.toString(),
-            payload: message.value?.toString()
+            error,
+            key,
+            payload,
         });
-      }
     }
-
-    try {
-        if (docsToUpsert.length > 0) {
-            await this.indexer.bulkUpsert(docsToUpsert);
-        }
-        if (idsToDelete.length > 0) {
-            await this.indexer.bulkDelete(idsToDelete);
-        }
-
-        const lastMsg = batch.messages[batch.messages.length - 1];
-        resolveOffset(lastMsg.offset);
-        await commitOffsetsIfNecessary();
-        await heartbeat();
-        
-        const duration = (performance.now() - start) / 1000;
-        this.metrics.recordWorkerBatch('success', duration, docsToUpsert.length + idsToDelete.length);
-        
-        this.logger.info('Batch Processed', { 
-            upserted: docsToUpsert.length, 
-            deleted: idsToDelete.length, 
-            partition: batch.partition 
-        });
-
-    } catch (err: any) {
-        const duration = (performance.now() - start) / 1000;
-        this.metrics.recordWorkerBatch('error', duration, 0);
-        this.logger.error('Batch Processing Fatal Error', { error: err.message });
-        throw err;
-    }
-  }
 }
