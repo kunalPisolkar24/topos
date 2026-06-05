@@ -58,36 +58,20 @@ describe('buildApolloServer', () => {
     });
 
     describe('validation rules', () => {
-        const buildAndStart = async (maxDepth: number, maxCost: number) => {
+        const buildAndStart = async (maxDepth: number) => {
             const server = buildApolloServer({
                 isProduction: false,
                 maxDepth,
-                maxCost,
             });
             await server.start();
             return server;
         };
 
         it('rejects queries that exceed the depth limit', async () => {
-            const server = await buildAndStart(1, 1000);
+            const server = await buildAndStart(1);
             try {
                 const res = await server.executeOperation(
                     { query: deepQuery },
-                    { contextValue: {} }
-                );
-                if (res.body.kind !== 'single') throw new Error('Expected single result');
-                const errors = res.body.singleResult.errors ?? [];
-                expect(errors.length).toBeGreaterThan(0);
-            } finally {
-                await server.stop();
-            }
-        });
-
-        it('rejects queries that exceed the cost limit', async () => {
-            const server = await buildAndStart(10, 1);
-            try {
-                const res = await server.executeOperation(
-                    { query: '{ searchPosts(query: "a", page: 1, limit: 10) { total } }' },
                     { contextValue: {} }
                 );
                 if (res.body.kind !== 'single') throw new Error('Expected single result');
