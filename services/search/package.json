@@ -33,6 +33,7 @@
     "graphql-query-complexity": "^1.1.0",
     "graphql-tag": "^2.12.6",
     "ioredis": "^5.8.2",
+    "jose": "^6.2.3",
     "kafkajs": "^2.2.4",
     "pino": "^10.1.0",
     "prom-client": "^15.1.3",
