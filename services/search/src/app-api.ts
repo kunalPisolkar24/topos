@@ -1,10 +1,7 @@
-import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express5';
 import express, { Request, Response } from 'express';
 import http from 'http';
-import { buildSubgraphSchema } from '@apollo/subgraph';
-import { typeDefs } from './api/graphql/schema.js';
-import { resolvers } from './api/graphql/resolvers.js';
+import { buildApolloServer } from './api/graphql/server.js';
 import { PinoLogger } from './infrastructure/logger/pino.logger.js';
 import { ElasticsearchRepository } from './infrastructure/elasticsearch/elasticsearch.repository.js';
 import { RedisCache } from './infrastructure/redis/redis.cache.js';
@@ -105,8 +102,8 @@ const start = async () => {
         maxLimit: 50,
     });
 
-    const server = new ApolloServer({
-        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+    const server = buildApolloServer({
+        isProduction: config.service.env === 'production',
     });
 
     await server.start();

@@ -29,6 +29,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "graphql": "^16.12.0",
+    "graphql-depth-limit": "^1.1.0",
+    "graphql-query-complexity": "^1.1.0",
     "graphql-tag": "^2.12.6",
     "ioredis": "^5.8.2",
     "kafkajs": "^2.2.4",
@@ -39,6 +41,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
+    "@types/graphql-depth-limit": "^1.1.6",
     "@types/node": "^24.10.0",
     "@vitest/coverage-v8": "^4.0.17",
     "nodemon": "^3.1.10",
