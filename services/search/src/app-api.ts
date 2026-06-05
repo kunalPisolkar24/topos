@@ -47,7 +47,11 @@ const start = async () => {
         process.exit(1);
     }
 
-    const searchService = new SearchService(esRepo, cache, logger, metrics);
+    const searchService = new SearchService(esRepo, cache, logger, metrics, {
+        defaultTtlSeconds: config.cache.defaultTtlSeconds,
+        maxQueryLength: config.cache.maxQueryLength,
+        maxLimit: 50,
+    });
 
     const server = new ApolloServer({
         schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
