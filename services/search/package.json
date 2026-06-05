@@ -12,7 +12,9 @@
     "dev:worker": "nodemon --watch 'src/**/*.ts' --exec 'node --loader ts-node/esm' src/app-worker.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.config.int.ts",
+    "test:integration:watch": "vitest --config vitest.config.int.ts"
   },
   "keywords": [],
   "author": "",
@@ -46,6 +48,7 @@
     "@types/node": "^24.10.0",
     "@vitest/coverage-v8": "^4.0.17",
     "nodemon": "^3.1.10",
+    "testcontainers": "^12.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
