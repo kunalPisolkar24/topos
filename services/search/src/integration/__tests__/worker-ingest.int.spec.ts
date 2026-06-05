@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { Kafka, type EachBatchPayload } from 'kafkajs';
 import { ElasticsearchRepository } from '../../infrastructure/elasticsearch/elasticsearch.repository.js';
 import { IngestService } from '../../worker/services/ingest.service.js';
@@ -56,7 +56,6 @@ function makeEachBatchPayload(messages: Array<{ key: string | null; value: unkno
         attributes: 0,
         offset: String(i),
         headers: {},
-        size: m.value !== null ? Buffer.byteLength(JSON.stringify(m.value)) : 0,
       })),
       isEmpty: () => messages.length === 0,
       firstOffset: () => '0',
