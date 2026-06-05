@@ -41,4 +41,28 @@ export class PinoLogger implements ILogger {
     debug(message: string, meta?: Record<string, unknown>): void {
         this.logger.debug(meta ?? {}, message);
     }
+
+    child(bindings: Record<string, unknown>): ILogger {
+        return new PinoLoggerFromPino(this.logger.child(bindings));
+    }
+}
+
+class PinoLoggerFromPino implements ILogger {
+    constructor(private readonly inner: pino.Logger) {}
+
+    info(message: string, meta?: Record<string, unknown>): void {
+        this.inner.info(meta ?? {}, message);
+    }
+    error(message: string, meta?: Record<string, unknown>): void {
+        this.inner.error(meta ?? {}, message);
+    }
+    warn(message: string, meta?: Record<string, unknown>): void {
+        this.inner.warn(meta ?? {}, message);
+    }
+    debug(message: string, meta?: Record<string, unknown>): void {
+        this.inner.debug(meta ?? {}, message);
+    }
+    child(bindings: Record<string, unknown>): ILogger {
+        return new PinoLoggerFromPino(this.inner.child(bindings));
+    }
 }
