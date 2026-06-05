@@ -1,5 +1,6 @@
 import { Kafka } from 'kafkajs';
-import express from 'express';
+import express, { Request, Response } from 'express';
+import http from 'http';
 import { buildConfig, ConfigValidationError } from './config/index.js';
 import { PinoLogger } from './infrastructure/logger/pino.logger.js';
 import { ElasticsearchRepository } from './infrastructure/elasticsearch/elasticsearch.repository.js';
@@ -8,6 +9,51 @@ import { KafkaDlqProducer } from './infrastructure/kafka/dlq.producer.js';
 import { KafkaConsumer } from './infrastructure/kafka/kafka.consumer.js';
 import { IngestService } from './worker/services/ingest.service.js';
 import { withRetry } from './utils/retry.util.js';
+import { runShutdown, ShutdownStep } from './utils/shutdown.util.js';
+
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+let consumer: KafkaConsumer | null = null;
+let dlqProducer: KafkaDlqProducer | null = null;
+let metricsServer: http.Server | null = null;
+let loggerRef: PinoLogger | null = null;
+let isShuttingDown = false;
+
+const shutdown = async (signal: string): Promise<void> => {
+    if (!loggerRef) {
+        process.exit(0);
+    }
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    loggerRef.info(`Received ${signal}, shutting down`);
+
+    const steps: ShutdownStep[] = [
+        { name: 'consumer.disconnect', run: async () => { if (consumer) await consumer.disconnect(); } },
+        { name: 'dlqProducer.disconnect', run: async () => { if (dlqProducer) await dlqProducer.disconnect(); } },
+        {
+            name: 'metricsServer.close',
+            run: async () => {
+                if (metricsServer) {
+                    await new Promise<void>((resolve) => metricsServer!.close(() => resolve()));
+                }
+            },
+        },
+    ];
+    await runShutdown(steps, loggerRef, SHUTDOWN_TIMEOUT_MS);
+    process.exit(0);
+};
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+    if (loggerRef) {
+        loggerRef.error('Unhandled promise rejection', { reason: String(reason) });
+    }
+});
+process.on('uncaughtException', (err) => {
+    if (loggerRef) {
+        loggerRef.error('Uncaught exception', { error: err.message, stack: err.stack });
+    }
+});
 
 const start = async () => {
     let config;
@@ -30,26 +76,32 @@ const start = async () => {
         service: config.service,
         logging: config.logging,
     });
+    loggerRef = logger;
     const metrics = new PrometheusMetrics();
 
     logger.info('Starting Search Worker');
 
     const metricsApp = express();
+    metricsServer = http.createServer(metricsApp);
 
-    metricsApp.get('/metrics', async (_req, res) => {
+    metricsApp.get('/metrics', async (_req: Request, res: Response) => {
         try {
             res.set('Content-Type', metrics.getContentType());
             res.send(await metrics.getMetrics());
         } catch (err) {
-            res.status(500).send(err);
+            logger.error('Metrics endpoint failed', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            res.status(500).json({ error: 'metrics_unavailable' });
         }
     });
 
-    metricsApp.listen(config.worker.metricsPort, () => {
-        logger.info(
-            `📊 Worker Metrics ready at http://localhost:${config.worker!.metricsPort}/metrics`
-        );
-    });
+    await new Promise<void>((resolve) =>
+        metricsServer!.listen(config.worker!.metricsPort, resolve)
+    );
+    logger.info(
+        `📊 Worker Metrics ready at http://localhost:${config.worker!.metricsPort}/metrics`
+    );
 
     const kafka = new Kafka({
         clientId: config.kafka.clientId,
@@ -60,33 +112,30 @@ const start = async () => {
         },
     });
 
-    const dlqProducer = new KafkaDlqProducer(kafka, config.kafka, logger);
-    const consumer = new KafkaConsumer(kafka, config.kafka, logger);
+    dlqProducer = new KafkaDlqProducer(kafka, config.kafka, logger);
+    consumer = new KafkaConsumer(kafka, config.kafka, logger);
     const esRepo = new ElasticsearchRepository(config.elasticsearch, logger, metrics);
+
+    try {
+        await esRepo.ensureIndex();
+    } catch (err: any) {
+        logger.error('Failed to ensure Elasticsearch index', { error: err.message });
+        process.exit(1);
+    }
 
     const ingestService = new IngestService(esRepo, dlqProducer, logger, metrics);
 
     const bootstrap = async () => {
-        await dlqProducer.connect();
-        await consumer.connect();
+        await dlqProducer!.connect();
+        await consumer!.connect();
 
-        await consumer.startBatch(async (batchPayload) => {
+        await consumer!.startBatch(async (batchPayload) => {
             await ingestService.processBatch(batchPayload);
         });
     };
 
     try {
         await withRetry(bootstrap, logger, { retries: 10, delay: 2000 });
-
-        const shutdown = async () => {
-            logger.info('Shutting down...');
-            await consumer.disconnect();
-            await dlqProducer.disconnect();
-            process.exit(0);
-        };
-
-        process.on('SIGINT', shutdown);
-        process.on('SIGTERM', shutdown);
     } catch (err) {
         logger.error('Fatal Worker Error', { err });
         process.exit(1);
