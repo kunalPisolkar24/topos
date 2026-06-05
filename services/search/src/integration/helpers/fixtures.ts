@@ -67,11 +67,11 @@ export const stubMetrics: IMetricsService = {
   incrementCacheReadError: () => {},
   incrementCacheWriteError: () => {},
   incrementSearchCount: () => {},
+  recordSearchLatency: () => {},
+  recordEsOperation: () => {},
   recordWorkerBatch: () => {},
   incrementDlqCount: () => {},
   incrementUnknownShapeCount: () => {},
-  recordEsOperation: () => {},
-  recordWorkerBatch: () => {},
   getContentType: () => 'text/plain',
   getMetrics: async () => '',
 };

@@ -18,9 +18,21 @@ function getRedisConfig(): RedisConfig {
   };
 }
 
+async function waitForRedis(client: RedisCache, maxRetries = 20): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await client.ping();
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+  throw new Error('Redis connection timed out');
+}
+
 beforeAll(async () => {
   cache = new RedisCache(getRedisConfig(), stubLogger);
-  await cache.connect();
+  await waitForRedis(cache);
 });
 
 afterAll(async () => {

@@ -10,10 +10,6 @@ export default defineConfig({
     hookTimeout: 180_000,
     globalSetup: ['./src/integration/helpers/global-setup.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    singleFork: true,
   },
 });
