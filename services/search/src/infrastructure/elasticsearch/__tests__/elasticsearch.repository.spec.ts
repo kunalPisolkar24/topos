@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mock, MockProxy } from 'vitest-mock-extended';
 import { ILogger } from '../../../core/interfaces/logger.interface.js';
 import { IMetricsService } from '../../../core/interfaces/metrics.interface.js';
+import { BulkPartialFailureError, InfrastructureError } from '../../../core/errors/app.error.js';
 import type { ElasticsearchConfig } from '../elasticsearch.repository.js';
 
 const mockBulk = vi.fn();
 const mockSearch = vi.fn();
 const mockClusterHealth = vi.fn();
+const mockIndicesExists = vi.fn();
+const mockIndicesCreate = vi.fn();
 
 vi.mock('@elastic/elasticsearch', () => {
     return {
@@ -14,6 +17,10 @@ vi.mock('@elastic/elasticsearch', () => {
             bulk = mockBulk;
             search = mockSearch;
             cluster = { health: mockClusterHealth };
+            indices = {
+                exists: mockIndicesExists,
+                create: mockIndicesCreate,
+            };
         },
     };
 });
@@ -132,20 +139,34 @@ describe('ElasticsearchRepository', () => {
             expect(mockBulk).not.toHaveBeenCalled();
         });
 
-        it('should log partial bulk errors', async () => {
+        it('should throw BulkPartialFailureError on partial bulk upsert errors', async () => {
             mockBulk.mockResolvedValue({
                 errors: true,
-                items: [{ index: { error: 'Mapping Error', status: 400 } }],
+                items: [{ index: { error: { reason: 'Mapping Error' }, status: 400 } }],
             });
+            const docs = [
+                { postId: '1', title: 'T', body: 'B', createdAt: '', imageUrl: null },
+            ];
+
+            await expect(repository.bulkUpsert(docs)).rejects.toBeInstanceOf(
+                BulkPartialFailureError
+            );
+            expect(logger.error).toHaveBeenCalledWith(
+                'Partial Bulk Upsert Failure',
+                expect.objectContaining({ failures: expect.any(Array) })
+            );
+        });
+
+        it('passes refresh policy from config to bulk calls', async () => {
+            mockBulk.mockResolvedValue({ errors: false, items: [] });
             const docs = [
                 { postId: '1', title: 'T', body: 'B', createdAt: '', imageUrl: null },
             ];
 
             await repository.bulkUpsert(docs);
 
-            expect(logger.error).toHaveBeenCalledWith(
-                'Partial Bulk Upsert Failure',
-                expect.any(Object)
+            expect(mockBulk).toHaveBeenCalledWith(
+                expect.objectContaining({ refresh: 'wait_for' })
             );
         });
 
@@ -197,6 +218,55 @@ describe('ElasticsearchRepository', () => {
                 'error',
                 expect.any(Number)
             );
+        });
+
+        it('should throw BulkPartialFailureError on partial bulk delete errors', async () => {
+            mockBulk.mockResolvedValue({
+                errors: true,
+                items: [{ delete: { error: { reason: 'Not Found' }, status: 404 } }],
+            });
+
+            await expect(repository.bulkDelete(['1'])).rejects.toBeInstanceOf(
+                BulkPartialFailureError
+            );
+        });
+    });
+
+    describe('ensureIndex', () => {
+        it('should skip create when index exists', async () => {
+            mockIndicesExists.mockResolvedValue(true);
+
+            await repository.ensureIndex();
+
+            expect(mockIndicesExists).toHaveBeenCalledWith({ index: 'test_index' });
+            expect(mockIndicesCreate).not.toHaveBeenCalled();
+        });
+
+        it('should create index with mapping when missing', async () => {
+            mockIndicesExists.mockResolvedValue(false);
+            mockIndicesCreate.mockResolvedValue({});
+
+            await repository.ensureIndex();
+
+            expect(mockIndicesCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    index: 'test_index',
+                    mappings: expect.objectContaining({
+                        properties: expect.objectContaining({
+                            postId: { type: 'keyword' },
+                        }),
+                    }),
+                })
+            );
+        });
+    });
+
+    describe('search pagination safety', () => {
+        it('rejects offset beyond max_result_window', async () => {
+            await expect(repository.search('q', 200, 60)).rejects.toBeInstanceOf(
+                InfrastructureError
+            );
+            expect(mockSearch).not.toHaveBeenCalled();
         });
     });
 
