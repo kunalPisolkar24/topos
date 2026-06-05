@@ -9,6 +9,14 @@ import { PrometheusMetrics } from './infrastructure/monitoring/prometheus.metric
 import { SearchService } from './api/services/search.service.js';
 import { buildConfig, ConfigValidationError } from './config/index.js';
 import { runShutdown, ShutdownStep } from './utils/shutdown.util.js';
+import { JwksAuthVerifier } from './infrastructure/auth/jwks-auth-verifier.js';
+import { IAuthVerifier } from './core/interfaces/auth.interface.js';
+import { requestId } from './api/middleware/request-id.middleware.js';
+import { securityHeaders } from './api/middleware/security-headers.middleware.js';
+import { corsMiddleware } from './api/middleware/cors.middleware.js';
+import { authMiddleware } from './api/middleware/auth.middleware.js';
+import { basicAuth } from './api/middleware/basic-auth.middleware.js';
+import { liveness, readiness } from './api/middleware/health.middleware.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 let httpServer: http.Server | null = null;
@@ -70,7 +78,11 @@ const start = async () => {
         process.exit(1);
     }
 
+    const isProduction = config.service.env === 'production';
     const app = express();
+    if (config.http.trustProxy) {
+        app.set('trust proxy', true);
+    }
     httpServer = http.createServer(app);
     const logger = new PinoLogger({
         service: config.service,
@@ -81,6 +93,18 @@ const start = async () => {
 
     const esRepo = new ElasticsearchRepository(config.elasticsearch, logger, metrics);
     cache = new RedisCache(config.redis, logger);
+
+    let verifier: IAuthVerifier | null = null;
+    if (config.auth.enabled) {
+        verifier = new JwksAuthVerifier({
+            jwksUri: config.auth.jwksUri!,
+            audience: config.auth.audience,
+            issuer: config.auth.issuer,
+            algorithms: config.auth.algorithms,
+            cacheMaxAgeMs: config.auth.cacheMaxAgeMs,
+            clockToleranceSec: config.auth.clockToleranceSec,
+        });
+    }
 
     try {
         await esRepo.ensureIndex();
@@ -103,13 +127,36 @@ const start = async () => {
     });
 
     const server = buildApolloServer({
-        isProduction: config.service.env === 'production',
+        isProduction,
     });
-
     await server.start();
 
-    app.use(express.json());
+    app.use(requestId({ logger }));
+    app.use(securityHeaders({ isProduction }));
+    app.use(
+        corsMiddleware({
+            allowedOrigins: config.http.corsOrigins,
+            isProduction,
+        })
+    );
+    app.use(express.json({ limit: config.http.bodyLimitKb + 'kb' }));
 
+    app.get('/healthz', liveness());
+    app.get(
+        '/readyz',
+        readiness(
+            { cache, es: esRepo },
+            logger.child({ component: 'readiness' })
+        )
+    );
+
+    app.use(
+        '/metrics',
+        basicAuth({
+            credentials: config.metrics.basicAuth,
+            isProduction,
+        })
+    );
     app.get('/metrics', async (_req: Request, res: Response) => {
         try {
             res.set('Content-Type', metrics.getContentType());
@@ -122,10 +169,19 @@ const start = async () => {
         }
     });
 
+    if (verifier) {
+        app.use(
+            authMiddleware({ verifier, logger, enabled: config.auth.enabled })
+        );
+    }
+
     app.use(
         '/graphql',
         expressMiddleware(server, {
-            context: async () => ({ searchService }),
+            context: async ({ req }) => ({
+                searchService,
+                viewer: (req as Request & { viewer?: unknown }).viewer,
+            }),
         })
     );
 
@@ -135,6 +191,7 @@ const start = async () => {
 
     logger.info(`🚀 Search API ready at http://localhost:${config.api!.port}/graphql`);
     logger.info(`📊 Metrics ready at http://localhost:${config.api!.port}/metrics`);
+    logger.info(`🩺 Health: /healthz /readyz`);
 };
 
 start().catch((err) => {

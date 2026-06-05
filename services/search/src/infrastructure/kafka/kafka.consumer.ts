@@ -8,10 +8,12 @@ export interface IBatchConsumer {
     connect(): Promise<void>;
     disconnect(): Promise<void>;
     startBatch(handler: (payload: EachBatchPayload) => Promise<void>): Promise<void>;
+    isHealthy(): Promise<boolean>;
 }
 
 export class KafkaConsumer implements IBatchConsumer {
     private readonly consumer: Consumer;
+    private connected = false;
 
     constructor(
         kafka: Kafka,
@@ -27,12 +29,18 @@ export class KafkaConsumer implements IBatchConsumer {
 
     async connect(): Promise<void> {
         await this.consumer.connect();
+        this.connected = true;
         this.logger.info('Kafka Consumer connected');
     }
 
     async disconnect(): Promise<void> {
         await this.consumer.disconnect();
+        this.connected = false;
         this.logger.info('Kafka Consumer disconnected');
+    }
+
+    async isHealthy(): Promise<boolean> {
+        return this.connected;
     }
 
     async startBatch(handler: (payload: EachBatchPayload) => Promise<void>): Promise<void> {

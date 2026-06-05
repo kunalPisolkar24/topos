@@ -10,6 +10,10 @@ import { KafkaConsumer } from './infrastructure/kafka/kafka.consumer.js';
 import { IngestService } from './worker/services/ingest.service.js';
 import { withRetry } from './utils/retry.util.js';
 import { runShutdown, ShutdownStep } from './utils/shutdown.util.js';
+import { requestId } from './api/middleware/request-id.middleware.js';
+import { securityHeaders } from './api/middleware/security-headers.middleware.js';
+import { basicAuth } from './api/middleware/basic-auth.middleware.js';
+import { liveness, readiness } from './api/middleware/health.middleware.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 let consumer: KafkaConsumer | null = null;
@@ -72,6 +76,7 @@ const start = async () => {
         process.exit(1);
     }
 
+    const isProduction = config.service.env === 'production';
     const logger = new PinoLogger({
         service: config.service,
         logging: config.logging,
@@ -82,7 +87,30 @@ const start = async () => {
     logger.info('Starting Search Worker');
 
     const metricsApp = express();
+    if (config.http.trustProxy) {
+        metricsApp.set('trust proxy', true);
+    }
     metricsServer = http.createServer(metricsApp);
+
+    metricsApp.use(requestId({ logger }));
+    metricsApp.use(securityHeaders({ isProduction }));
+    metricsApp.use(
+        basicAuth({ credentials: config.metrics.basicAuth, isProduction })
+    );
+
+    metricsApp.get('/healthz', liveness());
+    metricsApp.get(
+        '/readyz',
+        readiness(
+            {
+                es: { checkHealth: async () => true },
+                kafka: {
+                    isHealthy: async () => (consumer ? consumer.isHealthy() : false),
+                },
+            },
+            logger.child({ component: 'readiness' })
+        )
+    );
 
     metricsApp.get('/metrics', async (_req: Request, res: Response) => {
         try {
