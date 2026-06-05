@@ -10,58 +10,78 @@ import { ElasticsearchRepository } from './infrastructure/elasticsearch/elastics
 import { RedisCache } from './infrastructure/redis/redis.cache.js';
 import { PrometheusMetrics } from './infrastructure/monitoring/prometheus.metrics.js';
 import { SearchService } from './api/services/search.service.js';
-import { getApiConfig } from './config/index.js';
+import { buildConfig, ConfigValidationError } from './config/index.js';
 
 const start = async () => {
-	const config = getApiConfig();
-	const app = express();
-	const httpServer = http.createServer(app);
-	const logger = new PinoLogger();
-	const metrics = new PrometheusMetrics();
-	
-	const esRepo = new ElasticsearchRepository(logger, metrics);
-	const cache = new RedisCache(logger);
+    let config;
+    try {
+        config = buildConfig();
+    } catch (err) {
+        if (err instanceof ConfigValidationError) {
+            console.error('Invalid configuration:', err.message, err.issues);
+            process.exit(1);
+        }
+        throw err;
+    }
 
-	try {
-		await cache.connect();
-	} catch (err) {
-		logger.error('Failed to connect to Redis', { err });
-		process.exit(1);
-	}
+    if (!config.api) {
+        console.error('API_PORT or PORT must be set to run the API');
+        process.exit(1);
+    }
 
-	const searchService = new SearchService(esRepo, cache, logger, metrics);
+    const app = express();
+    const httpServer = http.createServer(app);
+    const logger = new PinoLogger({
+        service: config.service,
+        logging: config.logging,
+    });
+    const metrics = new PrometheusMetrics();
 
-	const server = new ApolloServer({
-		schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
-	});
+    const esRepo = new ElasticsearchRepository(config.elasticsearch, logger, metrics);
+    const cache = new RedisCache(config.redis, logger);
 
-	await server.start();
+    try {
+        await cache.connect();
+    } catch (err) {
+        logger.error('Failed to connect to Redis', { err });
+        process.exit(1);
+    }
 
-	app.use(express.json());
+    const searchService = new SearchService(esRepo, cache, logger, metrics);
 
-	app.get('/metrics', async (_req, res) => {
-		try {
-			res.set('Content-Type', metrics.getContentType());
-			res.send(await metrics.getMetrics());
-		} catch (err) {
-			res.status(500).send(err);
-		}
-	});
+    const server = new ApolloServer({
+        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+    });
 
-	app.use(
-		'/graphql',
-		expressMiddleware(server, {
-			context: async () => ({ searchService }),
-		})
-	);
+    await server.start();
 
-	await new Promise<void>((resolve) => httpServer.listen({ port: config.API_PORT }, resolve));
+    app.use(express.json());
 
-	logger.info(`🚀 Search API ready at http://localhost:${config.API_PORT}/graphql`);
-	logger.info(`📊 Metrics ready at http://localhost:${config.API_PORT}/metrics`);
+    app.get('/metrics', async (_req, res) => {
+        try {
+            res.set('Content-Type', metrics.getContentType());
+            res.send(await metrics.getMetrics());
+        } catch (err) {
+            res.status(500).send(err);
+        }
+    });
+
+    app.use(
+        '/graphql',
+        expressMiddleware(server, {
+            context: async () => ({ searchService }),
+        })
+    );
+
+    await new Promise<void>((resolve) =>
+        httpServer.listen({ port: config.api!.port }, resolve)
+    );
+
+    logger.info(`🚀 Search API ready at http://localhost:${config.api!.port}/graphql`);
+    logger.info(`📊 Metrics ready at http://localhost:${config.api!.port}/metrics`);
 };
 
 start().catch((err) => {
-	console.error(err);
-	process.exit(1);
+    console.error(err);
+    process.exit(1);
 });
