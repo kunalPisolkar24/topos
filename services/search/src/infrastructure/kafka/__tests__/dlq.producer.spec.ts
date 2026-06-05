@@ -97,11 +97,34 @@ describe('KafkaDlqProducer', () => {
         });
 
         it('logs and rethrows on producer send failure', async () => {
-            sendMock.mockRejectedValueOnce(new Error('broker down'));
+            sendMock.mockRejectedValue(new Error('broker down'));
             await expect(producer.publish(message)).rejects.toThrow('broker down');
-            expect(logger.error).toHaveBeenCalledWith('Failed to send message to DLQ', {
-                error: 'broker down',
-            });
+            expect(logger.error).toHaveBeenCalledWith(
+                'Failed to send message to DLQ',
+                expect.objectContaining({ error: 'broker down', key: 'post-1' })
+            );
+        });
+
+        it('retries on transient send errors and eventually succeeds', async () => {
+            sendMock.mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce(undefined);
+
+            await producer.publish(message);
+
+            expect(sendMock).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('shutdown', () => {
+        it('aborts in-flight retries and swallows disconnect errors', async () => {
+            disconnectMock.mockRejectedValueOnce(new Error('already disconnected'));
+
+            await producer.disconnect();
+
+            expect(disconnectMock).toHaveBeenCalled();
+            expect(logger.error).toHaveBeenCalledWith(
+                'DLQ Producer disconnect error',
+                expect.objectContaining({ error: 'already disconnected' })
+            );
         });
     });
 });
