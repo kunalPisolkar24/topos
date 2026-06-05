@@ -72,22 +72,32 @@ const parseSentinelHosts = (raw: string | undefined): Array<{ host: string; port
     return entries.map((entry) => {
         const idx = entry.lastIndexOf(':');
         if (idx <= 0 || idx === entry.length - 1) {
-            throw new Error(`Invalid REDIS_SENTINEL_HOSTS entry: "${entry}". Expected host:port`);
+            throw new ConfigValidationError(
+                `Invalid REDIS_SENTINEL_HOSTS entry: "${entry}". Expected host:port`,
+                { REDIS_SENTINEL_HOSTS: `Invalid entry: ${entry}` }
+            );
         }
         const host = entry.slice(0, idx).trim();
         const port = Number.parseInt(entry.slice(idx + 1).trim(), 10);
         if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
-            throw new Error(`Invalid REDIS_SENTINEL_HOSTS entry: "${entry}". Expected host:port`);
+            throw new ConfigValidationError(
+                `Invalid REDIS_SENTINEL_HOSTS entry: "${entry}". Expected host:port`,
+                { REDIS_SENTINEL_HOSTS: `Invalid entry: ${entry}` }
+            );
         }
         return { host, port };
     });
 };
 
-const parseMetricsBasicAuth = (raw: string): { username: string; password: string } | undefined => {
+const parseMetricsBasicAuth = (
+    raw: string
+): { username: string; password: string } | undefined => {
     if (!raw) return undefined;
     const idx = raw.indexOf(':');
     if (idx <= 0 || idx === raw.length - 1) {
-        throw new Error('Invalid METRICS_BASIC_AUTH. Expected username:password');
+        throw new ConfigValidationError('Invalid METRICS_BASIC_AUTH. Expected username:password', {
+            METRICS_BASIC_AUTH: 'Expected username:password',
+        });
     }
     return { username: raw.slice(0, idx), password: raw.slice(idx + 1) };
 };
