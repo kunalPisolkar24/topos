@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
-import type { IConfig } from '../core/interfaces/config.interface.js';
+import type { IConfig, Algorithm } from '../core/interfaces/config.interface.js';
 
 dotenv.config();
 
@@ -57,8 +57,18 @@ const envSchema = z.object({
         .enum(['true', 'false'])
         .default('false')
         .transform((v) => v === 'true'),
+    AUTH_JWKS_URI: z.string().url().optional(),
+    AUTH_AUDIENCE: z.string().optional(),
+    AUTH_ISSUER: z.string().optional(),
+    AUTH_ALGORITHMS: z.string().default('RS256'),
+    AUTH_CACHE_MAX_AGE_MS: positiveIntSchema.default(600000),
+    AUTH_CLOCK_TOLERANCE_SEC: positiveIntSchema.default(5),
     METRICS_BASIC_AUTH: z.string().default(''),
     HTTP_BODY_LIMIT_KB: positiveIntSchema.default(256),
+    HTTP_TRUST_PROXY: z
+        .enum(['true', 'false'])
+        .default('false')
+        .transform((v) => v === 'true'),
 
     SHUTDOWN_TIMEOUT_MS: positiveIntSchema.default(15000),
     LOG_LEVEL: logLevelSchema.optional(),
@@ -108,6 +118,25 @@ const parseCorsOrigins = (raw: string): string[] =>
         .map((s) => s.trim())
         .filter(Boolean);
 
+const ALLOWED_ALGORITHMS: Algorithm[] = [
+    'RS256', 'RS384', 'RS512',
+    'ES256', 'ES384', 'ES512',
+    'HS256', 'HS384', 'HS512',
+    'PS256', 'PS384', 'PS512',
+];
+
+const parseAuthAlgorithms = (raw: string): Algorithm[] => {
+    const tokens = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    const invalid = tokens.filter((t) => !ALLOWED_ALGORITHMS.includes(t as Algorithm));
+    if (invalid.length > 0) {
+        throw new ConfigValidationError(
+            `Invalid AUTH_ALGORITHMS: ${invalid.join(', ')}`,
+            { AUTH_ALGORITHMS: `Unsupported algorithms: ${invalid.join(', ')}` }
+        );
+    }
+    return tokens as Algorithm[];
+};
+
 export class ConfigValidationError extends Error {
     public readonly issues: unknown;
     constructor(message: string, issues: unknown) {
@@ -141,6 +170,13 @@ export const buildConfig = (overrides: NodeJS.ProcessEnv = process.env): IConfig
     }
 
     const metricsBasicAuth = parseMetricsBasicAuth(data.METRICS_BASIC_AUTH);
+
+    if (data.AUTH_ENABLED && !data.AUTH_JWKS_URI) {
+        logBootstrapError({ AUTH: 'AUTH_JWKS_URI is required when AUTH_ENABLED=true' });
+        throw new ConfigValidationError('Invalid environment variables', {
+            AUTH: 'AUTH_JWKS_URI is required when AUTH_ENABLED=true',
+        });
+    }
 
     const isWorker = data.KAFKA_BROKER !== undefined;
     const isApi = data.API_PORT !== undefined || data.PORT !== undefined;
@@ -203,6 +239,12 @@ export const buildConfig = (overrides: NodeJS.ProcessEnv = process.env): IConfig
         },
         auth: {
             enabled: data.AUTH_ENABLED,
+            jwksUri: data.AUTH_JWKS_URI,
+            audience: data.AUTH_AUDIENCE,
+            issuer: data.AUTH_ISSUER,
+            algorithms: parseAuthAlgorithms(data.AUTH_ALGORITHMS),
+            cacheMaxAgeMs: data.AUTH_CACHE_MAX_AGE_MS,
+            clockToleranceSec: data.AUTH_CLOCK_TOLERANCE_SEC,
         },
         metrics: {
             basicAuth: metricsBasicAuth,
@@ -210,6 +252,7 @@ export const buildConfig = (overrides: NodeJS.ProcessEnv = process.env): IConfig
         http: {
             corsOrigins: parseCorsOrigins(data.CORS_ORIGINS),
             bodyLimitKb: data.HTTP_BODY_LIMIT_KB,
+            trustProxy: data.HTTP_TRUST_PROXY,
         },
         shutdown: {
             timeoutMs: data.SHUTDOWN_TIMEOUT_MS,

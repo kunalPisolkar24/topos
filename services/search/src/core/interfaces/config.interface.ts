@@ -1,3 +1,5 @@
+export type Algorithm = 'RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512' | 'HS256' | 'HS384' | 'HS512' | 'PS256' | 'PS384' | 'PS512';
+
 export interface IConfig {
   service: {
     name: string;
@@ -44,6 +46,12 @@ export interface IConfig {
   };
   auth: {
     enabled: boolean;
+    jwksUri?: string;
+    audience?: string;
+    issuer?: string;
+    algorithms: Algorithm[];
+    cacheMaxAgeMs: number;
+    clockToleranceSec: number;
   };
   metrics: {
     basicAuth?: { username: string; password: string };
@@ -51,6 +59,7 @@ export interface IConfig {
   http: {
     corsOrigins: string[];
     bodyLimitKb: number;
+    trustProxy: boolean;
   };
   shutdown: {
     timeoutMs: number;

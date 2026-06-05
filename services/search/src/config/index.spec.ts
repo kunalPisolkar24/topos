@@ -54,6 +54,82 @@ describe('buildConfig', () => {
         });
     });
 
+    describe('auth', () => {
+        it('defaults to disabled with RS256 and 600s cache', () => {
+            const config = buildConfig(baseEnv);
+            expect(config.auth.enabled).toBe(false);
+            expect(config.auth.algorithms).toEqual(['RS256']);
+            expect(config.auth.cacheMaxAgeMs).toBe(600000);
+            expect(config.auth.clockToleranceSec).toBe(5);
+        });
+
+        it('requires AUTH_JWKS_URI when AUTH_ENABLED=true', () => {
+            try {
+                buildConfig({ ...baseEnv, AUTH_ENABLED: 'true' });
+                throw new Error('expected throw');
+            } catch (err: any) {
+                expect(err).toBeInstanceOf(ConfigValidationError);
+                expect(JSON.stringify(err.issues)).toMatch(/AUTH_JWKS_URI is required/);
+            }
+        });
+
+        it('parses algorithm allowlist', () => {
+            const config = buildConfig({
+                ...baseEnv,
+                AUTH_ENABLED: 'true',
+                AUTH_JWKS_URI: 'https://idp.test/.well-known/jwks.json',
+                AUTH_ALGORITHMS: 'RS256,ES256',
+            });
+            expect(config.auth.algorithms).toEqual(['RS256', 'ES256']);
+        });
+
+        it('rejects unknown algorithm names', () => {
+            expect(() =>
+                buildConfig({
+                    ...baseEnv,
+                    AUTH_ENABLED: 'true',
+                    AUTH_JWKS_URI: 'https://idp.test/jwks.json',
+                    AUTH_ALGORITHMS: 'RS256,XYZ',
+                })
+            ).toThrow(/AUTH_ALGORITHMS/);
+        });
+
+        it('parses audience, issuer, and tolerances', () => {
+            const config = buildConfig({
+                ...baseEnv,
+                AUTH_ENABLED: 'true',
+                AUTH_JWKS_URI: 'https://idp.test/jwks.json',
+                AUTH_AUDIENCE: 'search-api',
+                AUTH_ISSUER: 'https://idp.test',
+                AUTH_CLOCK_TOLERANCE_SEC: '10',
+            });
+            expect(config.auth.audience).toBe('search-api');
+            expect(config.auth.issuer).toBe('https://idp.test');
+            expect(config.auth.clockToleranceSec).toBe(10);
+        });
+    });
+
+    describe('http', () => {
+        it('defaults corsOrigins to empty and trustProxy to false', () => {
+            const config = buildConfig(baseEnv);
+            expect(config.http.corsOrigins).toEqual([]);
+            expect(config.http.trustProxy).toBe(false);
+            expect(config.http.bodyLimitKb).toBe(256);
+        });
+
+        it('parses CORS_ORIGINS and HTTP_TRUST_PROXY', () => {
+            const config = buildConfig({
+                ...baseEnv,
+                CORS_ORIGINS: 'https://a.test, https://b.test',
+                HTTP_TRUST_PROXY: 'true',
+                HTTP_BODY_LIMIT_KB: '512',
+            });
+            expect(config.http.corsOrigins).toEqual(['https://a.test', 'https://b.test']);
+            expect(config.http.trustProxy).toBe(true);
+            expect(config.http.bodyLimitKb).toBe(512);
+        });
+    });
+
     describe('redis', () => {
         it('accepts a redis url', () => {
             const config = buildConfig({
@@ -177,8 +253,12 @@ describe('buildConfig', () => {
 
         it('AUTH_ENABLED toggles config.auth.enabled', () => {
             expect(
-                buildConfig({ ...baseEnv, REDIS_URL: 'redis://x', AUTH_ENABLED: 'true' }).auth
-                    .enabled
+                buildConfig({
+                    ...baseEnv,
+                    REDIS_URL: 'redis://x',
+                    AUTH_ENABLED: 'true',
+                    AUTH_JWKS_URI: 'https://idp.test/jwks.json',
+                }).auth.enabled
             ).toBe(true);
         });
     });

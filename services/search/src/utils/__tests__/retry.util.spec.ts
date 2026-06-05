@@ -58,7 +58,12 @@ describe('withRetry', () => {
             .mockRejectedValueOnce(new Error('Fail 2'))
             .mockResolvedValue('success');
 
-        const resultPromise = withRetry(fn, logger, { retries: 3, delay: 100, factor: 2 });
+        const resultPromise = withRetry(fn, logger, {
+            retries: 3,
+            delay: 100,
+            factor: 2,
+            jitter: 'none',
+        });
 
         await vi.advanceTimersByTimeAsync(100);
         expect(fn).toHaveBeenCalledTimes(2);
