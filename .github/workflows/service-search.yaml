@@ -46,6 +46,11 @@ jobs:
       - name: Run Tests
         run: npm run test
 
+      - name: Run Integration Tests
+        run: npm run test:integration
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
   build-and-push:
     name: Build & Push Docker Image
     needs: quality-assurance
