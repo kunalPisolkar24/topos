@@ -212,11 +212,11 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	cleanBody := stripHtml(body)
 	if cleanBody == "" {
 		summary := fallbackSummary(cleanBody)
-		if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+		if err := w.postService.SetPostSummary(ctx, post.ID, summary, "FAILED"); err != nil {
 			status = monitoring.StatusErr
 			return fmt.Errorf("failed to update post summary: %w", err)
 		}
-		logger.Info("Generated fallback summary", "postID", post.ID)
+		logger.Info("Marked summary as FAILED for empty body", "postID", post.ID)
 		return nil
 	}
 

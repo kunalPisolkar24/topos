@@ -117,6 +117,22 @@ func TestWorker_processMessage(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		{
+			name: "EmptyBody_MarksAsFailed",
+			kafkaMsgValue: domain.PostEventPayload{
+				PostID: "post1",
+			},
+			setupMocks: func(pr *mocks.PostRepository, ai *mocks.AIService) {
+				pr.On("FindByID", mock.Anything, "post1").Return(&domain.Post{
+					ID:            "post1",
+					Body:          "<p></p>",
+					SummaryStatus: "PENDING",
+				}, nil)
+				pr.On("UpdateSummary", mock.Anything, "post1", mock.Anything, "FAILED").Return(nil)
+			},
+			expectedError: false,
+			assertNoAICall: true,
+		},
 	}
 
 	for _, tt := range tests {
