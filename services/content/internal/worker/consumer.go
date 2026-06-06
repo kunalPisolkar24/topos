@@ -213,19 +213,9 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	}
 
 	trimmedSummary := strings.TrimSpace(post.Summary)
-	if trimmedSummary != "" {
-		if post.SummaryStatus != domain.PostStatusCompleted && post.SummaryStatus != domain.PostStatusFailed {
-			if err := w.processor.SetPostSummary(ctx, post.ID, trimmedSummary, domain.PostStatusCompleted); err != nil {
-				status = monitoring.StatusErr
-				return fmt.Errorf("failed to update post summary: %w", err)
-			}
-			logger.Info("Summary already present, marking completed", "postID", post.ID)
-			return nil
-		}
-		if post.SummaryStatus == domain.PostStatusCompleted {
-			status = monitoring.StatusSkip
-			return nil
-		}
+	if trimmedSummary != "" && post.SummaryStatus == domain.PostStatusCompleted {
+		status = monitoring.StatusSkip
+		return nil
 	}
 
 	body := post.Body

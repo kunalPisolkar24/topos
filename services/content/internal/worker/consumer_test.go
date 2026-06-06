@@ -21,24 +21,24 @@ func init() {
 
 func TestWorker_processMessage(t *testing.T) {
 	tests := []struct {
-		name          string
-		kafkaMsgValue interface{}
-		setupMocks    func(*mocks.PostRepository, *mocks.AIService)
-		expectedError bool
+		name           string
+		kafkaMsgValue  interface{}
+		setupMocks     func(*mocks.PostRepository, *mocks.AIService)
+		expectedError  bool
 		assertNoAICall bool
 	}{
 		{
-			name:          "EmptyMessage",
-			kafkaMsgValue: nil,
-			setupMocks:    func(pr *mocks.PostRepository, ai *mocks.AIService) {},
-			expectedError: false,
+			name:           "EmptyMessage",
+			kafkaMsgValue:  nil,
+			setupMocks:     func(pr *mocks.PostRepository, ai *mocks.AIService) {},
+			expectedError:  false,
 			assertNoAICall: true,
 		},
 		{
-			name:          "InvalidJSON",
-			kafkaMsgValue: "invalid-json",
-			setupMocks:    func(pr *mocks.PostRepository, ai *mocks.AIService) {},
-			expectedError: true,
+			name:           "InvalidJSON",
+			kafkaMsgValue:  "invalid-json",
+			setupMocks:     func(pr *mocks.PostRepository, ai *mocks.AIService) {},
+			expectedError:  true,
 			assertNoAICall: true,
 		},
 		{
@@ -49,7 +49,7 @@ func TestWorker_processMessage(t *testing.T) {
 			setupMocks: func(pr *mocks.PostRepository, ai *mocks.AIService) {
 				pr.On("FindByID", mock.Anything, "post1").Return(nil, errors.New("not found"))
 			},
-			expectedError: true,
+			expectedError:  true,
 			assertNoAICall: true,
 		},
 		{
@@ -64,24 +64,44 @@ func TestWorker_processMessage(t *testing.T) {
 					Summary:       "Existing summary",
 				}, nil)
 			},
-			expectedError: false,
+			expectedError:  false,
 			assertNoAICall: true,
 		},
 		{
-			name: "SummaryAlreadyPresentPending",
+			name: "PendingStatus_RegeneratesSummary",
 			kafkaMsgValue: domain.PostEventPayload{
 				PostID: "post1",
+				Body:   "New body content",
 			},
 			setupMocks: func(pr *mocks.PostRepository, ai *mocks.AIService) {
 				pr.On("FindByID", mock.Anything, "post1").Return(&domain.Post{
 					ID:            "post1",
+					Body:          "New body content",
 					SummaryStatus: domain.PostStatusPending,
-					Summary:       "AI summary",
+					Summary:       "Stale summary",
 				}, nil)
-				pr.On("UpdateSummary", mock.Anything, "post1", "AI summary", domain.PostStatusCompleted).Return(nil)
+				ai.On("GenerateSummary", mock.Anything, "New body content").Return("Fresh summary", nil)
+				pr.On("UpdateSummary", mock.Anything, "post1", "Fresh summary", domain.PostStatusCompleted).Return(nil)
 			},
 			expectedError: false,
-			assertNoAICall: true,
+		},
+		{
+			name: "FailedStatus_RegeneratesSummary",
+			kafkaMsgValue: domain.PostEventPayload{
+				PostID: "post1",
+				Body:   "New body content",
+			},
+			setupMocks: func(pr *mocks.PostRepository, ai *mocks.AIService) {
+				pr.On("FindByID", mock.Anything, "post1").Return(&domain.Post{
+					ID:            "post1",
+					Body:          "New body content",
+					SummaryStatus: domain.PostStatusFailed,
+					Summary:       "",
+				}, nil)
+				ai.On("GenerateSummary", mock.Anything, "New body content").Return("Fresh summary", nil)
+				pr.On("UpdateSummary", mock.Anything, "post1", "Fresh summary", domain.PostStatusCompleted).Return(nil)
+			},
+			expectedError: false,
 		},
 		{
 			name: "AIGenerationError",
@@ -130,7 +150,7 @@ func TestWorker_processMessage(t *testing.T) {
 				}, nil)
 				pr.On("UpdateSummary", mock.Anything, "post1", mock.Anything, domain.PostStatusFailed).Return(nil)
 			},
-			expectedError: false,
+			expectedError:  false,
 			assertNoAICall: true,
 		},
 	}
