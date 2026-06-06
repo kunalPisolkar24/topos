@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -74,6 +75,9 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	var updatedPost domain.Post
 	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
+		}
 		return nil, err
 	}
 
@@ -156,7 +160,7 @@ func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.P
 func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, errors.New("invalid id format")
+		return nil, fmt.Errorf("%w: invalid id format", domain.ErrNotFound)
 	}
 
 	coll, err := r.collection.Clone(options.Collection().SetReadPreference(readpref.Primary()))
@@ -167,6 +171,9 @@ func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, 
 	var post domain.Post
 	err = coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
+		}
 		return nil, err
 	}
 	return &post, nil
