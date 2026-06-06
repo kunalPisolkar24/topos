@@ -7,8 +7,15 @@ import (
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/slug"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+const (
+	summaryPending  = "PENDING"
+	summaryComplete = "COMPLETED"
+	summaryFailed   = "FAILED"
 )
 
 func isDuplicateSlugError(err error) bool {
@@ -20,6 +27,7 @@ type PostService struct {
 	tagRepo       domain.TagRepository
 	eventProducer domain.EventProducer
 	aiService     domain.AIService
+	clock         func() time.Time
 }
 
 func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventProducer, aiService domain.AIService) *PostService {
@@ -28,6 +36,7 @@ func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository
 		tagRepo:       tagRepo,
 		eventProducer: eventProducer,
 		aiService:     aiService,
+		clock:         time.Now,
 	}
 }
 
@@ -37,29 +46,30 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 	}
 
 	summaryValue := ""
-	summaryStatus := "PENDING"
+	summaryStatus := summaryPending
 	if summary != nil {
 		trimmed := strings.TrimSpace(*summary)
 		if trimmed != "" {
 			summaryValue = trimmed
-			summaryStatus = "COMPLETED"
+			summaryStatus = summaryComplete
 		}
 	}
 
 	const maxSlugRetries = 5
+	now := s.clock()
 	var createdPost *domain.Post
 	for attempt := 0; attempt < maxSlugRetries; attempt++ {
 		post := &domain.Post{
 			Title:         title,
 			Body:          body,
-			Slug:          generateSlug(title),
+			Slug:          slug.Generate(title, now),
 			AuthorID:      authorID,
 			Tags:          tags,
 			ImageUrl:      imageUrl,
 			Summary:       summaryValue,
 			SummaryStatus: summaryStatus,
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		}
 
 		var err error
@@ -75,26 +85,26 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		}
 	}
 
-	if s.eventProducer != nil {
-		if err := s.eventProducer.PublishPostCreated(ctx, createdPost); err != nil {
-			logger.Error("Failed to publish PostCreated event", "error", err, "postID", createdPost.ID)
-		}
-	}
+	s.publishIfProducer(ctx, "PostCreated", createdPost, s.eventProducer.PublishPostCreated)
 
 	return createdPost, nil
 }
 
 func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *string, tags []string, imageUrl *string) (*domain.Post, error) {
+	now := s.clock()
 	post := &domain.Post{
-		UpdatedAt: time.Now(),
+		UpdatedAt: now,
 	}
 
+	summaryNeedsReset := false
 	if title != nil {
 		post.Title = *title
-		post.Slug = generateSlug(*title)
+		post.Slug = slug.Generate(*title, now)
+		summaryNeedsReset = true
 	}
 	if body != nil {
 		post.Body = *body
+		summaryNeedsReset = true
 	}
 	if imageUrl != nil {
 		post.ImageUrl = imageUrl
@@ -105,19 +115,28 @@ func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *st
 			_, _ = s.tagRepo.CreateOrFind(ctx, tagName)
 		}
 	}
+	if summaryNeedsReset {
+		post.Summary = ""
+		post.SummaryStatus = summaryPending
+	}
 
 	updatedPost, err := s.postRepo.Update(ctx, id, post)
 	if err != nil {
 		return nil, err
 	}
 
-	if s.eventProducer != nil {
-		if err := s.eventProducer.PublishPostUpdated(ctx, updatedPost); err != nil {
-			logger.Error("Failed to publish PostUpdated event", "error", err, "postID", updatedPost.ID)
-		}
-	}
+	s.publishIfProducer(ctx, "PostUpdated", updatedPost, s.eventProducer.PublishPostUpdated)
 
 	return updatedPost, nil
+}
+
+func (s *PostService) publishIfProducer(ctx context.Context, name string, post *domain.Post, publish func(context.Context, *domain.Post) error) {
+	if s.eventProducer == nil {
+		return
+	}
+	if err := publish(ctx, post); err != nil {
+		logger.Error("Failed to publish event", "event", name, "error", err, "postID", post.ID)
+	}
 }
 
 func (s *PostService) SetPostSummary(ctx context.Context, id, summary, status string) error {
@@ -125,17 +144,14 @@ func (s *PostService) SetPostSummary(ctx context.Context, id, summary, status st
 }
 
 func (s *PostService) DeletePost(ctx context.Context, id string) error {
-	err := s.postRepo.Delete(ctx, id)
-	if err != nil {
+	if err := s.postRepo.Delete(ctx, id); err != nil {
 		return err
 	}
-
 	if s.eventProducer != nil {
 		if err := s.eventProducer.PublishPostDeleted(ctx, id); err != nil {
 			logger.Error("Failed to publish PostDeleted event", "error", err, "postID", id)
 		}
 	}
-
 	return nil
 }
 

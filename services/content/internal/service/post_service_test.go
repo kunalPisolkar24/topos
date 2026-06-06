@@ -194,7 +194,13 @@ func TestPostService_UpdatePost(t *testing.T) {
 				tr.On("CreateOrFind", mock.Anything, "newtag").Return(&domain.Tag{}, nil)
 
 				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title && p.Body == body && *p.ImageUrl == img && len(p.Tags) == 1 && !p.UpdatedAt.IsZero()
+					return p.Title == title &&
+						p.Body == body &&
+						*p.ImageUrl == img &&
+						len(p.Tags) == 1 &&
+						!p.UpdatedAt.IsZero() &&
+						p.Summary == "" &&
+						p.SummaryStatus == "PENDING"
 				})).Return(&domain.Post{ID: id, Title: title}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
@@ -209,7 +215,27 @@ func TestPostService_UpdatePost(t *testing.T) {
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
 				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title && p.Body == "" && p.ImageUrl == nil && p.Tags == nil
+					return p.Title == title &&
+						p.Body == "" &&
+						p.ImageUrl == nil &&
+						p.Tags == nil &&
+						p.Summary == "" &&
+						p.SummaryStatus == "PENDING"
+				})).Return(&domain.Post{ID: id}, nil)
+
+				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "Success_ImageOnly_DoesNotResetSummary",
+			args: args{
+				id:       id,
+				imageUrl: &img,
+			},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
+					return p.Summary == "" && p.SummaryStatus == ""
 				})).Return(&domain.Post{ID: id}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)

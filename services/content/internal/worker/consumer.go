@@ -15,6 +15,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/textutil"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/segmentio/kafka-go"
 )
@@ -307,32 +308,13 @@ func stripHtml(input string) string {
 	}
 	decoded := html.UnescapeString(input)
 	stripped := htmlTagRegex.ReplaceAllString(decoded, " ")
-	return normalizeWhitespace(stripped)
-}
-
-func normalizeWhitespace(input string) string {
-	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
+	return textutil.NormalizeWhitespace(stripped)
 }
 
 func fallbackSummary(input string) string {
-	normalized := normalizeWhitespace(input)
+	normalized := textutil.NormalizeWhitespace(input)
 	if normalized == "" {
 		return "Summary is currently unavailable."
 	}
-	return truncateText(normalized, 240)
-}
-
-func truncateText(input string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(input)
-	if len(runes) <= max {
-		return input
-	}
-	cut := string(runes[:max])
-	if idx := strings.LastIndex(cut, " "); idx > 0 {
-		cut = cut[:idx]
-	}
-	return strings.TrimSpace(cut) + "..."
+	return textutil.Truncate(normalized, 240)
 }

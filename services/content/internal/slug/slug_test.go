@@ -1,11 +1,14 @@
-package service
+package slug
 
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestGenerateSlug(t *testing.T) {
+var fixedTime = time.Date(2024, 1, 2, 15, 4, 5, 0, time.UTC)
+
+func TestGenerate(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -105,20 +108,23 @@ func TestGenerateSlug(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			slug := generateSlug(tt.input)
-			tt.check(t, slug)
+			got := Generate(tt.input, fixedTime)
+			tt.check(t, got)
 		})
 	}
 }
 
-func TestGenerateSlug_HasTimestamp(t *testing.T) {
-	slug := generateSlug("Test")
-	parts := strings.Split(slug, "-")
+func TestGenerate_HasTimestamp(t *testing.T) {
+	got := Generate("Test", fixedTime)
+	parts := strings.Split(got, "-")
 	if len(parts) < 2 {
-		t.Fatalf("expected slug to have at least one dash separator, got %q", slug)
+		t.Fatalf("expected slug to have at least one dash separator, got %q", got)
 	}
 	timestamp := parts[len(parts)-1]
 	if len(timestamp) != 14 {
-		t.Errorf("expected timestamp length 14, got %d (slug: %q)", len(timestamp), slug)
+		t.Errorf("expected timestamp length 14, got %d (slug: %q)", len(timestamp), got)
+	}
+	if timestamp != "20240102150405" {
+		t.Errorf("expected fixed timestamp 20240102150405, got %q", timestamp)
 	}
 }

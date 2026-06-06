@@ -59,10 +59,11 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	if post.Slug != "" {
 		updateFields["slug"] = post.Slug
 	}
-
-	if post.Title != "" || post.Body != "" {
-		updateFields["summary"] = ""
-		updateFields["summaryStatus"] = "PENDING"
+	if post.Summary != "" {
+		updateFields["summary"] = post.Summary
+	}
+	if post.SummaryStatus != "" {
+		updateFields["summaryStatus"] = post.SummaryStatus
 	}
 
 	update := bson.M{

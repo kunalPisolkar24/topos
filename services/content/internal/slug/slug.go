@@ -1,4 +1,4 @@
-package service
+package slug
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-func generateSlug(title string) string {
+func Generate(title string, now time.Time) string {
 	var b strings.Builder
 	b.Grow(len(title) + 16)
 	prevDash := false
@@ -34,5 +34,5 @@ func generateSlug(title string) string {
 		slug = "post"
 	}
 
-	return slug + "-" + time.Now().Format("20060102150405")
+	return slug + "-" + now.Format("20060102150405")
 }
