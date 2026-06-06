@@ -25,12 +25,12 @@ func isDuplicateSlugError(err error) bool {
 type PostService struct {
 	postRepo      domain.PostRepository
 	tagRepo       domain.TagRepository
-	eventProducer domain.EventProducer
+	eventProducer domain.EventPublisher
 	aiService     domain.AIService
 	clock         func() time.Time
 }
 
-func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventProducer, aiService domain.AIService) *PostService {
+func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository, eventProducer domain.EventPublisher, aiService domain.AIService) *PostService {
 	return &PostService{
 		postRepo:      postRepo,
 		tagRepo:       tagRepo,

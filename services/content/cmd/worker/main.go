@@ -9,14 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/bootstrap"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/health"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,56 +32,21 @@ func run() error {
 		return err
 	}
 
-	mongoClient, err := db.Connect(cfg.MongoURI)
+	deps, err := bootstrap.Load(context.Background(), bootstrap.RoleWorker, cfg)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if dErr := mongoClient.Disconnect(context.Background()); dErr != nil {
-			logger.Error("Failed to disconnect MongoDB", "error", dErr)
-		}
-	}()
+	defer deps.Shutdown()
 
-	redisClient, err := cache.NewRedisClientAuto(cfg)
-	if err != nil {
-		logger.Error("Failed to connect to Redis", "mode", cfg.RedisMode, "error", err)
-		return err
-	}
-	defer func() {
-		if cErr := redisClient.Close(); cErr != nil {
-			logger.Error("Failed to close Redis client", "error", cErr)
-		}
-	}()
-
-	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cErr := aiClient.Close(); cErr != nil {
-			logger.Error("Failed to close AI client", "error", cErr)
-		}
-	}()
-
-	database := mongoClient.Database(cfg.DbName)
-
-	if err := db.EnsureIndexes(context.Background(), database); err != nil {
-		return err
-	}
-
-	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), cache.NewRedisCache(redisClient))
-	tagRepo := repository.NewMongoTagRepository(database)
-
-	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-	defer func() {
-		if cErr := kafkaProducer.Close(); cErr != nil {
-			logger.Error("Failed to close Kafka producer", "error", cErr)
-		}
-	}()
-
-	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer, aiClient)
-
-	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, cfg.KafkaDLQTopic, postService, aiClient, kafkaProducer)
+	w, err := worker.NewWorker(
+		cfg.KafkaBrokers,
+		cfg.KafkaConsumerGroupID,
+		cfg.KafkaConsumerTopics,
+		cfg.KafkaDLQTopic,
+		deps.PostService,
+		deps.AIService,
+		deps.EventProd,
+	)
 	if err != nil {
 		return err
 	}
@@ -100,10 +60,13 @@ func run() error {
 
 	healthChecker := health.NewChecker(2 * time.Second)
 	healthChecker.Register("mongo", func(ctx context.Context) error {
-		return mongoClient.Ping(ctx, readpref.Primary())
+		return deps.MongoClient.Ping(ctx, readpref.Primary())
 	})
 	healthChecker.Register("kafka", func(ctx context.Context) error {
-		return kafkaProducer.Ping(ctx)
+		if deps.EventProd == nil {
+			return errors.New("kafka producer not initialized")
+		}
+		return deps.EventProd.Ping(ctx)
 	})
 	healthChecker.Register("worker", func(_ context.Context) error {
 		return w.Running()
