@@ -7,9 +7,9 @@ package graph
 
 import (
 	"context"
-	"errors"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/graph/model"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
 )
 
@@ -17,7 +17,7 @@ import (
 func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePostInput) (*model.Post, error) {
 	userID, ok := middleware.UserIDFromContext(ctx)
 	if !ok {
-		return nil, errors.New("unauthorized")
+		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
 
 	var tags []string
@@ -27,7 +27,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 
 	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary)
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
 
 	return mapDomainPostToModel(domainPost), nil
@@ -37,20 +37,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input model.UpdatePostInput) (*model.Post, error) {
 	userID, ok := middleware.UserIDFromContext(ctx)
 	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-
-	existingPost, err := r.PostService.GetPost(ctx, id)
-	if err != nil {
-		return nil, errors.New("post not found")
-	}
-
-	if existingPost == nil {
-		return nil, errors.New("post not found")
-	}
-
-	if existingPost.AuthorID != userID {
-		return nil, errors.New("forbidden")
+		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
 
 	var tags []string
@@ -58,9 +45,9 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 		tags = append(tags, input.Tags...)
 	}
 
-	domainPost, err := r.PostService.UpdatePost(ctx, id, input.Title, input.Body, tags, input.ImageURL)
+	domainPost, err := r.PostService.UpdatePost(ctx, id, userID, input.Title, input.Body, tags, input.ImageURL)
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
 
 	return mapDomainPostToModel(domainPost), nil
@@ -70,24 +57,11 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, error) {
 	userID, ok := middleware.UserIDFromContext(ctx)
 	if !ok {
-		return false, errors.New("unauthorized")
+		return false, mapDomainError(domain.ErrUnauthorized)
 	}
 
-	existingPost, err := r.PostService.GetPost(ctx, id)
-	if err != nil {
-		return false, errors.New("post not found")
-	}
-
-	if existingPost == nil {
-		return false, errors.New("post not found")
-	}
-
-	if existingPost.AuthorID != userID {
-		return false, errors.New("forbidden")
-	}
-
-	if err := r.PostService.DeletePost(ctx, id); err != nil {
-		return false, err
+	if err := r.PostService.DeletePost(ctx, id, userID); err != nil {
+		return false, mapDomainError(err)
 	}
 
 	return true, nil
@@ -96,12 +70,12 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 // GenerateTags is the resolver for the generateTags field.
 func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body string) ([]string, error) {
 	if _, ok := middleware.UserIDFromContext(ctx); !ok {
-		return nil, errors.New("unauthorized")
+		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
 
 	tags, err := r.PostService.GenerateTags(ctx, title, body)
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
 
 	return tags, nil
@@ -110,12 +84,12 @@ func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body 
 // GeneratePostContent is the resolver for the generatePostContent field.
 func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt string) (*model.GeneratedPost, error) {
 	if _, ok := middleware.UserIDFromContext(ctx); !ok {
-		return nil, errors.New("unauthorized")
+		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
 
 	generated, err := r.PostService.GeneratePostContent(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
 
 	return &model.GeneratedPost{

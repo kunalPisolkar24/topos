@@ -90,7 +90,18 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 	return createdPost, nil
 }
 
-func (s *PostService) UpdatePost(ctx context.Context, id string, title, body *string, tags []string, imageUrl *string) (*domain.Post, error) {
+func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title, body *string, tags []string, imageUrl *string) (*domain.Post, error) {
+	existing, err := s.postRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, domain.ErrNotFound
+	}
+	if existing.AuthorID != actorID {
+		return nil, domain.ErrForbidden
+	}
+
 	now := s.clock()
 	post := &domain.Post{
 		UpdatedAt: now,
@@ -143,7 +154,18 @@ func (s *PostService) SetPostSummary(ctx context.Context, id, summary, status st
 	return s.postRepo.UpdateSummary(ctx, id, summary, status)
 }
 
-func (s *PostService) DeletePost(ctx context.Context, id string) error {
+func (s *PostService) DeletePost(ctx context.Context, id, actorID string) error {
+	existing, err := s.postRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return domain.ErrNotFound
+	}
+	if existing.AuthorID != actorID {
+		return domain.ErrForbidden
+	}
+
 	if err := s.postRepo.Delete(ctx, id); err != nil {
 		return err
 	}
