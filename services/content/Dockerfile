@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-FROM golang:1.25 AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -14,12 +14,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-service c
 FROM builder AS build-worker
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-worker cmd/worker/main.go
 
-FROM debian:bullseye-slim AS runtime-base
+FROM alpine:3.20 AS runtime-base
 
 WORKDIR /app
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -D appuser
+RUN apk add --no-cache ca-certificates wget
 
 FROM runtime-base AS content-service
 COPY --from=build-server /out/content-service /app/content-service
