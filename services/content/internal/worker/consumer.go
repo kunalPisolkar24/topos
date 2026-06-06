@@ -14,7 +14,6 @@ import (
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/textutil"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/segmentio/kafka-go"
@@ -22,22 +21,22 @@ import (
 
 type Worker struct {
 	reader         *kafka.Reader
-	postService    *service.PostService
+	processor      domain.SummaryProcessor
 	aiService      domain.AIService
-	producer       domain.EventProducer
+	producer       domain.DLQPublisher
 	consumerTopics []string
 	dlqTopic       string
 
-	mu        sync.RWMutex
-	running   atomic.Bool
-	started   atomic.Bool
-	lastErr   error
-	done      chan struct{}
+	mu      sync.RWMutex
+	running atomic.Bool
+	started atomic.Bool
+	lastErr error
+	done    chan struct{}
 }
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
 
-func NewWorker(brokers []string, groupID string, topics []string, dlqTopic string, postService *service.PostService, aiService domain.AIService, producer domain.EventProducer) (*Worker, error) {
+func NewWorker(brokers []string, groupID string, topics []string, dlqTopic string, processor domain.SummaryProcessor, aiService domain.AIService, producer domain.DLQPublisher) (*Worker, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("kafka brokers are required")
 	}
@@ -85,7 +84,7 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 
 	return &Worker{
 		reader:         reader,
-		postService:    postService,
+		processor:      processor,
 		aiService:      aiService,
 		producer:       producer,
 		consumerTopics: append([]string{}, topics...),
@@ -207,7 +206,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 
 	logger.Info("Processing message", "postID", event.PostID)
 
-	post, err := w.postService.GetPost(ctx, event.PostID)
+	post, err := w.processor.GetPost(ctx, event.PostID)
 	if err != nil {
 		status = monitoring.StatusErr
 		return fmt.Errorf("failed to fetch post: %w", err)
@@ -216,7 +215,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	trimmedSummary := strings.TrimSpace(post.Summary)
 	if trimmedSummary != "" {
 		if post.SummaryStatus != "COMPLETED" && post.SummaryStatus != "FAILED" {
-			if err := w.postService.SetPostSummary(ctx, post.ID, trimmedSummary, "COMPLETED"); err != nil {
+			if err := w.processor.SetPostSummary(ctx, post.ID, trimmedSummary, "COMPLETED"); err != nil {
 				status = monitoring.StatusErr
 				return fmt.Errorf("failed to update post summary: %w", err)
 			}
@@ -237,7 +236,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	cleanBody := stripHtml(body)
 	if cleanBody == "" {
 		summary := fallbackSummary(cleanBody)
-		if err := w.postService.SetPostSummary(ctx, post.ID, summary, "FAILED"); err != nil {
+		if err := w.processor.SetPostSummary(ctx, post.ID, summary, "FAILED"); err != nil {
 			status = monitoring.StatusErr
 			return fmt.Errorf("failed to update post summary: %w", err)
 		}
@@ -249,7 +248,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	if err != nil {
 		status = monitoring.StatusErr
 		fallback := fallbackSummary(cleanBody)
-		if updateErr := w.postService.SetPostSummary(ctx, post.ID, fallback, "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, fallback, "FAILED"); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("ai generation error: %w", err)
@@ -261,13 +260,13 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	}
 	if summary == "" {
 		status = monitoring.StatusErr
-		if updateErr := w.postService.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("empty summary generated")
 	}
 
-	if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+	if err := w.processor.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
 		status = monitoring.StatusErr
 		return fmt.Errorf("failed to update post summary: %w", err)
 	}

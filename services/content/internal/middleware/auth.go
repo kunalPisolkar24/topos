@@ -14,6 +14,11 @@ type ContextKey string
 
 const UserIDKey ContextKey = "userId"
 
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(UserIDKey).(string)
+	return v, ok && v != ""
+}
+
 func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

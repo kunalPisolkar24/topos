@@ -15,8 +15,8 @@ import (
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePostInput) (*model.Post, error) {
-	userID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok || userID == "" {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
 		return nil, errors.New("unauthorized")
 	}
 
@@ -35,8 +35,8 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 
 // UpdatePost is the resolver for the updatePost field.
 func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input model.UpdatePostInput) (*model.Post, error) {
-	userID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok || userID == "" {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
 		return nil, errors.New("unauthorized")
 	}
 
@@ -68,8 +68,8 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 
 // DeletePost is the resolver for the deletePost field.
 func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, error) {
-	userID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok || userID == "" {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
 		return false, errors.New("unauthorized")
 	}
 
@@ -95,8 +95,7 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 
 // GenerateTags is the resolver for the generateTags field.
 func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body string) ([]string, error) {
-	userID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok || userID == "" {
+	if _, ok := middleware.UserIDFromContext(ctx); !ok {
 		return nil, errors.New("unauthorized")
 	}
 
@@ -110,8 +109,7 @@ func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body 
 
 // GeneratePostContent is the resolver for the generatePostContent field.
 func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt string) (*model.GeneratedPost, error) {
-	userID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok || userID == "" {
+	if _, ok := middleware.UserIDFromContext(ctx); !ok {
 		return nil, errors.New("unauthorized")
 	}
 

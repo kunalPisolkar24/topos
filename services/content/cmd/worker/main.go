@@ -74,7 +74,7 @@ func run() error {
 		return err
 	}
 
-	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), redisClient)
+	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), cache.NewRedisCache(redisClient))
 	tagRepo := repository.NewMongoTagRepository(database)
 
 	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)

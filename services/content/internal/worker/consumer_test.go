@@ -147,8 +147,9 @@ func TestWorker_processMessage(t *testing.T) {
 			postService := service.NewPostService(mockPostRepo, mockTagRepo, mockEventProducer, mockAIService)
 
 			w := &Worker{
-				postService: postService,
-				aiService:   mockAIService,
+				processor: postService,
+				aiService: mockAIService,
+				done:      make(chan struct{}),
 			}
 
 			var valueBytes []byte

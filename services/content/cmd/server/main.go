@@ -85,7 +85,7 @@ func run() error {
 	}
 
 	var postRepo = repository.NewMongoPostRepository(database)
-	postRepo = repository.NewCachedPostRepository(postRepo, redisClient)
+	postRepo = repository.NewCachedPostRepository(postRepo, cache.NewRedisCache(redisClient))
 
 	tagRepo := repository.NewMongoTagRepository(database)
 
