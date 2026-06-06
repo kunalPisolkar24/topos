@@ -180,6 +180,25 @@ func TestCachedPostRepo_FindAll_Cache(t *testing.T) {
 	})
 }
 
+func TestCachedPostRepo_FindAll_NilFallback_DoesNotPanic(t *testing.T) {
+	mr, rdb := newTestRedis()
+	defer mr.Close()
+
+	ctx := context.Background()
+	page, limit := 1, 10
+	cacheKey := "posts:all:1:10"
+
+	fallbackMock := new(mocks.PostRepository)
+	fallbackMock.On("FindAll", mock.Anything, page, limit).Return(nil, nil)
+
+	repo := NewCachedPostRepository(fallbackMock, rdb)
+	got, err := repo.FindAll(ctx, page, limit)
+
+	assert.NoError(t, err)
+	assert.Nil(t, got)
+	assert.False(t, mr.Exists(cacheKey))
+}
+
 func seedListCaches(mr *miniredis.Miniredis) {
 	mr.Set("posts:all:1:6", "all1")
 	mr.Set("posts:all:2:6", "all2")

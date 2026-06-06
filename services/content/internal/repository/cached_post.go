@@ -203,6 +203,10 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 			return nil, err
 		}
 
+		if pp == nil {
+			return nil, nil
+		}
+
 		if data, marshalErr := json.Marshal(pp); marshalErr == nil {
 			if err := r.redis.Set(context.Background(), key, data, listTTL).Err(); err == nil {
 				monitoring.RecordCacheSet()
@@ -218,6 +222,9 @@ func (r *cachedPostRepo) findPaginated(ctx context.Context, key string, fetchFn 
 	case res := <-ch:
 		if res.Err != nil {
 			return nil, res.Err
+		}
+		if res.Val == nil {
+			return nil, nil
 		}
 		return res.Val.(*domain.PaginatedPosts), nil
 	}
