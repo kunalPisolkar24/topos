@@ -79,15 +79,9 @@ func Load(ctx context.Context, role Role, cfg *config.Config) (*Deps, error) {
 		TagRepo:     tagRepo,
 	}
 
-	if role == RoleServer {
-		producer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-		deps.EventProd = producer
-		deps.EventPub = producer
-	} else {
-		producer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-		deps.EventProd = producer
-		deps.EventPub = producer
-	}
+	producer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
+	deps.EventProd = producer
+	deps.EventPub = producer
 
 	deps.PostService = service.NewPostService(deps.PostRepo, deps.TagRepo, deps.EventPub, deps.AIService)
 	deps.TagService = service.NewTagService(deps.TagRepo)
