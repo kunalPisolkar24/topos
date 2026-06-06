@@ -14,17 +14,18 @@ const (
 )
 
 type Post struct {
-	ID            string    `bson:"_id,omitempty"`
-	Title         string    `bson:"title"`
-	Body          string    `bson:"body"`
-	Slug          string    `bson:"slug"`
-	ImageUrl      *string   `bson:"imageUrl"`
-	AuthorID      string    `bson:"authorId"`
-	Tags          []string  `bson:"tags"`
-	Summary       string    `bson:"summary"`
+	ID            string     `bson:"_id,omitempty"`
+	Title         string     `bson:"title"`
+	Body          string     `bson:"body"`
+	Slug          string     `bson:"slug"`
+	ImageUrl      *string    `bson:"imageUrl"`
+	AuthorID      string     `bson:"authorId"`
+	Tags          []string   `bson:"tags"`
+	Summary       string     `bson:"summary"`
 	SummaryStatus PostStatus `bson:"summaryStatus"`
-	CreatedAt     time.Time `bson:"createdAt"`
-	UpdatedAt     time.Time `bson:"updatedAt"`
+	CreatedAt     time.Time  `bson:"createdAt"`
+	UpdatedAt     time.Time  `bson:"updatedAt"`
+	ResetSummary  bool       `bson:"-"`
 }
 
 type PaginatedPosts struct {

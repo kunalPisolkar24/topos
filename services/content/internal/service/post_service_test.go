@@ -204,7 +204,8 @@ func TestPostService_UpdatePost(t *testing.T) {
 						len(p.Tags) == 1 &&
 						!p.UpdatedAt.IsZero() &&
 						p.Summary == "" &&
-						p.SummaryStatus == domain.PostStatusPending
+						p.SummaryStatus == domain.PostStatusPending &&
+						p.ResetSummary
 				})).Return(&domain.Post{ID: id, Title: title}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
@@ -226,7 +227,8 @@ func TestPostService_UpdatePost(t *testing.T) {
 						p.ImageUrl == nil &&
 						p.Tags == nil &&
 						p.Summary == "" &&
-						p.SummaryStatus == domain.PostStatusPending
+						p.SummaryStatus == domain.PostStatusPending &&
+						p.ResetSummary
 				})).Return(&domain.Post{ID: id}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)

@@ -123,6 +123,7 @@ func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title,
 	if summaryNeedsReset {
 		post.Summary = ""
 		post.SummaryStatus = domain.PostStatusPending
+		post.ResetSummary = true
 	}
 
 	updatedPost, err := s.postRepo.Update(ctx, id, post)

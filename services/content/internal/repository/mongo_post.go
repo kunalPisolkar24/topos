@@ -40,6 +40,25 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 		return nil, err
 	}
 
+	update := bson.M{
+		"$set": buildPostUpdateFields(post),
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var updatedPost domain.Post
+	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
+		}
+		return nil, err
+	}
+
+	return &updatedPost, nil
+}
+
+func buildPostUpdateFields(post *domain.Post) bson.M {
 	updateFields := bson.M{
 		"updatedAt": post.UpdatedAt,
 	}
@@ -59,29 +78,18 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	if post.Slug != "" {
 		updateFields["slug"] = post.Slug
 	}
+	if post.ResetSummary {
+		updateFields["summary"] = ""
+		updateFields["summaryStatus"] = domain.PostStatusPending
+		return updateFields
+	}
 	if post.Summary != "" {
 		updateFields["summary"] = post.Summary
 	}
 	if post.SummaryStatus != "" {
 		updateFields["summaryStatus"] = post.SummaryStatus
 	}
-
-	update := bson.M{
-		"$set": updateFields,
-	}
-
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-
-	var updatedPost domain.Post
-	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
-		}
-		return nil, err
-	}
-
-	return &updatedPost, nil
+	return updateFields
 }
 
 func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
