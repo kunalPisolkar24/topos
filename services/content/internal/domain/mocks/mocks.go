@@ -116,8 +116,8 @@ func (m *EventProducer) PublishPostDeleted(ctx context.Context, id string) error
 	return args.Error(0)
 }
 
-func (m *EventProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
-	args := m.Called(ctx, topic, key, value, err)
+func (m *EventProducer) PublishDeadLetter(ctx context.Context, originalTopic, dlqTopic string, key, value []byte, err error) error {
+	args := m.Called(ctx, originalTopic, dlqTopic, key, value, err)
 	return args.Error(0)
 }
 

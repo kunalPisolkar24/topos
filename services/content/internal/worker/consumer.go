@@ -18,11 +18,12 @@ import (
 )
 
 type Worker struct {
-	reader      *kafka.Reader
-	postService *service.PostService
-	aiService   domain.AIService
-	producer    domain.EventProducer
-	dlqTopic    string
+	reader         *kafka.Reader
+	postService    *service.PostService
+	aiService      domain.AIService
+	producer       domain.EventProducer
+	consumerTopics []string
+	dlqTopic       string
 }
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
@@ -74,11 +75,12 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 	reader := kafka.NewReader(config)
 
 	return &Worker{
-		reader:      reader,
-		postService: postService,
-		aiService:   aiService,
-		producer:    producer,
-		dlqTopic:    dlqTopic,
+		reader:         reader,
+		postService:    postService,
+		aiService:      aiService,
+		producer:       producer,
+		consumerTopics: append([]string{}, topics...),
+		dlqTopic:       dlqTopic,
 	}, nil
 }
 
@@ -130,7 +132,11 @@ func (w *Worker) Start(ctx context.Context) {
 				)
 
 				if w.producer != nil {
-					if dlqErr := w.producer.PublishDeadLetter(ctx, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
+					originalTopic := m.Topic
+					if originalTopic == "" && len(w.consumerTopics) > 0 {
+						originalTopic = w.consumerTopics[0]
+					}
+					if dlqErr := w.producer.PublishDeadLetter(ctx, originalTopic, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
 						logger.Error("Failed to publish to DLQ", "error", dlqErr)
 						continue
 					}
