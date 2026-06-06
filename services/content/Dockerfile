@@ -14,6 +14,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-service c
 FROM builder AS build-worker
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-worker cmd/worker/main.go
 
+FROM builder AS build-seed
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-seed cmd/seed/main.go
+
 FROM alpine:3.20 AS runtime-base
 
 WORKDIR /app
@@ -31,3 +34,8 @@ FROM runtime-base AS content-worker
 COPY --from=build-worker /out/content-worker /app/content-worker
 USER appuser
 CMD ["./content-worker"]
+
+FROM runtime-base AS seed
+COPY --from=build-seed /out/content-seed /app/content-seed
+USER appuser
+CMD ["./content-seed"]
