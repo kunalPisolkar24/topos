@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-service
     container_name: ${CONTENT_SERVICE_CONTAINER:-local-content-service}
     restart: unless-stopped
     ports:
@@ -39,6 +40,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-worker
     container_name: ${CONTENT_WORKER_CONTAINER:-local-content-worker}
     restart: unless-stopped
     command: [ "./content-worker" ]

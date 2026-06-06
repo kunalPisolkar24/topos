@@ -42,6 +42,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-worker
     container_name: ${CONTENT_WORKER_CONTAINER}
     restart: unless-stopped
     command: [ "./content-worker" ]
