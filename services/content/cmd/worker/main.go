@@ -10,14 +10,16 @@ import (
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/health"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/worker"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 func main() {
@@ -83,10 +85,15 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Worker OK"))
-	}))
+
+	healthChecker := health.NewChecker(2 * time.Second)
+	healthChecker.Register("mongo", func(ctx context.Context) error {
+		return mongoClient.Ping(ctx, readpref.Primary())
+	})
+	healthChecker.Register("kafka", func(ctx context.Context) error {
+		return kafkaProducer.Ping(ctx)
+	})
+	mux.Handle("/health", healthChecker.Handler())
 
 	metricsServer := &http.Server{
 		Addr:    ":" + cfg.Port,

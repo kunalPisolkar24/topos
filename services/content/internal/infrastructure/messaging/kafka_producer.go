@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 )
 
 type kafkaProducer struct {
-	writer *kafka.Writer
+	writer  *kafka.Writer
+	brokers []string
 }
 
 func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
@@ -35,7 +37,7 @@ func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
 			logger.Error(fmt.Sprintf("Kafka Producer Error: "+msg, args...))
 		}),
 	}
-	return &kafkaProducer{writer: writer}
+	return &kafkaProducer{writer: writer, brokers: append([]string(nil), brokers...)}
 }
 
 func (k *kafkaProducer) PublishPostCreated(ctx context.Context, post *domain.Post) error {
@@ -93,6 +95,19 @@ func buildDeadLetterPayload(originalTopic string, value []byte, cause error) ([]
 
 func (k *kafkaProducer) Close() error {
 	return k.writer.Close()
+}
+
+func (k *kafkaProducer) Ping(ctx context.Context) error {
+	if len(k.brokers) == 0 {
+		return errors.New("kafka brokers not configured")
+	}
+
+	dialer := &kafka.Dialer{Timeout: 3 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", k.brokers[0])
+	if err != nil {
+		return fmt.Errorf("kafka broker %s unreachable: %w", k.brokers[0], err)
+	}
+	return conn.Close()
 }
 
 func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {

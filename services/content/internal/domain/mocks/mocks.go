@@ -121,6 +121,11 @@ func (m *EventProducer) PublishDeadLetter(ctx context.Context, originalTopic, dl
 	return args.Error(0)
 }
 
+func (m *EventProducer) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 func (m *EventProducer) Close() error {
 	args := m.Called()
 	return args.Error(0)

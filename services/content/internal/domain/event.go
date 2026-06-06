@@ -20,5 +20,6 @@ type EventProducer interface {
 	PublishPostUpdated(ctx context.Context, post *Post) error
 	PublishPostDeleted(ctx context.Context, id string) error
 	PublishDeadLetter(ctx context.Context, originalTopic, dlqTopic string, key, value []byte, err error) error
+	Ping(ctx context.Context) error
 	Close() error
 }
