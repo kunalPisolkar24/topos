@@ -8,6 +8,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -24,6 +26,12 @@ type Worker struct {
 	producer       domain.EventProducer
 	consumerTopics []string
 	dlqTopic       string
+
+	mu        sync.RWMutex
+	running   atomic.Bool
+	started   atomic.Bool
+	lastErr   error
+	done      chan struct{}
 }
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
@@ -81,23 +89,39 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 		producer:       producer,
 		consumerTopics: append([]string{}, topics...),
 		dlqTopic:       dlqTopic,
+		done:           make(chan struct{}),
 	}, nil
 }
 
 func (w *Worker) Start(ctx context.Context) {
+	if !w.started.CompareAndSwap(false, true) {
+		logger.Warn("Worker.Start called more than once; ignoring")
+		return
+	}
+	defer close(w.done)
+	w.running.Store(true)
+	defer w.running.Store(false)
+
 	logger.Info("Starting Kafka Consumer Worker")
 
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Worker context cancelled, stopping...")
+			w.recordTermination(ctx.Err())
 			return
 		default:
 			m, err := w.reader.FetchMessage(ctx)
 			if err != nil {
 				if err == io.EOF {
+					w.recordTermination(io.EOF)
 					return
 				}
+				if ctx.Err() != nil {
+					w.recordTermination(ctx.Err())
+					return
+				}
+				w.recordTermination(err)
 				logger.Error("Failed to fetch message", "error", err)
 				continue
 			}
@@ -253,6 +277,28 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 
 func (w *Worker) Close() error {
 	return w.reader.Close()
+}
+
+func (w *Worker) Done() <-chan struct{} {
+	return w.done
+}
+
+func (w *Worker) Running() error {
+	if w.running.Load() {
+		return nil
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.lastErr == nil {
+		return fmt.Errorf("worker is not running")
+	}
+	return w.lastErr
+}
+
+func (w *Worker) recordTermination(err error) {
+	w.mu.Lock()
+	w.lastErr = err
+	w.mu.Unlock()
 }
 
 func stripHtml(input string) string {

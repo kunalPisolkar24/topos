@@ -197,6 +197,16 @@ func (c *resilientAIClient) GeneratePost(ctx context.Context, prompt string) (*d
 	return c.fallback.GeneratePost(ctx, prompt)
 }
 
+func (c *resilientAIClient) Close() error {
+	if err := c.primary.Close(); err != nil {
+		logger.Warn("Failed to close primary AI client", "error", err)
+	}
+	if err := c.fallback.Close(); err != nil {
+		logger.Warn("Failed to close fallback AI client", "error", err)
+	}
+	return nil
+}
+
 func (c *grpcAIClient) GenerateSummary(ctx context.Context, content string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

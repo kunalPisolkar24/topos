@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,52 +28,60 @@ import (
 
 func main() {
 	logger.Init()
+	if err := run(); err != nil {
+		logger.Error("Server terminated with error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Error("Failed to load configuration", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	mongoClient, err := db.Connect(cfg.MongoURI)
 	if err != nil {
-		logger.Error("Failed to connect to MongoDB", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
-		if err = mongoClient.Disconnect(context.Background()); err != nil {
-			logger.Error("Failed to disconnect MongoDB", "error", err)
+		if dErr := mongoClient.Disconnect(context.Background()); dErr != nil {
+			logger.Error("Failed to disconnect MongoDB", "error", dErr)
 		}
 	}()
 
 	redisClient, err := cache.NewRedisClientAuto(cfg)
 	if err != nil {
 		logger.Error("Failed to connect to Redis", "mode", cfg.RedisMode, "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
-		if err = redisClient.Close(); err != nil {
-			logger.Error("Failed to close Redis client", "error", err)
+		if cErr := redisClient.Close(); cErr != nil {
+			logger.Error("Failed to close Redis client", "error", cErr)
 		}
 	}()
 
 	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
 	defer func() {
-		if err := kafkaProducer.Close(); err != nil {
-			logger.Error("Failed to close Kafka producer", "error", err)
+		if cErr := kafkaProducer.Close(); cErr != nil {
+			logger.Error("Failed to close Kafka producer", "error", cErr)
 		}
 	}()
 
 	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
 	if err != nil {
-		logger.Error("Failed to connect to AI Service", "error", err)
-		return
+		return err
 	}
+	defer func() {
+		if cErr := aiClient.Close(); cErr != nil {
+			logger.Error("Failed to close AI client", "error", cErr)
+		}
+	}()
 
 	database := mongoClient.Database(cfg.DbName)
 
 	if err := db.EnsureIndexes(context.Background(), database); err != nil {
-		logger.Error("Failed to ensure MongoDB indexes", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	var postRepo = repository.NewMongoPostRepository(database)
@@ -124,7 +133,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server failed", "error", err)
 			stop <- syscall.SIGTERM
 		}
@@ -141,4 +150,5 @@ func main() {
 	}
 
 	logger.Info("Server exited properly")
+	return nil
 }

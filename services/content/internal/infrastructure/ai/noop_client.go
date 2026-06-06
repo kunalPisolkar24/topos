@@ -56,6 +56,10 @@ func (c *noopAIClient) GeneratePost(_ context.Context, prompt string) (*domain.G
 	}, nil
 }
 
+func (c *noopAIClient) Close() error {
+	return nil
+}
+
 func normalizeWhitespace(input string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
 }

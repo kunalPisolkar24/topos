@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,59 +25,70 @@ import (
 
 func main() {
 	logger.Init()
+	if err := run(); err != nil {
+		logger.Error("Worker terminated with error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Error("Failed to load configuration", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	mongoClient, err := db.Connect(cfg.MongoURI)
 	if err != nil {
-		logger.Error("Failed to connect to MongoDB", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
-		if err = mongoClient.Disconnect(context.Background()); err != nil {
-			logger.Error("Failed to disconnect MongoDB", "error", err)
+		if dErr := mongoClient.Disconnect(context.Background()); dErr != nil {
+			logger.Error("Failed to disconnect MongoDB", "error", dErr)
 		}
 	}()
 
 	redisClient, err := cache.NewRedisClientAuto(cfg)
 	if err != nil {
 		logger.Error("Failed to connect to Redis", "mode", cfg.RedisMode, "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
-		if err = redisClient.Close(); err != nil {
-			logger.Error("Failed to close Redis client", "error", err)
+		if cErr := redisClient.Close(); cErr != nil {
+			logger.Error("Failed to close Redis client", "error", cErr)
 		}
 	}()
 
 	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
 	if err != nil {
-		logger.Error("Failed to connect to AI Service", "error", err)
-		return
+		return err
 	}
+	defer func() {
+		if cErr := aiClient.Close(); cErr != nil {
+			logger.Error("Failed to close AI client", "error", cErr)
+		}
+	}()
 
 	database := mongoClient.Database(cfg.DbName)
 
 	if err := db.EnsureIndexes(context.Background(), database); err != nil {
-		logger.Error("Failed to ensure MongoDB indexes", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), redisClient)
 	tagRepo := repository.NewMongoTagRepository(database)
 
 	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-	defer kafkaProducer.Close()
+	defer func() {
+		if cErr := kafkaProducer.Close(); cErr != nil {
+			logger.Error("Failed to close Kafka producer", "error", cErr)
+		}
+	}()
 
 	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer, aiClient)
 
 	w, err := worker.NewWorker(cfg.KafkaBrokers, cfg.KafkaConsumerGroupID, cfg.KafkaConsumerTopics, cfg.KafkaDLQTopic, postService, aiClient, kafkaProducer)
 	if err != nil {
-		logger.Error("Failed to initialize worker", "error", err)
-		return
+		return err
 	}
 	defer w.Close()
 
@@ -93,6 +105,9 @@ func main() {
 	healthChecker.Register("kafka", func(ctx context.Context) error {
 		return kafkaProducer.Ping(ctx)
 	})
+	healthChecker.Register("worker", func(_ context.Context) error {
+		return w.Running()
+	})
 	mux.Handle("/health", healthChecker.Handler())
 
 	metricsServer := &http.Server{
@@ -105,7 +120,7 @@ func main() {
 
 	go func() {
 		logger.Info("Starting Worker Metrics Server", "port", cfg.Port)
-		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Metrics server failed", "error", err)
 			stop <- syscall.SIGTERM
 		}
@@ -118,6 +133,12 @@ func main() {
 	logger.Info("Shutting down worker...")
 	cancel()
 
+	select {
+	case <-w.Done():
+	case <-time.After(5 * time.Second):
+		logger.Warn("Worker did not stop within timeout")
+	}
+
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
@@ -126,4 +147,5 @@ func main() {
 	}
 
 	logger.Info("Worker exited properly")
+	return nil
 }
