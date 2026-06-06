@@ -520,3 +520,198 @@ func TestPostService_GetPostsByTag(t *testing.T) {
 		})
 	}
 }
+
+func TestPostService_SetPostSummary(t *testing.T) {
+	tests := []struct {
+		name          string
+		postID        string
+		summary       string
+		status        domain.PostStatus
+		setupMocks    func(*mocks.PostRepository)
+		expectedError bool
+	}{
+		{
+			name:    "Success",
+			postID:  "post123",
+			summary: "A great summary",
+			status:  domain.PostStatusCompleted,
+			setupMocks: func(pr *mocks.PostRepository) {
+				pr.On("UpdateSummary", mock.Anything, "post123", "A great summary", domain.PostStatusCompleted).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name:    "Success_Pending",
+			postID:  "post456",
+			summary: "",
+			status:  domain.PostStatusPending,
+			setupMocks: func(pr *mocks.PostRepository) {
+				pr.On("UpdateSummary", mock.Anything, "post456", "", domain.PostStatusPending).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name:    "Error",
+			postID:  "post789",
+			summary: "fail summary",
+			status:  domain.PostStatusFailed,
+			setupMocks: func(pr *mocks.PostRepository) {
+				pr.On("UpdateSummary", mock.Anything, "post789", "fail summary", domain.PostStatusFailed).Return(errors.New("repo error"))
+			},
+			expectedError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
+			tt.setupMocks(pr)
+			s := NewPostService(pr, nil, nil, ai)
+			err := s.SetPostSummary(context.Background(), tt.postID, tt.summary, tt.status)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			pr.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPostService_GenerateTags(t *testing.T) {
+	tests := []struct {
+		name          string
+		title         string
+		body          string
+		setupMocks    func(*mocks.AIService)
+		expectedTags  []string
+		expectedError bool
+	}{
+		{
+			name:  "Success",
+			title: "Go Programming",
+			body:  "Go is a statically typed language",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GenerateTags", mock.Anything, "Go Programming", "Go is a statically typed language").Return([]string{"go", "programming"}, nil)
+			},
+			expectedTags:  []string{"go", "programming"},
+			expectedError: false,
+		},
+		{
+			name:  "Success_Empty",
+			title: "Untitled",
+			body:  "",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GenerateTags", mock.Anything, "Untitled", "").Return([]string{}, nil)
+			},
+			expectedTags:  []string{},
+			expectedError: false,
+		},
+		{
+			name:  "Error",
+			title: "Fail",
+			body:  "case",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GenerateTags", mock.Anything, "Fail", "case").Return(nil, errors.New("ai error"))
+			},
+			expectedTags:  nil,
+			expectedError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
+			tt.setupMocks(ai)
+			s := NewPostService(pr, nil, nil, ai)
+			tags, err := s.GenerateTags(context.Background(), tt.title, tt.body)
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, tags)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedTags, tags)
+			}
+			ai.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPostService_GeneratePostContent(t *testing.T) {
+	tests := []struct {
+		name          string
+		prompt        string
+		setupMocks    func(*mocks.AIService)
+		expectedPost  *domain.GeneratedPost
+		expectedError bool
+	}{
+		{
+			name:   "Success",
+			prompt: "Write about Go",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GeneratePost", mock.Anything, "Write about Go").Return(&domain.GeneratedPost{
+					Title:   "All About Go",
+					Body:    "Go is great...",
+					Summary: "A summary",
+					Tags:    []string{"go"},
+				}, nil)
+			},
+			expectedPost: &domain.GeneratedPost{
+				Title:   "All About Go",
+				Body:    "Go is great...",
+				Summary: "A summary",
+				Tags:    []string{"go"},
+			},
+			expectedError: false,
+		},
+		{
+			name:   "Success_EmptyPrompt",
+			prompt: "",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GeneratePost", mock.Anything, "").Return((*domain.GeneratedPost)(nil), nil)
+			},
+			expectedPost:  nil,
+			expectedError: false,
+		},
+		{
+			name:   "Error",
+			prompt: "fail",
+			setupMocks: func(ai *mocks.AIService) {
+				ai.On("GeneratePost", mock.Anything, "fail").Return(nil, errors.New("ai error"))
+			},
+			expectedPost:  nil,
+			expectedError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := new(mocks.PostRepository)
+			ai := new(mocks.AIService)
+			tt.setupMocks(ai)
+			s := NewPostService(pr, nil, nil, ai)
+			got, err := s.GeneratePostContent(context.Background(), tt.prompt)
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedPost, got)
+			}
+			ai.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPostService_DeletePost_NilEventProducer(t *testing.T) {
+	pr := new(mocks.PostRepository)
+	ai := new(mocks.AIService)
+
+	pr.On("FindByID", mock.Anything, "post1").Return(&domain.Post{ID: "post1", AuthorID: "user1"}, nil)
+	pr.On("Delete", mock.Anything, "post1").Return(nil)
+
+	s := NewPostService(pr, nil, nil, ai)
+	err := s.DeletePost(context.Background(), "post1", "user1")
+
+	assert.NoError(t, err)
+	pr.AssertExpectations(t)
+}
