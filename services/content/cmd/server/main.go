@@ -25,7 +25,11 @@ import (
 
 func main() {
 	logger.Init()
-	cfg := config.LoadConfig()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logger.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
+	}
 
 	mongoClient, err := db.Connect(cfg.MongoURI)
 	if err != nil {
