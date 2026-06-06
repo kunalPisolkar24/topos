@@ -11,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type mongoPostRepo struct {
@@ -163,13 +162,8 @@ func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, 
 		return nil, fmt.Errorf("%w: invalid id format", domain.ErrNotFound)
 	}
 
-	coll, err := r.collection.Clone(options.Collection().SetReadPreference(readpref.Primary()))
-	if err != nil {
-		return nil, err
-	}
-
 	var post domain.Post
-	err = coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
