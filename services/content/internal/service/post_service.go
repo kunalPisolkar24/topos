@@ -147,7 +147,3 @@ func (s *PostService) GenerateTags(ctx context.Context, title, body string) ([]s
 func (s *PostService) GeneratePostContent(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
 	return s.aiService.GeneratePost(ctx, prompt)
 }
-
-func generateSlug(title string) string {
-	return strings.ToLower(strings.ReplaceAll(title, " ", "-")) + "-" + time.Now().Format("20060102150405")
-}
