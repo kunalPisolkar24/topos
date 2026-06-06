@@ -47,6 +47,18 @@ func TestMapDomainPostToModel_FullPost(t *testing.T) {
 	assert.Len(t, got.Tags, 2)
 }
 
+func TestMapDomainPostToModel_EmptySummaryYieldsNil(t *testing.T) {
+	dp := &domain.Post{
+		ID:      "post-1",
+		Summary: "",
+	}
+
+	got := mapDomainPostToModel(dp)
+
+	assert.NotNil(t, got)
+	assert.Nil(t, got.Summary)
+}
+
 func TestMapDomainPostToModel_InvalidSummaryStatus(t *testing.T) {
 	dp := &domain.Post{
 		ID:            "post-1",

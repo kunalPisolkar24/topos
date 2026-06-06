@@ -26,13 +26,18 @@ func mapDomainPostToModel(dp *domain.Post) *model.Post {
 		}
 	}
 
+	var summary *string
+	if dp.Summary != "" {
+		summary = &dp.Summary
+	}
+
 	return &model.Post{
 		ID:            dp.ID,
 		Title:         dp.Title,
 		Body:          dp.Body,
 		Slug:          dp.Slug,
 		ImageURL:      dp.ImageUrl,
-		Summary:       &dp.Summary,
+		Summary:       summary,
 		SummaryStatus: summaryStatus,
 		Tags:          mapTags(dp.Tags),
 		CreatedAt:     dp.CreatedAt.String(),
