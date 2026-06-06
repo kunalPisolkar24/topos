@@ -24,7 +24,7 @@ services:
       - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
       - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_SERVICE_INT_PORT}/health" ]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${CONTENT_SERVICE_INT_PORT}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -42,6 +42,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-worker
     container_name: ${CONTENT_WORKER_CONTAINER}
     restart: unless-stopped
     command: [ "./content-worker" ]
@@ -59,7 +60,7 @@ services:
       - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
       - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_WORKER_INT_PORT}/health" ]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${CONTENT_WORKER_INT_PORT}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -72,8 +73,6 @@ services:
         condition: service_healthy
       content-redis-sentinel-1:
         condition: service_healthy
-      init-kafka:
-        condition: service_completed_successfully
 
 networks:
   app-network:

@@ -15,10 +15,19 @@ type PostEventPayload struct {
 	CreatedAt     time.Time `json:"createdAt"`
 }
 
-type EventProducer interface {
+type EventPublisher interface {
 	PublishPostCreated(ctx context.Context, post *Post) error
 	PublishPostUpdated(ctx context.Context, post *Post) error
 	PublishPostDeleted(ctx context.Context, id string) error
-	PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error
+}
+
+type DLQPublisher interface {
+	PublishDeadLetter(ctx context.Context, originalTopic, dlqTopic string, key, value []byte, err error) error
+}
+
+type EventProducer interface {
+	EventPublisher
+	DLQPublisher
+	Ping(ctx context.Context) error
 	Close() error
 }

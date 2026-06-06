@@ -1,4 +1,5 @@
-FROM golang:1.25 AS builder
+# syntax=docker/dockerfile:1.4
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -7,21 +8,26 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o content-service cmd/server/main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -o content-worker cmd/worker/main.go
+FROM builder AS build-server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-service cmd/server/main.go
 
-FROM debian:bullseye-slim
+FROM builder AS build-worker
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/content-worker cmd/worker/main.go
+
+FROM alpine:3.20 AS runtime-base
 
 WORKDIR /app
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -D appuser
+RUN apk add --no-cache ca-certificates wget
 
-COPY --from=builder /app/content-service .
-COPY --from=builder /app/content-worker .
-
+FROM runtime-base AS content-service
+COPY --from=build-server /out/content-service /app/content-service
 USER appuser
-
 EXPOSE 4002
-
 CMD ["./content-service"]
+
+FROM runtime-base AS content-worker
+COPY --from=build-worker /out/content-worker /app/content-worker
+USER appuser
+CMD ["./content-worker"]

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
@@ -10,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type mongoPostRepo struct {
@@ -40,6 +40,25 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 		return nil, err
 	}
 
+	update := bson.M{
+		"$set": buildPostUpdateFields(post),
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var updatedPost domain.Post
+	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
+		}
+		return nil, err
+	}
+
+	return &updatedPost, nil
+}
+
+func buildPostUpdateFields(post *domain.Post) bson.M {
 	updateFields := bson.M{
 		"updatedAt": post.UpdatedAt,
 	}
@@ -59,28 +78,21 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	if post.Slug != "" {
 		updateFields["slug"] = post.Slug
 	}
-
-	if post.Title != "" || post.Body != "" {
+	if post.ResetSummary {
 		updateFields["summary"] = ""
-		updateFields["summaryStatus"] = "PENDING"
+		updateFields["summaryStatus"] = domain.PostStatusPending
+		return updateFields
 	}
-
-	update := bson.M{
-		"$set": updateFields,
+	if post.Summary != "" {
+		updateFields["summary"] = post.Summary
 	}
-
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-
-	var updatedPost domain.Post
-	err = r.collection.FindOneAndUpdate(ctx, bson.M{"_id": oid}, update, opts).Decode(&updatedPost)
-	if err != nil {
-		return nil, err
+	if post.SummaryStatus != "" {
+		updateFields["summaryStatus"] = post.SummaryStatus
 	}
-
-	return &updatedPost, nil
+	return updateFields
 }
 
-func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return err
@@ -156,17 +168,15 @@ func (r *mongoPostRepo) FindAll(ctx context.Context, page, limit int) (*domain.P
 func (r *mongoPostRepo) FindByID(ctx context.Context, id string) (*domain.Post, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, errors.New("invalid id format")
-	}
-
-	coll, err := r.collection.Clone(options.Collection().SetReadPreference(readpref.Primary()))
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: invalid id format", domain.ErrNotFound)
 	}
 
 	var post domain.Post
-	err = coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&post)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: %w", domain.ErrNotFound, err)
+		}
 		return nil, err
 	}
 	return &post, nil

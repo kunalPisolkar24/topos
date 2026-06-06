@@ -22,10 +22,8 @@ func (s *TagService) GetTags(ctx context.Context, query *string, limit int) ([]*
 	if q == "" && limit == 0 {
 		return s.repo.FindAll(ctx)
 	}
-	
 	if limit <= 0 {
 		limit = 10
 	}
-	
 	return s.repo.Search(ctx, q, limit)
 }

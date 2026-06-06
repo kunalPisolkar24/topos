@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-service
     container_name: ${CONTENT_SERVICE_CONTAINER:-local-content-service}
     restart: unless-stopped
     ports:
@@ -23,7 +24,7 @@ services:
       - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
       - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/health" ]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -39,6 +40,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: content-worker
     container_name: ${CONTENT_WORKER_CONTAINER:-local-content-worker}
     restart: unless-stopped
     command: [ "./content-worker" ]
@@ -48,6 +50,7 @@ services:
       - PORT=${CONTENT_WORKER_INT_PORT:-4012}
       - MONGO_URI=${CONTENT_MONGO_URI:-mongodb://local-content-mongo:27017}
       - DB_NAME=${CONTENT_DB_NAME:-blog_content}
+      - JWT_SECRET=${CONTENT_JWT_SECRET:-local-dev-secret}
       - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
       - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
       - REDIS_URL=${CONTENT_REDIS_URL:-redis://local-content-redis:6379}
@@ -56,7 +59,7 @@ services:
       - AI_REQUIRED=${CONTENT_AI_REQUIRED:-false}
       - AI_DIAL_TIMEOUT_SECONDS=${CONTENT_AI_DIAL_TIMEOUT_SECONDS:-5}
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:${CONTENT_WORKER_INT_PORT:-4012}/health" ]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${CONTENT_WORKER_INT_PORT:-4012}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -67,8 +70,6 @@ services:
         condition: service_healthy
       content-redis:
         condition: service_healthy
-      init-kafka:
-        condition: service_completed_successfully
 
 networks:
   app-network:

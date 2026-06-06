@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 )
 
 type kafkaProducer struct {
-	writer *kafka.Writer
+	writer  *kafka.Writer
+	brokers []string
 }
 
 func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
@@ -35,7 +37,7 @@ func NewKafkaProducer(brokers []string, topic string) domain.EventProducer {
 			logger.Error(fmt.Sprintf("Kafka Producer Error: "+msg, args...))
 		}),
 	}
-	return &kafkaProducer{writer: writer}
+	return &kafkaProducer{writer: writer, brokers: append([]string(nil), brokers...)}
 }
 
 func (k *kafkaProducer) PublishPostCreated(ctx context.Context, post *domain.Post) error {
@@ -55,26 +57,14 @@ func (k *kafkaProducer) PublishPostDeleted(ctx context.Context, id string) error
 	return k.writeMessages(ctx, message)
 }
 
-func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
-	dlqPayload := struct {
-		OriginalTopic string    `json:"originalTopic"`
-		Error         string    `json:"error"`
-		Payload       json.RawMessage `json:"payload"`
-		Timestamp     time.Time `json:"timestamp"`
-	}{
-		OriginalTopic: topic,
-		Error:         err.Error(),
-		Payload:       value,
-		Timestamp:     time.Now(),
-	}
-
-	dlqValue, marshalErr := json.Marshal(dlqPayload)
-	if marshalErr != nil {
-		return fmt.Errorf("failed to marshal dlq payload: %w", marshalErr)
+func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, originalTopic, dlqTopic string, key, value []byte, cause error) error {
+	dlqValue, err := buildDeadLetterPayload(originalTopic, value, cause)
+	if err != nil {
+		return err
 	}
 
 	message := kafka.Message{
-		Topic: topic + "-dlq",
+		Topic: dlqTopic,
 		Key:   key,
 		Value: dlqValue,
 		Time:  time.Now(),
@@ -83,8 +73,41 @@ func (k *kafkaProducer) PublishDeadLetter(ctx context.Context, topic string, key
 	return k.writeMessages(ctx, message)
 }
 
+func buildDeadLetterPayload(originalTopic string, value []byte, cause error) ([]byte, error) {
+	dlqPayload := struct {
+		OriginalTopic string            `json:"originalTopic"`
+		Error         string            `json:"error"`
+		Payload       json.RawMessage   `json:"payload"`
+		Timestamp     time.Time         `json:"timestamp"`
+	}{
+		OriginalTopic: originalTopic,
+		Error:         cause.Error(),
+		Payload:       value,
+		Timestamp:     time.Now(),
+	}
+
+	dlqValue, marshalErr := json.Marshal(dlqPayload)
+	if marshalErr != nil {
+		return nil, fmt.Errorf("failed to marshal dlq payload: %w", marshalErr)
+	}
+	return dlqValue, nil
+}
+
 func (k *kafkaProducer) Close() error {
 	return k.writer.Close()
+}
+
+func (k *kafkaProducer) Ping(ctx context.Context) error {
+	if len(k.brokers) == 0 {
+		return errors.New("kafka brokers not configured")
+	}
+
+	dialer := &kafka.Dialer{Timeout: 3 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", k.brokers[0])
+	if err != nil {
+		return fmt.Errorf("kafka broker %s unreachable: %w", k.brokers[0], err)
+	}
+	return conn.Close()
 }
 
 func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
@@ -94,7 +117,7 @@ func (k *kafkaProducer) publish(ctx context.Context, post *domain.Post) error {
 		Body:          post.Body,
 		ImageURL:      post.ImageUrl,
 		Summary:       post.Summary,
-		SummaryStatus: post.SummaryStatus,
+		SummaryStatus: string(post.SummaryStatus),
 		CreatedAt:     post.CreatedAt,
 	}
 

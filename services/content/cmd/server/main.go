@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,89 +12,66 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/bootstrap"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/health"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/repository"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 func main() {
 	logger.Init()
-	cfg := config.LoadConfig()
-
-	mongoClient, err := db.Connect(cfg.MongoURI)
-	if err != nil {
-		logger.Error("Failed to connect to MongoDB", "error", err)
+	if err := run(); err != nil {
+		logger.Error("Server terminated with error", "error", err)
 		os.Exit(1)
 	}
-	defer func() {
-		if err = mongoClient.Disconnect(context.Background()); err != nil {
-			logger.Error("Failed to disconnect MongoDB", "error", err)
-		}
-	}()
+}
 
-	redisClient, err := cache.NewRedisClientAuto(cfg)
+func run() error {
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Error("Failed to connect to Redis", "mode", cfg.RedisMode, "error", err)
-		os.Exit(1)
-	}
-	defer func() {
-		if err = redisClient.Close(); err != nil {
-			logger.Error("Failed to close Redis client", "error", err)
-		}
-	}()
-
-	kafkaProducer := messaging.NewKafkaProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
-	defer func() {
-		if err := kafkaProducer.Close(); err != nil {
-			logger.Error("Failed to close Kafka producer", "error", err)
-		}
-	}()
-
-	aiClient, err := ai.NewResilientAIClient(cfg.AIServiceURL, cfg.AIRequired, cfg.AIDialTimeout)
-	if err != nil {
-		logger.Error("Failed to connect to AI Service", "error", err)
-		return
+		return err
 	}
 
-	database := mongoClient.Database(cfg.DbName)
-
-	var postRepo = repository.NewMongoPostRepository(database)
-	postRepo = repository.NewCachedPostRepository(postRepo, redisClient)
-
-	tagRepo := repository.NewMongoTagRepository(database)
-
-	postService := service.NewPostService(postRepo, tagRepo, kafkaProducer, aiClient)
-	tagService := service.NewTagService(tagRepo)
+	deps, err := bootstrap.Load(context.Background(), bootstrap.RoleServer, cfg)
+	if err != nil {
+		return err
+	}
+	defer deps.Shutdown()
 
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			PostService: postService,
-			TagService:  tagService,
+			PostService: deps.PostService,
+			TagService:  deps.TagService,
 		},
 	}))
 
-	authMiddleware := middleware.AuthMiddleware(cfg)
-	metricsMiddleware := middleware.MetricsMiddleware
-
 	mux := http.NewServeMux()
-	mux.Handle("/query", metricsMiddleware(authMiddleware(srv)))
+	mux.Handle("/query", middleware.CORS(middleware.CORSConfig{
+		AllowedOrigins: cfg.CORSOrigins,
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type", "Apollo-Require-Preflight"},
+		MaxAgeSeconds:  86400,
+	})(middleware.MetricsMiddleware(middleware.AuthMiddleware(cfg)(srv))))
 	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := redisClient.Ping(r.Context()).Err(); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
+
+	healthChecker := health.NewChecker(2 * time.Second)
+	healthChecker.Register("redis", func(ctx context.Context) error {
+		return deps.RedisClient.Ping(ctx).Err()
+	})
+	healthChecker.Register("mongo", func(ctx context.Context) error {
+		return deps.MongoClient.Ping(ctx, readpref.Primary())
+	})
+	healthChecker.Register("kafka", func(ctx context.Context) error {
+		if deps.EventProd == nil {
+			return errors.New("kafka producer not initialized")
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Content Service OK"))
-	}))
+		return deps.EventProd.Ping(ctx)
+	})
+	mux.Handle("/health", healthChecker.Handler())
 
 	logger.Info("Content Service starting", "port", cfg.Port)
 
@@ -106,7 +84,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server failed", "error", err)
 			stop <- syscall.SIGTERM
 		}
@@ -123,4 +101,5 @@ func main() {
 	}
 
 	logger.Info("Server exited properly")
+	return nil
 }

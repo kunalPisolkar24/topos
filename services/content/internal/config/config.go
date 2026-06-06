@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -27,11 +28,12 @@ type Config struct {
 	AIServiceURL    string
 	AIRequired      bool
 	AIDialTimeout   time.Duration
+	CORSOrigins     []string
 }
 
 var envLoadOnce sync.Once
 
-func LoadConfig() *Config {
+func LoadConfig() (*Config, error) {
 	loadEnvIfPresent()
 
 	kafkaTopic := getEnvAny([]string{"CONTENT_KAFKA_TOPIC", "KAFKA_TOPIC"}, "posts")
@@ -40,11 +42,16 @@ func LoadConfig() *Config {
 		kafkaConsumerTopics = splitAndTrim(kafkaTopic)
 	}
 
+	jwtSecret := strings.TrimSpace(getEnv("JWT_SECRET", ""))
+	if jwtSecret == "" {
+		return nil, errors.New("JWT_SECRET is required")
+	}
+
 	return &Config{
 		Port:            getEnv("PORT", "4002"),
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:          getEnv("DB_NAME", "blog_content"),
-		JwtSecret:       getEnv("JWT_SECRET", "secret"),
+		JwtSecret:       jwtSecret,
 		KafkaBrokers:    splitAndTrim(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")),
 		KafkaTopic:      kafkaTopic,
 		KafkaConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
@@ -57,7 +64,8 @@ func LoadConfig() *Config {
 		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),
 		AIRequired:      getEnvBool("AI_REQUIRED", false),
 		AIDialTimeout:   time.Duration(getEnvInt("AI_DIAL_TIMEOUT_SECONDS", 5)) * time.Second,
-	}
+		CORSOrigins:     loadCORSOrigins(),
+	}, nil
 }
 
 func loadEnvIfPresent() {
@@ -142,4 +150,12 @@ func detectRedisMode() string {
 		return "sentinel"
 	}
 	return "standalone"
+}
+
+func loadCORSOrigins() []string {
+	raw := getEnv("CORS_ALLOWED_ORIGINS", "")
+	if raw == "" {
+		return []string{"*"}
+	}
+	return splitAndTrim(raw)
 }

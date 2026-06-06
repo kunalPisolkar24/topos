@@ -27,7 +27,7 @@ func (m *PostRepository) Update(ctx context.Context, id string, post *domain.Pos
 	return args.Get(0).(*domain.Post), args.Error(1)
 }
 
-func (m *PostRepository) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+func (m *PostRepository) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
 	args := m.Called(ctx, id, summary, status)
 	return args.Error(0)
 }
@@ -116,8 +116,13 @@ func (m *EventProducer) PublishPostDeleted(ctx context.Context, id string) error
 	return args.Error(0)
 }
 
-func (m *EventProducer) PublishDeadLetter(ctx context.Context, topic string, key, value []byte, err error) error {
-	args := m.Called(ctx, topic, key, value, err)
+func (m *EventProducer) PublishDeadLetter(ctx context.Context, originalTopic, dlqTopic string, key, value []byte, err error) error {
+	args := m.Called(ctx, originalTopic, dlqTopic, key, value, err)
+	return args.Error(0)
+}
+
+func (m *EventProducer) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 
@@ -149,4 +154,9 @@ func (m *AIService) GeneratePost(ctx context.Context, prompt string) (*domain.Ge
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.GeneratedPost), args.Error(1)
+}
+
+func (m *AIService) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }

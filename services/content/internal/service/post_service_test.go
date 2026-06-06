@@ -10,6 +10,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func init() {
@@ -48,7 +49,7 @@ func TestPostService_CreatePost(t *testing.T) {
 				tr.On("CreateOrFind", mock.Anything, "go").Return(&domain.Tag{ID: "1", Name: "go"}, nil)
 
 				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == "Test Title" && p.Slug != "" && p.SummaryStatus == "PENDING"
+					return p.Title == "Test Title" && p.Slug != "" && p.SummaryStatus == domain.PostStatusPending
 				})).Return(&domain.Post{
 					ID:       "post123",
 					Title:    "Test Title",
@@ -75,7 +76,7 @@ func TestPostService_CreatePost(t *testing.T) {
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
 				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Summary == "AI Summary" && p.SummaryStatus == "COMPLETED"
+					return p.Summary == "AI Summary" && p.SummaryStatus == domain.PostStatusCompleted
 				})).Return(&domain.Post{
 					ID:       "post456",
 					Title:    "AI Title",
@@ -112,6 +113,22 @@ func TestPostService_CreatePost(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name: "Success_RetriesOnDuplicateSlug",
+			args: args{
+				title:    "Same Title",
+				body:     "Body",
+				authorID: "user1",
+			},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("Create", mock.Anything, mock.Anything).Return(nil, mongo.WriteException{WriteErrors: mongo.WriteErrors{{Code: 11000}}}).Once()
+				pr.On("Create", mock.Anything, mock.Anything).Return(&domain.Post{ID: "post-retry-success"}, nil).Once()
+				ep.On("PublishPostCreated", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
+					return p.ID == "post-retry-success"
+				})).Return(nil)
+			},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -147,6 +164,7 @@ func TestPostService_CreatePost(t *testing.T) {
 func TestPostService_UpdatePost(t *testing.T) {
 	type args struct {
 		id       string
+		actorID  string
 		title    *string
 		body     *string
 		tags     []string
@@ -157,6 +175,7 @@ func TestPostService_UpdatePost(t *testing.T) {
 	body := "New Body"
 	img := "new.jpg"
 	id := "post123"
+	author := "user1"
 
 	tests := []struct {
 		name          string
@@ -168,16 +187,25 @@ func TestPostService_UpdatePost(t *testing.T) {
 			name: "Success_FullUpdate",
 			args: args{
 				id:       id,
+				actorID:  author,
 				title:    &title,
 				body:     &body,
 				imageUrl: &img,
 				tags:     []string{"newtag"},
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
 				tr.On("CreateOrFind", mock.Anything, "newtag").Return(&domain.Tag{}, nil)
 
 				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title && p.Body == body && *p.ImageUrl == img && len(p.Tags) == 1 && !p.UpdatedAt.IsZero()
+					return p.Title == title &&
+						p.Body == body &&
+						*p.ImageUrl == img &&
+						len(p.Tags) == 1 &&
+						!p.UpdatedAt.IsZero() &&
+						p.Summary == "" &&
+						p.SummaryStatus == domain.PostStatusPending &&
+						p.ResetSummary
 				})).Return(&domain.Post{ID: id, Title: title}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
@@ -187,12 +215,20 @@ func TestPostService_UpdatePost(t *testing.T) {
 		{
 			name: "Success_PartialUpdate_TitleOnly",
 			args: args{
-				id:    id,
-				title: &title,
+				id:      id,
+				actorID: author,
+				title:   &title,
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
 				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title && p.Body == "" && p.ImageUrl == nil && p.Tags == nil
+					return p.Title == title &&
+						p.Body == "" &&
+						p.ImageUrl == nil &&
+						p.Tags == nil &&
+						p.Summary == "" &&
+						p.SummaryStatus == domain.PostStatusPending &&
+						p.ResetSummary
 				})).Return(&domain.Post{ID: id}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
@@ -200,9 +236,43 @@ func TestPostService_UpdatePost(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "Failure_RepoUpdate",
-			args: args{id: id, body: &body},
+			name: "Success_ImageOnly_DoesNotResetSummary",
+			args: args{
+				id:       id,
+				actorID:  author,
+				imageUrl: &img,
+			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
+				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
+					return p.Summary == "" && p.SummaryStatus == ""
+				})).Return(&domain.Post{ID: id}, nil)
+
+				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "Failure_Forbidden",
+			args: args{id: id, actorID: "other-user", body: &body},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
+			},
+			expectedError: true,
+		},
+		{
+			name: "Failure_NotFound",
+			args: args{id: id, actorID: author, body: &body},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(nil, domain.ErrNotFound)
+			},
+			expectedError: true,
+		},
+		{
+			name: "Failure_RepoUpdate",
+			args: args{id: id, actorID: author, body: &body},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
 				pr.On("Update", mock.Anything, id, mock.Anything).Return(nil, errors.New("update failed"))
 			},
 			expectedError: true,
@@ -219,7 +289,7 @@ func TestPostService_UpdatePost(t *testing.T) {
 			tt.setupMocks(pr, tr, ep)
 
 			s := NewPostService(pr, tr, ep, ai)
-			_, err := s.UpdatePost(context.Background(), tt.args.id, tt.args.title, tt.args.body, tt.args.tags, tt.args.imageUrl)
+			_, err := s.UpdatePost(context.Background(), tt.args.id, tt.args.actorID, tt.args.title, tt.args.body, tt.args.tags, tt.args.imageUrl)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -233,23 +303,45 @@ func TestPostService_UpdatePost(t *testing.T) {
 
 func TestPostService_DeletePost(t *testing.T) {
 	id := "post123"
+	author := "user1"
 	tests := []struct {
 		name          string
+		actorID       string
 		setupMocks    func(*mocks.PostRepository, *mocks.EventProducer)
 		expectedError bool
 	}{
 		{
-			name: "Success",
+			name:    "Success",
+			actorID: author,
 			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
 				pr.On("Delete", mock.Anything, id).Return(nil)
 				ep.On("PublishPostDeleted", mock.Anything, id).Return(nil)
 			},
 			expectedError: false,
 		},
 		{
-			name: "Failure_Repo",
+			name:    "Failure_Repo",
+			actorID: author,
 			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
 				pr.On("Delete", mock.Anything, id).Return(errors.New("fail"))
+			},
+			expectedError: true,
+		},
+		{
+			name:    "Failure_Forbidden",
+			actorID: "other-user",
+			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
+			},
+			expectedError: true,
+		},
+		{
+			name:    "Failure_NotFound",
+			actorID: author,
+			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
+				pr.On("FindByID", mock.Anything, id).Return(nil, domain.ErrNotFound)
 			},
 			expectedError: true,
 		},
@@ -262,7 +354,7 @@ func TestPostService_DeletePost(t *testing.T) {
 			ai := new(mocks.AIService)
 			tt.setupMocks(pr, ep)
 			s := NewPostService(pr, nil, ep, ai)
-			err := s.DeletePost(context.Background(), id)
+			err := s.DeletePost(context.Background(), id, tt.actorID)
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {

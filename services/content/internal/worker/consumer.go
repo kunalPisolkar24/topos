@@ -8,26 +8,35 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/monitoring"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/textutil"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/segmentio/kafka-go"
 )
 
 type Worker struct {
-	reader      *kafka.Reader
-	postService *service.PostService
-	aiService   domain.AIService
-	producer    domain.EventProducer
-	dlqTopic    string
+	reader         *kafka.Reader
+	processor      domain.SummaryProcessor
+	aiService      domain.AIService
+	producer       domain.DLQPublisher
+	consumerTopics []string
+	dlqTopic       string
+
+	mu      sync.RWMutex
+	running atomic.Bool
+	started atomic.Bool
+	lastErr error
+	done    chan struct{}
 }
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
 
-func NewWorker(brokers []string, groupID string, topics []string, dlqTopic string, postService *service.PostService, aiService domain.AIService, producer domain.EventProducer) (*Worker, error) {
+func NewWorker(brokers []string, groupID string, topics []string, dlqTopic string, processor domain.SummaryProcessor, aiService domain.AIService, producer domain.DLQPublisher) (*Worker, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("kafka brokers are required")
 	}
@@ -38,64 +47,63 @@ func NewWorker(brokers []string, groupID string, topics []string, dlqTopic strin
 		return nil, fmt.Errorf("kafka consumer topics are required")
 	}
 
-	var config kafka.ReaderConfig
-	if len(topics) == 1 {
-		config = kafka.ReaderConfig{
-			Brokers:  brokers,
-			GroupID:  groupID,
-			Topic:    topics[0],
-			MinBytes: 1,
-			MaxBytes: 10e6,
-			MaxWait:  2 * time.Second,
-			Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-				logger.Info(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
-			}),
-			ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-				logger.Error(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
-			}),
-		}
-	} else {
-		config = kafka.ReaderConfig{
-			Brokers:     brokers,
-			GroupID:     groupID,
-			GroupTopics: topics,
-			MinBytes:    1,
-			MaxBytes:    10e6,
-			MaxWait:     2 * time.Second,
-			Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-				logger.Info(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
-			}),
-			ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-				logger.Error(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
-			}),
-		}
+	config := kafka.ReaderConfig{
+		Brokers:     brokers,
+		GroupID:     groupID,
+		GroupTopics: topics,
+		MinBytes:    1,
+		MaxBytes:    10e6,
+		MaxWait:     2 * time.Second,
+		Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+			logger.Info(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
+		}),
+		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+			logger.Error(strings.TrimSpace(fmt.Sprintf(msg, args...)), "component", "kafka-consumer")
+		}),
 	}
 
 	reader := kafka.NewReader(config)
 
 	return &Worker{
-		reader:      reader,
-		postService: postService,
-		aiService:   aiService,
-		producer:    producer,
-		dlqTopic:    dlqTopic,
+		reader:         reader,
+		processor:      processor,
+		aiService:      aiService,
+		producer:       producer,
+		consumerTopics: append([]string{}, topics...),
+		dlqTopic:       dlqTopic,
+		done:           make(chan struct{}),
 	}, nil
 }
 
 func (w *Worker) Start(ctx context.Context) {
+	if !w.started.CompareAndSwap(false, true) {
+		logger.Warn("Worker.Start called more than once; ignoring")
+		return
+	}
+	defer close(w.done)
+	w.running.Store(true)
+	defer w.running.Store(false)
+
 	logger.Info("Starting Kafka Consumer Worker")
 
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Worker context cancelled, stopping...")
+			w.recordTermination(ctx.Err())
 			return
 		default:
 			m, err := w.reader.FetchMessage(ctx)
 			if err != nil {
 				if err == io.EOF {
+					w.recordTermination(io.EOF)
 					return
 				}
+				if ctx.Err() != nil {
+					w.recordTermination(ctx.Err())
+					return
+				}
+				w.recordTermination(err)
 				logger.Error("Failed to fetch message", "error", err)
 				continue
 			}
@@ -130,7 +138,11 @@ func (w *Worker) Start(ctx context.Context) {
 				)
 
 				if w.producer != nil {
-					if dlqErr := w.producer.PublishDeadLetter(ctx, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
+					originalTopic := m.Topic
+					if originalTopic == "" && len(w.consumerTopics) > 0 {
+						originalTopic = w.consumerTopics[0]
+					}
+					if dlqErr := w.producer.PublishDeadLetter(ctx, originalTopic, w.dlqTopic, m.Key, m.Value, processErr); dlqErr != nil {
 						logger.Error("Failed to publish to DLQ", "error", dlqErr)
 						continue
 					}
@@ -176,26 +188,16 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 
 	logger.Info("Processing message", "postID", event.PostID)
 
-	post, err := w.postService.GetPost(ctx, event.PostID)
+	post, err := w.processor.GetPost(ctx, event.PostID)
 	if err != nil {
 		status = monitoring.StatusErr
 		return fmt.Errorf("failed to fetch post: %w", err)
 	}
 
 	trimmedSummary := strings.TrimSpace(post.Summary)
-	if trimmedSummary != "" {
-		if post.SummaryStatus != "COMPLETED" && post.SummaryStatus != "FAILED" {
-			if err := w.postService.SetPostSummary(ctx, post.ID, trimmedSummary, "COMPLETED"); err != nil {
-				status = monitoring.StatusErr
-				return fmt.Errorf("failed to update post summary: %w", err)
-			}
-			logger.Info("Summary already present, marking completed", "postID", post.ID)
-			return nil
-		}
-		if post.SummaryStatus == "COMPLETED" {
-			status = monitoring.StatusSkip
-			return nil
-		}
+	if trimmedSummary != "" && post.SummaryStatus == domain.PostStatusCompleted {
+		status = monitoring.StatusSkip
+		return nil
 	}
 
 	body := post.Body
@@ -206,11 +208,11 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	cleanBody := stripHtml(body)
 	if cleanBody == "" {
 		summary := fallbackSummary(cleanBody)
-		if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+		if err := w.processor.SetPostSummary(ctx, post.ID, summary, domain.PostStatusFailed); err != nil {
 			status = monitoring.StatusErr
 			return fmt.Errorf("failed to update post summary: %w", err)
 		}
-		logger.Info("Generated fallback summary", "postID", post.ID)
+		logger.Info("Marked summary as FAILED for empty body", "postID", post.ID)
 		return nil
 	}
 
@@ -218,7 +220,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	if err != nil {
 		status = monitoring.StatusErr
 		fallback := fallbackSummary(cleanBody)
-		if updateErr := w.postService.SetPostSummary(ctx, post.ID, fallback, "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, fallback, domain.PostStatusFailed); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("ai generation error: %w", err)
@@ -230,13 +232,13 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	}
 	if summary == "" {
 		status = monitoring.StatusErr
-		if updateErr := w.postService.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, "", domain.PostStatusFailed); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("empty summary generated")
 	}
 
-	if err := w.postService.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+	if err := w.processor.SetPostSummary(ctx, post.ID, summary, domain.PostStatusCompleted); err != nil {
 		status = monitoring.StatusErr
 		return fmt.Errorf("failed to update post summary: %w", err)
 	}
@@ -249,38 +251,41 @@ func (w *Worker) Close() error {
 	return w.reader.Close()
 }
 
+func (w *Worker) Done() <-chan struct{} {
+	return w.done
+}
+
+func (w *Worker) Running() error {
+	if w.running.Load() {
+		return nil
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.lastErr == nil {
+		return fmt.Errorf("worker is not running")
+	}
+	return w.lastErr
+}
+
+func (w *Worker) recordTermination(err error) {
+	w.mu.Lock()
+	w.lastErr = err
+	w.mu.Unlock()
+}
+
 func stripHtml(input string) string {
 	if strings.TrimSpace(input) == "" {
 		return ""
 	}
 	decoded := html.UnescapeString(input)
 	stripped := htmlTagRegex.ReplaceAllString(decoded, " ")
-	return normalizeWhitespace(stripped)
-}
-
-func normalizeWhitespace(input string) string {
-	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
+	return textutil.NormalizeWhitespace(stripped)
 }
 
 func fallbackSummary(input string) string {
-	normalized := normalizeWhitespace(input)
+	normalized := textutil.NormalizeWhitespace(input)
 	if normalized == "" {
 		return "Summary is currently unavailable."
 	}
-	return truncateText(normalized, 240)
-}
-
-func truncateText(input string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(input)
-	if len(runes) <= max {
-		return input
-	}
-	cut := string(runes[:max])
-	if idx := strings.LastIndex(cut, " "); idx > 0 {
-		cut = cut[:idx]
-	}
-	return strings.TrimSpace(cut) + "..."
+	return textutil.Truncate(normalized, 240)
 }

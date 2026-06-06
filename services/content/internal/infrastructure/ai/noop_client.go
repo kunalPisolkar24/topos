@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/textutil"
 )
 
 type noopAIClient struct{}
@@ -25,7 +26,7 @@ func NewNoopAIClient() domain.AIService {
 }
 
 func (c *noopAIClient) GenerateSummary(_ context.Context, content string) (string, error) {
-	summary := truncateText(normalizeWhitespace(content), 240)
+	summary := textutil.Truncate(textutil.NormalizeWhitespace(content), 240)
 	if summary == "" {
 		return "Summary is currently unavailable.", nil
 	}
@@ -37,8 +38,8 @@ func (c *noopAIClient) GenerateTags(_ context.Context, title, body string) ([]st
 }
 
 func (c *noopAIClient) GeneratePost(_ context.Context, prompt string) (*domain.GeneratedPost, error) {
-	normalized := normalizeWhitespace(prompt)
-	title := truncateText(normalized, 64)
+	normalized := textutil.NormalizeWhitespace(prompt)
+	title := textutil.Truncate(normalized, 64)
 	if title == "" {
 		title = "Generated Post"
 	}
@@ -51,28 +52,13 @@ func (c *noopAIClient) GeneratePost(_ context.Context, prompt string) (*domain.G
 	return &domain.GeneratedPost{
 		Title:   title,
 		Body:    body,
-		Summary: truncateText(body, 220),
+		Summary: textutil.Truncate(body, 220),
 		Tags:    deriveTags(title, body),
 	}, nil
 }
 
-func normalizeWhitespace(input string) string {
-	return strings.Join(strings.Fields(strings.TrimSpace(input)), " ")
-}
-
-func truncateText(input string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(input)
-	if len(runes) <= max {
-		return input
-	}
-	cut := string(runes[:max])
-	if idx := strings.LastIndex(cut, " "); idx > 0 {
-		cut = cut[:idx]
-	}
-	return strings.TrimSpace(cut) + "..."
+func (c *noopAIClient) Close() error {
+	return nil
 }
 
 func deriveTags(title, body string) []string {

@@ -19,7 +19,7 @@ func Connect(uri string) (*mongo.Client, error) {
 	wc := writeconcern.New(writeconcern.WMajority())
 	clientOptions.SetWriteConcern(wc)
 
-	rp, err := readpref.New(readpref.SecondaryPreferredMode)
+	rp, err := readpref.New(readpref.PrimaryPreferredMode)
 	if err != nil {
 		return nil, err
 	}
