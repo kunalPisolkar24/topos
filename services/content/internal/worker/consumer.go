@@ -214,15 +214,15 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 
 	trimmedSummary := strings.TrimSpace(post.Summary)
 	if trimmedSummary != "" {
-		if post.SummaryStatus != "COMPLETED" && post.SummaryStatus != "FAILED" {
-			if err := w.processor.SetPostSummary(ctx, post.ID, trimmedSummary, "COMPLETED"); err != nil {
+		if post.SummaryStatus != domain.PostStatusCompleted && post.SummaryStatus != domain.PostStatusFailed {
+			if err := w.processor.SetPostSummary(ctx, post.ID, trimmedSummary, domain.PostStatusCompleted); err != nil {
 				status = monitoring.StatusErr
 				return fmt.Errorf("failed to update post summary: %w", err)
 			}
 			logger.Info("Summary already present, marking completed", "postID", post.ID)
 			return nil
 		}
-		if post.SummaryStatus == "COMPLETED" {
+		if post.SummaryStatus == domain.PostStatusCompleted {
 			status = monitoring.StatusSkip
 			return nil
 		}
@@ -236,7 +236,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	cleanBody := stripHtml(body)
 	if cleanBody == "" {
 		summary := fallbackSummary(cleanBody)
-		if err := w.processor.SetPostSummary(ctx, post.ID, summary, "FAILED"); err != nil {
+		if err := w.processor.SetPostSummary(ctx, post.ID, summary, domain.PostStatusFailed); err != nil {
 			status = monitoring.StatusErr
 			return fmt.Errorf("failed to update post summary: %w", err)
 		}
@@ -248,7 +248,7 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	if err != nil {
 		status = monitoring.StatusErr
 		fallback := fallbackSummary(cleanBody)
-		if updateErr := w.processor.SetPostSummary(ctx, post.ID, fallback, "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, fallback, domain.PostStatusFailed); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("ai generation error: %w", err)
@@ -260,13 +260,13 @@ func (w *Worker) processMessage(ctx context.Context, m kafka.Message) error {
 	}
 	if summary == "" {
 		status = monitoring.StatusErr
-		if updateErr := w.processor.SetPostSummary(ctx, post.ID, "", "FAILED"); updateErr != nil {
+		if updateErr := w.processor.SetPostSummary(ctx, post.ID, "", domain.PostStatusFailed); updateErr != nil {
 			logger.Error("Failed to set summary status to FAILED", "error", updateErr, "postID", post.ID)
 		}
 		return fmt.Errorf("empty summary generated")
 	}
 
-	if err := w.processor.SetPostSummary(ctx, post.ID, summary, "COMPLETED"); err != nil {
+	if err := w.processor.SetPostSummary(ctx, post.ID, summary, domain.PostStatusCompleted); err != nil {
 		status = monitoring.StatusErr
 		return fmt.Errorf("failed to update post summary: %w", err)
 	}

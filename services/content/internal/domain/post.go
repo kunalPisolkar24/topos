@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+type PostStatus string
+
+const (
+	PostStatusPending   PostStatus = "PENDING"
+	PostStatusCompleted PostStatus = "COMPLETED"
+	PostStatusFailed    PostStatus = "FAILED"
+)
+
 type Post struct {
 	ID            string    `bson:"_id,omitempty"`
 	Title         string    `bson:"title"`
@@ -14,7 +22,7 @@ type Post struct {
 	AuthorID      string    `bson:"authorId"`
 	Tags          []string  `bson:"tags"`
 	Summary       string    `bson:"summary"`
-	SummaryStatus string    `bson:"summaryStatus"`
+	SummaryStatus PostStatus `bson:"summaryStatus"`
 	CreatedAt     time.Time `bson:"createdAt"`
 	UpdatedAt     time.Time `bson:"updatedAt"`
 }
@@ -29,7 +37,7 @@ type PaginatedPosts struct {
 type PostRepository interface {
 	Create(ctx context.Context, post *Post) (*Post, error)
 	Update(ctx context.Context, id string, post *Post) (*Post, error)
-	UpdateSummary(ctx context.Context, id string, summary string, status string) error
+	UpdateSummary(ctx context.Context, id string, summary string, status PostStatus) error
 	Delete(ctx context.Context, id string) error
 	FindAll(ctx context.Context, page, limit int) (*PaginatedPosts, error)
 	FindByID(ctx context.Context, id string) (*Post, error)
@@ -39,5 +47,5 @@ type PostRepository interface {
 
 type SummaryProcessor interface {
 	GetPost(ctx context.Context, id string) (*Post, error)
-	SetPostSummary(ctx context.Context, id, summary, status string) error
+	SetPostSummary(ctx context.Context, id, summary string, status PostStatus) error
 }

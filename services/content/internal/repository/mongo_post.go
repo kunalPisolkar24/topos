@@ -84,7 +84,7 @@ func (r *mongoPostRepo) Update(ctx context.Context, id string, post *domain.Post
 	return &updatedPost, nil
 }
 
-func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+func (r *mongoPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return err

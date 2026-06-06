@@ -27,7 +27,7 @@ func (m *PostRepository) Update(ctx context.Context, id string, post *domain.Pos
 	return args.Get(0).(*domain.Post), args.Error(1)
 }
 
-func (m *PostRepository) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+func (m *PostRepository) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
 	args := m.Called(ctx, id, summary, status)
 	return args.Error(0)
 }

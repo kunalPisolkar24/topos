@@ -71,7 +71,7 @@ func (r *cachedPostRepo) Update(ctx context.Context, id string, post *domain.Pos
 	return updatedPost, nil
 }
 
-func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status string) error {
+func (r *cachedPostRepo) UpdateSummary(ctx context.Context, id string, summary string, status domain.PostStatus) error {
 	if err := r.fallback.UpdateSummary(ctx, id, summary, status); err != nil {
 		return err
 	}

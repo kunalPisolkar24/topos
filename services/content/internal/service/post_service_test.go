@@ -49,7 +49,7 @@ func TestPostService_CreatePost(t *testing.T) {
 				tr.On("CreateOrFind", mock.Anything, "go").Return(&domain.Tag{ID: "1", Name: "go"}, nil)
 
 				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == "Test Title" && p.Slug != "" && p.SummaryStatus == "PENDING"
+					return p.Title == "Test Title" && p.Slug != "" && p.SummaryStatus == domain.PostStatusPending
 				})).Return(&domain.Post{
 					ID:       "post123",
 					Title:    "Test Title",
@@ -76,7 +76,7 @@ func TestPostService_CreatePost(t *testing.T) {
 			},
 			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
 				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Summary == "AI Summary" && p.SummaryStatus == "COMPLETED"
+					return p.Summary == "AI Summary" && p.SummaryStatus == domain.PostStatusCompleted
 				})).Return(&domain.Post{
 					ID:       "post456",
 					Title:    "AI Title",
@@ -204,7 +204,7 @@ func TestPostService_UpdatePost(t *testing.T) {
 						len(p.Tags) == 1 &&
 						!p.UpdatedAt.IsZero() &&
 						p.Summary == "" &&
-						p.SummaryStatus == "PENDING"
+						p.SummaryStatus == domain.PostStatusPending
 				})).Return(&domain.Post{ID: id, Title: title}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
@@ -226,7 +226,7 @@ func TestPostService_UpdatePost(t *testing.T) {
 						p.ImageUrl == nil &&
 						p.Tags == nil &&
 						p.Summary == "" &&
-						p.SummaryStatus == "PENDING"
+						p.SummaryStatus == domain.PostStatusPending
 				})).Return(&domain.Post{ID: id}, nil)
 
 				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)

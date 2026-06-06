@@ -12,12 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const (
-	summaryPending  = "PENDING"
-	summaryComplete = "COMPLETED"
-	summaryFailed   = "FAILED"
-)
-
 func isDuplicateSlugError(err error) bool {
 	return mongo.IsDuplicateKeyError(err)
 }
@@ -46,12 +40,12 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 	}
 
 	summaryValue := ""
-	summaryStatus := summaryPending
+	summaryStatus := domain.PostStatusPending
 	if summary != nil {
 		trimmed := strings.TrimSpace(*summary)
 		if trimmed != "" {
 			summaryValue = trimmed
-			summaryStatus = summaryComplete
+			summaryStatus = domain.PostStatusCompleted
 		}
 	}
 
@@ -128,7 +122,7 @@ func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title,
 	}
 	if summaryNeedsReset {
 		post.Summary = ""
-		post.SummaryStatus = summaryPending
+		post.SummaryStatus = domain.PostStatusPending
 	}
 
 	updatedPost, err := s.postRepo.Update(ctx, id, post)
@@ -150,7 +144,7 @@ func (s *PostService) publishIfProducer(ctx context.Context, name string, post *
 	}
 }
 
-func (s *PostService) SetPostSummary(ctx context.Context, id, summary, status string) error {
+func (s *PostService) SetPostSummary(ctx context.Context, id, summary string, status domain.PostStatus) error {
 	return s.postRepo.UpdateSummary(ctx, id, summary, status)
 }
 
