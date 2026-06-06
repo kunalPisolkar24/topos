@@ -2,12 +2,18 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func isDuplicateSlugError(err error) bool {
+	return mongo.IsDuplicateKeyError(err)
+}
 
 type PostService struct {
 	postRepo      domain.PostRepository
@@ -26,8 +32,6 @@ func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository
 }
 
 func (s *PostService) CreatePost(ctx context.Context, title, body, authorID string, tags []string, imageUrl *string, summary *string) (*domain.Post, error) {
-	slug := generateSlug(title)
-
 	for _, tagName := range tags {
 		_, _ = s.tagRepo.CreateOrFind(ctx, tagName)
 	}
@@ -42,22 +46,33 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 		}
 	}
 
-	post := &domain.Post{
-		Title:         title,
-		Body:          body,
-		Slug:          slug,
-		AuthorID:      authorID,
-		Tags:          tags,
-		ImageUrl:      imageUrl,
-		Summary:       summaryValue,
-		SummaryStatus: summaryStatus,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-	}
+	const maxSlugRetries = 5
+	var createdPost *domain.Post
+	for attempt := 0; attempt < maxSlugRetries; attempt++ {
+		post := &domain.Post{
+			Title:         title,
+			Body:          body,
+			Slug:          generateSlug(title),
+			AuthorID:      authorID,
+			Tags:          tags,
+			ImageUrl:      imageUrl,
+			Summary:       summaryValue,
+			SummaryStatus: summaryStatus,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
 
-	createdPost, err := s.postRepo.Create(ctx, post)
-	if err != nil {
-		return nil, err
+		var err error
+		createdPost, err = s.postRepo.Create(ctx, post)
+		if err == nil {
+			break
+		}
+		if !isDuplicateSlugError(err) {
+			return nil, err
+		}
+		if attempt == maxSlugRetries-1 {
+			return nil, fmt.Errorf("failed to create post after %d slug retries: %w", maxSlugRetries, err)
+		}
 	}
 
 	if s.eventProducer != nil {

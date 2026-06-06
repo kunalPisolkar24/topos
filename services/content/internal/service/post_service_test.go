@@ -10,6 +10,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func init() {
@@ -111,6 +112,22 @@ func TestPostService_CreatePost(t *testing.T) {
 				pr.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
 			},
 			expectedError: true,
+		},
+		{
+			name: "Success_RetriesOnDuplicateSlug",
+			args: args{
+				title:    "Same Title",
+				body:     "Body",
+				authorID: "user1",
+			},
+			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
+				pr.On("Create", mock.Anything, mock.Anything).Return(nil, mongo.WriteException{WriteErrors: mongo.WriteErrors{{Code: 11000}}}).Once()
+				pr.On("Create", mock.Anything, mock.Anything).Return(&domain.Post{ID: "post-retry-success"}, nil).Once()
+				ep.On("PublishPostCreated", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
+					return p.ID == "post-retry-success"
+				})).Return(nil)
+			},
+			expectedError: false,
 		},
 	}
 

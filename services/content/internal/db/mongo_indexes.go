@@ -31,6 +31,12 @@ func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 			Options: options.Index().
 				SetName("createdAt_desc"),
 		},
+		{
+			Keys: bson.D{{Key: "slug", Value: 1}},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("slug_unique"),
+		},
 	}
 
 	if _, err := posts.Indexes().CreateMany(ctx, postIndexes); err != nil {
