@@ -86,9 +86,15 @@ func main() {
 
 	authMiddleware := middleware.AuthMiddleware(cfg)
 	metricsMiddleware := middleware.MetricsMiddleware
+	corsMiddleware := middleware.CORS(middleware.CORSConfig{
+		AllowedOrigins: cfg.CORSOrigins,
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type", "Apollo-Require-Preflight"},
+		MaxAgeSeconds:  86400,
+	})
 
 	mux := http.NewServeMux()
-	mux.Handle("/query", metricsMiddleware(authMiddleware(srv)))
+	mux.Handle("/query", corsMiddleware(metricsMiddleware(authMiddleware(srv))))
 	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

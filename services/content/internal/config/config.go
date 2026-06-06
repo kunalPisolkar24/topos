@@ -27,6 +27,7 @@ type Config struct {
 	AIServiceURL    string
 	AIRequired      bool
 	AIDialTimeout   time.Duration
+	CORSOrigins     []string
 }
 
 var envLoadOnce sync.Once
@@ -57,6 +58,7 @@ func LoadConfig() *Config {
 		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),
 		AIRequired:      getEnvBool("AI_REQUIRED", false),
 		AIDialTimeout:   time.Duration(getEnvInt("AI_DIAL_TIMEOUT_SECONDS", 5)) * time.Second,
+		CORSOrigins:     loadCORSOrigins(),
 	}
 }
 
@@ -142,4 +144,12 @@ func detectRedisMode() string {
 		return "sentinel"
 	}
 	return "standalone"
+}
+
+func loadCORSOrigins() []string {
+	raw := getEnv("CORS_ALLOWED_ORIGINS", "")
+	if raw == "" {
+		return []string{"*"}
+	}
+	return splitAndTrim(raw)
 }
