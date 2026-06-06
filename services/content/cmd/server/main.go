@@ -13,6 +13,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/graph"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/db"
+	"github.com/kunalPisolkar24/blogapp/services/content/internal/health"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/ai"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/cache"
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/infrastructure/messaging"
@@ -21,6 +22,7 @@ import (
 	"github.com/kunalPisolkar24/blogapp/services/content/internal/service"
 	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 func main() {
@@ -101,14 +103,15 @@ func main() {
 	mux.Handle("/query", corsMiddleware(metricsMiddleware(authMiddleware(srv))))
 	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := redisClient.Ping(r.Context()).Err(); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Content Service OK"))
-	}))
+
+	healthChecker := health.NewChecker(2 * time.Second)
+	healthChecker.Register("redis", func(ctx context.Context) error {
+		return redisClient.Ping(ctx).Err()
+	})
+	healthChecker.Register("mongo", func(ctx context.Context) error {
+		return mongoClient.Ping(ctx, readpref.Primary())
+	})
+	mux.Handle("/health", healthChecker.Handler())
 
 	logger.Info("Content Service starting", "port", cfg.Port)
 
