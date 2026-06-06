@@ -53,6 +53,12 @@ func main() {
 	}
 
 	database := mongoClient.Database(cfg.DbName)
+
+	if err := db.EnsureIndexes(context.Background(), database); err != nil {
+		logger.Error("Failed to ensure MongoDB indexes", "error", err)
+		os.Exit(1)
+	}
+
 	postRepo := repository.NewCachedPostRepository(repository.NewMongoPostRepository(database), redisClient)
 	tagRepo := repository.NewMongoTagRepository(database)
 
