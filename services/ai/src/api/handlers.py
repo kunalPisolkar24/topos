@@ -20,7 +20,7 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except LLMProviderError as e:
             self.logger.error(f"Summary generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
-        except Exception as e:
+        except Exception:
             self.logger.exception("Summary generation failed")
             await context.abort(grpc.StatusCode.INTERNAL, "Internal service error")
 
@@ -37,7 +37,7 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except LLMProviderError as e:
             self.logger.error(f"Tags generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
-        except Exception as e:
+        except Exception:
             self.logger.exception("Tag generation failed")
             await context.abort(grpc.StatusCode.INTERNAL, "Internal service error")
 
@@ -59,6 +59,6 @@ class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
         except LLMProviderError as e:
             self.logger.error(f"Post generation LLM error: {e}")
             await context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
-        except Exception as e:
+        except Exception:
             self.logger.exception("Post generation failed")
             await context.abort(grpc.StatusCode.INTERNAL, "Internal service error")

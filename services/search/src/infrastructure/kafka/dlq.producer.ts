@@ -30,8 +30,10 @@ export class KafkaDlqProducer implements IDlqProducer {
         this.retrySignal.abort();
         try {
             await this.producer.disconnect();
-        } catch (err: any) {
-            this.logger.error('DLQ Producer disconnect error', { error: err.message });
+        } catch (err) {
+            this.logger.error('DLQ Producer disconnect error', {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
         this.logger.info('DLQ Producer disconnected');
     }
@@ -58,8 +60,11 @@ export class KafkaDlqProducer implements IDlqProducer {
                 }
             );
             this.logger.warn('Message sent to DLQ', { key, error: message.error });
-        } catch (error: any) {
-            this.logger.error('Failed to send message to DLQ', { error: error.message, key });
+        } catch (error) {
+            this.logger.error('Failed to send message to DLQ', {
+                error: error instanceof Error ? error.message : String(error),
+                key,
+            });
             throw error;
         }
     }

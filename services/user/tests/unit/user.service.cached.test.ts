@@ -4,7 +4,6 @@ import { IUserService } from '../../src/services/interfaces/user.service.interfa
 import Keyv from 'keyv';
 
 const USER_KEY = 'user:v1:1';
-const USER_KEY_2 = 'user:v1:2';
 const MISSING_KEY = 'user:v1:missing:1';
 const NEGATIVE_MARKER = 1;
 

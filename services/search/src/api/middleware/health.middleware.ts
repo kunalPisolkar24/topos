@@ -8,6 +8,9 @@ export interface ReadinessChecks {
     kafka?: { isHealthy: () => Promise<boolean> };
 }
 
+const errorMessage = (err: unknown): string =>
+    err instanceof Error ? err.message : String(err);
+
 const withTimeout = async <T>(op: () => Promise<T>, ms: number): Promise<T | null> => {
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<null>((resolve) => {
@@ -36,8 +39,8 @@ export const readiness = (
             try {
                 const r = await withTimeout(() => checks.cache!.ping(), timeoutMs);
                 results.cache = { ok: r !== null };
-            } catch (err: any) {
-                results.cache = { ok: false, detail: err?.message };
+            } catch (err) {
+                results.cache = { ok: false, detail: errorMessage(err) };
             }
         }
 
@@ -45,8 +48,8 @@ export const readiness = (
             try {
                 const ok = await withTimeout(() => checks.es!.checkHealth(), timeoutMs);
                 results.elasticsearch = { ok: ok === true };
-            } catch (err: any) {
-                results.elasticsearch = { ok: false, detail: err?.message };
+            } catch (err) {
+                results.elasticsearch = { ok: false, detail: errorMessage(err) };
             }
         }
 
@@ -54,8 +57,8 @@ export const readiness = (
             try {
                 const ok = await withTimeout(() => checks.kafka!.isHealthy(), timeoutMs);
                 results.kafka = { ok: ok === true };
-            } catch (err: any) {
-                results.kafka = { ok: false, detail: err?.message };
+            } catch (err) {
+                results.kafka = { ok: false, detail: errorMessage(err) };
             }
         }
 

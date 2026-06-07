@@ -2,7 +2,7 @@
        local-build local-up local-down local-logs local-restart local-clean
 
 ENV_FILE ?= .env
-APP_NETWORK ?= blog_app_network
+APP_NETWORK ?= topos_network
 PROD_DIR      := infrastructure/docker/prod
 PROD_COMPOSE  := $(PROD_DIR)/docker-compose.yml
 COMPOSE ?= docker compose -f $(PROD_COMPOSE) --env-file $(ENV_FILE)

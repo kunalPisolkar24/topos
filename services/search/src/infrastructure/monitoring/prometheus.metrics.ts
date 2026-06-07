@@ -92,8 +92,7 @@ export class PrometheusMetrics implements IMetricsService {
 
     recordWorkerBatch(
         status: 'success' | 'error',
-        durationSeconds: number,
-        recordsProcessed: number
+        durationSeconds: number
     ): void {
         this.workerBatch.labels({ status }).observe(durationSeconds);
     }

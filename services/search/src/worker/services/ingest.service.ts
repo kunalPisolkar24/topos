@@ -84,10 +84,12 @@ export class IngestService {
                 deleted: idsToDelete.length,
                 partition: batch.partition,
             });
-        } catch (err: any) {
+        } catch (err) {
             const duration = (performance.now() - start) / 1000;
             this.metrics.recordWorkerBatch('error', duration, 0);
-            this.logger.error('Batch Processing Fatal Error', { error: err.message });
+            this.logger.error('Batch Processing Fatal Error', {
+                error: err instanceof Error ? err.message : String(err),
+            });
             throw err;
         }
     }
@@ -100,8 +102,9 @@ export class IngestService {
         let eventData: unknown;
         try {
             eventData = JSON.parse(raw);
-        } catch (err: any) {
-            await this.sendToDlq(topic, `Invalid JSON: ${err.message}`, key, raw);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            await this.sendToDlq(topic, `Invalid JSON: ${message}`, key, raw);
             return null;
         }
 

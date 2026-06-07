@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mock, MockProxy } from 'vitest-mock-extended';
 import { SearchService, type SearchServiceConfig } from '../search.service.js';
 import { ISearchReader } from '../../../core/interfaces/repository.interface.js';

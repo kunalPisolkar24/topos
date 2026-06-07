@@ -52,7 +52,7 @@ export async function buildApp(): Promise<AppHandle> {
     });
 
     const composed = await composeApp({ prisma });
-    const { apolloServer, userService, serviceCache, cacheBackend } = composed;
+    const { apolloServer, userService, serviceCache } = composed;
 
     app.use('/graphql', async (c) => {
         const contentLengthHeader = c.req.header('content-length');

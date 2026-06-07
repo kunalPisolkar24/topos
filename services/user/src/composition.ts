@@ -30,7 +30,12 @@ export interface ComposedApp {
 
 const buildApolloServer = (apolloCache: KeyvAdapter | undefined) =>
     new ApolloServer({
-        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+        schema: buildSubgraphSchema({
+            typeDefs,
+            // @apollo/subgraph's IResolvers type does not match the plain resolvers object literal
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            resolvers: resolvers as any,
+        }),
         cache: apolloCache,
         plugins: [ApolloServerPluginCacheControl({ defaultMaxAge: 0 })],
         formatError: formatGraphQLError,

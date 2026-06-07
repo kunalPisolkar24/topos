@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 FROM node:${NODE_VERSION}-alpine AS runtime
 ARG GIT_REVISION=unknown
-LABEL org.opencontainers.image.title="blogapp-search" \
+LABEL org.opencontainers.image.title="topos-search" \
       org.opencontainers.image.source="https://github.com/kunalPisolkar24/topos" \
       org.opencontainers.image.revision="${GIT_REVISION}" \
       org.opencontainers.image.licenses="MIT"

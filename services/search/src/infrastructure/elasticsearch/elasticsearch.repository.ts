@@ -29,7 +29,7 @@ interface BulkFailure {
 }
 
 const collectBulkFailures = (
-    items: Array<Record<string, any>>,
+    items: Array<Record<string, unknown>>,
     ids: string[]
 ): BulkFailure[] => {
     const failures: BulkFailure[] = [];
@@ -72,7 +72,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
         if (exists) return;
         await this.client.indices.create({
             index: this.index,
-            mappings: POSTS_INDEX_MAPPING as any,
+            mappings: POSTS_INDEX_MAPPING as unknown as Record<string, unknown>,
         });
         this.logger.info('Elasticsearch index created', { index: this.index });
     }
@@ -96,7 +96,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
 
             if (result.errors) {
                 const failures = collectBulkFailures(
-                    result.items as Array<Record<string, any>>,
+                    result.items as Array<Record<string, unknown>>,
                     documents.map((d) => d.postId)
                 );
                 this.logger.error('Partial Bulk Upsert Failure', { failures });
@@ -105,14 +105,15 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
                     failedIds: failures,
                 });
             }
-        } catch (err: any) {
+        } catch (err) {
             const duration = (performance.now() - start) / 1000;
             this.metrics.recordEsOperation('bulk_upsert', 'error', duration);
             if (err instanceof BulkPartialFailureError) {
                 throw err;
             }
-            this.logger.error('Elasticsearch Bulk Upsert Critical Fail', { error: err.message });
-            throw new InfrastructureError(err.message);
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error('Elasticsearch Bulk Upsert Critical Fail', { error: message });
+            throw new InfrastructureError(message);
         }
     }
 
@@ -132,7 +133,7 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
 
             if (result.errors) {
                 const failures = collectBulkFailures(
-                    result.items as Array<Record<string, any>>,
+                    result.items as Array<Record<string, unknown>>,
                     ids
                 );
                 this.logger.error('Partial Bulk Delete Failure', { failures });
@@ -141,14 +142,15 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
                     failedIds: failures,
                 });
             }
-        } catch (err: any) {
+        } catch (err) {
             const duration = (performance.now() - start) / 1000;
             this.metrics.recordEsOperation('bulk_delete', 'error', duration);
             if (err instanceof BulkPartialFailureError) {
                 throw err;
             }
-            this.logger.error('Elasticsearch Bulk Delete Critical Fail', { error: err.message });
-            throw new InfrastructureError(err.message);
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error('Elasticsearch Bulk Delete Critical Fail', { error: message });
+            throw new InfrastructureError(message);
         }
     }
 
@@ -181,16 +183,17 @@ export class ElasticsearchRepository implements ISearchReader, ISearchIndexer {
             const duration = (performance.now() - start) / 1000;
             this.metrics.recordEsOperation('search', 'success', duration);
 
-            const hits = result.hits.hits.map((h: any) => h._source as PostDocument);
+            const hits = result.hits.hits.map((h) => h._source as PostDocument);
             const totalVal = result.hits.total;
             const total = typeof totalVal === 'number' ? totalVal : totalVal?.value || 0;
 
             return { hits, total };
-        } catch (err: any) {
+        } catch (err) {
             const duration = (performance.now() - start) / 1000;
             this.metrics.recordEsOperation('search', 'error', duration);
-            this.logger.error('Search Query Failed', { error: err.message });
-            throw new InfrastructureError(err.message);
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error('Search Query Failed', { error: message });
+            throw new InfrastructureError(message);
         }
     }
 

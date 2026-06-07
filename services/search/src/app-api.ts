@@ -108,8 +108,10 @@ const start = async () => {
 
     try {
         await esRepo.ensureIndex();
-    } catch (err: any) {
-        logger.error('Failed to ensure Elasticsearch index', { error: err.message });
+    } catch (err) {
+        logger.error('Failed to ensure Elasticsearch index', {
+            error: err instanceof Error ? err.message : String(err),
+        });
         process.exit(1);
     }
 

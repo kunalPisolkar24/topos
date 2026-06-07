@@ -38,7 +38,7 @@ export const basicAuth = ({
 }: BasicAuthOptions): RequestHandler => {
     if (!credentials) {
         if (isProduction) {
-            return (_req: Request, res, _next) => {
+            return (_req: Request, res) => {
                 res.status(404).json({ error: 'not_found' });
             };
         }
