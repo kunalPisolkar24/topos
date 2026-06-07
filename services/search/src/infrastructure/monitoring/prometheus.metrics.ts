@@ -7,6 +7,7 @@ export class PrometheusMetrics implements IMetricsService {
     private searchLatency: client.Histogram;
     private esOps: client.Histogram;
     private workerBatch: client.Histogram;
+    private workerRecordsProcessed: client.Counter;
     private dlqOps: client.Counter;
     private unknownShapeOps: client.Counter;
 
@@ -43,6 +44,12 @@ export class PrometheusMetrics implements IMetricsService {
             help: 'Time taken to process kafka batch',
             labelNames: ['status'],
             buckets: [0.1, 0.5, 1, 2, 5, 10],
+        });
+
+        this.workerRecordsProcessed = new client.Counter({
+            name: 'worker_records_processed_total',
+            help: 'Total records processed by the worker, per batch status',
+            labelNames: ['status'],
         });
 
         this.dlqOps = new client.Counter({
@@ -92,9 +99,11 @@ export class PrometheusMetrics implements IMetricsService {
 
     recordWorkerBatch(
         status: 'success' | 'error',
-        durationSeconds: number
+        durationSeconds: number,
+        recordsProcessed: number
     ): void {
         this.workerBatch.labels({ status }).observe(durationSeconds);
+        this.workerRecordsProcessed.labels({ status }).inc(recordsProcessed);
     }
 
     incrementDlqCount(topic: string): void {

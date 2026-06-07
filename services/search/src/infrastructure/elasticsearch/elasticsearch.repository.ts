@@ -35,12 +35,19 @@ const collectBulkFailures = (
     const failures: BulkFailure[] = [];
     items.forEach((action, i) => {
         const operation = Object.keys(action)[0];
-        const item = action[operation];
+        const item = action[operation] as { status?: number; error?: unknown } | undefined;
         if (item?.error) {
+            const errorDetail = item.error;
+            let reason: string;
+            if (typeof errorDetail === 'object' && errorDetail !== null && 'reason' in errorDetail) {
+                reason = String((errorDetail as { reason?: unknown }).reason ?? '');
+            } else {
+                reason = String(errorDetail);
+            }
             failures.push({
                 id: ids[i],
                 status: item.status,
-                reason: typeof item.error === 'object' ? item.error.reason : String(item.error),
+                reason,
             });
         }
     });
