@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockCounterInc = vi.fn();
+const mockCounterLabels = vi.fn().mockReturnValue({ inc: mockCounterInc });
 const mockHistogramObserve = vi.fn();
 const mockHistogramLabels = vi.fn().mockReturnValue({ observe: mockHistogramObserve });
 
 vi.mock('prom-client', () => {
     class MockCounter {
         inc = mockCounterInc;
+        labels = mockCounterLabels;
         constructor() { }
     }
     class MockHistogram {
