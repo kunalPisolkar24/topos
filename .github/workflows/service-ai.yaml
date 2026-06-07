@@ -41,28 +41,37 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: ${{ env.SERVICE_PATH }}/requirements.txt
+
+      - name: Install Poetry
+        run: pip install --no-cache-dir poetry
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SERVICE_PATH }}/.venv
+          key: poetry-${{ runner.os }}-${{ env.SERVICE_PATH }}-${{ hashFiles(format('{0}/pyproject.toml', env.SERVICE_PATH), format('{0}/poetry.lock', env.SERVICE_PATH)) }}
+          restore-keys: |
+            poetry-${{ runner.os }}-${{ env.SERVICE_PATH }}-
 
       - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff
+        run: poetry install --no-interaction
 
       - name: Generate gRPC Code
         run: |
           mkdir -p src/generated
           touch src/generated/__init__.py
-          python -m grpc_tools.protoc -Iproto --python_out=src/generated --grpc_python_out=src/generated ai_service.proto
+          poetry run python -m grpc_tools.protoc -Iproto --python_out=src/generated --grpc_python_out=src/generated ai_service.proto
           find src/generated -type f -name "*.py" -exec sed -i 's/^import ai_service_pb2/from . import ai_service_pb2/' {} +
 
       - name: Run Linting
-        run: ruff check src
+        run: poetry run flake8 src
 
       - name: Run Tests
         run: |
-          python -m pytest tests -v --cov=src --cov-report=term-missing
+          PYTHONPATH=. poetry run pytest tests -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --asyncio-mode=auto
 
   build-and-push:
     name: Build & Push Docker Image
