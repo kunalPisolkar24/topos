@@ -1,0 +1,114 @@
+name: Service - AI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - "services/ai/**"
+      - ".github/workflows/service-ai.yaml"
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - "services/ai/**"
+      - ".github/workflows/service-ai.yaml"
+
+env:
+  DOCKER_IMAGE_NAME: kunalpisolkar/topos-ai
+  SERVICE_PATH: ./services/ai
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-assurance:
+    name: Run Tests & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.SERVICE_PATH }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: pip install --no-cache-dir poetry
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SERVICE_PATH }}/.venv
+          key: poetry-${{ runner.os }}-${{ env.SERVICE_PATH }}-${{ hashFiles(format('{0}/pyproject.toml', env.SERVICE_PATH), format('{0}/poetry.lock', env.SERVICE_PATH)) }}
+          restore-keys: |
+            poetry-${{ runner.os }}-${{ env.SERVICE_PATH }}-
+
+      - name: Install Dependencies
+        run: poetry install --no-interaction
+
+      - name: Generate gRPC Code
+        run: |
+          mkdir -p src/generated
+          touch src/generated/__init__.py
+          poetry run python -m grpc_tools.protoc -Iproto --python_out=src/generated --grpc_python_out=src/generated ai_service.proto
+          find src/generated -type f -name "*.py" -exec sed -i 's/^import ai_service_pb2/from . import ai_service_pb2/' {} +
+
+      - name: Run Linting
+        run: poetry run flake8 src
+
+      - name: Run Tests
+        run: |
+          PYTHONPATH=. poetry run pytest tests -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --asyncio-mode=auto
+
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: quality-assurance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.SERVICE_PATH }}
+          file: ${{ env.SERVICE_PATH }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max

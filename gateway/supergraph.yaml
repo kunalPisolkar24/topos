@@ -1,0 +1,17 @@
+federation_version: 2
+
+subgraphs:
+  user:
+    routing_url: http://user-service:4001/graphql
+    schema:
+      file: ./subgraphs/user.graphql
+
+  content:
+    routing_url: http://content-service:4002/query
+    schema:
+      file: ./subgraphs/content.graphql
+
+  search:
+    routing_url: http://search-api:4003/graphql
+    schema:
+      file: ./subgraphs/search.graphql

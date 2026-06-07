@@ -1,0 +1,72 @@
+services:
+  es-logging:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: ${LOGGING_ES_CONTAINER}
+    restart: unless-stopped
+    ports:
+      - "${LOGGING_ES_EXT_PORT}:${LOGGING_ES_INT_PORT}"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es_logging_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:${LOGGING_ES_INT_PORT} >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: ${LOGGING_LOGSTASH_CONTAINER}
+    restart: unless-stopped
+    ports:
+      - "${LOGGING_LOGSTASH_EXT_PORT}:${LOGGING_LOGSTASH_INT_PORT}"
+    volumes:
+      - ../../logging/logstash/pipeline:/usr/share/logstash/pipeline/
+    networks:
+      - app-network
+    depends_on:
+      es-logging:
+        condition: service_healthy
+
+  kibana-logging:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: ${LOGGING_KIBANA_CONTAINER}
+    restart: unless-stopped
+    ports:
+      - "${LOGGING_KIBANA_EXT_PORT}:${LOGGING_KIBANA_INT_PORT}"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://${LOGGING_ES_CONTAINER}:${LOGGING_ES_INT_PORT}
+    networks:
+      - app-network
+    depends_on:
+      es-logging:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: ${LOGGING_FILEBEAT_CONTAINER}
+    user: root
+    restart: unless-stopped
+    volumes:
+      - ../../logging/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-network
+    depends_on:
+      logstash:
+        condition: service_started
+
+networks:
+  app-network:
+    external: true
+    name: ${APP_NETWORK}
+
+volumes:
+  es_logging_data:
+    driver: local
