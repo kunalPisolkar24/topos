@@ -9,6 +9,7 @@ from src.usecases.prompts import Prompts
 from src.core.domain.models import GeneratedPost
 from src.core.exceptions import DataParsingError, AIServiceException
 
+
 class ContentLogic:
     def __init__(self, llm_provider: LLMProvider):
         self.llm = llm_provider
@@ -19,16 +20,16 @@ class ContentLogic:
         clean_text = self.cleaner.clean_html(html_text)
         if not clean_text:
             return ""
-        
+
         return await self.llm.generate_completion(Prompts.SUMMARY_SYSTEM, clean_text)
 
     async def generate_tags(self, title: str, body: str) -> List[str]:
         clean_body = self.cleaner.clean_html(body)
         content = f"Title: {title}\nBody: {clean_body[:3000]}"
-        
+
         raw_response = await self.llm.generate_completion(Prompts.TAGS_SYSTEM, content)
         json_str = self.cleaner.extract_json_block(raw_response)
-        
+
         try:
             tags = json.loads(json_str)
             if isinstance(tags, list):
@@ -40,15 +41,15 @@ class ContentLogic:
 
     async def generate_post(self, user_topic: str) -> GeneratedPost:
         user_prompt = Prompts.get_post_user_prompt(user_topic)
-        
+
         raw_response = await self.llm.generate_completion(Prompts.POST_SYSTEM, user_prompt)
         json_str = self.cleaner.extract_json_block(raw_response)
-        
+
         try:
             post = GeneratedPost.model_validate_json(json_str)
-            
+
             post.body = Sanitizer.clean_post_html(post.body)
-            
+
             return post
 
         except ValidationError as e:
@@ -56,4 +57,6 @@ class ContentLogic:
             raise DataParsingError("AI response failed schema validation") from e
         except Exception as e:
             self.logger.exception("Unexpected error during post generation")
-            raise AIServiceException("An unexpected error occurred during post generation") from e
+            raise AIServiceException(
+                "An unexpected error occurred during post generation"
+            ) from e

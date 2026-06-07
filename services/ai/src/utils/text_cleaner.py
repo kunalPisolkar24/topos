@@ -1,6 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 
+
 class TextCleaner:
     @staticmethod
     def clean_html(html_content: str) -> str:
@@ -18,10 +19,10 @@ class TextCleaner:
             r"```\s*(\{.*\}|\[.*\])\s*```",
             r"(\{.*\}|\[.*\])"
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, text, re.DOTALL)
             if match:
                 return match.group(1).strip()
-            
+
         return text.strip()

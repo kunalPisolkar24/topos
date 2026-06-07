@@ -5,6 +5,7 @@ from src.generated import ai_service_pb2, ai_service_pb2_grpc
 from src.usecases.content_logic import ContentLogic
 from src.core.exceptions import LLMProviderError, DataParsingError
 
+
 class AIHandler(ai_service_pb2_grpc.AIServiceServicer):
     def __init__(self, logic: ContentLogic):
         self.logic = logic

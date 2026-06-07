@@ -2,11 +2,20 @@ import httpx
 import logging
 import time
 import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 from src.config.settings import settings
 from src.core.interfaces.llm_provider import LLMProvider
 from src.core.exceptions import LLMProviderError
-from src.infrastructure.monitoring.metrics import LLM_PROVIDER_LATENCY, LLM_TOKEN_ERROR_COUNT
+from src.infrastructure.monitoring.metrics import (
+    LLM_PROVIDER_LATENCY,
+    LLM_TOKEN_ERROR_COUNT,
+)
+
 
 class LightningClient(LLMProvider):
     def __init__(self, http_client: httpx.AsyncClient):
@@ -25,7 +34,6 @@ class LightningClient(LLMProvider):
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
         reraise=True
     )
-    
     async def _make_request(self, payload: dict) -> dict:
         """
         Internal method to execute the HTTP request with retry logic.
@@ -60,20 +68,33 @@ class LightningClient(LLMProvider):
             raise
 
         except httpx.HTTPStatusError as e:
-            LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="http_status").inc()
-            self.logger.error(f"Provider returned status {e.response.status_code}", extra={"status_code": e.response.status_code})
-            raise LLMProviderError(f"Provider returned {e.response.status_code}") from e
+            LLM_TOKEN_ERROR_COUNT.labels(
+                provider="lightning", error_type="http_status"
+            ).inc()
+            self.logger.error(
+                f"Provider returned status {e.response.status_code}",
+                extra={"status_code": e.response.status_code},
+            )
+            raise LLMProviderError(
+                f"Provider returned {e.response.status_code}"
+            ) from e
 
         except httpx.RequestError as e:
-            LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="network").inc()
+            LLM_TOKEN_ERROR_COUNT.labels(
+                provider="lightning", error_type="network"
+            ).inc()
             self.logger.error(f"Network error communicating with provider: {str(e)}")
             raise LLMProviderError("Failed to communicate with AI provider") from e
 
         except (KeyError, IndexError, TypeError) as e:
-            LLM_TOKEN_ERROR_COUNT.labels(provider="lightning", error_type="parsing").inc()
+            LLM_TOKEN_ERROR_COUNT.labels(
+                provider="lightning", error_type="parsing"
+            ).inc()
             self.logger.error(f"Unexpected response structure: {str(e)}")
             raise LLMProviderError("Invalid response format from provider") from e
 
         finally:
             duration = time.perf_counter() - start_time
-            LLM_PROVIDER_LATENCY.labels(provider="lightning", endpoint="chat/completions").observe(duration)
+            LLM_PROVIDER_LATENCY.labels(
+                provider="lightning", endpoint="chat/completions"
+            ).observe(duration)

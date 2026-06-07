@@ -1,6 +1,7 @@
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
 
+
 class Sanitizer:
     ALLOWED_TAGS = [
         'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'code', 'div',

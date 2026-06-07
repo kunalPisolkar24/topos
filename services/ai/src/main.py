@@ -12,6 +12,7 @@ from src.infrastructure.logging.config import setup_logging
 from src.infrastructure.monitoring.interceptors import PrometheusInterceptor
 from src.usecases.content_logic import ContentLogic
 
+
 async def serve():
     setup_logging()
     logger = logging.getLogger("Main")
@@ -52,22 +53,23 @@ async def serve():
 
         interceptors = [PrometheusInterceptor()]
         server = grpc.aio.server(interceptors=interceptors)
-        
+
         ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
-        
+
         listen_addr = f"[::]:{settings.PORT}"
         server.add_insecure_port(listen_addr)
-        
+
         logger.info(f"AI Intelligence Service starting on {listen_addr}")
         await server.start()
         await server.wait_for_termination()
-        
+
     except Exception:
         logger.exception("Server crashed")
         raise
     finally:
         logger.info("Shutting down HTTP client...")
         await http_client.aclose()
+
 
 if __name__ == "__main__":
     try:
