@@ -21,6 +21,10 @@ env:
   DOCKER_IMAGE_NAME: kunalpisolkar/topos-ai
   SERVICE_PATH: ./services/ai
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-assurance:
     name: Run Tests & Lint

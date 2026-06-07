@@ -21,6 +21,10 @@ env:
   DOCKER_IMAGE_NAME: kunalpisolkar/topos-search
   SERVICE_PATH: ./services/search
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-assurance:
     name: Run Tests & Lint

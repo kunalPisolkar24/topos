@@ -26,6 +26,10 @@ on:
 env:
   DOCKER_IMAGE_NAME: kunalpisolkar/topos-gateway
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-assurance:
     name: Verify Supergraph Composition
