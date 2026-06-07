@@ -1,3 +1,4 @@
+import os from 'os';
 import pino from 'pino';
 import { env } from '../config/env';
 
@@ -35,5 +36,5 @@ export const logger = pino({
         paths: ['password', 'token', 'headers.authorization', 'user.password', 'input.password'],
         remove: true
     },
-    base: isProduction ? undefined : { pid: process.pid, hostname: require('os').hostname() }
+    base: isProduction ? undefined : { pid: process.pid, hostname: os.hostname() }
 });

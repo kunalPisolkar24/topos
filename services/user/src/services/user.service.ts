@@ -2,7 +2,7 @@ import { PrismaClient, User } from '../generated/prisma/client';
 import { PasswordHasher, passwordHasher } from '../utils/passwordHasher';
 import { TokenService, tokenService } from '../utils/tokenService';
 import { SignupInput, SigninInput, UpdateProfileInput } from '../types';
-import { IUserService, PaginationArgs, UserResponse } from './interfaces/user.service.interface';
+import { IUserService, PaginationArgs } from './interfaces/user.service.interface';
 import { metrics } from '../lib/metrics';
 import {
     InvalidCredentialsError,

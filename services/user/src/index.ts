@@ -17,10 +17,16 @@ const start = async () => {
             port: parseInt(env.PORT),
         });
 
-        new ShutdownManager(server as any, [
-            { name: 'apollo+cache', close: handle.shutdown },
-            { name: 'database', close: () => prisma.$disconnect() },
-        ]);
+        new ShutdownManager(
+            // @hono/node-server's serve() returns a server structurally compatible with node:http.Server
+            // but the declared type is not interchangeable under strict TS
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            server as any,
+            [
+                { name: 'apollo+cache', close: handle.shutdown },
+                { name: 'database', close: () => prisma.$disconnect() },
+            ]
+        );
 
     } catch (err) {
         logger.fatal({ msg: 'Failed to start server', err });

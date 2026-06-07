@@ -37,7 +37,7 @@ describe('ShutdownManager', () => {
             { name: 'database', close: vi.fn(async () => { calls.push('database'); }) }
         );
 
-        const manager = new ShutdownManager(server as any, closers, 5_000);
+        void new ShutdownManager(server as any, closers, 5_000);
         process.emit('SIGTERM');
 
         await new Promise((r) => setImmediate(r));

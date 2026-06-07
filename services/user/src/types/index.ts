@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { normalizeEmail, normalizeUsername, ValidationPatterns } from '../utils/normalize';
+import { normalizeUsername, ValidationPatterns } from '../utils/normalize';
 
 const usernameSchema = z
     .string()
