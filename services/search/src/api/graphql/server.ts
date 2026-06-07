@@ -16,9 +16,15 @@ export const buildApolloServer = (
     const maxDepth = options.maxDepth ?? 7;
 
     return new ApolloServer<BaseContext>({
-        schema: buildSubgraphSchema({ typeDefs, resolvers: resolvers as any }),
+        schema: buildSubgraphSchema({
+            typeDefs,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            resolvers: resolvers as any,
+        }),
         introspection: !options.isProduction,
         validationRules: [
+            // graphql-depth-limit and @apollo/server disagree on the ValidationRule type signature
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             depthLimit(maxDepth) as any,
         ],
         formatError: formatGraphQLError({ isProduction: options.isProduction }),

@@ -33,8 +33,10 @@ export const runShutdown = async (
     for (const step of steps) {
         try {
             await withTimeout(step.run, timeoutMs, step.name, logger);
-        } catch (err: any) {
-            logger.error(`Shutdown step '${step.name}' failed`, { error: err?.message });
+        } catch (err) {
+            logger.error(`Shutdown step '${step.name}' failed`, {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 };

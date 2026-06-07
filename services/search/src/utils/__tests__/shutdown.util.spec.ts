@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 import { ILogger } from '../../core/interfaces/logger.interface.js';
 import { withTimeout, runShutdown } from '../shutdown.util.js';

@@ -56,8 +56,10 @@ export class KafkaConsumer implements IBatchConsumer {
             eachBatch: async (payload) => {
                 try {
                     await handler(payload);
-                } catch (error: any) {
-                    this.logger.error('Fatal Batch Error', { error: error.message });
+                } catch (error) {
+                    this.logger.error('Fatal Batch Error', {
+                        error: error instanceof Error ? error.message : String(error),
+                    });
                     throw error;
                 }
             },

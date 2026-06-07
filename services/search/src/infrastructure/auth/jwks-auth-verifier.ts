@@ -56,8 +56,9 @@ export class JwksAuthVerifier implements IAuthVerifier {
         let result;
         try {
             result = await jwtVerify(token, this.jwks, this.verifyOptions);
-        } catch (err: any) {
-            throw new UnauthorizedError(`Invalid token: ${err?.message ?? 'verification failed'}`);
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            throw new UnauthorizedError(`Invalid token: ${detail || 'verification failed'}`);
         }
         const payload = result.payload as JWTPayload;
         return {

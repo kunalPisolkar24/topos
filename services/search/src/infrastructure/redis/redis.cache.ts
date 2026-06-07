@@ -58,32 +58,39 @@ export class RedisCache implements ICacheService {
             try {
                 await this.client.ping();
                 this.logger.info('Redis Connected');
-            } catch (err: any) {
-                this.logger.error('Redis ping failed', { error: err.message });
+            } catch (err) {
+                this.logger.error('Redis ping failed', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
                 throw err;
             }
             return;
         }
         try {
             await this.client.connect();
-        } catch (err: any) {
-            if (err.message && err.message.includes('already connecting')) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message && message.includes('already connecting')) {
                 try {
                     await this.client.ping();
                     this.logger.info('Redis Connected');
                     return;
-                } catch (pingErr: any) {
-                    this.logger.error('Redis ping failed', { error: pingErr.message });
+                } catch (pingErr) {
+                    this.logger.error('Redis ping failed', {
+                        error: pingErr instanceof Error ? pingErr.message : String(pingErr),
+                    });
                     throw pingErr;
                 }
             }
-            this.logger.error('Redis connect failed', { error: err.message });
+            this.logger.error('Redis connect failed', { error: message });
             throw err;
         }
         try {
             await this.client.ping();
-        } catch (err: any) {
-            this.logger.error('Redis ping failed', { error: err.message });
+        } catch (err) {
+            this.logger.error('Redis ping failed', {
+                error: err instanceof Error ? err.message : String(err),
+            });
             throw err;
         }
         this.logger.info('Redis Connected');
@@ -93,8 +100,10 @@ export class RedisCache implements ICacheService {
         try {
             await this.client.quit();
             this.logger.info('Redis Disconnected');
-        } catch (err: any) {
-            this.logger.error('Redis Disconnect Error', { error: err.message });
+        } catch (err) {
+            this.logger.error('Redis Disconnect Error', {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 

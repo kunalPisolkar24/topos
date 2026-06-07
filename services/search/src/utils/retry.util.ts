@@ -17,7 +17,7 @@ const computeBackoff = (base: number, factor: number, max: number): number => {
     return Number.isFinite(next) ? Math.min(next, max) : max;
 };
 
-const applyJitter = (delay: number, mode: JitterMode, attempt: number): number => {
+const applyJitter = (delay: number, mode: JitterMode): number => {
     if (mode === 'none') return delay;
     if (mode === 'full') {
         return Math.random() * delay;
@@ -63,7 +63,7 @@ export async function withRetry<T>(
         }
         try {
             return await fn();
-        } catch (error: any) {
+        } catch (error) {
             attempt += 1;
             if (onFailedAttempt) {
                 try {
@@ -79,10 +79,10 @@ export async function withRetry<T>(
             logger.warn('Operation failed, retrying', {
                 attempt,
                 maxRetries: retries,
-                error: error?.message ?? String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
 
-            const wait = applyJitter(currentDelay, jitter, attempt);
+            const wait = applyJitter(currentDelay, jitter);
             await sleep(wait, signal);
 
             currentDelay = computeBackoff(currentDelay, factor, maxDelay);
