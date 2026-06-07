@@ -18,8 +18,6 @@ on:
       - ".github/workflows/service-content.yaml"
 
 env:
-  SERVICE_IMAGE_NAME: kunalpisolkar/topos-content
-  WORKER_IMAGE_NAME: kunalpisolkar/topos-content-worker
   SERVICE_PATH: ./services/content
 
 concurrency:
@@ -64,11 +62,11 @@ jobs:
       matrix:
         include:
           - target: content-service
-            image: ${{ env.SERVICE_IMAGE_NAME }}
+            image: kunalpisolkar/topos-content
             tag_suffix: ""
             cache_namespace: service
           - target: content-worker
-            image: ${{ env.WORKER_IMAGE_NAME }}
+            image: kunalpisolkar/topos-content-worker
             tag_suffix: "-worker"
             cache_namespace: worker
 
@@ -105,5 +103,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.SERVICE_IMAGE_NAME }}:${{ matrix.cache_namespace }}-buildcache
-          cache-to: type=registry,ref=${{ env.SERVICE_IMAGE_NAME }}:${{ matrix.cache_namespace }}-buildcache,mode=max
+          cache-from: type=registry,ref=${{ matrix.image }}:${{ matrix.cache_namespace }}-buildcache
+          cache-to: type=registry,ref=${{ matrix.image }}:${{ matrix.cache_namespace }}-buildcache,mode=max
