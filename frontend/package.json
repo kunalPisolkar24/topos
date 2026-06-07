@@ -9,9 +9,9 @@
     "build": "npm run codegen && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --exclude='**/*.integration.test.{ts,tsx}'",
+    "test:watch": "vitest --exclude='**/*.integration.test.{ts,tsx}'",
+    "test:coverage": "vitest run --coverage --exclude='**/*.integration.test.{ts,tsx}'",
     "test:integration": "vitest run --reporter=verbose \"integration\""
   },
   "dependencies": {
