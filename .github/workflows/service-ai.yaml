@@ -18,7 +18,7 @@ on:
       - ".github/workflows/service-ai.yaml"
 
 env:
-  DOCKER_IMAGE_NAME: kunalpisolkar/blogapp-ai
+  DOCKER_IMAGE_NAME: kunalpisolkar/topos-ai
   SERVICE_PATH: ./services/ai
 
 jobs:

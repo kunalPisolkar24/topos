@@ -18,7 +18,7 @@ on:
       - ".github/workflows/service-user.yaml"
 
 env:
-  DOCKER_IMAGE_NAME: kunalpisolkar/blog-app-user
+  DOCKER_IMAGE_NAME: kunalpisolkar/topos-user
   SERVICE_PATH: ./services/user
 
 jobs:

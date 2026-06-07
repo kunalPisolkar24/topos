@@ -18,7 +18,7 @@ on:
       - ".github/workflows/service-search.yaml"
 
 env:
-  DOCKER_IMAGE_NAME: kunalpisolkar/blogapp-search
+  DOCKER_IMAGE_NAME: kunalpisolkar/topos-search
   SERVICE_PATH: ./services/search
 
 jobs:

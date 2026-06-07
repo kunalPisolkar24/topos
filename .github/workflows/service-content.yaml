@@ -18,8 +18,8 @@ on:
       - ".github/workflows/service-content.yaml"
 
 env:
-  SERVICE_IMAGE_NAME: kunalpisolkar/blogapp-content
-  WORKER_IMAGE_NAME: kunalpisolkar/blogapp-content-worker
+  SERVICE_IMAGE_NAME: kunalpisolkar/topos-content
+  WORKER_IMAGE_NAME: kunalpisolkar/topos-content-worker
   SERVICE_PATH: ./services/content
 
 jobs:
