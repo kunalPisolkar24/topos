@@ -7,9 +7,10 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run tests/unit",
+    "test:watch": "vitest tests/unit",
+    "test:coverage": "vitest run tests/unit --coverage",
+    "test:integration": "vitest run tests/integration",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy"
