@@ -1,14 +1,16 @@
-FROM debian:bullseye-slim as composer
+FROM debian:bullseye-slim AS composer
 
 RUN apt-get update && apt-get install -y curl ca-certificates
 
 RUN curl -sSL https://rover.apollo.dev/nix/latest | sh
 ENV PATH="/root/.rover/bin:${PATH}"
+ENV APOLLO_ELV2_LICENSE=accept
 
 WORKDIR /app
 
 COPY ./services/user/schema.graphql ./subgraphs/user.graphql
-COPY ./services/content/graph/schema.graphql ./subgraphs/content.graphql
+COPY ./services/content/graph/schema.graphqls ./subgraphs/content.graphql
+COPY ./services/search/schema.graphql ./subgraphs/search.graphql
 COPY ./gateway/supergraph.yaml ./supergraph.yaml
 
 RUN rover supergraph compose --config ./supergraph.yaml > supergraph.graphql

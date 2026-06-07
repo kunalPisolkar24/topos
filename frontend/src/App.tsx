@@ -1,30 +1,77 @@
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from "@/components/utils/theme-provider";
-import { Signup } from '@/components/auth';
-import { Signin } from '@/components/auth/';
-import Home from "@/components/pages/Home";
-import ViewBlogPage from '@/components/pages/ViewBlogPage';
-import CreateNewBlog from '@/components/pages/CreateNewBlog';
-import UserProfile from '@/components/pages/UserProfile';
-import SearchResultsPage from '@/components/pages/SearchResultsPage';
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import Home from "@/pages/Home";
+import SearchResultsPage from "@/pages/SearchResultsPage";
+import ViewBlogPage from "@/pages/ViewBlogPage";
+import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { ProtectedRoute } from "@/app/routing/ProtectedRoute";
+import { PublicOnlyRoute } from "@/app/routing/PublicOnlyRoute";
+
+const Signup = lazy(() =>
+  import("@/features/auth").then((module) => ({
+    default: module.Signup,
+  })),
+);
+
+const Signin = lazy(() =>
+  import("@/features/auth").then((module) => ({
+    default: module.Signin,
+  })),
+);
+
+const CreateNewBlog = lazy(() =>
+  import("@/pages/CreateNewBlog").then((module) => ({
+    default: module.default,
+  })),
+);
+
+const UserProfile = lazy(() =>
+  import("@/pages/UserProfile").then((module) => ({
+    default: module.default,
+  })),
+);
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <Router>
-        <Routes>
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/signin" element={<Signin />} />
-          <Route path="/" element={<Home />} />
-          <Route path="/blog/:id" element={<ViewBlogPage />} />
-          <Route path="/create-blog" element={<CreateNewBlog />} />
-          <Route path="/profile" element={<UserProfile />} />
-          <Route path="*" element={<Navigate to="/signin" />} />
-          <Route path="/search" element={<SearchResultsPage />} />
-        </Routes>
-      </Router>
-      <Toaster />
-    </ThemeProvider>
+    <Suspense fallback={<LoadingSpinner />}>
+      <Routes>
+        <Route
+          path="/signup"
+          element={
+            <PublicOnlyRoute>
+              <Signup />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route
+          path="/signin"
+          element={
+            <PublicOnlyRoute>
+              <Signin />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route path="/" element={<Home />} />
+        <Route path="/blog/:id" element={<ViewBlogPage />} />
+        <Route
+          path="/create-blog"
+          element={
+            <ProtectedRoute>
+              <CreateNewBlog />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/search" element={<SearchResultsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

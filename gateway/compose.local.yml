@@ -1,0 +1,19 @@
+services:
+  gateway:
+    build:
+      context: ../
+      dockerfile: gateway/Dockerfile
+    container_name: ${GATEWAY_CONTAINER:-local-gateway}
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_EXT_PORT:-4000}:${GATEWAY_INT_PORT:-4000}"
+    depends_on:
+      - user-service
+      - content-service
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: ${APP_NETWORK:-topos_local_network}
+    driver: bridge

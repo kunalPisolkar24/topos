@@ -18,8 +18,12 @@ on:
       - ".github/workflows/service-user.yaml"
 
 env:
-  DOCKER_IMAGE_NAME: kunalpisolkar/blog-app-user
+  DOCKER_IMAGE_NAME: kunalpisolkar/topos-user
   SERVICE_PATH: ./services/user
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality-assurance:
@@ -48,8 +52,16 @@ jobs:
           DATABASE_URL_MIGRATE: "postgresql://dummy:dummy@localhost:5432/dummy"
         run: npx prisma generate
 
+      - name: Run Lint
+        run: npm run lint
+
       - name: Run Tests
         run: npm run test
+
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL_MIGRATE: "postgresql://dummy:dummy@localhost:5432/dummy"
+        run: npm run test:integration
 
   build-and-push:
     name: Build & Push Docker Image

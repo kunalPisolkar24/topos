@@ -1,0 +1,109 @@
+name: Service - Content
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - "services/content/**"
+      - ".github/workflows/service-content.yaml"
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - "services/content/**"
+      - ".github/workflows/service-content.yaml"
+
+env:
+  SERVICE_IMAGE_NAME: kunalpisolkar/topos-content
+  WORKER_IMAGE_NAME: kunalpisolkar/topos-content-worker
+  SERVICE_PATH: ./services/content
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-assurance:
+    name: Run Tests & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.SERVICE_PATH }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: ${{ env.SERVICE_PATH }}/go.sum
+
+      - name: Install Dependencies
+        run: go mod download
+
+      - name: Verify Code
+        run: go vet ./...
+
+      - name: Run Tests
+        run: go test -v -cover ./...
+
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: quality-assurance
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: content-service
+            image: ${{ env.SERVICE_IMAGE_NAME }}
+            tag_suffix: ""
+            cache_namespace: service
+          - target: content-worker
+            image: ${{ env.WORKER_IMAGE_NAME }}
+            tag_suffix: "-worker"
+            cache_namespace: worker
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest${{ matrix.tag_suffix }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short,suffix=${{ matrix.tag_suffix }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.SERVICE_PATH }}
+          file: ${{ env.SERVICE_PATH }}/Dockerfile
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.SERVICE_IMAGE_NAME }}:${{ matrix.cache_namespace }}-buildcache
+          cache-to: type=registry,ref=${{ env.SERVICE_IMAGE_NAME }}:${{ matrix.cache_namespace }}-buildcache,mode=max

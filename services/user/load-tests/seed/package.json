@@ -1,0 +1,10 @@
+{
+  "name": "user-service-loadtest-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Idempotent seed for the user-service load test rig",
+  "main": "seed.ts",
+  "scripts": {
+    "start": "tsx seed.ts"
+  }
+}

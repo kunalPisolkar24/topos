@@ -20,7 +20,6 @@ Welcome to **BlogApp**, a feature-rich, high-performance blogging platform engin
     *   **XSS Protection:** Employs DOMPurify to sanitize all rich text input, effectively preventing cross-site scripting attacks.
     *   **Rate Limiting:** API endpoints are safeguarded with a rate limiter (120 requests/60 secs per user) implemented via Upstash Redis.
     *   **Input Validation:** Zod ensures strict data integrity and validation for all backend operations.
-    *   **DDoS Protection:** The Vercel-deployed frontend benefits from built-in DDoS mitigation.
 *   **👤 Secure User Management:** Implements secure mechanisms for user authentication, authorization, and content ownership.
 *   **⚙️ Asynchronous Operations:** Critical tasks like summary generation are handled by a dedicated worker service using a Redis producer-consumer pattern, ensuring the main application remains highly responsive.
 *   **🧪 Comprehensive Testing:** Boasts over **80% test coverage** (statements, lines, functions, branches) for the backend, achieved using Vitest and `@cloudflare/vitest-pool-workers`.
@@ -58,7 +57,7 @@ This project is built with a cutting-edge and scalable technology stack:
     *   **ORM:** Prisma
     *   **Language:** TypeScript
 *   **DevOps & Deployment Infrastructure:**
-    *   **Frontend Hosting:** Vercel (CI/CD, DDoS Protection)
+    *   **Frontend Hosting:** Docker (nginx)
     *   **Backend API Hosting:** Cloudflare Workers (CI/CD)
     *   **Summary Worker Hosting:** Railway (Serverless, CI/CD)
     *   **AI Model Hosting:** Lightning AI (Autoscaling with 16GB RAM, 4vCPUs per replica)
@@ -108,7 +107,7 @@ To set up and run the entire BlogApp stack on your local machine for development
     *   **Frontend:** Typically accessible at `http://localhost:5173`
     *   **Backend API (Cloudflare Worker dev server):** `http://localhost:8787`
     *   **Summary API (Flask):** `http://localhost:5000`
-    *   *(Refer to the `docker-compose.yml` file and individual service logs for precise port mappings if they deviate from these defaults.)*
+    *   *(Refer to `infrastructure/docker/prod/docker-compose.yml` and individual service logs for precise port mappings if they deviate from these defaults.)*
 
 5.  **Stopping the Environment:**
     To stop all running services and remove the containers and network:

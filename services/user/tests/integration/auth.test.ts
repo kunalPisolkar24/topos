@@ -3,7 +3,13 @@ import { Hono } from 'hono';
 import { prismaMock } from '../mocks/prisma';
 import { faker } from '@faker-js/faker';
 
-vi.mock('../../src/lib/prisma', () => import('../mocks/prisma'));
+vi.mock('../../src/generated/prisma/client', () => ({
+    PrismaClient: vi.fn(() => prismaMock)
+}));
+
+vi.mock('../../src/lib/prisma', () => ({
+    default: prismaMock
+}));
 
 describe('Auth Integration Tests', () => {
     let app: Hono;
@@ -41,8 +47,8 @@ describe('Auth Integration Tests', () => {
 
     it('POST /graphql - Signup flow', async () => {
         const payload = {
-            email: faker.internet.email(),
-            username: faker.internet.username(),
+            email: faker.internet.email().toLowerCase(),
+            username: faker.string.alphanumeric({ length: 10, casing: 'lower' }),
             password: 'securePassword123!',
         };
 
@@ -86,8 +92,8 @@ describe('Auth Integration Tests', () => {
             createdAt: new Date(),
         } as any;
 
-        const { PasswordUtils } = await import('../../src/utils/password');
-        vi.spyOn(PasswordUtils, 'compare').mockResolvedValue(true);
+        const { Argon2PasswordHasher } = await import('../../src/utils/passwordHasher');
+        vi.spyOn(Argon2PasswordHasher.prototype, 'verify').mockResolvedValue(true);
 
         prismaMock.user.findUnique.mockResolvedValue(userMock);
 
@@ -106,8 +112,9 @@ describe('Auth Integration Tests', () => {
         expect(response.status).toBe(200);
         const body = await response.json();
 
-        expect(body.data.signin.user.id).toBe('456');
-        expect(body.data.signin.token).toBeDefined();
+        expect(body.data?.signin.user.id).toBe('456');
+        expect(body.data?.signin.token).toBeDefined();
+        expect(body.errors).toBeUndefined();
     });
 
     it('GET /health - Health check', async () => {
