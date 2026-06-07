@@ -51,6 +51,11 @@ jobs:
       - name: Run Tests
         run: npm run test
 
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL_MIGRATE: "postgresql://dummy:dummy@localhost:5432/dummy"
+        run: npm run test:integration
+
   build-and-push:
     name: Build & Push Docker Image
     needs: quality-assurance

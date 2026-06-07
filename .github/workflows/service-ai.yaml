@@ -44,7 +44,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install flake8
+          pip install ruff
 
       - name: Generate gRPC Code
         run: |
@@ -53,9 +53,8 @@ jobs:
           python -m grpc_tools.protoc -Iproto --python_out=src/generated --grpc_python_out=src/generated ai_service.proto
           find src/generated -type f -name "*.py" -exec sed -i 's/^import ai_service_pb2/from . import ai_service_pb2/' {} +
 
-      # - name: Run Linting
-      #   run: |
-      #     flake8 src
+      - name: Run Linting
+        run: ruff check src
 
       - name: Run Tests
         run: |
