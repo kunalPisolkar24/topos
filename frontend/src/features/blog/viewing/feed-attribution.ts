@@ -6,6 +6,7 @@
 // directly, so they only need this handoff.
 
 import type { RecommendMode } from "@/shared/graphql/content-documents";
+import { browserSessionStorage, type StoragePort } from "@/shared/lib/storage";
 
 const FEED_MODE_KEY_PREFIX = "topos.feedMode.";
 
@@ -14,39 +15,40 @@ const FEED_MODES: ReadonlySet<string> = new Set<RecommendMode>([
   "SURPRISE",
 ]);
 
+let storage: StoragePort = browserSessionStorage;
+
+export function setFeedAttributionStorage(port: StoragePort): void {
+  storage = port;
+}
+
+export function getFeedAttributionStorage(): StoragePort {
+  return storage;
+}
+
 // markFeedMode remembers the feed mode a post was displayed in. It is
-// best-effort: a full or disabled sessionStorage never breaks the feed.
+// best-effort: a full or disabled storage never breaks the feed.
 export function markFeedMode(postId: string, mode: RecommendMode): void {
-  try {
-    sessionStorage.setItem(FEED_MODE_KEY_PREFIX + postId, mode);
-  } catch {
-    // storage unavailable (private mode, quota): attribution is lost
-  }
+  storage.setItem(FEED_MODE_KEY_PREFIX + postId, mode);
 }
 
 // takeFeedMode reads and clears the stored feed mode for a post, so the
 // view event can carry it. Unknown values are treated as no attribution.
 export function takeFeedMode(postId: string): RecommendMode | null {
-  try {
-    const mode = sessionStorage.getItem(FEED_MODE_KEY_PREFIX + postId);
-    sessionStorage.removeItem(FEED_MODE_KEY_PREFIX + postId);
-    return mode !== null && FEED_MODES.has(mode) ? (mode as RecommendMode) : null;
-  } catch {
-    return null;
-  }
+  const mode = storage.getItem(FEED_MODE_KEY_PREFIX + postId);
+  storage.removeItem(FEED_MODE_KEY_PREFIX + postId);
+  return mode !== null && FEED_MODES.has(mode) ? (mode as RecommendMode) : null;
 }
 
 export function resetFeedAttributionForTests(): void {
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i += 1) {
-      const key = sessionStorage.key(i);
-      if (key?.startsWith(FEED_MODE_KEY_PREFIX)) {
-        keys.push(key);
-      }
-    }
-    keys.forEach((key) => sessionStorage.removeItem(key));
-  } catch {
-    // storage unavailable: nothing to clear
+  if (storage.length === undefined || !storage.key) {
+    return;
   }
+  const keys: string[] = [];
+  for (let i = 0; i < (storage.length ?? 0); i += 1) {
+    const key = storage.key(i);
+    if (key?.startsWith(FEED_MODE_KEY_PREFIX)) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => storage.removeItem(key));
 }

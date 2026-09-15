@@ -2,9 +2,9 @@ import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Edit3, Mail, Trash2, UserRound } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
+import { Card, CardContent, CardHeader } from "@/shared/ui/primitives/card";
+import { Button } from "@/shared/ui/primitives/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,7 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/shared/ui/primitives/alert-dialog";
 import { cn } from "@/shared/lib/cn";
 
 interface Author {

@@ -4,10 +4,6 @@ import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
 const toastMock = vi.fn();
 const updateProfileMock = vi.fn();
 
-vi.mock("@apollo/client/react", () => ({
-  useMutation: () => [updateProfileMock, { loading: false }],
-}));
-
 vi.mock("@/shared/ui/hooks/useToast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
@@ -19,21 +15,9 @@ vi.mock("@/entities/upload", () => ({
   }),
 }));
 
-vi.mock("@/entities/user", () => ({
-  sanitizeProfileName: (v: string) => v.trim(),
-  sanitizeProfileBioInput: (v: string) => v,
-  sanitizeProfileFormData: (v: { name?: string; bio?: string }) => ({
-    name: (v.name ?? "").trim(),
-    bio: v.bio ?? "",
-  }),
-  buildProfileUpdatePayload: (
-    next: { name: string; bio: string },
-    current: { name: string; bio: string },
-  ) => {
-    const payload: Record<string, string> = {};
-    if (next.name && next.name !== current.name) payload.name = next.name;
-    if (next.bio !== current.bio) payload.bio = next.bio;
-    return payload;
+vi.mock("@/entities/user/api/userRepository", () => ({
+  userRepository: {
+    useUpdateProfile: () => [updateProfileMock, { loading: false }],
   },
 }));
 

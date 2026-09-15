@@ -35,22 +35,6 @@ export interface MockPost {
   updatedAt: string;
 }
 
-export interface MockChat {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface MockChatMessage {
-  id: string;
-  chatId: string;
-  role: "USER" | "ASSISTANT";
-  content: string;
-  citedPostIds: string[];
-  createdAt: string;
-}
-
 const buildBody = (intro: string, points: string[], outro: string) =>
   [
     `<p>${intro}</p>`,
@@ -510,78 +494,7 @@ const posts: MockPost[] = [
   },
 ];
 
-const chats: MockChat[] = [
-  {
-    id: "chat-1",
-    title: "Rust vs Go for backend services",
-    createdAt: "2025-06-01T10:00:00.000Z",
-    updatedAt: "2025-06-01T10:15:00.000Z",
-  },
-  {
-    id: "chat-2",
-    title: "Scaling Postgres",
-    createdAt: "2025-06-05T14:30:00.000Z",
-    updatedAt: "2025-06-05T14:35:00.000Z",
-  },
-];
-
-const chatMessages: MockChatMessage[] = [
-  {
-    id: "message-1",
-    chatId: "chat-1",
-    role: "USER",
-    content: "What are the main trade-offs between Rust and Go for building backend services?",
-    citedPostIds: [],
-    createdAt: "2025-06-01T10:00:00.000Z",
-  },
-  {
-    id: "message-2",
-    chatId: "chat-1",
-    role: "ASSISTANT",
-    content:
-      "Both are excellent for backend work, but they trade different currencies. Go keeps the team moving fast with a simple language and a great toolchain, while Rust offers stronger guarantees at the cost of a steeper learning curve. If you are a Go team, the ownership model is the biggest adjustment, but it pays off where memory safety and peak performance matter. Two of our posts cover this directly.",
-    citedPostIds: ["post-3", "post-9"],
-    createdAt: "2025-06-01T10:01:00.000Z",
-  },
-  {
-    id: "message-3",
-    chatId: "chat-1",
-    role: "USER",
-    content: "Which one has a smoother learning curve for a Go team?",
-    citedPostIds: [],
-    createdAt: "2025-06-01T10:08:00.000Z",
-  },
-  {
-    id: "message-4",
-    chatId: "chat-1",
-    role: "ASSISTANT",
-    content:
-      "Go, without question. You can be productive in a week because there is very little to learn beyond the standard library and goroutines. Rust takes months of focused practice before the borrow checker stops slowing you down. That said, the article on Rust ownership for Go developers argues the model becomes intuitive once it clicks.",
-    citedPostIds: ["post-3"],
-    createdAt: "2025-06-01T10:09:00.000Z",
-  },
-  {
-    id: "message-5",
-    chatId: "chat-2",
-    role: "USER",
-    content: "What is the right way to handle connection exhaustion under high concurrency?",
-    citedPostIds: [],
-    createdAt: "2025-06-05T14:30:00.000Z",
-  },
-  {
-    id: "message-6",
-    chatId: "chat-2",
-    role: "ASSISTANT",
-    content:
-      "The short answer is to pool connections at the proxy layer and size the pool against query duration rather than instance count. We wrote about the exact math and the pitfalls we hit, including idle session pins silently defeating the pool.",
-    citedPostIds: ["post-6"],
-    createdAt: "2025-06-05T14:31:00.000Z",
-  },
-];
-
 let nextPostId = 100;
-let nextChatId = 100;
-let nextMessageId = 100;
 let signedInUser: MockUser | null = null;
 
 const getUser = (id: string) => {
@@ -594,12 +507,6 @@ const getTag = (id: string) => {
   const tag = tags.find((t) => t.id === id);
   if (!tag) throw new Error(`Mock tag ${id} not found`);
   return tag;
-};
-
-const getChat = (id: string) => {
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) throw new Error(`Mock chat ${id} not found`);
-  return chat;
 };
 
 const sortNewestFirst = <T extends { createdAt: string }>(items: T[]) =>
@@ -705,24 +612,6 @@ const toPaginatedPostsResponse = (items: MockPost[], page: number, limit: number
     totalPosts: total,
   };
 };
-
-const toChatResponse = (chat: MockChat) => ({
-  __typename: "Chat",
-  id: chat.id,
-  title: chat.title,
-  createdAt: chat.createdAt,
-  updatedAt: chat.updatedAt,
-});
-
-const toChatMessageResponse = (message: MockChatMessage) => ({
-  __typename: "ChatMessage",
-  id: message.id,
-  chatId: message.chatId,
-  role: message.role,
-  content: message.content,
-  citedPostIds: message.citedPostIds,
-  createdAt: message.createdAt,
-});
 
 export const listPosts = (page = 1, limit = 6) =>
   toPaginatedPostsResponse(sortNewestFirst(posts), page, limit);
@@ -935,112 +824,258 @@ export const generatePostContent = (prompt: string) => {
   };
 };
 
-export const listChats = (page = 1, limit = 10) => {
-  const { items: pageItems, totalPages, currentPage, total } = paginate(
-    sortNewestFirst(chats),
-    page,
-    limit,
-  );
-  return {
-    __typename: "PaginatedChats",
-    chats: pageItems.map(toChatResponse),
-    totalPages,
-    currentPage,
-    totalChats: total,
-  };
-};
+export interface MockDraft {
+  id: string;
+  approvalId: string;
+  prompt: string;
+  title: string;
+  body: string;
+  summary: string;
+  tags: string[];
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  authorId: string;
+  postId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export const getChatResponse = (id: string) => {
-  const chat = chats.find((c) => c.id === id);
-  return chat ? toChatResponse(chat) : null;
-};
+let nextDraftId = 100;
+let nextApprovalId = 200;
 
-export const listChatMessages = (chatId: string, page = 1, limit = 20) => {
-  const { items: pageItems, totalPages, currentPage, total } = paginate(
-    chatMessages.filter((message) => message.chatId === chatId),
-    page,
-    limit,
-  );
-  return {
-    __typename: "PaginatedMessages",
-    messages: pageItems.map(toChatMessageResponse),
-    totalPages,
-    currentPage,
-    totalMessages: total,
-  };
-};
-
-export const createChat = (title: string | null | undefined) => {
-  const now = nowIso();
-  const chat: MockChat = {
-    id: `chat-${nextChatId++}`,
-    title: title ?? "New conversation",
-    createdAt: now,
-    updatedAt: now,
-  };
-  chats.unshift(chat);
-  return toChatResponse(chat);
-};
-
-export const renameChat = (id: string, title: string) => {
-  const chat = getChat(id);
-  chat.title = title;
-  chat.updatedAt = nowIso();
-  return toChatResponse(chat);
-};
-
-export const deleteChat = (id: string) => {
-  const index = chats.findIndex((c) => c.id === id);
-  if (index === -1) throw new Error(`Mock chat ${id} not found`);
-  chats.splice(index, 1);
-  return true;
-};
-
-const ASSISTANT_REPLIES: Array<{ content: string; citedPostIds: string[] }> = [
+const drafts: MockDraft[] = [
   {
-    content:
-      "Good question. In our experience the answer depends on whether you are optimizing for throughput or consistency. We covered related patterns in two posts that might help: one on reliable event processing and another on idempotent APIs.",
-    citedPostIds: ["post-11", "post-15"],
+    id: "draft-1",
+    approvalId: "approval-1",
+    prompt: "Write about connection pooling for Postgres at scale",
+    title: "Postgres Connection Pooling at Scale",
+    body: buildBody(
+      "Pooling Postgres connections behind a proxy lets many app instances share a bounded set of backend sessions.",
+      [
+        "Size the pool against query duration and QPS, not replica count.",
+        "Detect idle-in-transaction pins that silently exhaust the pool.",
+        "Cancel slow queries early to free connections faster.",
+      ],
+      "With the right pool math and observability, a small fixed pool is safer than generous per-instance limits.",
+    ),
+    summary: "Sizing and operating a Postgres connection pool behind a shared proxy without burning connections.",
+    tags: ["Databases", "DevOps"],
+    status: "PENDING",
+    authorId: "user-1",
+    postId: null,
+    createdAt: "2025-03-02T10:00:00.000Z",
+    updatedAt: "2025-03-02T10:00:00.000Z",
   },
   {
-    content:
-      "There is a well-trodden path here. Start by measuring where the time actually goes, then apply the cheapest fix that moves the metric. Our post on cutting p95 latency walks through three fixes that worked in production.",
-    citedPostIds: ["post-13"],
+    id: "draft-2",
+    approvalId: "approval-2",
+    prompt: "Explain hybrid dense and sparse search with Qdrant",
+    title: "Hybrid Search with Dense and Sparse Vectors",
+    body: buildBody(
+      "Hybrid retrieval combines semantic recall from dense embeddings with lexical precision from sparse vectors.",
+      [
+        "Dense vectors miss rare terms; sparse vectors preserve them like learned BM25.",
+        "Index both representations per post and fuse scores at the ranker.",
+        "Evaluate on ranking NDCG, not embedding cosine alone.",
+      ],
+      "We ship both signals into Qdrant and fuse at query time for a clear relevance lift on technical content.",
+    ),
+    summary: "Indexing posts as dense plus sparse vectors and fusing scores at the ranker for better relevance.",
+    tags: ["Machine Learning", "Databases"],
+    status: "PENDING",
+    authorId: "user-2",
+    postId: null,
+    createdAt: "2025-03-03T08:30:00.000Z",
+    updatedAt: "2025-03-03T08:30:00.000Z",
   },
   {
-    content:
-      "This connects to how we run search at Topos. We use hybrid dense and sparse embeddings fused at the ranker level, and fine-tuned the embedding model on curated pairs. The posts below go into both halves of the pipeline.",
-    citedPostIds: ["post-8", "post-14"],
+    id: "draft-3",
+    approvalId: "approval-3",
+    prompt: "Design idempotent APIs with client-generated keys",
+    title: "Designing Idempotent APIs for Retries",
+    body: buildBody(
+      "At-least-once retries are the normal path in distributed systems; APIs must tolerate safe replay.",
+      [
+        "Accept a client-generated idempotency key and dedupe on first write.",
+        "Return the stored response for replayed keys instead of re-executing.",
+        "Prefer natural keys when uniqueness already implies idempotency.",
+      ],
+      "A small idempotency contract pays for itself the moment partial failures become routine.",
+    ),
+    summary: "Client keys, stored responses, and natural keys that make mutating APIs safely retryable.",
+    tags: ["Distributed Systems", "Go"],
+    status: "PENDING",
+    authorId: "user-3",
+    postId: null,
+    createdAt: "2025-03-04T09:15:00.000Z",
+    updatedAt: "2025-03-04T09:15:00.000Z",
   },
   {
-    content:
-      "The safest approach is expand-and-contract: add the new structure while old code still runs, dual-write during the transition, and drop the old structure only after backfill and verification. Our zero-downtime migration playbook has the full sequence.",
-    citedPostIds: ["post-16"],
+    id: "draft-4",
+    approvalId: "approval-4",
+    prompt: "Guide to rolling out zero-trust mTLS between services",
+    title: "Zero-Trust mTLS Between Services",
+    body: buildBody(
+      "Zero-trust replaces implicit network trust with short-lived cryptographic identity per service.",
+      [
+        "Issue mutual TLS certificates with automatic rotation.",
+        "Enforce per-endpoint policies at the proxy rather than firewall ports.",
+        "Roll out incrementally starting from the highest-value paths.",
+      ],
+      "Treat every hop as untrusted until proven otherwise, and rotate credentials faster than they can leak.",
+    ),
+    summary: "Moving from VPC trust to short-lived mTLS with proxy-enforced policies.",
+    tags: ["Security", "DevOps"],
+    status: "APPROVED",
+    authorId: "user-4",
+    postId: "post-1",
+    createdAt: "2025-02-28T12:00:00.000Z",
+    updatedAt: "2025-03-01T14:00:00.000Z",
+  },
+  {
+    id: "draft-5",
+    approvalId: "approval-5",
+    prompt: "Compare TypeScript conditional types to generics",
+    title: "Conditional Types Versus Generics in TypeScript",
+    body: buildBody(
+      "Conditional types turn generics from placeholders into type-level programs.",
+      [
+        "Map types with conditionals to build utilities like Pick and ReturnType.",
+        "Use infer to peel hidden types out of generic positions.",
+        "Prefer simple generics unless the abstraction pays back in autocomplete.",
+      ],
+      "Conditional types are powerful and easy to overuse; keep them hidden behind well-named helpers.",
+    ),
+    summary: "How conditional types extend generics with inference and mapped-type power.",
+    tags: ["TypeScript"],
+    status: "REJECTED",
+    authorId: "user-5",
+    postId: null,
+    createdAt: "2025-02-27T16:00:00.000Z",
+    updatedAt: "2025-02-28T11:00:00.000Z",
   },
 ];
 
-export const askChat = (chatId: string, query: string) => {
-  getChat(chatId);
-  const now = nowIso();
-  chatMessages.push({
-    id: `message-${nextMessageId++}`,
-    chatId,
-    role: "USER",
-    content: query,
-    citedPostIds: [],
-    createdAt: now,
-  });
-  const reply = ASSISTANT_REPLIES[chatMessages.length % ASSISTANT_REPLIES.length];
-  const message: MockChatMessage = {
-    id: `message-${nextMessageId++}`,
-    chatId,
-    role: "ASSISTANT",
-    content: reply.content,
-    citedPostIds: reply.citedPostIds,
-    createdAt: nowIso(),
+const toDraftResponse = (draft: MockDraft) => ({
+  __typename: "PostDraft" as const,
+  id: draft.id,
+  approvalId: draft.approvalId,
+  prompt: draft.prompt,
+  title: draft.title,
+  body: draft.body,
+  summary: draft.summary,
+  tags: draft.tags,
+  status: draft.status,
+  authorId: draft.authorId,
+  postId: draft.postId,
+  createdAt: draft.createdAt,
+  updatedAt: draft.updatedAt,
+});
+
+const toPaginatedDraftsResponse = (items: MockDraft[], page: number, limit: number) => {
+  const { items: pageItems, totalPages, currentPage, total } = paginate(
+    sortNewestFirst(items),
+    page,
+    limit,
+  );
+  return {
+    __typename: "PaginatedPostDrafts" as const,
+    drafts: pageItems.map(toDraftResponse),
+    totalPages,
+    currentPage,
+    totalDrafts: total,
   };
-  chatMessages.push(message);
-  const chat = getChat(chatId);
-  chat.updatedAt = message.createdAt;
-  return toChatMessageResponse(message);
+};
+
+export const createMockDraft = (overrides: Partial<MockDraft> = {}): MockDraft => {
+  const now = nowIso();
+  return {
+    id: `draft-${nextDraftId++}`,
+    approvalId: `approval-${nextApprovalId++}`,
+    prompt: "Write a draft about reliable event processing",
+    title: "Reliable Event Processing with Kafka",
+    body: buildBody(
+      "Reliable consumption starts with idempotency and offset hygiene.",
+      [
+        "Store offsets only after side effects commit.",
+        "Design for reprocessing by making handlers idempotent.",
+        "Keep partition keys stable for ordering.",
+      ],
+      "Combine a DLQ with replay and Kafka becomes boring in the best way.",
+    ),
+    summary: "Patterns that keep Kafka consumers reliable without over-engineering.",
+    tags: ["Distributed Systems", "DevOps"],
+    status: "PENDING",
+    authorId: signedInUser?.id ?? users[0].id,
+    postId: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+};
+
+export const listPostDrafts = (page = 1, limit = 6) =>
+  toPaginatedDraftsResponse(drafts, page, limit);
+
+export const listMyPostDrafts = (page = 1, limit = 6) => {
+  const ownerId = signedInUser?.id ?? users[0].id;
+  const mine = drafts.filter((draft) => draft.authorId === ownerId);
+  return toPaginatedDraftsResponse(mine, page, limit);
+};
+
+export const getDraft = (id: string) => {
+  const draft = drafts.find((d) => d.id === id);
+  return draft ? toDraftResponse(draft) : null;
+};
+
+export const createPostDraft = (prompt: string) => {
+  const authorId = signedInUser?.id ?? users[0].id;
+  const generated = generatePostContent(prompt);
+  const now = nowIso();
+  const draft: MockDraft = {
+    id: `draft-${nextDraftId++}`,
+    approvalId: `approval-${nextApprovalId++}`,
+    prompt,
+    title: generated.title,
+    body: generated.body,
+    summary: generated.summary,
+    tags: generated.tags,
+    status: "PENDING",
+    authorId,
+    postId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  drafts.unshift(draft);
+  return toDraftResponse(draft);
+};
+
+export const approvePostDraft = (
+  id: string,
+  input?: { title?: string | null; body?: string | null; summary?: string | null; tags?: string[] | null } | null,
+) => {
+  const draft = drafts.find((d) => d.id === id);
+  if (!draft) throw new Error(`Mock draft ${id} not found`);
+  if (input?.title !== undefined && input?.title !== null) draft.title = input.title;
+  if (input?.body !== undefined && input?.body !== null) draft.body = input.body;
+  if (input?.summary !== undefined && input?.summary !== null) draft.summary = input.summary;
+  if (input?.tags !== undefined && input?.tags !== null) draft.tags = input.tags;
+  draft.status = "APPROVED";
+  draft.postId = draft.postId ?? `post-${nextPostId++}`;
+  draft.updatedAt = nowIso();
+  return toDraftResponse(draft);
+};
+
+export const rejectPostDraft = (id: string) => {
+  const draft = drafts.find((d) => d.id === id);
+  if (!draft) throw new Error(`Mock draft ${id} not found`);
+  draft.status = "REJECTED";
+  draft.updatedAt = nowIso();
+  return toDraftResponse(draft);
+};
+
+export const deletePostDraft = (id: string) => {
+  const index = drafts.findIndex((d) => d.id === id);
+  if (index === -1) throw new Error(`Mock draft ${id} not found`);
+  drafts.splice(index, 1);
+  return true;
 };

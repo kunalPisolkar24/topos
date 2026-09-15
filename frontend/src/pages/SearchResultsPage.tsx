@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@apollo/client/react";
-import { PagePagination, StickyNavbar } from "@/widgets";
+import { PagePagination } from "@/shared/ui/PagePagination";
+import { StickyNavbar } from "@/widgets";
 import { BlogCard } from "@/features/blog";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
-import { SearchPostsDocument } from "@/shared/graphql/content-documents";
-import { buildSearchPagination, mapPostToBlogCardItem } from "@/entities/post/lib";
+import { useSearchResultsController } from "@/features/search/useSearchResultsController";
+import { getGraphQLErrorMessage } from "@/shared/api";
 
 const SEARCH_RESULTS_PAGE_SIZE = 6;
 
@@ -22,30 +22,15 @@ const SearchResultsPage: React.FC = () => {
     }
   }, [navigate, query]);
 
-  const { data, loading } = useQuery(SearchPostsDocument, {
-    variables: {
-      query,
-      page,
-      limit: SEARCH_RESULTS_PAGE_SIZE,
-    },
-    skip: query.length === 0,
-    notifyOnNetworkStatusChange: true,
-  });
+  const { results, paginationInfo, loading, error, data } =
+    useSearchResultsController(query, page, SEARCH_RESULTS_PAGE_SIZE);
 
-  const results = useMemo(
-    () => data?.searchPosts.hits.map(mapPostToBlogCardItem) ?? [],
-    [data],
-  );
-
-  const paginationInfo = useMemo(
-    () =>
-      buildSearchPagination(
-        data?.searchPosts.total ?? 0,
-        page,
-        SEARCH_RESULTS_PAGE_SIZE,
-      ),
-    [data, page],
-  );
+  const totalPages = paginationInfo.totalPages;
+  useEffect(() => {
+    if (!loading && data?.searchPosts && page > totalPages) {
+      setSearchParams({ q: query, page: totalPages.toString() });
+    }
+  }, [page, totalPages, loading, data, query, setSearchParams]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -56,6 +41,19 @@ const SearchResultsPage: React.FC = () => {
       setSearchParams({ q: query, page: nextPage.toString() });
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-surface">
+        <StickyNavbar />
+        <main className="container mx-auto pb-8 pt-app-navbar-offset">
+          <div className="max-w-[88rem] px-4 sm:px-5 lg:mx-auto lg:px-6">
+            <p className="text-sm text-destructive">{getGraphQLErrorMessage(error, "Could not load search results.")}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface">
@@ -74,7 +72,7 @@ const SearchResultsPage: React.FC = () => {
                 Search Results for "{query}"
               </h1>
               <p className="mb-8 text-sm text-muted-foreground">
-                {data?.searchPosts.total ?? 0} posts found.
+                {data?.searchPosts?.total ?? 0} posts found.
               </p>
             </div>
 

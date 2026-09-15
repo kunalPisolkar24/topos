@@ -6,6 +6,7 @@ import ViewBlogPage from "@/pages/ViewBlogPage";
 import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { ProtectedRoute } from "@/app/routing/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/routing/PublicOnlyRoute";
+import { hasValidEnv } from "@/shared/config/env";
 
 const Signup = lazy(() =>
   import("@/features/auth").then((module) => ({
@@ -32,12 +33,29 @@ const UserProfile = lazy(() =>
 );
 
 const ReviewQueuePage = lazy(() =>
-  import("@/features/blog/review").then((module) => ({
+  import("@/pages/ReviewQueuePage").then((module) => ({
     default: module.default,
   })),
 );
 
 export default function App() {
+  if (!hasValidEnv) {
+    return (
+      <div
+        role="alert"
+        className="flex min-h-screen items-center justify-center p-6 text-center"
+      >
+        <div className="max-w-md space-y-2">
+          <h1 className="text-lg font-semibold">Configuration error</h1>
+          <p className="text-sm text-muted-foreground">
+            VITE_GRAPHQL_URL is not configured. Please set it in your
+            environment and reload the application.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <Routes>

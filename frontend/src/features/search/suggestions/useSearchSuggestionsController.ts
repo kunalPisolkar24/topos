@@ -1,12 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
-import {
-  SearchPostsDocument,
-  type ContentPostCard,
-  type ContentTag,
-} from "@/shared/graphql/content-documents";
+import { type ContentPostCard, type ContentTag } from "@/shared/graphql/content-documents";
 import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/entities/post/lib";
 import { tagRepository } from "@/entities/tag";
+import { postRepository } from "@/entities/post/api/postRepository";
 
 export type SearchMode = "tags" | "posts";
 
@@ -31,6 +28,8 @@ export interface SearchSuggestionsState {
   totalPosts: number;
   isLoading: boolean;
   debouncedQuery: string;
+  error: string | null;
+  retry: () => void;
 }
 
 const DEBOUNCE_MS = 500;
@@ -56,6 +55,12 @@ export const useSearchSuggestionsController = ({
   const [posts, setPosts] = useState<SearchPostSuggestion[]>([]);
   const [totalPosts, setTotalPosts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const retry = useCallback(() => {
+    setRetryCount((count) => count + 1);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), DEBOUNCE_MS);
@@ -71,6 +76,7 @@ export const useSearchSuggestionsController = ({
       setPosts([]);
       setTotalPosts(0);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
@@ -78,6 +84,7 @@ export const useSearchSuggestionsController = ({
 
     const fetchSuggestions = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         if (mode === "tags") {
           const fetched = await tagRepository.searchTagsOnce(client, {
@@ -89,24 +96,27 @@ export const useSearchSuggestionsController = ({
           setTags(fetched);
           setPosts([]);
           setTotalPosts(0);
+          setError(null);
         } else {
-          const { data } = await client.query({
-            query: SearchPostsDocument,
-            variables: { query: trimmedQuery, limit: postLimit, page: 1 },
-            fetchPolicy: "no-cache",
-          });
+          const { data } = await postRepository.searchOnce(client, trimmedQuery, 1, postLimit);
 
           if (requestId !== requestSequenceRef.current) return;
           const hits: ContentPostCard[] = data?.searchPosts?.hits ?? [];
           setPosts(hits.map(toPostSuggestion));
           setTotalPosts(data?.searchPosts?.total ?? 0);
           setTags([]);
+          setError(null);
         }
-      } catch {
+      } catch (err) {
         if (requestId !== requestSequenceRef.current) return;
         setTags([]);
         setPosts([]);
         setTotalPosts(0);
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Failed to load suggestions. Please try again.";
+        setError(message);
       } finally {
         if (requestId === requestSequenceRef.current) {
           setIsLoading(false);
@@ -115,7 +125,7 @@ export const useSearchSuggestionsController = ({
     };
 
     void fetchSuggestions();
-  }, [client, debouncedQuery, isFocused, mode, postLimit, tagLimit]);
+  }, [client, debouncedQuery, isFocused, mode, postLimit, tagLimit, retryCount]);
 
   return {
     tags,
@@ -123,5 +133,7 @@ export const useSearchSuggestionsController = ({
     totalPosts,
     isLoading,
     debouncedQuery,
+    error,
+    retry,
   };
 };

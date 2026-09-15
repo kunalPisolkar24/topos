@@ -1,8 +1,8 @@
 import type React from "react";
 import { Sparkles } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
+import { Textarea } from "@/shared/ui/primitives/textarea";
+import { Button } from "@/shared/ui/primitives/button";
 
 interface AIDraftGeneratorProps {
   prompt: string;

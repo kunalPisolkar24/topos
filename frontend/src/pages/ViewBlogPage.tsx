@@ -3,18 +3,17 @@
 import type React from "react";
 import { Sparkles } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { StickyNavbar } from "@/widgets";
+import { StickyNavbar, BlogEditor, BlogAuthorSidebar } from "@/widgets";
 import { ViewBlogPageSkeleton } from "@/shared/ui/feedback";
 import {
   usePostViewerController,
-  BlogEditForm,
   AISummaryDialog,
   BlogHeader,
   BlogBody,
   BlogRelatedSection,
   type PostForEditing,
 } from "@/features/blog";
-import { BlogAuthorSidebar } from "@/widgets";
+import { BlogEditForm } from "@/features/blog/components/BlogEditForm";
 import { useCurrentUser } from "@/entities/session";
 
 const ViewBlogPage: React.FC = () => {
@@ -95,6 +94,14 @@ const ViewBlogPage: React.FC = () => {
                   setView("reading");
                   refetch();
                 }}
+                renderEditor={({ value, onChange, onImageUpload, quillRef }) => (
+                  <BlogEditor
+                    ref={quillRef as React.MutableRefObject<never>}
+                    value={value}
+                    onChange={onChange}
+                    onImageUpload={onImageUpload}
+                  />
+                )}
               />
             </>
           ) : (

@@ -1,14 +1,9 @@
-import { useEffect, useState } from "react";
-import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import {
-  DeletePostDocument,
-  PostDocument,
-  RecordPostViewDocument,
-  type PostQuery,
-  type PostQueryVariables,
-} from "@/shared/graphql/content-documents";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
+import type { PostQuery } from "@/shared/graphql/content-documents";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
 import { markPostViewed } from "./viewed-posts";
@@ -40,8 +35,27 @@ export interface PostViewerController {
   setView: (view: PostViewerView) => void;
   setDialog: (dialog: PostViewerDialog) => void;
   deletePost: () => Promise<void>;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
+
+const isValidPostId = (value: string | undefined): boolean => {
+  if (value == null) return false;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  // Accept MongoDB ObjectId (24 hex chars), UUID, or slug-like ids
+  const objectIdPattern = /^[a-fA-F0-9]{24}$/;
+  const uuidPattern =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const slugPattern = /^[a-zA-Z0-9_-]+$/;
+  if (
+    objectIdPattern.test(trimmed) ||
+    uuidPattern.test(trimmed) ||
+    slugPattern.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
+};
 
 export const usePostViewerController = (
   postId: string | undefined,
@@ -54,25 +68,45 @@ export const usePostViewerController = (
   const isAuthenticated =
     useSessionStore((state) => state.status) === "authenticated";
 
+  const trimmedId = postId?.trim() ?? "";
+  const isValidId = isValidPostId(postId);
+  const queryId = isValidId ? trimmedId : "";
+
   const { data, loading, error, refetch, startPolling, stopPolling } =
-    useQuery<PostQuery, PostQueryVariables>(PostDocument, {
-      variables: { id: postId ?? "" },
-      skip: !postId,
-      notifyOnNetworkStatusChange: true,
-    });
+    postRepository.useGet(queryId);
 
-  const isReady = Boolean(data?.post);
+  const isReady = Boolean(isValidId && data?.post);
 
-  const [recordPostView] = useMutation(RecordPostViewDocument);
+  const [recordPostView] = postRepository.useRecordView();
+
+  const isPollingRef = useRef(false);
 
   useEffect(() => {
-    if (data?.post?.summaryStatus === "PENDING") {
-      startPolling(3000);
-    } else {
-      stopPolling();
+    if (!isValidId) {
+      if (isPollingRef.current) {
+        stopPolling();
+        isPollingRef.current = false;
+      }
+      return;
     }
-    return () => stopPolling();
-  }, [data?.post?.summaryStatus, startPolling, stopPolling]);
+    if (data?.post?.summaryStatus === "PENDING") {
+      if (!isPollingRef.current) {
+        startPolling(3000);
+        isPollingRef.current = true;
+      }
+    } else {
+      if (isPollingRef.current) {
+        stopPolling();
+        isPollingRef.current = false;
+      }
+    }
+    return () => {
+      if (isPollingRef.current) {
+        stopPolling();
+        isPollingRef.current = false;
+      }
+    };
+  }, [data?.post?.summaryStatus, isValidId, startPolling, stopPolling]);
 
   // Report the view once the post has loaded: debounced, once per
   // session per post, and never for anonymous readers (the mutation
@@ -80,33 +114,23 @@ export const usePostViewerController = (
   // opened from the For You feed, the stored feed mode is attached to
   // the view event for engagement measurement.
   useEffect(() => {
-    if (!postId || !isReady || !isAuthenticated) return;
+    if (!isValidId || !isReady || !isAuthenticated) return;
     const timer = setTimeout(() => {
-      if (!markPostViewed(postId)) return;
+      if (!markPostViewed(trimmedId)) return;
       void recordPostView({
-        variables: { postId, mode: takeFeedMode(postId) ?? undefined },
+        variables: { postId: trimmedId, mode: takeFeedMode(trimmedId) ?? undefined },
       }).catch(() => {});
     }, VIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [postId, isReady, isAuthenticated, recordPostView]);
+  }, [trimmedId, isValidId, isReady, isAuthenticated, recordPostView]);
 
-  const [deletePost, { loading: isDeleting }] = useMutation(DeletePostDocument);
-
-  useEffect(() => {
-    if (!error) return;
-    toast({
-      title: "Error",
-      description: "Could not load blog post.",
-      variant: "destructive",
-    });
-    navigate("/");
-  }, [error, navigate, toast]);
+  const [deletePost, { loading: isDeleting }] = postRepository.useDelete();
 
   const handleDelete = async () => {
-    if (!postId) return;
+    if (!isValidId) return;
     try {
-      await deletePost({ variables: { id: postId } });
-      await refreshPostListQueries(client, { postId });
+      await deletePost({ variables: { id: trimmedId } });
+      await refreshPostListQueries(client, { postId: trimmedId });
       toast({
         title: "Blog Deleted",
         description: "Successfully deleted.",
@@ -124,7 +148,9 @@ export const usePostViewerController = (
   };
 
   let state: PostViewerSnapshot;
-  if (error) {
+  if (!isValidId) {
+    state = { kind: "not-found" };
+  } else if (error) {
     state = { kind: "error" };
   } else if (loading && !data) {
     state = { kind: "loading" };
@@ -140,13 +166,17 @@ export const usePostViewerController = (
     };
   }
 
+  const handleRefetch = useCallback(() => {
+    return refetch().catch(() => {
+      // Swallow to avoid unhandled rejection; error is exposed via query error field
+    });
+  }, [refetch]);
+
   return {
     state,
     setView,
     setDialog,
     deletePost: handleDelete,
-    refetch: () => {
-      void refetch();
-    },
+    refetch: handleRefetch,
   };
 };

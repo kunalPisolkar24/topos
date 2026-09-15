@@ -2,17 +2,18 @@ import type React from "react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/primitives/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/shared/ui/primitives/dialog";
+import { Input } from "@/shared/ui/primitives/input";
+import { Label } from "@/shared/ui/primitives/label";
+import { Textarea } from "@/shared/ui/primitives/textarea";
 import type { PostDraft } from "@/shared/graphql/content-documents";
 import {
   approveDraftSchema,
@@ -61,10 +62,10 @@ export const ApproveDraftDialog: React.FC<ApproveDraftDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Review &amp; approve draft</DialogTitle>
         </DialogHeader>
-        <p className="text-sm leading-6 text-muted-foreground">
+        <DialogDescription className="text-sm leading-6 text-muted-foreground">
           Approving resumes the paused AI workflow and publishes this post
           under its author's name. Edit anything before you confirm.
-        </p>
+        </DialogDescription>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="draft-review-title">Title</Label>

@@ -1,6 +1,7 @@
-import type React from "react";
+import React, { useId } from "react";
 import { UploadCloud, ImageIcon } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
+import { Label } from "@/shared/ui/primitives/label";
 
 interface FeaturedImageSectionProps {
   preview: string | null;
@@ -19,6 +20,7 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
   onFileChange,
   inputRef,
 }) => {
+  const inputId = useId();
   return (
     <Card className="gap-0 bg-surface-lowest py-0">
       <CardHeader className="bg-surface-low p-4 sm:p-5">
@@ -36,6 +38,8 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
       <CardContent className="p-4 sm:p-5">
         <button
           type="button"
+          aria-label={cardImage ? "Change cover image" : "Upload cover image"}
+          aria-controls={inputId}
           className="interactive-hover-primary flex min-h-72 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-5 text-left"
           onClick={() => inputRef.current?.click()}
         >
@@ -68,12 +72,17 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
             )}
           </div>
         </button>
+        <Label htmlFor={inputId} className="sr-only">
+          Featured image
+        </Label>
         <input
+          id={inputId}
           type="file"
           className="sr-only"
           accept="image/*"
           ref={inputRef}
           onChange={onFileChange}
+          aria-label="Featured image file input"
         />
         {cardImageUrl && (
           <div className="mt-3 bg-primary-container p-3 text-primary-foreground">

@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { UpdateProfileDocument } from "@/shared/graphql/generated/graphql";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { userRepository } from "@/entities/user/api/userRepository";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useImageUpload } from "@/entities/upload";
 import {
@@ -52,6 +51,33 @@ export interface UseProfileEditorControllerProps {
   currentUser: UserCoreFragment | null | undefined;
 }
 
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+
+const isImageFile = (file: File): boolean => file.type.startsWith("image/");
+
+const validateImageFile = (
+  file: File,
+  toast: ReturnType<typeof useToast>["toast"],
+): boolean => {
+  if (!isImageFile(file)) {
+    toast({
+      title: "Invalid file type",
+      description: "Please select an image file.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    toast({
+      title: "File too large",
+      description: "Image must be smaller than 10MB.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  return true;
+};
+
 export const useProfileEditorController = ({
   currentUser,
 }: UseProfileEditorControllerProps) => {
@@ -70,10 +96,21 @@ export const useProfileEditorController = ({
     bio: "",
   });
 
-  const [updateProfile, { loading: isSaving }] = useMutation(
-    UpdateProfileDocument,
-  );
+  const [updateProfile, { loading: isSaving }] = userRepository.useUpdateProfile();
   const { upload: uploadImage } = useImageUpload();
+
+  const avatarReaderRef = useRef<FileReader | null>(null);
+  const bannerReaderRef = useRef<FileReader | null>(null);
+
+  useEffect(() => {
+    return () => {
+      for (const ref of [avatarReaderRef, bannerReaderRef]) {
+        if (ref.current && ref.current.readyState === FileReader.LOADING) {
+          ref.current.abort();
+        }
+      }
+    };
+  }, []);
 
   const profileFormDefaults = useMemo<EditableProfileFormData>(
     () =>
@@ -96,6 +133,11 @@ export const useProfileEditorController = ({
     (event: React.ChangeEvent<HTMLInputElement>, type: AvatarOrBanner) => {
       const file = event.target.files?.[0];
       if (!file) return;
+      if (!validateImageFile(file, toast)) return;
+      const readerRef = type === "avatar" ? avatarReaderRef : bannerReaderRef;
+      if (readerRef.current && readerRef.current.readyState === FileReader.LOADING) {
+        readerRef.current.abort();
+      }
       if (type === "avatar") {
         setAvatarFile(file);
       } else {
@@ -103,6 +145,7 @@ export const useProfileEditorController = ({
       }
 
       const reader = new FileReader();
+      readerRef.current = reader;
       reader.onloadend = () => {
         const result =
           typeof reader.result === "string" ? reader.result : null;
@@ -112,9 +155,23 @@ export const useProfileEditorController = ({
           setBannerPreview(result);
         }
       };
+      reader.onerror = () => {
+        toast({
+          title: "Preview failed",
+          description: "Failed to read image file.",
+          variant: "destructive",
+        });
+      };
+      reader.onabort = () => {
+        toast({
+          title: "Preview aborted",
+          description: "Image preview was cancelled.",
+          variant: "destructive",
+        });
+      };
       reader.readAsDataURL(file);
     },
-    [],
+    [toast],
   );
 
   const handleFormChange = (

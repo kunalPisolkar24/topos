@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { GeneratePostContentDocument } from "@/shared/graphql/content-documents";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { MIN_PROMPT_LENGTH, normalizeTags } from "@/entities/post/lib";
@@ -35,9 +34,7 @@ export const usePostAIDraft = ({
   const [summary, setSummary] = useState<string | null>(null);
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
 
-  const [mutate, { loading: isGenerating }] = useMutation(
-    GeneratePostContentDocument,
-  );
+  const [mutate, { loading: isGenerating }] = postRepository.useGenerateDraft();
 
   const trimmedPrompt = prompt.trim();
   const canGenerate = trimmedPrompt.length >= MIN_PROMPT_LENGTH;

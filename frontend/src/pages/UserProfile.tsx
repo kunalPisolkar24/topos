@@ -2,9 +2,9 @@
 
 import React from "react";
 import { Camera, Edit3 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/shared/ui/primitives/button";
+import { Card, CardContent } from "@/shared/ui/primitives/card";
+import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { useCurrentUser } from "@/entities/session";
 import { StickyNavbar } from "@/widgets";
 import {

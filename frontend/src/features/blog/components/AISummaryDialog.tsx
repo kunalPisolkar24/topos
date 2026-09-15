@@ -1,15 +1,16 @@
 import type React from "react";
 import { Sparkles, Clock, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/primitives/button";
 import {
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/shared/ui/primitives/alert-dialog";
 
 interface AISummaryDialogProps {
   summary: string | null | undefined;
@@ -92,6 +93,9 @@ export const AISummaryDialog: React.FC<AISummaryDialogProps> = ({
             <Sparkles className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             AI-Generated Summary
           </AlertDialogTitle>
+          <AlertDialogDescription className="sr-only">
+            AI-generated summary for this post. Use Close to dismiss.
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="px-5 pb-2 sm:px-6">{renderContent()}</div>
         <AlertDialogFooter className="border-outline-variant/20 bg-surface-low px-5 py-4 sm:px-6">

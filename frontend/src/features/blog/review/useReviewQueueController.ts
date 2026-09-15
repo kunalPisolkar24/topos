@@ -1,21 +1,11 @@
-import { useState } from "react";
-import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
-import {
-  ApprovePostDraftDocument,
-  DeletePostDraftDocument,
-  MyPostDraftsDocument,
-  PostDraftsDocument,
-  RejectPostDraftDocument,
-  type DraftEditsInput,
-  type MyPostDraftsQuery,
-  type MyPostDraftsQueryVariables,
-  type PostDraft,
-  type PostDraftsQuery,
-  type PostDraftsQueryVariables,
-} from "@/shared/graphql/content-documents";
+import { useRef, useState } from "react";
+import { gql } from "@apollo/client";
+import { useApolloClient } from "@apollo/client/react";
+import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
+import type { DraftEditsInput, PostDraft } from "@/shared/graphql/content-documents";
 
 export type ReviewDialog =
   | { kind: "closed" }
@@ -48,12 +38,12 @@ export interface ReviewQueueController {
   };
   dialog: ReviewDialog;
   setDialog: (dialog: ReviewDialog) => void;
+  pendingIds: Set<string>;
+  isPending: (draftId: string) => boolean;
   approve: (draftId: string, edits: DraftEditsInput) => Promise<void>;
   reject: (draftId: string, reason: string) => Promise<void>;
   withdraw: (draftId: string) => Promise<void>;
 }
-
-const PAGE_LIMIT = 6;
 
 const emptySection: PaginatedDraftSection = {
   drafts: [],
@@ -61,6 +51,12 @@ const emptySection: PaginatedDraftSection = {
   currentPage: 1,
   totalDrafts: 0,
 };
+
+const POST_DRAFT_STATUS_FRAGMENT = gql`
+  fragment PostDraftStatus on PostDraft {
+    status
+  }
+`;
 
 // useReviewQueueController drives the two-section review page. Status
 // flips land optimistically on the normalized PostDraft entity so the
@@ -76,20 +72,18 @@ export const useReviewQueueController = (): ReviewQueueController => {
   const [communityPage, setCommunityPage] = useState(1);
   const [minePage, setMinePage] = useState(1);
 
-  const communityQuery = useQuery<PostDraftsQuery, PostDraftsQueryVariables>(
-    PostDraftsDocument,
-    { variables: { page: communityPage, limit: PAGE_LIMIT }, skip: !isAuthenticated },
-  );
-  const mineQuery = useQuery<MyPostDraftsQuery, MyPostDraftsQueryVariables>(
-    MyPostDraftsDocument,
-    { variables: { page: minePage, limit: PAGE_LIMIT }, skip: !isAuthenticated },
-  );
+  const communityQuery = draftRepository.usePostDrafts(communityPage, { skip: !isAuthenticated });
+  const mineQuery = draftRepository.useMyPostDrafts(minePage, { skip: !isAuthenticated });
 
-  const [approveMutation] = useMutation(ApprovePostDraftDocument);
-  const [rejectMutation] = useMutation(RejectPostDraftDocument);
-  const [withdrawMutation] = useMutation(DeletePostDraftDocument);
+  const [approveMutation] = draftRepository.useApproveDraft();
+  const [rejectMutation] = draftRepository.useRejectDraft();
+  const [withdrawMutation] = draftRepository.useDeleteDraft();
 
   const [dialog, setDialog] = useState<ReviewDialog>({ kind: "closed" });
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set<string>());
+  const pendingRef = useRef<Set<string>>(new Set<string>());
+
+  const isPending = (draftId: string) => pendingIds.has(draftId);
 
   const applyStatus = (draftId: string, status: PostDraft["status"]) => {
     const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
@@ -120,21 +114,46 @@ export const useReviewQueueController = (): ReviewQueueController => {
 
   const act = async (
     draftId: string,
-    optimisticStatus: PostDraft["status"],
+    optimisticStatus: PostDraft["status"] | null,
     run: () => Promise<unknown>,
     successTitle: string,
     failureFallback: string,
   ) => {
-    const previousStatus = applyStatus(draftId, optimisticStatus);
+    if (pendingRef.current.has(draftId)) return;
+    pendingRef.current.add(draftId);
+    setPendingIds(new Set(pendingRef.current));
+
+    let previousStatus: PostDraft["status"] | undefined;
+    if (optimisticStatus) {
+      previousStatus = applyStatus(draftId, optimisticStatus);
+    }
+
     try {
       await run();
       toast({ title: successTitle });
       await refreshLists();
     } catch (err) {
-      if (previousStatus !== undefined) {
-        applyStatus(draftId, previousStatus);
+      if (previousStatus !== undefined && optimisticStatus) {
+        const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
+        if (ref) {
+          const snapshot = client.cache.readFragment<{ status: PostDraft["status"] }>({
+            id: ref,
+            fragment: POST_DRAFT_STATUS_FRAGMENT,
+          });
+          // Only rollback if the entity still exists and still shows the
+          // optimistic status. If another tab/user won the race and
+          // refetched to APPROVED/REJECTED, or the draft was evicted
+          // (withdrawn), we must not overwrite winner's truth with a
+          // stale rollback to PENDING.
+          if (snapshot && snapshot.status === optimisticStatus) {
+            applyStatus(draftId, previousStatus);
+          }
+        }
       }
       reportError(failureFallback)(err);
+    } finally {
+      pendingRef.current.delete(draftId);
+      setPendingIds(new Set(pendingRef.current));
     }
   };
 
@@ -162,7 +181,7 @@ export const useReviewQueueController = (): ReviewQueueController => {
   const withdraw = async (draftId: string) =>
     act(
       draftId,
-      "PENDING",
+      null,
       () => withdrawMutation({ variables: { id: draftId } }),
       "Draft Withdrawn",
       "Could not withdraw the draft.",
@@ -200,6 +219,8 @@ export const useReviewQueueController = (): ReviewQueueController => {
     mine,
     dialog,
     setDialog,
+    pendingIds,
+    isPending,
     approve,
     reject,
     withdraw,

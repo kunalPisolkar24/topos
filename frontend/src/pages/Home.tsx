@@ -3,8 +3,8 @@ import { StickyNavbar } from "@/widgets";
 import { BlogList, ForYouList } from "@/features/blog";
 import { SearchBar } from "@/features/search";
 import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/shared/ui/primitives/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { X } from "lucide-react";
 
 const Home: React.FC = () => {

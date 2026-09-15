@@ -5,9 +5,13 @@ import {
   DeletePostDocument,
   GeneratePostContentDocument,
   GenerateTagsDocument,
+  LikePostDocument,
   PostDocument,
   PostsByTagDocument,
   PostsDocument,
+  RecommendedPostsDocument,
+  RecordPostViewDocument,
+  SavePostDocument,
   SearchPostsDocument,
   UpdatePostDocument,
   type CreatePostInput,
@@ -19,31 +23,39 @@ import {
   type GeneratePostContentMutationVariables,
   type GenerateTagsMutation,
   type GenerateTagsMutationVariables,
+  type LikePostMutation,
+  type LikePostMutationVariables,
   type PostQuery,
   type PostQueryVariables,
   type PostsByTagQuery,
   type PostsByTagQueryVariables,
   type PostsQuery,
   type PostsQueryVariables,
+  type RecommendedPostsQuery,
+  type RecommendedPostsQueryVariables,
+  type RecordPostViewMutation,
+  type RecordPostViewMutationVariables,
+  type SavePostMutation,
+  type SavePostMutationVariables,
   type SearchPostsQuery,
   type SearchPostsQueryVariables,
   type UpdatePostInput,
   type UpdatePostMutation,
   type UpdatePostMutationVariables,
 } from "@/shared/graphql/content-documents";
-import { POST_LIST_QUERY_NAMES } from "@/shared/api/refetchLists";
-
 export const postRepository = {
-  useList({ page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
+  useList({ page = 1, limit = 6, skip = false }: { page?: number; limit?: number; skip?: boolean } = {}) {
     return useQuery<PostsQuery, PostsQueryVariables>(PostsDocument, {
       variables: { page, limit },
+      skip,
       notifyOnNetworkStatusChange: true,
     });
   },
 
-  useListByTag(tag: string, { page = 1, limit = 6 }: { page?: number; limit?: number } = {}) {
+  useListByTag(tag: string, { page = 1, limit = 6, skip = false }: { page?: number; limit?: number; skip?: boolean } = {}) {
     return useQuery<PostsByTagQuery, PostsByTagQueryVariables>(PostsByTagDocument, {
       variables: { tag, page, limit },
+      skip: skip || !tag,
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -67,21 +79,18 @@ export const postRepository = {
   useCreate() {
     return useMutation<CreatePostMutation, CreatePostMutationVariables>(
       CreatePostDocument,
-      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
   useUpdate() {
     return useMutation<UpdatePostMutation, UpdatePostMutationVariables>(
       UpdatePostDocument,
-      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
   useDelete() {
     return useMutation<DeletePostMutation, DeletePostMutationVariables>(
       DeletePostDocument,
-      { refetchQueries: POST_LIST_QUERY_NAMES },
     );
   },
 
@@ -96,6 +105,63 @@ export const postRepository = {
       GeneratePostContentMutation,
       GeneratePostContentMutationVariables
     >(GeneratePostContentDocument);
+  },
+
+  useRecommended({
+    page = 1,
+    limit = 6,
+    mode = "DEFAULT" as RecommendedPostsQueryVariables["mode"],
+    seed,
+    skip = false,
+  }: {
+    page?: number;
+    limit?: number;
+    mode?: RecommendedPostsQueryVariables["mode"];
+    seed?: number;
+    skip?: boolean;
+  } = {}) {
+    return useQuery<RecommendedPostsQuery, RecommendedPostsQueryVariables>(RecommendedPostsDocument, {
+      variables: { page, limit, mode, seed },
+      skip,
+      notifyOnNetworkStatusChange: true,
+    });
+  },
+
+  useRecordView() {
+    return useMutation<RecordPostViewMutation, RecordPostViewMutationVariables>(RecordPostViewDocument);
+  },
+
+  useLike() {
+    return useMutation<LikePostMutation, LikePostMutationVariables>(LikePostDocument);
+  },
+
+  useSave() {
+    return useMutation<SavePostMutation, SavePostMutationVariables>(SavePostDocument);
+  },
+
+  async searchOnce(
+    client: ReturnType<typeof useApolloClient>,
+    query: string,
+    page = 1,
+    limit = 6,
+  ) {
+    return client.query<SearchPostsQuery, SearchPostsQueryVariables>({
+      query: SearchPostsDocument,
+      variables: { query, page, limit },
+      fetchPolicy: "no-cache",
+    });
+  },
+
+  async recommendedOnce(
+    client: ReturnType<typeof useApolloClient>,
+    page = 1,
+    limit = 6,
+  ) {
+    return client.query<RecommendedPostsQuery, RecommendedPostsQueryVariables>({
+      query: RecommendedPostsDocument,
+      variables: { page, limit },
+      fetchPolicy: "cache-first",
+    });
   },
 
   async createOnce(client: ReturnType<typeof useApolloClient>, input: CreatePostInput) {

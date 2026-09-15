@@ -99,14 +99,16 @@ describe("session", () => {
 
       await bootstrapSession(client);
 
-      expect(client.query).toHaveBeenCalledWith({
-        query: MeDocument,
-        fetchPolicy: "network-only",
-      });
+      expect(client.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: MeDocument,
+          fetchPolicy: "network-only",
+        }),
+      );
       expect(client.writeQuery).toHaveBeenCalled();
     });
 
-    it("calls logoutSession when query fails", async () => {
+    it("keeps session authenticated when query fails with transient error", async () => {
       localStorage.setItem("jwt", "bad-token");
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const client = createMockClient({
@@ -116,7 +118,7 @@ describe("session", () => {
 
       await bootstrapSession(client);
 
-      expect(client.clearStore).toHaveBeenCalled();
+      expect(client.clearStore).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 

@@ -6,8 +6,8 @@ import {
   CommandEmpty,
   CommandInput,
   CommandList,
-} from "@/components/ui/command";
-import { Card } from "@/components/ui/card";
+} from "@/shared/ui/primitives/command";
+import { Card } from "@/shared/ui/primitives/card";
 import { type ContentTag } from "@/shared/graphql/content-documents";
 import { useSearchSuggestionsController, type SearchMode } from "../suggestions";
 import { TagSuggestions } from "./TagSuggestions";
@@ -48,6 +48,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const commandWrapperRef = useRef<HTMLDivElement>(null);
   const interactionModeRef = useRef<InteractionMode>("idle");
   const idleValueCounterRef = useRef(0);
+  const blurTimeoutRef = useRef<number | null>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>("tags");
   const [searchQuery, setSearchQuery] = useState("");
   const [inputIsFocused, setInputIsFocused] = useState(false);
@@ -56,13 +57,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     createIdleCommandValue(idleValueCounterRef.current),
   );
 
-  const { tags, posts, totalPosts, isLoading, debouncedQuery } = useSearchSuggestionsController({
-    query: searchQuery,
-    mode: searchMode,
-    isFocused: inputIsFocused,
-    tagLimit: TAG_SEARCH_LIMIT,
-    postLimit: POST_SEARCH_LIMIT,
-  });
+  const { tags, posts, totalPosts, isLoading, debouncedQuery, error, retry } =
+    useSearchSuggestionsController({
+      query: searchQuery,
+      mode: searchMode,
+      isFocused: inputIsFocused,
+      tagLimit: TAG_SEARCH_LIMIT,
+      postLimit: POST_SEARCH_LIMIT,
+    });
 
   const resultsSignature =
     searchMode === "tags"
@@ -81,6 +83,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       setSearchQuery("");
     }
   }, [currentFilterTag]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current !== null) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const updateInteractionMode = (nextMode: InteractionMode) => {
     if (interactionModeRef.current === nextMode) {
@@ -168,7 +178,31 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const showCommandList = inputIsFocused && searchQuery.trim() !== "";
-  const noResults = !isLoading && tags.length === 0 && posts.length === 0;
+  const hasError = Boolean(error);
+  const noResults = !isLoading && !hasError && tags.length === 0 && posts.length === 0;
+
+  const tagsTabId = "search-tab-tags";
+  const postsTabId = "search-tab-posts";
+  const panelId = "search-panel";
+
+  const handleTabsKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.getAttribute("role") !== "tab") return;
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      setSearchMode((prev) => (prev === "tags" ? "posts" : "tags"));
+      const nextId = target.id === tagsTabId ? postsTabId : tagsTabId;
+      document.getElementById(nextId)?.focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      setSearchMode("tags");
+      document.getElementById(tagsTabId)?.focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setSearchMode("posts");
+      document.getElementById(postsTabId)?.focus();
+    }
+  };
 
   return (
     <div
@@ -179,12 +213,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <div
           role="tablist"
           aria-label="Search mode"
+          onKeyDown={handleTabsKeyDown}
           className="flex items-center gap-0.5 bg-surface-low px-0 py-0"
         >
           <button
+            id={tagsTabId}
             type="button"
             role="tab"
             aria-selected={searchMode === "tags"}
+            aria-controls={panelId}
+            tabIndex={searchMode === "tags" ? 0 : -1}
             onClick={() => setSearchMode("tags")}
             className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
               searchMode === "tags"
@@ -195,9 +233,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <Hash className="h-3.5 w-3.5" /> Tags
           </button>
           <button
+            id={postsTabId}
             type="button"
             role="tab"
             aria-selected={searchMode === "posts"}
+            aria-controls={panelId}
+            tabIndex={searchMode === "posts" ? 0 : -1}
             onClick={() => setSearchMode("posts")}
             className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
               searchMode === "posts"
@@ -227,9 +268,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 }
                 value={searchQuery}
                 onValueChange={setSearchQuery}
-                onFocus={() => setInputIsFocused(true)}
-                onBlur={() =>
-                  setTimeout(() => {
+                onFocus={() => {
+                  if (blurTimeoutRef.current !== null) {
+                    clearTimeout(blurTimeoutRef.current);
+                    blurTimeoutRef.current = null;
+                  }
+                  setInputIsFocused(true);
+                }}
+                onBlur={() => {
+                  if (blurTimeoutRef.current !== null) {
+                    clearTimeout(blurTimeoutRef.current);
+                  }
+                  blurTimeoutRef.current = window.setTimeout(() => {
                     if (
                       commandWrapperRef.current &&
                       !commandWrapperRef.current.contains(document.activeElement)
@@ -237,12 +287,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                       setInputIsFocused(false);
                       resetActiveItem();
                     }
-                  }, 150)
-                }
+                    blurTimeoutRef.current = null;
+                  }, 150);
+                }}
                 className="flex h-10 w-full rounded-none border-none bg-transparent py-0 text-[0.95rem] text-foreground shadow-none outline-none placeholder:text-muted-foreground sm:h-11"
               />
             </div>
             <CommandList
+              id={panelId}
+              role="tabpanel"
+              aria-labelledby={searchMode === "tags" ? tagsTabId : postsTabId}
               data-interaction-mode={interactionMode}
               onPointerMoveCapture={handleCommandListPointerMoveCapture}
               onPointerLeave={handleCommandListPointerLeave}
@@ -254,6 +308,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     <div className="flex items-center justify-center px-3 py-5 text-sm text-muted-foreground sm:px-4">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       <span>Searching...</span>
+                    </div>
+                  )}
+                  {hasError && !isLoading && (
+                    <div
+                      className="px-3 py-5 text-center text-sm text-destructive sm:px-4"
+                      role="alert"
+                    >
+                      <p>{error}</p>
+                      <button
+                        type="button"
+                        onClick={retry}
+                        className="mt-2 text-xs font-medium underline underline-offset-4 hover:text-destructive/80"
+                      >
+                        Retry
+                      </button>
                     </div>
                   )}
                   {noResults && (
