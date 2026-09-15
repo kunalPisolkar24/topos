@@ -9,5 +9,7 @@ export * from "./components/BlogTitleSection";
 export * from "./components/BlogTagSection";
 export * from "./components/FeaturedImageSection";
 export * from "./components/AIDraftGenerator";
+export * from "./components/BlogEditForm";
+export * from "./components/PublishChecklistItem";
 export * from "./authoring";
 export * from "./viewing";
