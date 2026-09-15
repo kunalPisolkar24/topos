@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { userRepository } from "@/entities/user/api/userRepository";
-import { mapPostToBlogCardItem } from "@/entities/post/lib";
-import type { BlogCardItem } from "@/entities/post/lib";
+import {
+  mapPostToBlogCardItem,
+  type BlogCardItem,
+} from "@/features/blog/presenters/blog-card-presenter";
 
 export interface UseUserPostsControllerProps {
   userId: string | undefined;

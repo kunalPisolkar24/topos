@@ -10,6 +10,11 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/primitives/dropdown-menu";
 import { cn } from "@/shared/lib/cn";
+import {
+  getAccountIdentityName,
+  getUserEmail,
+  getUserInitial,
+} from "@/shared/lib/account-identity";
 import { useSessionStore } from "@/entities/session";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
 
@@ -131,13 +136,9 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
     setIsOpen(false);
   }, [pathname]);
 
-  const accountIdentityName = user?.username || user?.name || displayName;
-  const userEmail = user?.email || "No email on file";
-  const userInitial =
-    user?.name?.charAt(0).toUpperCase() ||
-    user?.username?.charAt(0).toUpperCase() ||
-    user?.email?.charAt(0).toUpperCase() ||
-    "U";
+  const accountIdentityName = getAccountIdentityName(user, displayName);
+  const userEmail = getUserEmail(user);
+  const userInitial = getUserInitial(user);
 
   if (!isAuthenticated) {
     return (

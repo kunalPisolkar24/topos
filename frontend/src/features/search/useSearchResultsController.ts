@@ -4,7 +4,7 @@ import {
   buildSearchPagination,
   mapPostToBlogCardItem,
   type BlogCardItem,
-} from "@/entities/post/lib";
+} from "@/features/blog/presenters/blog-card-presenter";
 import type { SearchPostsQuery } from "@/shared/graphql/content-documents";
 
 export interface SearchResultsController {

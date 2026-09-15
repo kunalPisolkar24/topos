@@ -1,6 +1,6 @@
 import type React from "react";
 import { BlogCard } from "./BlogCard";
-import { mapPostToBlogCardItem } from "@/entities/post/lib";
+import { mapPostToBlogCardItem } from "@/features/blog/presenters/blog-card-presenter";
 import type { PostCardFieldsFragment } from "@/shared/graphql/generated/graphql";
 
 const RELATED_HEADING = "MORE LIKE THIS";
