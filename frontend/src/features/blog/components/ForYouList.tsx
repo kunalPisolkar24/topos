@@ -1,19 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@apollo/client/react";
 import { BlogCard } from "./BlogCard";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/shared/ui/primitives/skeleton";
+import { Button } from "@/shared/ui/primitives/button";
 import { useSessionStore } from "@/entities/session";
 import { FeedModeProvider } from "@/features/blog/feed-mode";
 import { markFeedMode } from "@/features/blog/viewing/feed-attribution";
-import {
-  PostsDocument,
-  RecommendedPostsDocument,
-  type RecommendMode,
-} from "@/shared/graphql/content-documents";
+import { type RecommendMode } from "@/shared/graphql/content-documents";
 import { mapPostToBlogCardItem } from "@/entities/post/lib";
-import { PagePagination } from "@/widgets";
+import { postRepository } from "@/entities/post/api/postRepository";
+import { PagePagination } from "@/shared/ui/PagePagination";
+import { useToast } from "@/shared/ui/hooks/useToast";
 
 const ITEMS_PER_PAGE = 6;
 const FOR_YOU_HEADING = "FOR YOU";
@@ -23,21 +20,24 @@ const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 export const ForYouList: React.FC = () => {
   const isAuthenticated =
     useSessionStore((state) => state.status) === "authenticated";
+  const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [mode, setMode] = useState<RecommendMode>("DEFAULT");
   const [seed, setSeed] = useState(randomSeed);
   const [useLatestFallback, setUseLatestFallback] = useState(false);
 
-  const recommendedQuery = useQuery(RecommendedPostsDocument, {
-    variables: { page: currentPage, limit: ITEMS_PER_PAGE, mode, seed },
+  const recommendedQuery = postRepository.useRecommended({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    mode,
+    seed,
     skip: !isAuthenticated || useLatestFallback,
-    notifyOnNetworkStatusChange: true,
   });
 
-  const latestQuery = useQuery(PostsDocument, {
-    variables: { page: currentPage, limit: ITEMS_PER_PAGE },
+  const latestQuery = postRepository.useList({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
     skip: isAuthenticated && !useLatestFallback,
-    notifyOnNetworkStatusChange: true,
   });
 
   const showLatest = !isAuthenticated || useLatestFallback;
@@ -46,7 +46,7 @@ export const ForYouList: React.FC = () => {
     : recommendedQuery.data?.recommendedPosts;
 
   const reasonById = useMemo(() => {
-    const reasons = recommendedQuery.data?.recommendedPosts.reasons ?? [];
+    const reasons = recommendedQuery.data?.recommendedPosts?.reasons ?? [];
     return new Map(reasons.map((entry) => [entry.postId, entry.reason]));
   }, [recommendedQuery.data]);
 
@@ -59,6 +59,11 @@ export const ForYouList: React.FC = () => {
       !recommendedQuery.loading && recommended && recommended.posts.length === 0;
     if (recommendedQuery.error || isEmptyResult) {
       setUseLatestFallback(true);
+      toast({
+        title: "Personalized feed unavailable",
+        description: "Showing latest posts instead.",
+        variant: "destructive",
+      });
     }
   }, [
     recommendedQuery.data,
@@ -66,11 +71,16 @@ export const ForYouList: React.FC = () => {
     recommendedQuery.loading,
     isAuthenticated,
     useLatestFallback,
+    toast,
   ]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [mode, seed]);
+
+  useEffect(() => {
+    setUseLatestFallback(false);
+  }, [mode, currentPage]);
 
   const blogPosts = useMemo(
     () =>
@@ -101,6 +111,10 @@ export const ForYouList: React.FC = () => {
     setUseLatestFallback(false);
   };
 
+  const handleRetry = () => {
+    setUseLatestFallback(false);
+  };
+
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -112,11 +126,23 @@ export const ForYouList: React.FC = () => {
       <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-muted-foreground">
         {FOR_YOU_HEADING}
       </p>
-      {isAuthenticated && (
-        <Button type="button" variant="outline" size="sm" onClick={handleSurprise}>
-          Surprise me
-        </Button>
-      )}
+      <div className="flex items-center gap-2">
+        {isAuthenticated && useLatestFallback && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRetry}
+          >
+            Retry personalized feed
+          </Button>
+        )}
+        {isAuthenticated && (
+          <Button type="button" variant="outline" size="sm" onClick={handleSurprise}>
+            Surprise me
+          </Button>
+        )}
+      </div>
     </div>
   );
 
@@ -156,7 +182,7 @@ export const ForYouList: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[88rem] px-4 py-8 sm:px-5 lg:px-6">
       {sectionHeading}
-      <FeedModeProvider value={mode}>
+      <FeedModeProvider value={showLatest ? null : mode}>
         <div className="space-y-4">
           {blogPosts.map((post) => (
             <BlogCard key={post.id} {...post} />

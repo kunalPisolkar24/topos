@@ -1,13 +1,13 @@
 import type React from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/shared/ui/primitives/badge";
+import { Button } from "@/shared/ui/primitives/button";
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/shared/ui/primitives/card";
 import { Check, RotateCcw, Undo2 } from "lucide-react";
 import type { DraftStatus, PostDraft } from "@/shared/graphql/content-documents";
 
@@ -71,12 +71,7 @@ export const DraftCard: React.FC<DraftCardProps> = ({
       <CardFooter className="flex flex-wrap gap-2 border-t border-outline-variant/20 p-4 sm:px-5">
         {!isOwnDraft && draft.status !== "APPROVED" && (
           <>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => onApprove(draft)}
-              disabled={draft.status === "APPROVED"}
-            >
+            <Button type="button" size="sm" onClick={() => onApprove(draft)}>
               <Check className="h-4 w-4" />
               Review &amp; Approve
             </Button>

@@ -1,8 +1,8 @@
-import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SigninDocument } from "@/shared/graphql/generated/graphql";
+import { authRepository } from "@/entities/auth/api/authRepository";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionActions } from "@/entities/session";
 import { signinSchema, type SigninFormValues } from "@/features/auth/model/signin.schema";
@@ -12,7 +12,7 @@ export const useSignin = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { authenticate } = useSessionActions();
-  const [signin, { loading }] = useMutation(SigninDocument);
+  const [signin, { loading }] = authRepository.useSignin();
 
   const form = useForm<SigninFormValues>({
     resolver: zodResolver(signinSchema),
@@ -58,8 +58,7 @@ export const useSignin = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Invalid credentials.",
+        description: getGraphQLErrorMessage(error, "Invalid credentials."),
       });
     }
   });

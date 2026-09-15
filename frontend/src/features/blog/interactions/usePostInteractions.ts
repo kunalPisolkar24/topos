@@ -1,9 +1,7 @@
-import { useApolloClient, useMutation } from "@apollo/client/react";
-import {
-  LikePostDocument,
-  SavePostDocument,
-  type RecommendMode,
-} from "@/shared/graphql/content-documents";
+import { gql } from "@apollo/client";
+import { useApolloClient } from "@apollo/client/react";
+import { type RecommendMode } from "@/shared/graphql/content-documents";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 
@@ -14,6 +12,13 @@ export interface PostInteractionsController {
   toggleLike: () => Promise<void>;
   toggleSave: () => Promise<void>;
 }
+
+const POST_INTERACTION_FRAGMENT = gql`
+  fragment PostInteractionState on Post {
+    likedByMe
+    savedByMe
+  }
+`;
 
 // usePostInteractions wires the like/save toggle buttons on post cards
 // to the likePost/savePost mutations. The current state comes from the
@@ -33,18 +38,36 @@ export const usePostInteractions = (
 ): PostInteractionsController => {
   const client = useApolloClient();
   const { toast } = useToast();
-  const [likePost, { loading: isLiking }] = useMutation(LikePostDocument);
-  const [savePost, { loading: isSaving }] = useMutation(SavePostDocument);
+  const [likePost, { loading: isLiking }] = postRepository.useLike();
+  const [savePost, { loading: isSaving }] = postRepository.useSave();
 
-  const applyState = (liked: boolean, saved: boolean) => {
+  const getCurrentState = (): { liked: boolean; saved: boolean } => {
+    const postRef = client.cache.identify({ __typename: "Post", id: postId });
+    if (postRef) {
+      const fragment = client.cache.readFragment<{ likedByMe: boolean; savedByMe: boolean }>({
+        id: postRef,
+        fragment: POST_INTERACTION_FRAGMENT,
+      });
+      if (fragment) return { liked: fragment.likedByMe, saved: fragment.savedByMe };
+    }
+    return { liked: likedByMe, saved: savedByMe };
+  };
+
+  const applyLiked = (liked: boolean) => {
     const postRef = client.cache.identify({ __typename: "Post", id: postId });
     if (!postRef) return;
     client.cache.modify({
       id: postRef,
-      fields: {
-        likedByMe: () => liked,
-        savedByMe: () => saved,
-      },
+      fields: { likedByMe: () => liked },
+    });
+  };
+
+  const applySaved = (saved: boolean) => {
+    const postRef = client.cache.identify({ __typename: "Post", id: postId });
+    if (!postRef) return;
+    client.cache.modify({
+      id: postRef,
+      fields: { savedByMe: () => saved },
     });
   };
 
@@ -59,38 +82,42 @@ export const usePostInteractions = (
   const modeVariable = feedMode ?? undefined;
 
   const toggleLike = async () => {
-    const previous = likedByMe;
-    applyState(!previous, savedByMe);
+    if (isLiking || isSaving) return;
+    const { liked: previous } = getCurrentState();
+    applyLiked(!previous);
     try {
       const { data } = await likePost({
         variables: { postId, mode: modeVariable },
         optimisticResponse: { likePost: !previous },
       });
-      applyState(data?.likePost ?? !previous, savedByMe);
+      applyLiked(data?.likePost ?? !previous);
     } catch (err) {
-      applyState(previous, savedByMe);
+      applyLiked(previous);
       reportError("Could not update like.")(err);
     }
   };
 
   const toggleSave = async () => {
-    const previous = savedByMe;
-    applyState(likedByMe, !previous);
+    if (isLiking || isSaving) return;
+    const { saved: previous } = getCurrentState();
+    applySaved(!previous);
     try {
       const { data } = await savePost({
         variables: { postId, mode: modeVariable },
         optimisticResponse: { savePost: !previous },
       });
-      applyState(likedByMe, data?.savePost ?? !previous);
+      applySaved(data?.savePost ?? !previous);
     } catch (err) {
-      applyState(likedByMe, previous);
+      applySaved(previous);
       reportError("Could not update save.")(err);
     }
   };
 
+  const { liked, saved } = getCurrentState();
+
   return {
-    liked: likedByMe,
-    saved: savedByMe,
+    liked,
+    saved,
     isToggling: isLiking || isSaving,
     toggleLike,
     toggleSave,

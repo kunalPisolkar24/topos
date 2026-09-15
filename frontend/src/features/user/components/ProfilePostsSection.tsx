@@ -1,12 +1,12 @@
 import React from "react";
 import { FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/shared/ui/primitives/card";
+import { Button } from "@/shared/ui/primitives/button";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { BlogCard } from "@/features/blog";
 import type { BlogCardItem } from "@/entities/post/lib";
-import { PagePagination } from "@/widgets";
+import { PagePagination } from "@/shared/ui/PagePagination";
 
 interface ProfilePostsSectionProps {
   blogs: BlogCardItem[];

@@ -99,12 +99,12 @@ describe("mergePaginatedPostLists", () => {
     expect(merged).toEqual(buildList(1, ["c"]));
   });
 
-  it("appends deduped items on subsequent pages", () => {
+  it("replaces the list on subsequent pages", () => {
     const merged = mergePaginatedPostLists(buildList(1, ["a", "b"]), buildList(2, ["b", "c"]), {
       args: { page: 2, limit: 2 },
     });
     const list = (merged as { posts: Array<{ id: string }> }).posts;
-    expect(list.map((p) => p.id)).toEqual(["a", "b", "c"]);
+    expect(list.map((p) => p.id)).toEqual(["b", "c"]);
   });
 
   it("preserves incoming when there is no existing data", () => {
@@ -189,7 +189,7 @@ describe("mergePaginatedPostLists edge cases", () => {
       args: { page: 2, limit: 2 },
     });
     const list = (merged as { posts: Array<{ __ref: string }> }).posts;
-    expect(list.map((p) => p.__ref)).toEqual(["Post:a", "Post:b", "Post:c"]);
+    expect(list.map((p) => p.__ref)).toEqual(["Post:b", "Post:c"]);
   });
 });
 
@@ -218,7 +218,7 @@ describe("buildApolloCache", () => {
       { page: 2, limit: 2 },
     );
     const list = (merged as { posts: Array<{ id: string }> }).posts;
-    expect(list.map((p) => p.id)).toEqual(["a", "b", "c"]);
+    expect(list.map((p) => p.id)).toEqual(["b", "c"]);
   });
 });
 

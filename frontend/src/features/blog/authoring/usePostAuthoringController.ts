@@ -3,6 +3,7 @@ import type ReactQuill from "react-quill-new";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { toPlainText } from "@/entities/post/lib";
+import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
 import {
   isSubmitInFlight,
   submitLabel as deriveSubmitLabel,
@@ -143,6 +144,30 @@ export const usePostAuthoringController = ({
     navigate("/");
   };
 
+  const readiness = useMemo(
+    () =>
+      evaluatePublishReadiness({
+        title,
+        body: content,
+        cardImage: imageUploader.file,
+        cardImageUrl: imageUploader.url,
+        cardImagePreview: imageUploader.preview,
+        tags: tagInput.tags,
+        isUploadingCardImage: imageUploader.isCardUploading,
+        isCreatingPost: isSubmitInFlight(submitController.submit),
+      }),
+    [
+      title,
+      content,
+      imageUploader.file,
+      imageUploader.url,
+      imageUploader.preview,
+      imageUploader.isCardUploading,
+      tagInput.tags,
+      submitController.submit,
+    ],
+  );
+
   return {
     state: {
       mode,
@@ -167,11 +192,9 @@ export const usePostAuthoringController = ({
       isGeneratingPost: aiDraft.isGenerating,
       canGeneratePost: aiDraft.canGenerate,
       contentText,
-      isTitleReady: title.trim().length > 0,
-      isContentReady: contentText.length > 0,
-      isCoverImageReady: Boolean(
-        imageUploader.file || imageUploader.url || imageUploader.preview,
-      ),
+      isTitleReady: readiness.titleReady,
+      isContentReady: readiness.contentReady,
+      isCoverImageReady: readiness.imageReady,
     },
     setters: {
       setTitle,

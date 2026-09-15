@@ -1,8 +1,8 @@
 import type React from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, Heart } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@/shared/ui/primitives/card";
+import { Button } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/lib/cn";
 import { getBlogCardImageSources } from "@/entities/upload";
 import { useSessionStore } from "@/entities/session";
@@ -40,7 +40,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
   const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
   const remainingTagsCount = tags.length - MAX_VISIBLE_TAGS;
   const formattedDate = publishedAt ? formatBlogCardDate(publishedAt) : null;
-  const authorName = author.name.trim() || "Unknown Author";
+  const authorName = author.name || "Unknown Author";
   const publishedAtValue = publishedAt;
   const blogCardImage = getBlogCardImageSources(imageUrl ?? DEFAULT_BLOG_CARD_IMAGE);
   const fallbackImage = getBlogCardImageSources(DEFAULT_BLOG_CARD_IMAGE);

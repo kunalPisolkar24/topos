@@ -1,12 +1,9 @@
-import { useCallback, useReducer } from "react";
+import { useCallback, useReducer, useRef } from "react";
 import { z } from "zod";
-import { useApolloClient, useMutation } from "@apollo/client/react";
+import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import {
-  CreatePostDocument,
-  UpdatePostDocument,
-  type UpdatePostInput,
-} from "@/shared/graphql/content-documents";
+import { type UpdatePostInput } from "@/shared/graphql/content-documents";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import {
@@ -81,74 +78,81 @@ export const usePostAuthoringSubmit = ({
   const { toast } = useToast();
   const client = useApolloClient();
   const [submit, dispatch] = useReducer(reducer, { kind: "idle" });
+  const isSubmittingRef = useRef(false);
 
-  const [createPost] = useMutation(CreatePostDocument);
-  const [updatePost] = useMutation(UpdatePostDocument);
+  const [createPost] = postRepository.useCreate();
+  const [updatePost] = postRepository.useUpdate();
 
   const handleCreateSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      const trimmedTitle = title.trim();
-      if (!trimmedTitle || !contentText) {
-        toast({
-          title: "Missing Information",
-          description: "Title and content are required.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      let finalImageUrl = imageUrl;
-      if (imageFile && !finalImageUrl) {
-        dispatch({ type: "beginUpload" });
-        finalImageUrl = await uploadCardImage();
-        if (!finalImageUrl) {
-          dispatch({ type: "resolveIdle" });
-          return;
-        }
-      }
-
-      if (!finalImageUrl) {
-        toast({
-          title: "Missing Card Image",
-          description: "Please upload a card image for the blog.",
-          variant: "destructive",
-        });
-        dispatch({ type: "resolveIdle" });
-        return;
-      }
-
-      const candidate: CreatePostFormValues = {
-        title: trimmedTitle,
-        body: content,
-        summary: summary?.trim() || undefined,
-        tags,
-        imageUrl: finalImageUrl,
-      };
-
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
       try {
-        const parsed = createPostSchema.parse(candidate);
-        dispatch({ type: "beginCreate" });
-        await createPost({ variables: { input: parsed } });
-        await refreshPostListQueries(client);
-        toast({ title: "Blog Created", description: "Successfully created." });
-        dispatch({ type: "resolveIdle" });
-        navigate("/");
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          reportZodIssues(toast, error.issues);
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle || !contentText) {
+          toast({
+            title: "Missing Information",
+            description: "Title and content are required.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        let finalImageUrl = imageUrl;
+        if (imageFile && !finalImageUrl) {
+          dispatch({ type: "beginUpload" });
+          finalImageUrl = await uploadCardImage();
+          if (!finalImageUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+        }
+
+        if (!finalImageUrl) {
+          toast({
+            title: "Missing Card Image",
+            description: "Please upload a card image for the blog.",
+            variant: "destructive",
+          });
           dispatch({ type: "resolveIdle" });
           return;
         }
-        toast({
-          title: "Error",
-          description: getGraphQLErrorMessage(
-            error,
-            "Failed to create blog post.",
-          ),
-          variant: "destructive",
-        });
-        dispatch({ type: "fail", message: "create" });
+
+        const candidate: CreatePostFormValues = {
+          title: trimmedTitle,
+          body: content,
+          summary: summary?.trim() || undefined,
+          tags,
+          imageUrl: finalImageUrl,
+        };
+
+        try {
+          const parsed = createPostSchema.parse(candidate);
+          dispatch({ type: "beginCreate" });
+          await createPost({ variables: { input: parsed } });
+          await refreshPostListQueries(client);
+          toast({ title: "Blog Created", description: "Successfully created." });
+          dispatch({ type: "resolveIdle" });
+          navigate("/");
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            reportZodIssues(toast, error.issues);
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          toast({
+            title: "Error",
+            description: getGraphQLErrorMessage(
+              error,
+              "Failed to create blog post.",
+            ),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "create" });
+        }
+      } finally {
+        isSubmittingRef.current = false;
       }
     },
     [
@@ -170,54 +174,59 @@ export const usePostAuthoringSubmit = ({
   const handleEditSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
+      if (isSubmittingRef.current) return;
       if (!post) return;
-
-      let finalImageUrl = imageUrl;
-      if (imageFile) {
-        dispatch({ type: "beginUpload" });
-        const uploadedUrl = await uploadCardImage();
-        if (!uploadedUrl) {
-          dispatch({ type: "resolveIdle" });
-          return;
-        }
-        finalImageUrl = uploadedUrl;
-      }
-
-      const originalTagNames = post.tags.map((tag) => tag.name);
-      const updateData: Partial<UpdatePostFormValues> = {};
-      if (title !== post.title) updateData.title = title;
-      if (content !== post.body) updateData.body = content;
-      if (JSON.stringify(tags) !== JSON.stringify(originalTagNames)) {
-        updateData.tags = tags;
-      }
-      if (finalImageUrl !== post.imageUrl) updateData.imageUrl = finalImageUrl;
-
-      if (Object.keys(updateData).length === 0) {
-        toast({ title: "No Changes", description: "No changes detected." });
-        onComplete?.();
-        return;
-      }
-
+      isSubmittingRef.current = true;
       try {
-        const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
-        dispatch({ type: "beginUpdate" });
-        await updatePost({ variables: { id: post.id, input: parsedInput } });
-        await refreshPostListQueries(client);
-        toast({ title: "Success", description: "Post updated successfully." });
-        dispatch({ type: "resolveIdle" });
-        onComplete?.();
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          reportZodIssues(toast, error.issues);
-          dispatch({ type: "resolveIdle" });
+        let finalImageUrl = imageUrl;
+        if (imageFile) {
+          dispatch({ type: "beginUpload" });
+          const uploadedUrl = await uploadCardImage();
+          if (!uploadedUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          finalImageUrl = uploadedUrl;
+        }
+
+        const originalTagNames = post.tags.map((tag) => tag.name);
+        const updateData: Partial<UpdatePostFormValues> = {};
+        if (title !== post.title) updateData.title = title;
+        if (content !== post.body) updateData.body = content;
+        if (JSON.stringify(tags) !== JSON.stringify(originalTagNames)) {
+          updateData.tags = tags;
+        }
+        if (finalImageUrl !== post.imageUrl) updateData.imageUrl = finalImageUrl;
+
+        if (Object.keys(updateData).length === 0) {
+          toast({ title: "No Changes", description: "No changes detected." });
+          onComplete?.();
           return;
         }
-        toast({
-          title: "Update Failed",
-          description: getGraphQLErrorMessage(error, "Could not update post."),
-          variant: "destructive",
-        });
-        dispatch({ type: "fail", message: "update" });
+
+        try {
+          const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
+          dispatch({ type: "beginUpdate" });
+          await updatePost({ variables: { id: post.id, input: parsedInput } });
+          await refreshPostListQueries(client);
+          toast({ title: "Success", description: "Post updated successfully." });
+          dispatch({ type: "resolveIdle" });
+          onComplete?.();
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            reportZodIssues(toast, error.issues);
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          toast({
+            title: "Update Failed",
+            description: getGraphQLErrorMessage(error, "Could not update post."),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "update" });
+        }
+      } finally {
+        isSubmittingRef.current = false;
       }
     },
     [

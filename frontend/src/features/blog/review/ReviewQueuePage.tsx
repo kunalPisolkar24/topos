@@ -1,18 +1,18 @@
 import type React from "react";
 import { ShieldCheck } from "lucide-react";
 import { useCurrentUser } from "@/entities/session";
-import { PagePagination, StickyNavbar } from "@/widgets";
+import { PagePagination } from "@/shared/ui/PagePagination";
 import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/primitives/button";
 import type { DraftEditsInput, PostDraft } from "@/shared/graphql/content-documents";
+import { DraftCard } from "./DraftCard";
+import { ApproveDraftDialog, buildEditsInput } from "./ApproveDraftDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import {
-  DraftCard,
-  ApproveDraftDialog,
-  ConfirmDialog,
-  buildEditsInput,
   useReviewQueueController,
   type ReviewQueueController,
-} from "./index";
+} from "./useReviewQueueController";
+import type { ApproveDraftFormValues } from "./model/approve-draft.schema";
 
 interface DraftSectionProps {
   title: string;
@@ -96,30 +96,26 @@ const ReviewQueuePage: React.FC = () => {
 
   if (!controller.isAuthenticated) {
     return (
-      <div className="min-h-screen bg-surface text-foreground">
-        <StickyNavbar />
-        <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl bg-surface-low p-10 text-center ring-1 ring-outline-variant/20">
-            <ShieldCheck className="mx-auto h-10 w-10 text-muted-foreground" />
-            <h1 className="mt-4 text-xl font-semibold">Sign in to review drafts</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              The review queue is only available to signed-in users.
-            </p>
-          </div>
-        </main>
-      </div>
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl bg-surface-low p-10 text-center ring-1 ring-outline-variant/20">
+          <ShieldCheck className="mx-auto h-10 w-10 text-muted-foreground" />
+          <h1 className="mt-4 text-xl font-semibold">Sign in to review drafts</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The review queue is only available to signed-in users.
+          </p>
+        </div>
+      </main>
     );
   }
 
-  const handleApproveConfirm = (draft: PostDraft, values: Parameters<ReturnType<typeof buildEditsInput>>[1]) => {
-    const edits: DraftEditsInput = buildEditsInput(values).input;
+  const handleApproveConfirm = (draft: PostDraft, values: ApproveDraftFormValues) => {
+    const edits: DraftEditsInput = buildEditsInput(draft.id, values).input;
     controller.setDialog({ kind: "closed" });
     void controller.approve(draft.id, edits);
   };
 
   return (
-    <div className="min-h-screen bg-surface text-foreground">
-      <StickyNavbar />
+    <>
       <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="relative overflow-hidden bg-surface-low p-5 ring-1 ring-outline-variant/20 sm:p-8">
@@ -205,7 +201,7 @@ const ReviewQueuePage: React.FC = () => {
           if (draft) void controller.withdraw(draft.id);
         }}
       />
-    </div>
+    </>
   );
 };
 

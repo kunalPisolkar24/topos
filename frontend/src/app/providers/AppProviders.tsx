@@ -1,6 +1,6 @@
 import { type PropsWithChildren } from "react";
 import { BrowserRouter } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/shared/ui/primitives/toaster";
 import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
 import { ThemeProvider } from "@/shared/ui/theme";
 import { AppApolloProvider } from "./AppApolloProvider";

@@ -25,4 +25,3 @@ export {
   type PublishReadiness,
   type PublishReadinessInput,
 } from "./post-rules";
-export { postRepository } from "../api/postRepository";

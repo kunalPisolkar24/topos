@@ -1,4 +1,5 @@
 import type { ApolloCache, ApolloClient } from "@apollo/client";
+import { logger } from "@/shared/lib/logger";
 
 export type PostListQueryName =
   | "Posts"
@@ -75,6 +76,6 @@ export const refreshPostListQueries = async (
   try {
     await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
   } catch (error) {
-    console.warn("Unable to refetch post list queries.", error);
+    logger.warn("Unable to refetch post list queries.", error);
   }
 };

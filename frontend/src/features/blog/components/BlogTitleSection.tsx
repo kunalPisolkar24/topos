@@ -1,7 +1,7 @@
 import type React from "react";
 import { FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
+import { Input } from "@/shared/ui/primitives/input";
 
 interface BlogTitleSectionProps {
   value: string;

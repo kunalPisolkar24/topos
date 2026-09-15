@@ -1,13 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
+import { ApolloProvider } from "@apollo/client/react";
+import { createApolloClient } from "@/shared/api";
+import { env } from "@/shared/config/env";
+import type { ReactNode } from "react";
 
 const searchTagsOnceMock = vi.fn();
-const searchPostsMock = vi.fn();
-
-const mockApolloClient = { query: searchPostsMock };
-
-vi.mock("@apollo/client/react", () => ({
-  useApolloClient: () => mockApolloClient,
-}));
+const searchOnceMock = vi.fn();
 
 vi.mock("@/entities/tag/api/tagRepository", () => ({
   tagRepository: {
@@ -16,31 +14,46 @@ vi.mock("@/entities/tag/api/tagRepository", () => ({
   },
 }));
 
-vi.mock("@/entities/post/lib", () => ({
-  DEFAULT_BLOG_CARD_IMAGE: "https://default.png",
-  getAuthorDisplayName: (author: { name?: string | null; username: string }) =>
-    author.name || author.username,
+vi.mock("@/entities/post/api/postRepository", () => ({
+  postRepository: {
+    searchOnce: (...args: unknown[]) => searchOnceMock(...args),
+  },
 }));
 
 import { useSearchSuggestionsController } from "../useSearchSuggestionsController";
 
+const noopUnauthorized = async () => {};
+
+function makeWrapper() {
+  const client = createApolloClient({
+    uri: env.VITE_GRAPHQL_URL,
+    getToken: () => null,
+    onUnauthorized: noopUnauthorized,
+  });
+  return ({ children }: { children: ReactNode }) => (
+    <ApolloProvider client={client}>{children}</ApolloProvider>
+  );
+}
+
 function renderSuggestions(
   props?: Partial<Parameters<typeof useSearchSuggestionsController>[0]>,
 ) {
-  return renderHook(() =>
-    useSearchSuggestionsController({
-      query: "test",
-      mode: "tags",
-      isFocused: true,
-      ...props,
-    }),
+  return renderHook(
+    () =>
+      useSearchSuggestionsController({
+        query: "test",
+        mode: "tags",
+        isFocused: true,
+        ...props,
+      }),
+    { wrapper: makeWrapper() },
   );
 }
 
 describe("useSearchSuggestionsController", () => {
   beforeEach(() => {
     searchTagsOnceMock.mockReset();
-    searchPostsMock.mockReset();
+    searchOnceMock.mockReset();
   });
 
   it("returns empty results when not focused", async () => {
@@ -74,7 +87,7 @@ describe("useSearchSuggestionsController", () => {
   });
 
   it("fetches posts in posts mode", async () => {
-    searchPostsMock.mockResolvedValue({
+    searchOnceMock.mockResolvedValue({
       data: {
         searchPosts: {
           hits: [
@@ -111,7 +124,7 @@ describe("useSearchSuggestionsController", () => {
   });
 
   it("handles posts search error gracefully", async () => {
-    searchPostsMock.mockRejectedValue(new Error("Network error"));
+    searchOnceMock.mockRejectedValue(new Error("Network error"));
     const { result } = renderSuggestions({ query: "react", mode: "posts" });
 
     await waitFor(() => {
@@ -122,7 +135,7 @@ describe("useSearchSuggestionsController", () => {
   });
 
   it("handles posts response with missing hits", async () => {
-    searchPostsMock.mockResolvedValue({
+    searchOnceMock.mockResolvedValue({
       data: {
         searchPosts: { total: 0 },
       },
@@ -137,7 +150,7 @@ describe("useSearchSuggestionsController", () => {
   });
 
   it("returns empty posts when posts mode returns no hits", async () => {
-    searchPostsMock.mockResolvedValue({});
+    searchOnceMock.mockResolvedValue({});
     const { result } = renderSuggestions({ query: "react", mode: "posts" });
 
     await waitFor(() => {

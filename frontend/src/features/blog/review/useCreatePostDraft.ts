@@ -1,11 +1,8 @@
 import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import {
-  CreatePostDraftDocument,
-  type PostDraft,
-} from "@/shared/graphql/content-documents";
+import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
+import type { PostDraft } from "@/shared/graphql/content-documents";
 
 export interface UseCreatePostDraftResult {
   isSubmitting: boolean;
@@ -17,7 +14,7 @@ export interface UseCreatePostDraftResult {
 export const useCreatePostDraft = (): UseCreatePostDraftResult => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mutate] = useMutation(CreatePostDraftDocument);
+  const [mutate] = draftRepository.useCreateDraft();
 
   const submitForReview = async (prompt: string): Promise<PostDraft | null> => {
     const trimmed = prompt.trim();

@@ -1,15 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@apollo/client/react";
 import { BlogCard } from "./BlogCard";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  PostsByTagDocument,
-  PostsDocument,
-} from "@/shared/graphql/content-documents";
+import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { mapPostToBlogCardItem } from "@/entities/post/lib";
-import { PagePagination } from "@/widgets";
+import { postRepository } from "@/entities/post/api/postRepository";
+import { PagePagination } from "@/shared/ui/PagePagination";
 
 interface BlogListProps {
   filterTag?: string;
@@ -22,23 +18,16 @@ export const BlogList: React.FC<BlogListProps> = ({ filterTag }) => {
   const { toast } = useToast();
   const itemsPerPage = 6;
 
-  const postsQuery = useQuery(PostsDocument, {
-    variables: {
-      page: currentPage,
-      limit: itemsPerPage,
-    },
+  const postsQuery = postRepository.useList({
+    page: currentPage,
+    limit: itemsPerPage,
     skip: Boolean(filterTag),
-    notifyOnNetworkStatusChange: true,
   });
 
-  const postsByTagQuery = useQuery(PostsByTagDocument, {
-    variables: {
-      tag: filterTag ?? "",
-      page: currentPage,
-      limit: itemsPerPage,
-    },
+  const postsByTagQuery = postRepository.useListByTag(filterTag ?? "", {
+    page: currentPage,
+    limit: itemsPerPage,
     skip: !filterTag,
-    notifyOnNetworkStatusChange: true,
   });
 
   const activeQuery = filterTag ? postsByTagQuery : postsQuery;

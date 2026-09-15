@@ -1,8 +1,8 @@
-import { useMutation } from "@apollo/client/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { SignupDocument } from "@/shared/graphql/generated/graphql";
+import { authRepository } from "@/entities/auth/api/authRepository";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionActions } from "@/entities/session";
 import { type ChangeEvent } from "react";
@@ -13,7 +13,7 @@ export const useSignup = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { authenticate } = useSessionActions();
-  const [signup, { loading }] = useMutation(SignupDocument);
+  const [signup, { loading }] = authRepository.useSignup();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -63,7 +63,7 @@ export const useSignup = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Signup failed.",
+        description: getGraphQLErrorMessage(error, "Signup failed."),
       });
     }
   });

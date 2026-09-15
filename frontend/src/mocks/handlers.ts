@@ -1,23 +1,22 @@
 import { HttpResponse, graphql, http } from "msw";
 import {
-  askChat,
+  approvePostDraft,
   authenticate,
-  createChat,
   createPost,
-  deleteChat,
+  createPostDraft,
   deletePost,
+  deletePostDraft,
   generatePostContent,
   generateTags,
-  getChatResponse,
   getPost,
   getSignedInUser,
-  listChatMessages,
-  listChats,
+  listMyPostDrafts,
+  listPostDrafts,
   listPosts,
   listPostsByTag,
   listTags,
   recordPostView,
-  renameChat,
+  rejectPostDraft,
   searchPosts,
   toUserResponse,
   togglePostLike,
@@ -187,51 +186,39 @@ export const handlers = [
     }),
   ),
 
-  gql.query("Chats", ({ variables }) =>
+  gql.query("PostDrafts", ({ variables }) =>
     HttpResponse.json({
-      data: { chats: listChats(variables?.page ?? 1, variables?.limit ?? 10) },
+      data: { postDrafts: listPostDrafts(variables?.page ?? 1, variables?.limit ?? 6) },
     }),
   ),
 
-  gql.query("Chat", ({ variables }) =>
+  gql.query("MyPostDrafts", ({ variables }) =>
     HttpResponse.json({
-      data: { chat: getChatResponse(variables?.id) },
+      data: { myPostDrafts: listMyPostDrafts(variables?.page ?? 1, variables?.limit ?? 6) },
     }),
   ),
 
-  gql.query("ChatMessages", ({ variables }) =>
+  gql.mutation("CreatePostDraft", ({ variables }) =>
     HttpResponse.json({
-      data: {
-        chatMessages: listChatMessages(
-          variables?.chatId,
-          variables?.page ?? 1,
-          variables?.limit ?? 20,
-        ),
-      },
+      data: { createPostDraft: createPostDraft(variables?.prompt) },
     }),
   ),
 
-  gql.mutation("CreateChat", ({ variables }) =>
+  gql.mutation("ApprovePostDraft", ({ variables }) =>
     HttpResponse.json({
-      data: { createChat: createChat(variables?.title) },
+      data: { approvePostDraft: approvePostDraft(variables?.id, variables?.input) },
     }),
   ),
 
-  gql.mutation("RenameChat", ({ variables }) =>
+  gql.mutation("RejectPostDraft", ({ variables }) =>
     HttpResponse.json({
-      data: { renameChat: renameChat(variables?.id, variables?.title) },
+      data: { rejectPostDraft: rejectPostDraft(variables?.id) },
     }),
   ),
 
-  gql.mutation("DeleteChat", ({ variables }) =>
+  gql.mutation("DeletePostDraft", ({ variables }) =>
     HttpResponse.json({
-      data: { deleteChat: deleteChat(variables?.id) },
-    }),
-  ),
-
-  gql.mutation("AskChat", ({ variables }) =>
-    HttpResponse.json({
-      data: { askChat: askChat(variables?.chatId, variables?.query) },
+      data: { deletePostDraft: deletePostDraft(variables?.id) },
     }),
   ),
 
