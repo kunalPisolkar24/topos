@@ -40,4 +40,5 @@ export const env = parsed.success
     };
 
 export const isPreviewEnv = env.VITE_ENV_TYPE === "preview";
-export const shouldEnableMocks = isPreviewEnv || env.VITE_ENABLE_MOCKS === "true";
+export const isProdEnv = env.VITE_ENV_TYPE === "prod";
+export const shouldEnableMocks = !isProdEnv && (isPreviewEnv || env.VITE_ENABLE_MOCKS === "true");

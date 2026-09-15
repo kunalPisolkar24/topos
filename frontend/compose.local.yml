@@ -4,6 +4,7 @@ services:
       context: ..
       dockerfile: frontend/Dockerfile
       args:
+        VITE_ENV_TYPE: ${VITE_ENV_TYPE:-dev}
         VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4000/graphql}
         VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:4000}
         VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}

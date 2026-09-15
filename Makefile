@@ -1,6 +1,6 @@
 .PHONY: help build ensure-network up down logs restart clean prune \
        local-build local-up local-down local-logs local-restart local-clean \
-       frontend-mock
+       frontend-dev frontend-mock frontend-preview frontend-build frontend-build-preview frontend-build-prod
 
 ENV_FILE ?= .env
 APP_NETWORK ?= topos_network
@@ -33,8 +33,13 @@ help:
 	@echo "  make local-logs    - View local dev logs"
 	@echo "  make local-clean   - Stop local dev and remove volumes"
 	@echo ""
-	@echo "  Frontend:"
-	@echo "  make frontend-mock - Run only the frontend with an in-memory mock backend"
+	@echo "  Frontend (host via npm):"
+	@echo "  make frontend-dev     - Run frontend against real gateway (VITE_ENV_TYPE=dev)"
+	@echo "  make frontend-mock    - Run frontend with in-memory mock (dev + ENABLE_MOCKS)"
+	@echo "  make frontend-preview - Run frontend with IndexedDB preview (VITE_ENV_TYPE=preview)"
+	@echo "  make frontend-build         - Build frontend (respects VITE_ENV_TYPE env, default dev)"
+	@echo "  make frontend-build-preview - Build frontend for preview"
+	@echo "  make frontend-build-prod    - Build frontend for prod"
 
 build:
 	$(COMPOSE) build
@@ -88,7 +93,22 @@ local-logs:
 local-clean:
 	$(LOCAL_COMPOSE) down -v
 
-# --- Frontend ---
+# --- Frontend (host) ---
+
+frontend-dev:
+	cd frontend && npm run dev
 
 frontend-mock:
 	cd frontend && npm run dev:mock
+
+frontend-preview:
+	cd frontend && npm run dev:preview
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-build-preview:
+	cd frontend && npm run build:preview
+
+frontend-build-prod:
+	cd frontend && npm run build:prod
