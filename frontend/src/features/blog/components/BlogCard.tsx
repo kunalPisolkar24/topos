@@ -8,12 +8,12 @@ import { getBlogCardImageSources } from "@/entities/upload";
 import { useSessionStore } from "@/entities/session";
 import { useFeedMode } from "@/features/blog/feed-mode";
 import { usePostInteractions } from "@/features/blog/interactions/usePostInteractions";
+import { DEFAULT_BLOG_CARD_IMAGE } from "@/entities/post/lib/blog-card";
 import {
-  DEFAULT_BLOG_CARD_IMAGE,
   formatBlogCardDate,
   formatBlogCardTag,
   type BlogCardItem,
-} from "@/entities/post/lib";
+} from "@/features/blog/presenters/blog-card-presenter";
 
 const MAX_VISIBLE_TAGS = 3;
 

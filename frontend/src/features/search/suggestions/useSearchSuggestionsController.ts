@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { type ContentPostCard, type ContentTag } from "@/shared/graphql/content-documents";
-import { DEFAULT_BLOG_CARD_IMAGE, getAuthorDisplayName } from "@/entities/post/lib";
+import { DEFAULT_BLOG_CARD_IMAGE } from "@/entities/post/lib/blog-card";
+import { getAuthorDisplayName } from "@/features/blog/presenters/blog-card-presenter";
 import { tagRepository } from "@/entities/tag";
 import { postRepository } from "@/entities/post/api/postRepository";
 

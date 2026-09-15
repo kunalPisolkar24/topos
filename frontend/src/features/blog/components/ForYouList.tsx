@@ -7,7 +7,7 @@ import { useSessionStore } from "@/entities/session";
 import { FeedModeProvider } from "@/features/blog/feed-mode";
 import { markFeedMode } from "@/features/blog/viewing/feed-attribution";
 import { type RecommendMode } from "@/shared/graphql/content-documents";
-import { mapPostToBlogCardItem } from "@/entities/post/lib";
+import { mapPostToBlogCardItem } from "@/features/blog/presenters/blog-card-presenter";
 import { postRepository } from "@/entities/post/api/postRepository";
 import { PagePagination } from "@/shared/ui/PagePagination";
 import { useToast } from "@/shared/ui/hooks/useToast";

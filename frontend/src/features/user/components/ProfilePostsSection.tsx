@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/shared/ui/primitives/card";
 import { Button } from "@/shared/ui/primitives/button";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { BlogCard } from "@/features/blog";
-import type { BlogCardItem } from "@/entities/post/lib";
+import type { BlogCardItem } from "@/features/blog/presenters/blog-card-presenter";
 import { PagePagination } from "@/shared/ui/PagePagination";
 
 interface ProfilePostsSectionProps {

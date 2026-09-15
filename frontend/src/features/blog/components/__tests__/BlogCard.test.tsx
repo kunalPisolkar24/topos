@@ -5,7 +5,7 @@ import { useQuery } from "@apollo/client/react";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
 import { sessionStoreActions } from "@/entities/session";
-import { mapPostToBlogCardItem } from "@/entities/post/lib";
+import { mapPostToBlogCardItem } from "@/features/blog/presenters/blog-card-presenter";
 import { PostsDocument } from "@/shared/graphql/content-documents";
 import { BlogCard } from "../BlogCard";
 

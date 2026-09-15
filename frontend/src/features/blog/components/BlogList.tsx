@@ -3,7 +3,7 @@ import { BlogCard } from "./BlogCard";
 import { BlogCardSkeleton } from "@/shared/ui/feedback";
 import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { useToast } from "@/shared/ui/hooks/useToast";
-import { mapPostToBlogCardItem } from "@/entities/post/lib";
+import { mapPostToBlogCardItem } from "@/features/blog/presenters/blog-card-presenter";
 import { postRepository } from "@/entities/post/api/postRepository";
 import { PagePagination } from "@/shared/ui/PagePagination";
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { CommandGroup, CommandItem } from "@/shared/ui/primitives/command";
 import { type ContentTag } from "@/shared/graphql/content-documents";
-import { formatBlogCardTag } from "@/entities/post/lib";
+import { formatBlogCardTag } from "@/features/blog/presenters/blog-card-presenter";
 
 interface TagSuggestionsProps {
   tags: ContentTag[];

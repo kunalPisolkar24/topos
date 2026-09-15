@@ -10,6 +10,7 @@ import {
   usePostAuthoringController,
   type PostForEditing,
 } from "../authoring";
+import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
 
 export interface BlogEditFormEditorProps {
   value: string;
@@ -40,12 +41,15 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
   });
   const cardImageInputRef = useRef<HTMLInputElement>(null);
 
+  const { titleReady, contentReady, imageReady } = evaluatePublishReadiness({
+    title: state.title,
+    body: state.content,
+    cardImage: state.cardImage,
+    cardImageUrl: state.cardImageUrl,
+    cardImagePreview: state.cardImagePreview,
+    tags: state.tags,
+  });
   const { contentText } = state;
-  const titleReady = state.title.trim().length > 0;
-  const contentReady = contentText.length > 0;
-  const imageReady = Boolean(
-    state.cardImage || state.cardImageUrl || state.cardImagePreview,
-  );
 
   return (
     <form

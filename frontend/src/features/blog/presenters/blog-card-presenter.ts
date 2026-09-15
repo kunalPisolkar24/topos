@@ -1,5 +1,5 @@
-export const DEFAULT_BLOG_CARD_IMAGE =
-  "https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80";
+import { DEFAULT_BLOG_CARD_IMAGE } from "@/entities/post/lib/blog-card";
+import { toPlainText } from "@/entities/post/lib/post-text";
 
 export const BLOG_CARD_SNIPPET_MAX_CHARS = 120;
 export const BLOG_CARD_SNIPPET_ELLIPSIS = "...";
@@ -47,14 +47,6 @@ export interface BlogCardItem {
   reason?: string;
 }
 
-export function stripHtml(html: string) {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 export function getAuthorDisplayName(author: AuthorLike) {
   const normalizedName = author.name?.trim();
   return normalizedName || author.username;
@@ -92,7 +84,7 @@ export function truncateSnippet(text: string, maxChars: number): string {
 }
 
 export function mapPostToBlogCardItem(post: PostLike): BlogCardItem {
-  const plainTextBody = stripHtml(post.body);
+  const plainTextBody = toPlainText(post.body);
 
   return {
     id: post.id,

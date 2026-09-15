@@ -3,6 +3,11 @@ import { LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/lib/cn";
+import {
+  getAccountIdentityName,
+  getUserEmail,
+  getUserInitial,
+} from "@/shared/lib/account-identity";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
 
 const authoringNavigation = {
@@ -98,13 +103,9 @@ export type MobileMenuProps = {
 export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: MobileMenuProps) {
   if (!isOpen) return null;
 
-  const accountIdentityName = user?.username || user?.name || displayName;
-  const userEmail = user?.email || "No email on file";
-  const userInitial =
-    user?.name?.charAt(0).toUpperCase() ||
-    user?.username?.charAt(0).toUpperCase() ||
-    user?.email?.charAt(0).toUpperCase() ||
-    "U";
+  const accountIdentityName = getAccountIdentityName(user, displayName);
+  const userEmail = getUserEmail(user);
+  const userInitial = getUserInitial(user);
 
   const isAuthenticated = !!user;
   const AuthoringIcon = authoringNavigation.icon;
