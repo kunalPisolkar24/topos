@@ -38,6 +38,10 @@ export interface DraftRepository {
   useRejectDraft(): ReturnType<typeof useMutation<RejectPostDraftMutation, RejectPostDraftMutationVariables>>;
   useDeleteDraft(): ReturnType<typeof useMutation<DeletePostDraftMutation, DeletePostDraftMutationVariables>>;
   createDraftOnce(client: ReturnType<typeof useApolloClient>, prompt: string): Promise<unknown>;
+  applyDraftStatusOptimistic(client: ReturnType<typeof useApolloClient>, draftId: string, status: string): string | undefined;
+  readDraftStatus(client: ReturnType<typeof useApolloClient>, draftId: string): string | undefined;
+  rollbackDraftStatusIfOptimistic(client: ReturnType<typeof useApolloClient>, draftId: string, optimisticStatus: string, previousStatus: string | undefined): void;
+  refreshDraftLists(client: ReturnType<typeof useApolloClient>): Promise<void>;
 }
 
 export const draftRepository: DraftRepository = {

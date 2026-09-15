@@ -9,7 +9,12 @@ export const paginatedPostListKeyArgs = (args: Record<string, unknown> | null): 
   return `tag:${String(tag)}|mode:${String(mode)}|seed:${String(seed)}|page:${String(args.page ?? 1)}|limit:${String(args.limit ?? "")}${query}`;
 };
 
-export const mergePaginatedPostLists = (existing: unknown, incoming: unknown) => {
+export const mergePaginatedPostLists = (
+  existing: unknown,
+  incoming: unknown,
+  _context?: unknown,
+) => {
+  void _context;
   if (!incoming) return existing;
   return incoming;
 };

@@ -6,6 +6,8 @@ import { Label } from "@/shared/ui/primitives/label";
 import { USERNAME_MAX_LENGTH } from "@/entities/user";
 import { useSignup } from "../hooks/use-signup";
 import { PasswordField } from "./PasswordField";
+import { PreviewNoticeDialog } from "@/features/preview/components/PreviewNoticeDialog";
+import { isPreview } from "@/shared/config/preview";
 import {
   AuthDivider,
   AuthGoogleButton,
@@ -24,7 +26,9 @@ export const Signup = () => {
   const { errors } = form.formState;
 
   return (
-    <AuthSplitLayout
+    <>
+      <PreviewNoticeDialog trigger="auth" />
+      <AuthSplitLayout
       heroTitle={
         <>
           Build your <span className="text-primary">editorial</span> identity.
@@ -145,6 +149,11 @@ export const Signup = () => {
               : undefined,
           }}
         />
+        {isPreview() && (
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-primary">
+            Preview stores this account locally in your browser.
+          </p>
+        )}
 
         <Button
           type="submit"
@@ -166,5 +175,6 @@ export const Signup = () => {
         </Button>
       </form>
     </AuthSplitLayout>
+    </>
   );
 };

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { userRepository } from "@/entities/user/api/userRepository";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useImageUpload } from "@/entities/upload";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   buildProfileUpdatePayload,
   sanitizeProfileBioInput,
@@ -131,6 +132,10 @@ export const useProfileEditorController = ({
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>, type: AvatarOrBanner) => {
+      if (isPreview()) {
+        toast({ title: PREVIEW_DISABLED_REASON, variant: "destructive" });
+        return;
+      }
       const file = event.target.files?.[0];
       if (!file) return;
       if (!validateImageFile(file, toast)) return;

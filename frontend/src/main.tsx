@@ -3,12 +3,17 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { logger } from "@/shared/lib/logger";
+import { isPreviewEnv, shouldEnableMocks } from "@/shared/config/env";
 import "./index.css";
 
 async function bootstrap() {
   try {
-    if (import.meta.env.VITE_ENABLE_MOCKS === "true") {
+    if (shouldEnableMocks) {
       const { worker } = await import("@/mocks/browser");
+      if (isPreviewEnv) {
+        const { ensurePreviewSeed } = await import("@/mocks/preview/seed");
+        await ensurePreviewSeed();
+      }
       await worker.start({ onUnhandledRequest: "bypass" });
     }
   } catch (err) {

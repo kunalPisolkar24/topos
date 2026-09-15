@@ -4,6 +4,8 @@ import { Button } from "@/shared/ui/primitives/button";
 import { Input } from "@/shared/ui/primitives/input";
 import { Label } from "@/shared/ui/primitives/label";
 import { PasswordField } from "./PasswordField";
+import { PreviewNoticeDialog } from "@/features/preview/components/PreviewNoticeDialog";
+import { isPreview } from "@/shared/config/preview";
 import {
   AuthDivider,
   AuthGoogleButton,
@@ -17,7 +19,9 @@ export const Signin = () => {
   const { errors } = form.formState;
 
   return (
-    <AuthSplitLayout
+    <>
+      <PreviewNoticeDialog trigger="auth" />
+      <AuthSplitLayout
       heroTitle={
         <>
           Access your <span className="text-primary">writing</span> workspace.
@@ -94,6 +98,11 @@ export const Signin = () => {
             </Button>
           }
         />
+        {isPreview() && (
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-primary">
+            Preview: any password works. New email creates a demo account.
+          </p>
+        )}
 
         <Button
           type="submit"
@@ -115,5 +124,6 @@ export const Signin = () => {
         </Button>
       </form>
     </AuthSplitLayout>
+    </>
   );
 };

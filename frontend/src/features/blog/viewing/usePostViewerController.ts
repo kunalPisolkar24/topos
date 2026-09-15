@@ -166,10 +166,12 @@ export const usePostViewerController = (
     };
   }
 
-  const handleRefetch = useCallback(() => {
-    return refetch().catch(() => {
+  const handleRefetch = useCallback(async () => {
+    try {
+      await refetch();
+    } catch {
       // Swallow to avoid unhandled rejection; error is exposed via query error field
-    });
+    }
   }, [refetch]);
 
   return {

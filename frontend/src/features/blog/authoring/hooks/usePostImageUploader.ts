@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type ReactQuill from "react-quill-new";
 import { useImageUpload } from "@/entities/upload";
 import { useToast } from "@/shared/ui/hooks/useToast";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 
 export interface UsePostImageUploaderArgs {
   initialImageUrl?: string | null;
@@ -83,6 +84,10 @@ export const usePostImageUploader = ({
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    if (isPreview()) {
+      toast({ title: PREVIEW_DISABLED_REASON, variant: "destructive" });
+      return;
+    }
     const next = event.target.files?.[0];
     if (!next) return;
     if (!validateImageFile(next, toast)) return;
@@ -143,6 +148,10 @@ export const usePostImageUploader = ({
   };
 
   const richTextImageHandler = useCallback(async () => {
+    if (isPreview()) {
+      toast({ title: PREVIEW_DISABLED_REASON, variant: "destructive" });
+      return;
+    }
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");

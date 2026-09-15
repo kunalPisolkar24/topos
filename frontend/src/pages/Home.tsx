@@ -3,6 +3,7 @@ import { StickyNavbar } from "@/widgets";
 import { BlogList, ForYouList } from "@/features/blog";
 import { SearchBar } from "@/features/search";
 import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
+import { PreviewNoticeDialog } from "@/features/preview/components/PreviewNoticeDialog";
 import { Button } from "@/shared/ui/primitives/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { X } from "lucide-react";
@@ -16,6 +17,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface">
+      <PreviewNoticeDialog trigger="landing" />
       <StickyNavbar />
 
       <main className="mx-auto pt-4 md:pt-4 pt-8">

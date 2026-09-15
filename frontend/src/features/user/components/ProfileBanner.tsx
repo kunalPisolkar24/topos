@@ -1,5 +1,6 @@
 import React from "react";
 import { Camera } from "lucide-react";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 
 interface ProfileBannerProps {
   bannerUrl: string;
@@ -46,7 +47,8 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
         <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-center px-4 py-4">
           <label
             htmlFor="bannerUpload"
-            className="interactive-hover-primary flex cursor-pointer items-center gap-3 border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-foreground"
+            title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
+            className={`interactive-hover-primary flex items-center gap-3 border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-foreground ${isPreview() ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
           >
             <div className="flex h-8 w-8 items-center justify-center bg-primary-container text-primary-foreground">
               <Camera className="h-4 w-4" />
@@ -60,6 +62,8 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
               accept="image/*"
               onChange={onBannerChange}
               className="hidden"
+              disabled={isPreview()}
+              title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
             />
           </label>
         </div>

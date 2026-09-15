@@ -4,6 +4,7 @@ import { Menu, PenSquare, ShieldCheck, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/lib/cn";
+import { isPreview } from "@/shared/config/preview";
 import { NavBrand } from "./components/NavBrand";
 import { AccountMenu } from "./components/AccountMenu";
 import { MobileMenu } from "./components/MobileMenu";
@@ -41,8 +42,15 @@ export const StickyNavbar = () => {
   const AuthoringIcon = authoringNavigation.icon;
   const ReviewIcon = reviewNavigation.icon;
 
+  const previewMode = isPreview();
+
   return (
-    <nav className="fixed inset-x-0 top-0 z-50 border-b border-outline-variant/20 bg-surface-low text-foreground">
+    <nav
+      className={cn(
+        "fixed inset-x-0 z-50 border-b border-outline-variant/20 bg-surface-low text-foreground",
+        previewMode ? "top-7" : "top-0",
+      )}
+    >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(77,68,227,0.06),transparent_24%,transparent_76%,rgba(77,68,227,0.06))]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
 

@@ -5,6 +5,7 @@ import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
 import { ThemeProvider } from "@/shared/ui/theme";
 import { AppApolloProvider } from "./AppApolloProvider";
 import { SessionBootstrap } from "./SessionBootstrap";
+import { PreviewBanner } from "@/features/preview/components/PreviewBanner";
 
 export function AppProviders({ children }: PropsWithChildren) {
   return (
@@ -12,7 +13,10 @@ export function AppProviders({ children }: PropsWithChildren) {
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <AppApolloProvider>
           <SessionBootstrap>
-            <BrowserRouter>{children}</BrowserRouter>
+            <BrowserRouter>
+              <PreviewBanner />
+              {children}
+            </BrowserRouter>
             <Toaster />
           </SessionBootstrap>
         </AppApolloProvider>

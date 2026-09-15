@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/primitives/dropdown-menu";
 import { cn } from "@/shared/lib/cn";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   ALIGNMENT_CYCLE,
   BACKGROUND_COLORS,
@@ -49,10 +50,12 @@ export function ResponsiveRichTextToolbar({
   const { state, applyFormat, removeFormat, applyLink, cycleAlignment } =
     useQuillFormat(quillRef);
   const [moreOpen, setMoreOpen] = useState(false);
+  const previewMode = isPreview();
 
   const handleImage = useCallback(() => {
+    if (previewMode) return;
     onImageUpload?.();
-  }, [onImageUpload]);
+  }, [onImageUpload, previewMode]);
 
   const activeHeader = useMemo(() => {
     const match = HEADER_OPTIONS.find((option) => option.value === state.header);
@@ -127,11 +130,14 @@ export function ResponsiveRichTextToolbar({
 
       <PriorityGroup>
         <ToolbarIconButton label="Link" icon={LinkIcon} onClick={applyLink} />
-        <ToolbarIconButton
-          label="Image"
-          icon={ImageIcon}
-          onClick={handleImage}
-        />
+        <span title={previewMode ? PREVIEW_DISABLED_REASON : undefined}>
+          <ToolbarIconButton
+            label="Image"
+            icon={ImageIcon}
+            disabled={previewMode}
+            onClick={handleImage}
+          />
+        </span>
       </PriorityGroup>
 
       <SecondaryGroup className="hidden md:flex">
@@ -161,13 +167,18 @@ export function ResponsiveRichTextToolbar({
         </PriorityGroup>
         <PriorityDivider />
         <PriorityGroup>
-          <ToolbarIconButton
-            label="Video"
-            icon={Video}
-            onClick={() =>
-              applyFormat("video", window.prompt("Video URL", "https://") || false)
-            }
-          />
+          <span title={previewMode ? PREVIEW_DISABLED_REASON : undefined}>
+            <ToolbarIconButton
+              label="Video"
+              icon={Video}
+              disabled={previewMode}
+              onClick={() =>
+                previewMode
+                  ? undefined
+                  : applyFormat("video", window.prompt("Video URL", "https://") || false)
+              }
+            />
+          </span>
           <ToolbarIconButton
             label="Blockquote"
             icon={Quote}

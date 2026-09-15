@@ -2,6 +2,7 @@ import React, { useId } from "react";
 import { UploadCloud, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
 import { Label } from "@/shared/ui/primitives/label";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 
 interface FeaturedImageSectionProps {
   preview: string | null;
@@ -21,6 +22,7 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
   inputRef,
 }) => {
   const inputId = useId();
+  const previewMode = isPreview();
   return (
     <Card className="gap-0 bg-surface-lowest py-0">
       <CardHeader className="bg-surface-low p-4 sm:p-5">
@@ -40,8 +42,13 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
           type="button"
           aria-label={cardImage ? "Change cover image" : "Upload cover image"}
           aria-controls={inputId}
-          className="interactive-hover-primary flex min-h-72 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-5 text-left"
-          onClick={() => inputRef.current?.click()}
+          title={previewMode ? PREVIEW_DISABLED_REASON : undefined}
+          disabled={previewMode}
+          className="interactive-hover-primary flex min-h-72 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-5 text-left disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => {
+            if (previewMode) return;
+            inputRef.current?.click();
+          }}
         >
           <div className="w-full space-y-4">
             {preview ? (
@@ -83,6 +90,8 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
           ref={inputRef}
           onChange={onFileChange}
           aria-label="Featured image file input"
+          disabled={previewMode}
+          title={previewMode ? PREVIEW_DISABLED_REASON : undefined}
         />
         {cardImageUrl && (
           <div className="mt-3 bg-primary-container p-3 text-primary-foreground">

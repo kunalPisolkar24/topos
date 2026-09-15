@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/shared/ui/primitives/card";
 import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { useCurrentUser } from "@/entities/session";
 import { StickyNavbar } from "@/widgets";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   useProfileEditorController,
   useUserPostsController,
@@ -121,7 +122,8 @@ const UserProfile: React.FC = () => {
                   {profileState.isEditingProfile && (
                     <label
                       htmlFor="avatarUpload"
-                      className="interactive-hover-primary absolute bottom-2 right-2 flex h-10 w-10 cursor-pointer items-center justify-center border border-outline-variant/20 bg-surface-lowest text-foreground"
+                      title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
+                      className={`interactive-hover-primary absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center border border-outline-variant/20 bg-surface-lowest text-foreground ${isPreview() ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                       aria-label="Change avatar"
                     >
                       <Camera className="h-5 w-5" />
@@ -131,6 +133,8 @@ const UserProfile: React.FC = () => {
                         accept="image/*"
                         onChange={(e) => profileHandlers.handleFileChange(e, "avatar")}
                         className="hidden"
+                        disabled={isPreview()}
+                        title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
                       />
                     </label>
                   )}

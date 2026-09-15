@@ -44,6 +44,7 @@ const buildBody = (intro: string, points: string[], outro: string) =>
   ].join("");
 
 const users: MockUser[] = [
+
   {
     id: "user-1",
     username: "alexcarter",
@@ -1079,3 +1080,8 @@ export const deletePostDraft = (id: string) => {
   drafts.splice(index, 1);
   return true;
 };
+
+export const seedUsers = users;
+export const seedTags = tags;
+export const seedPosts = posts;
+export const seedDrafts = drafts;

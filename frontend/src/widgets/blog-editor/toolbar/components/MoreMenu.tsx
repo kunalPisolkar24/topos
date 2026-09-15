@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/primitives/dropdown-menu";
 import { cn } from "@/shared/lib/cn";
+import { isPreview } from "@/shared/config/preview";
 import { BACKGROUND_COLORS, TEXT_COLORS } from "../constants";
 import type { FormatState } from "../types";
 import { ColorSwatch } from "./ColorPicker";
@@ -84,9 +85,11 @@ export function MoreMenu({
         <MoreMenuAction
           label="Insert video"
           icon={Video}
-          onClick={() =>
-            onApplyFormat("video", window.prompt("Video URL", "https://") || false)
-          }
+          disabled={isPreview()}
+          onClick={() => {
+            if (isPreview()) return;
+            onApplyFormat("video", window.prompt("Video URL", "https://") || false);
+          }}
         />
         <MoreMenuAction
           label="Blockquote"
