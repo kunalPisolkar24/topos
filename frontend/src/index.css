@@ -10,7 +10,7 @@
   :root {
     --font-sans: "Inter";
     --font-mono: "Space Grotesk";
-    --app-navbar-height: 4.5rem;
+    --app-navbar-height: 3.5rem;
     --app-navbar-offset: calc(var(--app-navbar-height) + 1rem);
     --background: 248 248 249;
     --foreground: 20 20 20;

@@ -48,7 +48,7 @@ export const StickyNavbar = () => {
     <nav
       className={cn(
         "fixed inset-x-0 z-50 border-b border-outline-variant/20 bg-surface-low text-foreground",
-        previewMode ? "top-7" : "top-0",
+        previewMode ? "top-6" : "top-0",
       )}
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(77,68,227,0.06),transparent_24%,transparent_76%,rgba(77,68,227,0.06))]" />
@@ -61,14 +61,14 @@ export const StickyNavbar = () => {
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {isHydrating ? (
-            <div className="h-11 w-28 animate-pulse bg-surface-low ring-1 ring-outline-variant/20" />
+            <div className="h-9 w-24 animate-pulse bg-surface-low ring-1 ring-outline-variant/20" />
           ) : isAuthenticated ? (
             <>
               <Link
                 to={authoringNavigation.to}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
-                  "hidden h-11 px-4 md:inline-flex",
+                  "hidden h-9 px-3 md:inline-flex",
                 )}
               >
                 <AuthoringIcon className="h-4 w-4" />
@@ -79,7 +79,7 @@ export const StickyNavbar = () => {
                 to={reviewNavigation.to}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
-                  "hidden h-11 px-4 md:inline-flex",
+                  "hidden h-9 px-3 md:inline-flex",
                 )}
               >
                 <ReviewIcon className="h-4 w-4" />
@@ -104,7 +104,7 @@ export const StickyNavbar = () => {
               >
                 <Avatar
                   size="default"
-                  className="size-10 bg-transparent after:border-transparent after:mix-blend-normal"
+                  className="size-8 bg-transparent after:border-transparent after:mix-blend-normal"
                 >
                   <AvatarImage src={user?.avatarUrl || undefined} alt={displayName} />
                   <AvatarFallback className="bg-primary-container font-mono text-[0.72rem] uppercase tracking-[0.12em] text-primary-foreground">
@@ -121,7 +121,7 @@ export const StickyNavbar = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11 border border-outline-variant/20 bg-surface-lowest hover:bg-surface-low md:hidden"
+                className="h-9 w-9 border border-outline-variant/20 bg-surface-lowest hover:bg-surface-low md:hidden"
                 aria-expanded={isMobileMenuOpen}
                 aria-label={
                   isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
