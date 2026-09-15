@@ -10,9 +10,6 @@ export function useNavbarSession() {
   const isAuthenticated = hasHydrated && status === "authenticated";
 
   const displayName = user?.name || user?.username || "Workspace member";
-  const accountIdentityName =
-    user?.username || user?.name || "Workspace member";
-  const userEmail = user?.email || "No email on file";
   const userInitial =
     user?.name?.charAt(0).toUpperCase() ||
     user?.username?.charAt(0).toUpperCase() ||
@@ -26,8 +23,6 @@ export function useNavbarSession() {
     isHydrating,
     isAuthenticated,
     displayName,
-    accountIdentityName,
-    userEmail,
     userInitial,
     logout,
   };

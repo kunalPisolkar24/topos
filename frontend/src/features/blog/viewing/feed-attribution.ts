@@ -21,6 +21,7 @@ export function setFeedAttributionStorage(port: StoragePort): void {
   storage = port;
 }
 
+// test-only
 export function getFeedAttributionStorage(): StoragePort {
   return storage;
 }

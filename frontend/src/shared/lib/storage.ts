@@ -7,6 +7,7 @@ export interface StoragePort {
   readonly length?: number;
 }
 
+// test-only: in-memory StoragePort for unit tests
 export const createMemoryStorage = (): StoragePort & { clear: () => void; length: number; key: (index: number) => string | null } => {
   const store = new Map<string, string>();
   return {

@@ -1,6 +1,6 @@
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/render-with-providers";
-import { PagePagination } from "../PagePagination";
+import { PagePagination } from "@/shared/ui/PagePagination";
 
 describe("PagePagination", () => {
   const onPageChange = vi.fn();

@@ -104,9 +104,3 @@ export const fetchHttpClient: HttpClient = {
     }
   },
 };
-
-export const createMockHttpClient = (response: unknown): HttpClient => ({
-  async postFormData() {
-    return response;
-  },
-});
