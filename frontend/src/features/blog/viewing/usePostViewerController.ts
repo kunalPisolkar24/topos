@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import { postRepository } from "@/entities/post/api/postRepository";
-import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import type { PostQuery } from "@/shared/graphql/content-documents";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
@@ -130,7 +130,7 @@ export const usePostViewerController = (
     if (!isValidId) return;
     try {
       await deletePost({ variables: { id: trimmedId } });
-      await refreshPostListQueries(client, { postId: trimmedId });
+      await postRepository.refreshLists(client, { postId: trimmedId });
       toast({
         title: "Blog Deleted",
         description: "Successfully deleted.",

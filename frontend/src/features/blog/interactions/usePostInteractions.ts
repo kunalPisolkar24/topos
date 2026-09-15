@@ -1,9 +1,7 @@
-import { gql } from "@apollo/client";
 import { useApolloClient } from "@apollo/client/react";
 import { type RecommendMode } from "@/shared/graphql/content-documents";
 import { postRepository } from "@/entities/post/api/postRepository";
-import { getGraphQLErrorMessage } from "@/shared/api";
-import { useToast } from "@/shared/ui/hooks/useToast";
+import { useAppError } from "@/shared/ui/hooks/useAppError";
 
 export interface PostInteractionsController {
   liked: boolean;
@@ -12,13 +10,6 @@ export interface PostInteractionsController {
   toggleLike: () => Promise<void>;
   toggleSave: () => Promise<void>;
 }
-
-const POST_INTERACTION_FRAGMENT = gql`
-  fragment PostInteractionState on Post {
-    likedByMe
-    savedByMe
-  }
-`;
 
 // usePostInteractions wires the like/save toggle buttons on post cards
 // to the likePost/savePost mutations. The current state comes from the
@@ -37,47 +28,23 @@ export const usePostInteractions = (
   feedMode: RecommendMode | null = null,
 ): PostInteractionsController => {
   const client = useApolloClient();
-  const { toast } = useToast();
+  const reportError = useAppError();
   const [likePost, { loading: isLiking }] = postRepository.useLike();
   const [savePost, { loading: isSaving }] = postRepository.useSave();
 
-  const getCurrentState = (): { liked: boolean; saved: boolean } => {
-    const postRef = client.cache.identify({ __typename: "Post", id: postId });
-    if (postRef) {
-      const fragment = client.cache.readFragment<{ likedByMe: boolean; savedByMe: boolean }>({
-        id: postRef,
-        fragment: POST_INTERACTION_FRAGMENT,
-      });
-      if (fragment) return { liked: fragment.likedByMe, saved: fragment.savedByMe };
-    }
-    return { liked: likedByMe, saved: savedByMe };
-  };
-
-  const applyLiked = (liked: boolean) => {
-    const postRef = client.cache.identify({ __typename: "Post", id: postId });
-    if (!postRef) return;
-    client.cache.modify({
-      id: postRef,
-      fields: { likedByMe: () => liked },
+  const getCurrentState = (): { liked: boolean; saved: boolean } =>
+    postRepository.readInteractionState(client, postId, {
+      liked: likedByMe,
+      saved: savedByMe,
     });
-  };
 
-  const applySaved = (saved: boolean) => {
-    const postRef = client.cache.identify({ __typename: "Post", id: postId });
-    if (!postRef) return;
-    client.cache.modify({
-      id: postRef,
-      fields: { savedByMe: () => saved },
-    });
-  };
+  const applyLiked = (liked: boolean) =>
+    postRepository.writeLikedState(client, postId, liked);
 
-  const reportError = (fallback: string) => (err: unknown) => {
-    toast({
-      title: "Error",
-      description: getGraphQLErrorMessage(err, fallback),
-      variant: "destructive",
-    });
-  };
+  const applySaved = (saved: boolean) =>
+    postRepository.writeSavedState(client, postId, saved);
+
+
 
   const modeVariable = feedMode ?? undefined;
 
@@ -93,7 +60,7 @@ export const usePostInteractions = (
       applyLiked(data?.likePost ?? !previous);
     } catch (err) {
       applyLiked(previous);
-      reportError("Could not update like.")(err);
+      reportError(err, "Could not update like.");
     }
   };
 
@@ -109,7 +76,7 @@ export const usePostInteractions = (
       applySaved(data?.savePost ?? !previous);
     } catch (err) {
       applySaved(previous);
-      reportError("Could not update save.")(err);
+      reportError(err, "Could not update save.");
     }
   };
 

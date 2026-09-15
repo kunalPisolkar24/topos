@@ -1,3 +1,4 @@
+import { gql } from "@apollo/client";
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import {
   ApprovePostDraftDocument,
@@ -22,6 +23,12 @@ import {
 } from "@/shared/graphql/content-documents";
 
 const PAGE_LIMIT = 6;
+
+const POST_DRAFT_STATUS_FRAGMENT = gql`
+  fragment PostDraftStatus on PostDraft {
+    status
+  }
+`;
 
 export interface DraftRepository {
   usePostDrafts(page: number, opts?: { skip?: boolean }): ReturnType<typeof useQuery<PostDraftsQuery, PostDraftsQueryVariables>>;
@@ -69,6 +76,60 @@ export const draftRepository: DraftRepository = {
       mutation: CreatePostDraftDocument,
       variables: { prompt },
     });
+  },
+
+  applyDraftStatusOptimistic(
+    client: ReturnType<typeof useApolloClient>,
+    draftId: string,
+    status: string,
+  ): string | undefined {
+    const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
+    if (!ref) return undefined;
+    let previous: string | undefined;
+    client.cache.modify({
+      id: ref,
+      fields: {
+        status: (existing) => {
+          previous = existing as string;
+          return status;
+        },
+      },
+    });
+    return previous;
+  },
+
+  readDraftStatus(
+    client: ReturnType<typeof useApolloClient>,
+    draftId: string,
+  ): string | undefined {
+    const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
+    if (!ref) return undefined;
+    const snapshot = client.cache.readFragment<{ status: string }>({
+      id: ref,
+      fragment: POST_DRAFT_STATUS_FRAGMENT,
+    });
+    return snapshot?.status;
+  },
+
+  rollbackDraftStatusIfOptimistic(
+    client: ReturnType<typeof useApolloClient>,
+    draftId: string,
+    optimisticStatus: string,
+    previousStatus: string | undefined,
+  ): void {
+    if (previousStatus === undefined) return;
+    const status = draftRepository.readDraftStatus(client, draftId);
+    if (status !== optimisticStatus) return;
+    const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
+    if (!ref) return;
+    client.cache.modify({
+      id: ref,
+      fields: { status: () => previousStatus },
+    });
+  },
+
+  async refreshDraftLists(client: ReturnType<typeof useApolloClient>): Promise<void> {
+    await client.refetchQueries({ include: ["PostDrafts", "MyPostDrafts"] });
   },
 };
 

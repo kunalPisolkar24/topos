@@ -4,7 +4,7 @@ import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import { type UpdatePostInput } from "@/shared/graphql/content-documents";
 import { postRepository } from "@/entities/post/api/postRepository";
-import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import {
   createPostSchema,
@@ -131,7 +131,7 @@ export const usePostAuthoringSubmit = ({
           const parsed = createPostSchema.parse(candidate);
           dispatch({ type: "beginCreate" });
           await createPost({ variables: { input: parsed } });
-          await refreshPostListQueries(client);
+          await postRepository.refreshLists(client);
           toast({ title: "Blog Created", description: "Successfully created." });
           dispatch({ type: "resolveIdle" });
           navigate("/");
@@ -208,7 +208,7 @@ export const usePostAuthoringSubmit = ({
           const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
           dispatch({ type: "beginUpdate" });
           await updatePost({ variables: { id: post.id, input: parsedInput } });
-          await refreshPostListQueries(client);
+          await postRepository.refreshLists(client);
           toast({ title: "Success", description: "Post updated successfully." });
           dispatch({ type: "resolveIdle" });
           onComplete?.();
