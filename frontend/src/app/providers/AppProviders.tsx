@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/shared/ui/theme";
 import { AppApolloProvider } from "./AppApolloProvider";
 import { SessionBootstrap } from "./SessionBootstrap";
 import { PreviewBanner } from "@/features/preview/components/PreviewBanner";
+import { ScrollManager } from "@/app/routing/ScrollManager";
 
 export function AppProviders({ children }: PropsWithChildren) {
   return (
@@ -14,6 +15,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         <AppApolloProvider>
           <SessionBootstrap>
             <BrowserRouter>
+              <ScrollManager />
               <PreviewBanner />
               {children}
             </BrowserRouter>
