@@ -33,7 +33,8 @@ help:
 	@echo "  make local-clean   - Stop local dev and remove volumes"
 	@echo ""
 	@echo "  Frontend:"
-	@echo "  See frontend/Makefile — e.g. make -C frontend dev-preview"
+	@echo "  cd frontend && make <target> — see frontend/Makefile (e.g. make dev-preview)"
+	@echo "  (from repo root: make -C frontend <target>)"
 
 build:
 	$(COMPOSE) build

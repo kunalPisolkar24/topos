@@ -4,7 +4,7 @@ VITE_ENV_TYPE ?= dev
 NPM ?= npm
 
 help:
-	@echo "Frontend — run from frontend/ (or make -C frontend <target>)"
+	@echo "Frontend — cd frontend && make <target> (e.g. make dev-preview)"
 	@echo ""
 	@echo "  make dev              - Run against real gateway (VITE_ENV_TYPE=dev)"
 	@echo "  make dev-mock         - Run with in-memory mock (VITE_ENABLE_MOCKS=true)"
