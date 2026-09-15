@@ -1,5 +1,7 @@
+import { gql } from "@apollo/client";
 import { useApolloClient } from "@apollo/client/react";
 import { useMutation, useQuery } from "@apollo/client/react";
+import { refreshPostListQueries } from "@/shared/api";
 import {
   CreatePostDocument,
   DeletePostDocument,
@@ -43,6 +45,13 @@ import {
   type UpdatePostMutation,
   type UpdatePostMutationVariables,
 } from "@/shared/graphql/content-documents";
+const POST_INTERACTION_FRAGMENT = gql`
+  fragment PostInteractionState on Post {
+    likedByMe
+    savedByMe
+  }
+`;
+
 export const postRepository = {
   useList({ page = 1, limit = 6, skip = false }: { page?: number; limit?: number; skip?: boolean } = {}) {
     return useQuery<PostsQuery, PostsQueryVariables>(PostsDocument, {
@@ -187,5 +196,57 @@ export const postRepository = {
       mutation: DeletePostDocument,
       variables: { id },
     });
+  },
+
+  readInteractionState(
+    client: ReturnType<typeof useApolloClient>,
+    postId: string,
+    fallback: { liked: boolean; saved: boolean },
+  ): { liked: boolean; saved: boolean } {
+    const postRef = client.cache.identify({ __typename: "Post", id: postId });
+    if (postRef) {
+      const fragment = client.cache.readFragment<{
+        likedByMe: boolean;
+        savedByMe: boolean;
+      }>({
+        id: postRef,
+        fragment: POST_INTERACTION_FRAGMENT,
+      });
+      if (fragment) return { liked: fragment.likedByMe, saved: fragment.savedByMe };
+    }
+    return fallback;
+  },
+
+  writeLikedState(
+    client: ReturnType<typeof useApolloClient>,
+    postId: string,
+    liked: boolean,
+  ): void {
+    const postRef = client.cache.identify({ __typename: "Post", id: postId });
+    if (!postRef) return;
+    client.cache.modify({
+      id: postRef,
+      fields: { likedByMe: () => liked },
+    });
+  },
+
+  writeSavedState(
+    client: ReturnType<typeof useApolloClient>,
+    postId: string,
+    saved: boolean,
+  ): void {
+    const postRef = client.cache.identify({ __typename: "Post", id: postId });
+    if (!postRef) return;
+    client.cache.modify({
+      id: postRef,
+      fields: { savedByMe: () => saved },
+    });
+  },
+
+  async refreshLists(
+    client: ReturnType<typeof useApolloClient>,
+    options?: { postId?: string },
+  ): Promise<void> {
+    await refreshPostListQueries(client, options);
   },
 };

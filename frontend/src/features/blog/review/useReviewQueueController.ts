@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
-import { gql } from "@apollo/client";
 import { useApolloClient } from "@apollo/client/react";
 import { draftRepository } from "@/entities/draft/api/draftRepository";
-import { getGraphQLErrorMessage } from "@/shared/api";
+import { useAppError } from "@/shared/ui/hooks/useAppError";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
 import type { DraftEditsInput, PostDraft } from "@/shared/graphql/content-documents";
@@ -52,12 +51,6 @@ const emptySection: PaginatedDraftSection = {
   totalDrafts: 0,
 };
 
-const POST_DRAFT_STATUS_FRAGMENT = gql`
-  fragment PostDraftStatus on PostDraft {
-    status
-  }
-`;
-
 // useReviewQueueController drives the two-section review page. Status
 // flips land optimistically on the normalized PostDraft entity so the
 // row reacts instantly, then both lists refetch so reviewed drafts
@@ -85,32 +78,14 @@ export const useReviewQueueController = (): ReviewQueueController => {
 
   const isPending = (draftId: string) => pendingIds.has(draftId);
 
-  const applyStatus = (draftId: string, status: PostDraft["status"]) => {
-    const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
-    if (!ref) return undefined;
-    let previous: PostDraft["status"] | undefined;
-    client.cache.modify({
-      id: ref,
-      fields: {
-        status: (existing) => {
-          previous = existing as PostDraft["status"];
-          return status;
-        },
-      },
-    });
-    return previous;
-  };
+  const applyStatus = (draftId: string, status: PostDraft["status"]) =>
+    draftRepository.applyDraftStatusOptimistic(client, draftId, status) as
+      | PostDraft["status"]
+      | undefined;
 
-  const reportError = (fallback: string) => (err: unknown) => {
-    toast({
-      title: "Error",
-      description: getGraphQLErrorMessage(err, fallback),
-      variant: "destructive",
-    });
-  };
+  const reportError = useAppError();
 
-  const refreshLists = () =>
-    client.refetchQueries({ include: ["PostDrafts", "MyPostDrafts"] });
+  const refreshLists = () => draftRepository.refreshDraftLists(client);
 
   const act = async (
     draftId: string,
@@ -134,23 +109,14 @@ export const useReviewQueueController = (): ReviewQueueController => {
       await refreshLists();
     } catch (err) {
       if (previousStatus !== undefined && optimisticStatus) {
-        const ref = client.cache.identify({ __typename: "PostDraft", id: draftId });
-        if (ref) {
-          const snapshot = client.cache.readFragment<{ status: PostDraft["status"] }>({
-            id: ref,
-            fragment: POST_DRAFT_STATUS_FRAGMENT,
-          });
-          // Only rollback if the entity still exists and still shows the
-          // optimistic status. If another tab/user won the race and
-          // refetched to APPROVED/REJECTED, or the draft was evicted
-          // (withdrawn), we must not overwrite winner's truth with a
-          // stale rollback to PENDING.
-          if (snapshot && snapshot.status === optimisticStatus) {
-            applyStatus(draftId, previousStatus);
-          }
-        }
+        draftRepository.rollbackDraftStatusIfOptimistic(
+          client,
+          draftId,
+          optimisticStatus,
+          previousStatus,
+        );
       }
-      reportError(failureFallback)(err);
+      reportError(err, failureFallback);
     } finally {
       pendingRef.current.delete(draftId);
       setPendingIds(new Set(pendingRef.current));
