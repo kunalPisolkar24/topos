@@ -34,7 +34,7 @@ const UserProfile: React.FC = () => {
     return (
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
-        <div className="pt-app-navbar">
+        <div className="pt-app-chrome">
           <Skeleton className="h-[17rem] w-full rounded-none bg-surface-low sm:h-[21rem]" />
         </div>
         <main className="container mx-auto px-4 pb-20 sm:px-6 lg:px-8">
@@ -88,7 +88,7 @@ const UserProfile: React.FC = () => {
     <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
 
-      <div className="pt-app-navbar">
+      <div className="pt-app-chrome">
         <ProfileBanner
           bannerUrl={bannerSrc}
           isEditing={profileState.isEditingProfile}

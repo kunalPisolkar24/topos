@@ -231,6 +231,10 @@
     padding-top: var(--app-navbar-offset);
   }
 
+  .pt-app-chrome {
+    padding-top: calc(var(--app-navbar-offset) - 1rem);
+  }
+
   .top-app-navbar-offset {
     top: var(--app-navbar-offset);
   }

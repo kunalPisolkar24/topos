@@ -12,7 +12,7 @@ export const PreviewBanner = () => {
         <span className="hidden sm:inline">Preview — local demo data · uploads disabled · AI simulated · clearing site data resets</span>
         <span className="sm:hidden">Preview — local demo · uploads disabled</span>
       </div>
-      <style>{` :root { --app-navbar-height: calc(3rem + 20px); --app-navbar-offset: calc(3rem + 20px + 1rem); } `}</style>
+      <style>{` :root { --app-navbar-height: 3rem; --app-navbar-offset: calc(3rem + 20px + 1rem); } `}</style>
     </>
   );
 };

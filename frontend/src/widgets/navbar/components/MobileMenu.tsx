@@ -30,21 +30,19 @@ const accountNavigation = {
 
 const stackedMenuActionClassName = cn(
   buttonVariants({ variant: "ghost", size: "lg" }),
-  "w-full justify-start border-outline-variant/20 bg-surface-lowest px-4",
+  "w-full justify-start rounded-none border border-outline-variant/20 bg-surface-lowest px-4 font-mono text-[0.6875rem] tracking-[0.12em]",
 );
 
 const stackedMenuDestructiveClassName = cn(
   buttonVariants({ variant: "destructive", size: "lg" }),
-  "w-full justify-start border border-destructive/20 px-4 shadow-none",
+  "w-full justify-start rounded-none border border-destructive/20 px-4 shadow-none font-mono text-[0.6875rem] tracking-[0.12em]",
 );
 
 const menuPanelSurfaceClassName =
-  "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none ring-1 ring-outline-variant/20";
+  "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none";
 
 const menuPanelTintClassName =
-  "pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]";
-
-const menuPanelDividerClassName = "h-px bg-gradient-to-r from-primary via-primary/45 to-transparent";
+  "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.42)_0%,transparent_100%)]";
 
 interface UserAvatarProps {
   avatarUrl?: string | null;
@@ -79,13 +77,13 @@ interface AccountMenuIdentityProps {
 
 function AccountMenuIdentity({ avatarUrl, displayName, email, initial }: AccountMenuIdentityProps) {
   return (
-    <div className="relative overflow-hidden border border-outline-variant/20 bg-surface-lowest px-4 py-3">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(31,26,72,0.22)_0%,transparent_100%)]" />
+    <div className="relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest px-4 py-3">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(31,26,72,0.14)_0%,transparent_100%)]" />
       <div className="relative flex items-center gap-3">
         <UserAvatar avatarUrl={avatarUrl} label={displayName} initial={initial} size="sm" />
-        <div className="min-w-0 space-y-1">
-          <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-          <p className="truncate font-mono text-[0.68rem] tracking-[0.08em] text-muted-foreground">{email}</p>
+        <div className="min-w-0 space-y-1 text-left">
+          <p className="truncate font-mono text-[0.75rem] font-medium uppercase tracking-[0.08em] text-foreground">{displayName}</p>
+          <p className="truncate font-mono text-[0.625rem] tracking-[0.08em] text-muted-foreground">{email}</p>
         </div>
       </div>
     </div>
@@ -115,9 +113,9 @@ export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: Mob
     <div className="relative border-t border-outline-variant/20 bg-surface-low md:hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-        <div className={cn(menuPanelSurfaceClassName, "p-3 ring-0")}>
+        <div className={cn(menuPanelSurfaceClassName, "p-3")}>
           <div className={menuPanelTintClassName} />
-          <div className="relative space-y-3">
+          <div className="relative space-y-4">
             {isAuthenticated ? (
               <>
                 <AccountMenuIdentity
@@ -126,42 +124,51 @@ export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: Mob
                   email={userEmail}
                   initial={userInitial}
                 />
-                <div className={menuPanelDividerClassName} />
-                <div className="space-y-2">
-                  <Link
-                    to={authoringNavigation.to}
-                    onClick={onClose}
-                    className={stackedMenuActionClassName}
-                  >
-                    <AuthoringIcon className="h-4 w-4" />
-                    {authoringNavigation.label}
-                  </Link>
-                  <Link
-                    to={reviewNavigation.to}
-                    onClick={onClose}
-                    className={stackedMenuActionClassName}
-                  >
-                    <ReviewIcon className="h-4 w-4" />
-                    {reviewNavigation.label}
-                  </Link>
-                  <Link
-                    to={accountNavigation.to}
-                    onClick={onClose}
-                    className={stackedMenuActionClassName}
-                  >
-                    <User className="h-4 w-4" />
-                    {accountNavigation.label}
-                  </Link>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="lg"
-                    className={stackedMenuDestructiveClassName}
-                    onClick={() => void onLogout()}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Log out
-                  </Button>
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-1">
+                    <p className="px-1 py-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Workspace
+                    </p>
+                    <Link
+                      to={authoringNavigation.to}
+                      onClick={onClose}
+                      className={stackedMenuActionClassName}
+                    >
+                      <AuthoringIcon className="h-4 w-4" />
+                      {authoringNavigation.label}
+                    </Link>
+                    <Link
+                      to={reviewNavigation.to}
+                      onClick={onClose}
+                      className={stackedMenuActionClassName}
+                    >
+                      <ReviewIcon className="h-4 w-4" />
+                      {reviewNavigation.label}
+                    </Link>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="px-1 py-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Identity
+                    </p>
+                    <Link
+                      to={accountNavigation.to}
+                      onClick={onClose}
+                      className={stackedMenuActionClassName}
+                    >
+                      <User className="h-4 w-4" />
+                      {accountNavigation.label}
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="lg"
+                      className={stackedMenuDestructiveClassName}
+                      onClick={() => void onLogout()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -172,7 +179,7 @@ export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: Mob
                 <Link
                   to="/signup"
                   onClick={onClose}
-                  className={cn(buttonVariants({ size: "lg" }), "w-full justify-start px-4")}
+                  className={cn(buttonVariants({ size: "lg" }), "w-full justify-start rounded-none px-4 font-mono text-[0.6875rem] tracking-[0.12em]")}
                 >
                   Sign Up
                 </Link>

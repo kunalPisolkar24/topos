@@ -44,7 +44,7 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
       </div>
 
       {isEditing && (
-        <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-center px-4 py-4">
+        <div className="absolute left-0 right-0 top-4 z-10 flex items-center justify-center px-4 py-4 sm:top-6">
           <label
             htmlFor="bannerUpload"
             title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}

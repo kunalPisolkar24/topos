@@ -1,12 +1,13 @@
 import { forwardRef, type ComponentPropsWithoutRef, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LogOut, User } from "lucide-react";
+import { LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/shared/ui/primitives/dropdown-menu";
 import { cn } from "@/shared/lib/cn";
@@ -18,30 +19,40 @@ import {
 import { useSessionStore } from "@/entities/session";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
 
+const authoringNavigation = {
+  to: "/create-blog",
+  label: "Create Blog",
+  icon: PenSquare,
+};
+
+const reviewNavigation = {
+  to: "/review",
+  label: "Review",
+  icon: ShieldCheck,
+};
+
 const stackedMenuActionClassName = cn(
   buttonVariants({ variant: "ghost", size: "lg" }),
-  "w-full justify-start border-outline-variant/20 bg-surface-lowest px-4",
+  "w-full justify-start rounded-none border border-outline-variant/20 bg-surface-lowest px-4 font-mono text-[0.6875rem] tracking-[0.12em]",
 );
 
 const stackedMenuDestructiveClassName = cn(
   buttonVariants({ variant: "destructive", size: "lg" }),
-  "w-full justify-start border border-destructive/20 px-4 shadow-none",
+  "w-full justify-start rounded-none border border-destructive/20 px-4 shadow-none font-mono text-[0.6875rem] tracking-[0.12em]",
 );
 
-const dropdownMenuActionClassName = cn(stackedMenuActionClassName, "cursor-pointer");
+const dropdownMenuActionClassName = cn(stackedMenuActionClassName, "cursor-pointer rounded-none");
 
 const dropdownMenuDestructiveClassName = cn(
   stackedMenuDestructiveClassName,
-  "cursor-pointer text-destructive-foreground data-[highlighted]:bg-destructive data-[highlighted]:text-destructive-foreground",
+  "cursor-pointer rounded-none text-destructive-foreground data-[highlighted]:bg-destructive data-[highlighted]:text-destructive-foreground",
 );
 
 const menuPanelSurfaceClassName =
-  "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none ring-1 ring-outline-variant/20";
+  "relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-low text-foreground shadow-none";
 
 const menuPanelTintClassName =
-  "pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(31,26,72,0.88)_0%,rgba(31,26,72,0.28)_55%,transparent_100%)]";
-
-const menuPanelDividerClassName = "h-px bg-gradient-to-r from-primary via-primary/45 to-transparent";
+  "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(31,26,72,0.42)_0%,transparent_100%)]";
 
 interface UserAvatarProps {
   avatarUrl?: string | null;
@@ -106,13 +117,13 @@ interface AccountMenuIdentityProps {
 
 function AccountMenuIdentity({ avatarUrl, displayName, email, initial }: AccountMenuIdentityProps) {
   return (
-    <div className="relative overflow-hidden border border-outline-variant/20 bg-surface-lowest px-4 py-3">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(31,26,72,0.22)_0%,transparent_100%)]" />
+    <div className="relative overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest px-4 py-3">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(31,26,72,0.14)_0%,transparent_100%)]" />
       <div className="relative flex items-center gap-3">
         <UserAvatar avatarUrl={avatarUrl} label={displayName} initial={initial} size="sm" />
-        <div className="min-w-0 space-y-1">
-          <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-          <p className="truncate font-mono text-[0.68rem] tracking-[0.08em] text-muted-foreground">{email}</p>
+        <div className="min-w-0 space-y-1 text-left">
+          <p className="truncate font-mono text-[0.75rem] font-medium uppercase tracking-[0.08em] text-foreground">{displayName}</p>
+          <p className="truncate font-mono text-[0.625rem] tracking-[0.08em] text-muted-foreground">{email}</p>
         </div>
       </div>
     </div>
@@ -156,6 +167,9 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
     );
   }
 
+  const AuthoringIcon = authoringNavigation.icon;
+  const ReviewIcon = reviewNavigation.icon;
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -164,36 +178,56 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
           label={displayName}
           initial={userInitial}
           ariaLabel="Open account menu"
-          className="hidden md:inline-flex"
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
         sideOffset={10}
         forceMount
-        className={cn(menuPanelSurfaceClassName, "w-[19rem] p-0")}
+        className={cn(menuPanelSurfaceClassName, "w-[20rem] p-0")}
       >
         <div className="relative p-3">
           <div className={menuPanelTintClassName} />
-          <div className="relative space-y-3">
+          <div className="relative space-y-4">
             <AccountMenuIdentity
               avatarUrl={user?.avatarUrl}
               displayName={accountIdentityName}
               email={userEmail}
               initial={userInitial}
             />
-            <div className={menuPanelDividerClassName} />
-            <div className="space-y-2">
-              <DropdownMenuItem asChild className={dropdownMenuActionClassName}>
-                <Link to="/profile" className="flex w-full items-center">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Account</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void onLogout()} className={dropdownMenuDestructiveClassName}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1">
+                <DropdownMenuLabel className="px-1 py-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Workspace
+                </DropdownMenuLabel>
+                <DropdownMenuItem asChild className={dropdownMenuActionClassName}>
+                  <Link to={authoringNavigation.to} className="flex w-full items-center">
+                    <AuthoringIcon className="mr-2 h-4 w-4" />
+                    <span>Create Blog</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className={dropdownMenuActionClassName}>
+                  <Link to={reviewNavigation.to} className="flex w-full items-center">
+                    <ReviewIcon className="mr-2 h-4 w-4" />
+                    <span>Review</span>
+                  </Link>
+                </DropdownMenuItem>
+              </div>
+              <div className="space-y-1">
+                <DropdownMenuLabel className="px-1 py-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Identity
+                </DropdownMenuLabel>
+                <DropdownMenuItem asChild className={dropdownMenuActionClassName}>
+                  <Link to="/profile" className="flex w-full items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Account</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void onLogout()} className={dropdownMenuDestructiveClassName}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </div>
             </div>
           </div>
         </div>

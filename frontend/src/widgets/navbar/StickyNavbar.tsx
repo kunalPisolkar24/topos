@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, PenSquare, ShieldCheck, X } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
-import { Button, buttonVariants } from "@/shared/ui/primitives/button";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/lib/cn";
 import { isPreview } from "@/shared/config/preview";
 import { NavBrand } from "./components/NavBrand";
@@ -10,23 +9,11 @@ import { AccountMenu } from "./components/AccountMenu";
 import { MobileMenu } from "./components/MobileMenu";
 import { useNavbarSession } from "./useNavbarSession";
 
-const authoringNavigation = {
-  to: "/create-blog",
-  label: "Create Blog",
-  icon: PenSquare,
-};
-
-const reviewNavigation = {
-  to: "/review",
-  label: "Review",
-  icon: ShieldCheck,
-};
-
 export const StickyNavbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { user, isHydrating, isAuthenticated, displayName, userInitial, logout } =
+  const { user, isHydrating, isAuthenticated, displayName, logout } =
     useNavbarSession();
 
   useEffect(() => {
@@ -38,9 +25,6 @@ export const StickyNavbar = () => {
     await logout();
     navigate("/signin", { replace: true });
   };
-
-  const AuthoringIcon = authoringNavigation.icon;
-  const ReviewIcon = reviewNavigation.icon;
 
   const previewMode = isPreview();
 
@@ -63,56 +47,7 @@ export const StickyNavbar = () => {
           {isHydrating ? (
             <div className="h-8 w-20 animate-pulse bg-surface-low ring-1 ring-outline-variant/20" />
           ) : isAuthenticated ? (
-            <>
-              <Link
-                to={authoringNavigation.to}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "xs" }),
-                  "hidden h-8 px-3 md:inline-flex",
-                )}
-              >
-                <AuthoringIcon className="h-3.5 w-3.5" />
-                {authoringNavigation.label}
-              </Link>
-
-              <Link
-                to={reviewNavigation.to}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "xs" }),
-                  "hidden h-8 px-3 md:inline-flex",
-                )}
-              >
-                <ReviewIcon className="h-3.5 w-3.5" />
-                {reviewNavigation.label}
-              </Link>
-
-              <AccountMenu
-                user={user}
-                displayName={displayName}
-                onLogout={handleLogout}
-              />
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-auto w-auto rounded-full border border-primary/45 bg-transparent p-0.5 hover:bg-transparent focus-visible:ring-primary-container md:hidden"
-                aria-label={
-                  isMobileMenuOpen ? "Close mobile account menu" : "Open mobile account menu"
-                }
-                aria-expanded={isMobileMenuOpen}
-                onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-              >
-                <Avatar
-                  size="default"
-                  className="size-7 bg-transparent after:border-transparent after:mix-blend-normal"
-                >
-                  <AvatarImage src={user?.avatarUrl || undefined} alt={displayName} />
-                  <AvatarFallback className="bg-primary-container font-mono text-[0.72rem] uppercase tracking-[0.12em] text-primary-foreground">
-                    {userInitial}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </>
+            <AccountMenu user={user} displayName={displayName} onLogout={handleLogout} />
           ) : (
             <>
               <AccountMenu user={user} displayName={displayName} onLogout={handleLogout} />

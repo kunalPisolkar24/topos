@@ -207,7 +207,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <div
       ref={commandWrapperRef}
-      className="mx-auto mt-16 w-full max-w-3xl px-4 sm:mt-20 sm:px-6"
+      className="mx-auto mt-6 w-full max-w-3xl px-4 sm:mt-8 sm:px-6"
     >
       <Card className="gap-0 overflow-hidden rounded-none border-0 bg-surface-lowest py-0 shadow-none">
         <div

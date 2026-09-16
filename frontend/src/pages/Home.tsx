@@ -20,7 +20,7 @@ const Home: React.FC = () => {
       <PreviewNoticeDialog trigger="landing" />
       <StickyNavbar />
 
-      <main className="mx-auto pt-4 md:pt-4 pt-8">
+      <main className="mx-auto pb-8 pt-app-navbar-offset">
         <ErrorBoundary>
           <SearchBar onTagSelect={handleTagSelect} currentFilterTag={selectedTag} />
         </ErrorBoundary>
