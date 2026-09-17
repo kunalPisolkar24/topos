@@ -17,13 +17,22 @@ const FOR_YOU_HEADING = "FOR YOU";
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
+// Stable for the session so back-navigation keeps the same order;
+// Surprise-me generates a fresh one explicitly.
+let sessionSeed: number | null = null;
+
+const getSessionSeed = () => {
+  if (sessionSeed === null) sessionSeed = randomSeed();
+  return sessionSeed;
+};
+
 export const ForYouList: React.FC = () => {
   const isAuthenticated =
     useSessionStore((state) => state.status) === "authenticated";
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [mode, setMode] = useState<RecommendMode>("DEFAULT");
-  const [seed, setSeed] = useState(randomSeed);
+  const [seed, setSeed] = useState(getSessionSeed);
   const [useLatestFallback, setUseLatestFallback] = useState(false);
 
   const recommendedQuery = postRepository.useRecommended({
@@ -122,23 +131,24 @@ export const ForYouList: React.FC = () => {
   };
 
   const sectionHeading = (
-    <div className="mb-6 flex items-center justify-between">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-muted-foreground">
         {FOR_YOU_HEADING}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {isAuthenticated && useLatestFallback && (
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={handleRetry}
           >
             Retry personalized feed
           </Button>
         )}
         {isAuthenticated && (
-          <Button type="button" variant="outline" size="sm" onClick={handleSurprise}>
+          <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleSurprise}>
             Surprise me
           </Button>
         )}

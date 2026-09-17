@@ -1,6 +1,6 @@
 import { forwardRef, type ComponentPropsWithoutRef, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
+import { Bot, LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import {
@@ -29,6 +29,12 @@ const reviewNavigation = {
   to: "/review",
   label: "Review",
   icon: ShieldCheck,
+};
+
+const chatNavigation = {
+  to: "/chat",
+  label: "AI Chat",
+  icon: Bot,
 };
 
 const stackedMenuActionClassName = cn(
@@ -67,7 +73,7 @@ function UserAvatar({ avatarUrl, label, initial, size = "default" }: UserAvatarP
       size={size}
       className={cn(
         "bg-transparent after:border-transparent after:mix-blend-normal",
-        size === "default" ? "size-10" : "size-9",
+        size === "default" ? "size-8" : "size-8",
       )}
     >
       <AvatarImage src={avatarUrl || undefined} alt={label} />
@@ -160,7 +166,7 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
         >
           Sign In
         </Link>
-        <Link to="/signup" className={cn(buttonVariants({ size: "sm" }), "h-11 px-4")}>
+        <Link to="/signup" className={cn(buttonVariants({ size: "sm" }), "hidden h-11 px-4 md:inline-flex")}>
           Sign Up
         </Link>
       </>
@@ -169,6 +175,7 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
 
   const AuthoringIcon = authoringNavigation.icon;
   const ReviewIcon = reviewNavigation.icon;
+  const ChatIcon = chatNavigation.icon;
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -184,7 +191,7 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
         align="end"
         sideOffset={10}
         forceMount
-        className={cn(menuPanelSurfaceClassName, "w-[20rem] p-0")}
+        className={cn(menuPanelSurfaceClassName, "w-[20rem] max-w-[calc(100vw-2rem)] p-0")}
       >
         <div className="relative p-3">
           <div className={menuPanelTintClassName} />
@@ -210,6 +217,12 @@ export function AccountMenu({ user, displayName, onLogout }: AccountMenuProps) {
                   <Link to={reviewNavigation.to} className="flex w-full items-center">
                     <ReviewIcon className="mr-2 h-4 w-4" />
                     <span>Review</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className={dropdownMenuActionClassName}>
+                  <Link to={chatNavigation.to} className="flex w-full items-center">
+                    <ChatIcon className="mr-2 h-4 w-4" />
+                    <span>AI Chat</span>
                   </Link>
                 </DropdownMenuItem>
               </div>

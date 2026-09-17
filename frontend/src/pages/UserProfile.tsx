@@ -14,7 +14,7 @@ import {
   ProfileBanner,
   ProfileViewInfo,
   ProfileEditForm,
-  ProfilePostsSection,
+  ProfilePublicationIndex,
 } from "@/features/user";
 
 const FALLBACK_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
@@ -26,8 +26,7 @@ const UserProfile: React.FC = () => {
     currentUser,
   });
   const {
-    state: { blogs: userBlogs, loading: isPostsLoading, currentPage, totalPages, totalPosts },
-    handlePageChange,
+    state: { totalPosts },
   } = useUserPostsController({ userId: currentUser?.id });
 
   if (isUserLoading) {
@@ -35,10 +34,10 @@ const UserProfile: React.FC = () => {
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
         <div className="pt-app-chrome">
-          <Skeleton className="h-[17rem] w-full rounded-none bg-surface-low sm:h-[21rem]" />
+          <Skeleton className="h-44 w-full rounded-none bg-surface-low sm:h-[17rem] lg:h-[21rem]" />
         </div>
-        <main className="container mx-auto px-4 pb-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
+        <main className="container mx-auto px-4 pb-20 sm:px-5 lg:px-6">
+          <div className="mx-auto max-w-[88rem]">
             <Card className="relative -mt-24 gap-0 bg-surface-low py-0">
               <CardContent className="grid gap-0 p-0 lg:grid-cols-[minmax(240px,0.38fr)_minmax(0,1fr)]">
                 <div className="bg-surface-lowest p-5 sm:p-6 lg:p-8">
@@ -96,10 +95,9 @@ const UserProfile: React.FC = () => {
         />
       </div>
 
-      <main className="container mx-auto px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
+      <main className="container mx-auto px-4 pb-20 sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[88rem]">
           <Card className="relative -mt-24 gap-0 bg-surface-low py-0">
-            <div className="absolute left-0 top-0 h-1 w-28 bg-primary" aria-hidden="true" />
             <CardContent className="grid gap-0 p-0 lg:grid-cols-[minmax(240px,0.38fr)_minmax(0,1fr)]">
               <aside className="bg-surface-lowest p-5 sm:p-6 lg:p-8">
                 <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
@@ -140,7 +138,7 @@ const UserProfile: React.FC = () => {
                   )}
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-2 lg:grid-cols-1">
+                <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
                   <div className="bg-surface-low p-3 ring-1 ring-outline-variant/20">
                     <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
                       Access
@@ -208,14 +206,7 @@ const UserProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          <ProfilePostsSection
-            blogs={userBlogs}
-            isLoading={isPostsLoading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalPosts={totalPosts}
-            handlePageChange={handlePageChange}
-          />
+          <ProfilePublicationIndex userId={currentUser?.id} />
         </div>
       </main>
     </div>

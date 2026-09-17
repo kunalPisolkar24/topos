@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useApolloClient } from "@apollo/client/react";
 import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
@@ -13,6 +14,7 @@ export interface UseCreatePostDraftResult {
 // the generated post enters the peer-review queue instead of the editor.
 export const useCreatePostDraft = (): UseCreatePostDraftResult => {
   const { toast } = useToast();
+  const client = useApolloClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mutate] = draftRepository.useCreateDraft();
 
@@ -39,6 +41,7 @@ export const useCreatePostDraft = (): UseCreatePostDraftResult => {
         description:
           "Your AI draft is waiting in the review queue until someone else approves it.",
       });
+      await draftRepository.refreshDraftLists(client);
       return draft;
     } catch (error) {
       toast({

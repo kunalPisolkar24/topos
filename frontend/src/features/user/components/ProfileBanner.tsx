@@ -14,7 +14,7 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
   onBannerChange,
 }) => {
   return (
-    <div className="relative h-[17rem] w-full overflow-hidden bg-surface-low sm:h-[21rem]">
+    <div className="relative h-44 w-full overflow-hidden bg-surface-low sm:h-[17rem] lg:h-[21rem]">
       <div
         className="absolute inset-0 h-full w-full bg-cover bg-center opacity-80 saturate-[0.72]"
         style={{ backgroundImage: `url(${bannerUrl})` }}
@@ -30,8 +30,8 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
         className="absolute inset-0 opacity-35 [background-image:linear-gradient(to_right,rgb(var(--outline-variant)/0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgb(var(--outline-variant)/0.12)_1px,transparent_1px)] [background-size:5rem_5rem]"
         aria-hidden="true"
       />
-      <div className="container relative mx-auto flex h-full items-end px-4 pb-28 sm:px-6 lg:px-8">
-        <div className="max-w-6xl">
+      <div className="container relative mx-auto flex h-full items-end px-4 pb-20 sm:px-5 sm:pb-28 lg:px-6">
+        <div className="mx-auto w-full max-w-[88rem]">
           <div className="bg-surface-lowest/80 px-4 py-3 ring-1 ring-outline-variant/20 backdrop-blur-sm">
             <p className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.24em] text-primary">
               Topos Profile

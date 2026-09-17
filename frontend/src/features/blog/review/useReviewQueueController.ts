@@ -1,16 +1,19 @@
 import { useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { draftRepository } from "@/entities/draft/api/draftRepository";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { useAppError } from "@/shared/ui/hooks/useAppError";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
 import type { DraftEditsInput, PostDraft } from "@/shared/graphql/content-documents";
+import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
 
 export type ReviewDialog =
   | { kind: "closed" }
   | { kind: "approve"; draft: PostDraft }
   | { kind: "reject"; draft: PostDraft }
-  | { kind: "withdraw"; draft: PostDraft };
+  | { kind: "withdraw"; draft: PostDraft }
+  | { kind: "resubmit"; draft: PostDraft };
 
 export interface PaginatedDraftSection {
   drafts: PostDraft[];
@@ -42,6 +45,7 @@ export interface ReviewQueueController {
   approve: (draftId: string, edits: DraftEditsInput) => Promise<void>;
   reject: (draftId: string, reason: string) => Promise<void>;
   withdraw: (draftId: string) => Promise<void>;
+  resubmit: (draftId: string, input: ContentDraftInput) => Promise<void>;
 }
 
 const emptySection: PaginatedDraftSection = {
@@ -71,6 +75,7 @@ export const useReviewQueueController = (): ReviewQueueController => {
   const [approveMutation] = draftRepository.useApproveDraft();
   const [rejectMutation] = draftRepository.useRejectDraft();
   const [withdrawMutation] = draftRepository.useDeleteDraft();
+  const [resubmitMutation] = draftRepository.useResubmitContentDraft();
 
   const [dialog, setDialog] = useState<ReviewDialog>({ kind: "closed" });
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set<string>());
@@ -93,6 +98,7 @@ export const useReviewQueueController = (): ReviewQueueController => {
     run: () => Promise<unknown>,
     successTitle: string,
     failureFallback: string,
+    refreshPosts = false,
   ) => {
     if (pendingRef.current.has(draftId)) return;
     pendingRef.current.add(draftId);
@@ -107,6 +113,8 @@ export const useReviewQueueController = (): ReviewQueueController => {
       await run();
       toast({ title: successTitle });
       await refreshLists();
+      // Approving publishes a live post, so post lists need revalidation too.
+      if (refreshPosts) await postRepository.refreshLists(client);
     } catch (err) {
       if (previousStatus !== undefined && optimisticStatus) {
         draftRepository.rollbackDraftStatusIfOptimistic(
@@ -130,6 +138,7 @@ export const useReviewQueueController = (): ReviewQueueController => {
       () => approveMutation({ variables: { id: draftId, input: edits } }),
       "Draft Approved",
       "Could not approve the draft.",
+      true,
     );
 
   const reject = async (draftId: string, reason: string) =>
@@ -151,6 +160,17 @@ export const useReviewQueueController = (): ReviewQueueController => {
       () => withdrawMutation({ variables: { id: draftId } }),
       "Draft Withdrawn",
       "Could not withdraw the draft.",
+    );
+
+  // A rejected draft stays rejected until its author edits it; that edit
+  // flips it back to PENDING so it re-enters the community queue.
+  const resubmit = async (draftId: string, input: ContentDraftInput) =>
+    act(
+      draftId,
+      "PENDING",
+      () => resubmitMutation({ variables: { id: draftId, input } }),
+      "Back in review",
+      "Could not resubmit the draft.",
     );
 
   const mapSection = (
@@ -190,5 +210,6 @@ export const useReviewQueueController = (): ReviewQueueController => {
     approve,
     reject,
     withdraw,
+    resubmit,
   };
 };

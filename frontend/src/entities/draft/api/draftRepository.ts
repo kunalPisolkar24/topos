@@ -21,6 +21,14 @@ import {
   type RejectPostDraftMutation,
   type RejectPostDraftMutationVariables,
 } from "@/shared/graphql/content-documents";
+import {
+  CreateContentDraftDocument,
+  ResubmitContentDraftDocument,
+  type CreateContentDraftMutation,
+  type CreateContentDraftMutationVariables,
+  type ResubmitContentDraftMutation,
+  type ResubmitContentDraftMutationVariables,
+} from "@/shared/graphql/content-draft.documents";
 
 const PAGE_LIMIT = 6;
 
@@ -34,10 +42,11 @@ export interface DraftRepository {
   usePostDrafts(page: number, opts?: { skip?: boolean }): ReturnType<typeof useQuery<PostDraftsQuery, PostDraftsQueryVariables>>;
   useMyPostDrafts(page: number, opts?: { skip?: boolean }): ReturnType<typeof useQuery<MyPostDraftsQuery, MyPostDraftsQueryVariables>>;
   useCreateDraft(): ReturnType<typeof useMutation<CreatePostDraftMutation, CreatePostDraftMutationVariables>>;
+  useCreateContentDraft(): ReturnType<typeof useMutation<CreateContentDraftMutation, CreateContentDraftMutationVariables>>;
+  useResubmitContentDraft(): ReturnType<typeof useMutation<ResubmitContentDraftMutation, ResubmitContentDraftMutationVariables>>;
   useApproveDraft(): ReturnType<typeof useMutation<ApprovePostDraftMutation, ApprovePostDraftMutationVariables>>;
   useRejectDraft(): ReturnType<typeof useMutation<RejectPostDraftMutation, RejectPostDraftMutationVariables>>;
   useDeleteDraft(): ReturnType<typeof useMutation<DeletePostDraftMutation, DeletePostDraftMutationVariables>>;
-  createDraftOnce(client: ReturnType<typeof useApolloClient>, prompt: string): Promise<unknown>;
   applyDraftStatusOptimistic(client: ReturnType<typeof useApolloClient>, draftId: string, status: string): string | undefined;
   readDraftStatus(client: ReturnType<typeof useApolloClient>, draftId: string): string | undefined;
   rollbackDraftStatusIfOptimistic(client: ReturnType<typeof useApolloClient>, draftId: string, optimisticStatus: string, previousStatus: string | undefined): void;
@@ -49,6 +58,8 @@ export const draftRepository: DraftRepository = {
     return useQuery<PostDraftsQuery, PostDraftsQueryVariables>(PostDraftsDocument, {
       variables: { page, limit: PAGE_LIMIT },
       skip: opts?.skip,
+      fetchPolicy: "cache-and-network",
+      notifyOnNetworkStatusChange: true,
     });
   },
 
@@ -56,11 +67,21 @@ export const draftRepository: DraftRepository = {
     return useQuery<MyPostDraftsQuery, MyPostDraftsQueryVariables>(MyPostDraftsDocument, {
       variables: { page, limit: PAGE_LIMIT },
       skip: opts?.skip,
+      fetchPolicy: "cache-and-network",
+      notifyOnNetworkStatusChange: true,
     });
   },
 
   useCreateDraft() {
     return useMutation<CreatePostDraftMutation, CreatePostDraftMutationVariables>(CreatePostDraftDocument);
+  },
+
+  useCreateContentDraft() {
+    return useMutation<CreateContentDraftMutation, CreateContentDraftMutationVariables>(CreateContentDraftDocument);
+  },
+
+  useResubmitContentDraft() {
+    return useMutation<ResubmitContentDraftMutation, ResubmitContentDraftMutationVariables>(ResubmitContentDraftDocument);
   },
 
   useApproveDraft() {
@@ -73,13 +94,6 @@ export const draftRepository: DraftRepository = {
 
   useDeleteDraft() {
     return useMutation<DeletePostDraftMutation, DeletePostDraftMutationVariables>(DeletePostDraftDocument);
-  },
-
-  async createDraftOnce(client, prompt) {
-    return client.mutate<CreatePostDraftMutation, CreatePostDraftMutationVariables>({
-      mutation: CreatePostDraftDocument,
-      variables: { prompt },
-    });
   },
 
   applyDraftStatusOptimistic(

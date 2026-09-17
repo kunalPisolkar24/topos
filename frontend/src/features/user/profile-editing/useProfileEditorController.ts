@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useApolloClient } from "@apollo/client/react";
 import { userRepository } from "@/entities/user/api/userRepository";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useImageUpload } from "@/entities/upload";
 import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
@@ -83,6 +85,7 @@ export const useProfileEditorController = ({
   currentUser,
 }: UseProfileEditorControllerProps) => {
   const { toast } = useToast();
+  const client = useApolloClient();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -233,6 +236,8 @@ export const useProfileEditorController = ({
         setIsEditingProfile(false);
         setAvatarFile(null);
         setBannerFile(null);
+        // Post lists embed author name/avatar/bio — revalidate them too.
+        await postRepository.refreshLists(client);
         toast({
           title: "Success",
           description: "Profile updated successfully.",

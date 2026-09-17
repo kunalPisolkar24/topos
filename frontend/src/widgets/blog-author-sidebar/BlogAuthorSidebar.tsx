@@ -54,7 +54,7 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
   const hasLongBio = (author.bio?.length ?? 0) > 120;
 
   return (
-    <aside className="w-full shrink-0 lg:w-80 xl:w-96">
+    <div className="w-full shrink-0 lg:w-80 xl:w-96">
       <Card className="sticky top-app-navbar-offset gap-0 bg-surface-low py-0">
         <CardHeader className="p-4 sm:p-5">
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
@@ -182,6 +182,6 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
           )}
         </CardContent>
       </Card>
-    </aside>
+    </div>
   );
 };

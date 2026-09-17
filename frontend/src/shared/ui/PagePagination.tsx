@@ -37,6 +37,20 @@ const handlePageLinkClick = (
   onPageChange(page);
 };
 
+const getVisiblePages = (current: number, total: number): (number | "ellipsis")[] => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: (number | "ellipsis")[] = [1];
+  if (current > 3) pages.push("ellipsis");
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 2) pages.push("ellipsis");
+  pages.push(total);
+  return pages;
+};
+
 export const PagePagination = ({
   currentPage,
   totalPages,
@@ -50,8 +64,10 @@ export const PagePagination = ({
 }: PagePaginationProps) => {
   if (totalPages <= 1) return null;
 
+  const visiblePages = getVisiblePages(currentPage, totalPages);
+
   return (
-    <Pagination className={cn(ALIGNMENT_CLASSNAMES[align], className)}>
+    <Pagination className={cn(ALIGNMENT_CLASSNAMES[align], "w-full max-w-full overflow-x-auto", className)}>
       <PaginationContent>
         <PaginationItem>
           {currentPage > 1 ? (
@@ -67,24 +83,28 @@ export const PagePagination = ({
             />
           ) : null}
         </PaginationItem>
-        {Array.from({ length: totalPages }, (_, index) => {
-          const page = index + 1;
-          const isActive = currentPage === page;
-          return (
+        {visiblePages.map((page, index) =>
+          page === "ellipsis" ? (
+            <PaginationItem key={`ellipsis-${index}`}>
+              <span className="flex h-9 min-w-9 items-center justify-center px-2 font-mono text-xs text-muted-foreground" aria-hidden="true">
+                …
+              </span>
+            </PaginationItem>
+          ) : (
             <PaginationItem key={page}>
               <PaginationLink
                 href="#"
                 onClick={(event) => handlePageLinkClick(event, page, onPageChange)}
-                isActive={isActive}
+                isActive={currentPage === page}
                 className={cn(
-                  isActive ? activePageClassName : inactivePageClassName,
+                  currentPage === page ? activePageClassName : inactivePageClassName,
                 )}
               >
                 {page}
               </PaginationLink>
             </PaginationItem>
-          );
-        })}
+          ),
+        )}
         <PaginationItem>
           {currentPage < totalPages ? (
             <PaginationNext

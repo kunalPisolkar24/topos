@@ -41,7 +41,7 @@ export const useSignin = () => {
         throw new Error("Sign-in response was empty.");
       }
 
-      authenticate(payload.token, payload.user);
+      await authenticate(payload.token, payload.user);
 
       toast({
         title: "Success",

@@ -19,6 +19,13 @@ export interface MockTag {
   name: string;
 }
 
+export interface MockUserProfile {
+  id: string;
+  tagWeights: Record<string, number>;
+  seenPostIds: string[];
+  totalWeight: number;
+}
+
 export interface MockPost {
   id: string;
   title: string;
@@ -33,6 +40,7 @@ export interface MockPost {
   savedByMe: boolean;
   createdAt: string;
   updatedAt: string;
+  approvedById?: string | null;
 }
 
 const buildBody = (intro: string, points: string[], outro: string) =>
@@ -833,11 +841,17 @@ export interface MockDraft {
   body: string;
   summary: string;
   tags: string[];
+  // Cover proposed with the draft. Optional so older seeds stay valid;
+  // preview responses normalize it to null.
+  imageUrl?: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   authorId: string;
   postId: string | null;
   createdAt: string;
   updatedAt: string;
+  reviewedById?: string | null;
+  reviewedAt?: string | null;
+  rejectionNote?: string | null;
 }
 
 let nextDraftId = 100;
@@ -931,6 +945,8 @@ const drafts: MockDraft[] = [
     postId: "post-1",
     createdAt: "2025-02-28T12:00:00.000Z",
     updatedAt: "2025-03-01T14:00:00.000Z",
+    reviewedById: "user-2",
+    reviewedAt: "2025-03-01T14:00:00.000Z",
   },
   {
     id: "draft-5",
@@ -953,6 +969,34 @@ const drafts: MockDraft[] = [
     postId: null,
     createdAt: "2025-02-27T16:00:00.000Z",
     updatedAt: "2025-02-28T11:00:00.000Z",
+    reviewedById: "user-1",
+    reviewedAt: "2025-02-28T11:00:00.000Z",
+    rejectionNote:
+      "Needs a stronger motivating example and clearer trade-offs — the generics baseline is too brief for the audience. Add a runnable utility and resubmit.",
+  },
+  {
+    id: "draft-6",
+    approvalId: "approval-6",
+    prompt: "Revision proposal for post-1",
+    title: "Optimizing Neural Network Throughput for Low-Latency Architectures",
+    body: buildBody(
+      "Model quality matters, but so does the time it takes to serve a prediction. This revision adds a section on continuous batching trade-offs.",
+      [
+        "Kernel fusion removes launch overhead by combining element-wise operations into a single pass.",
+        "INT8 quantization cuts memory bandwidth roughly fourfold with a carefully calibrated calibration set.",
+        "Continuous batching keeps the GPU saturated even when requests arrive in sparse bursts.",
+      ],
+      "Start by profiling where time actually goes before reaching for any of these techniques; the fastest optimization is usually removing work entirely.",
+    ),
+    summary:
+      "Practical techniques for reducing inference latency: kernel fusion, quantization, and batching strategies that keep GPUs saturated.",
+    tags: ["Machine Learning", "Architecture"],
+    imageUrl: pic("nn-throughput"),
+    status: "PENDING",
+    authorId: "user-2",
+    postId: "post-1",
+    createdAt: "2025-03-05T10:00:00.000Z",
+    updatedAt: "2025-03-05T10:00:00.000Z",
   },
 ];
 
@@ -965,11 +1009,15 @@ const toDraftResponse = (draft: MockDraft) => ({
   body: draft.body,
   summary: draft.summary,
   tags: draft.tags,
+  imageUrl: draft.imageUrl ?? null,
   status: draft.status,
   authorId: draft.authorId,
   postId: draft.postId,
   createdAt: draft.createdAt,
   updatedAt: draft.updatedAt,
+  reviewedById: draft.reviewedById ?? null,
+  reviewedAt: draft.reviewedAt ?? null,
+  rejectionNote: draft.rejectionNote ?? null,
 });
 
 const toPaginatedDraftsResponse = (items: MockDraft[], page: number, limit: number) => {
@@ -1081,7 +1129,63 @@ export const deletePostDraft = (id: string) => {
   return true;
 };
 
+export interface MockChat {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockChatMessage {
+  id: string;
+  chatId: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  citedPostIds: string[];
+  createdAt: string;
+}
+
+const chats: MockChat[] = [
+  {
+    id: "chat-1",
+    userId: "user-1",
+    title: "Idempotency patterns",
+    createdAt: "2025-03-05T10:00:00.000Z",
+    updatedAt: "2025-03-05T10:12:00.000Z",
+  },
+  {
+    id: "chat-2",
+    userId: "user-1",
+    title: "New Chat",
+    createdAt: "2025-03-06T09:00:00.000Z",
+    updatedAt: "2025-03-06T09:00:00.000Z",
+  },
+];
+
+const chatMessages: MockChatMessage[] = [
+  {
+    id: "chat-msg-1",
+    chatId: "chat-1",
+    role: "USER",
+    content: "How do I make retries safe for mutating APIs?",
+    citedPostIds: [],
+    createdAt: "2025-03-05T10:10:00.000Z",
+  },
+  {
+    id: "chat-msg-2",
+    chatId: "chat-1",
+    role: "ASSISTANT",
+    content:
+      "Based on 1 Topos post, the reliable pattern is client-generated idempotency keys with stored responses: accept a key on mutating operations, dedupe on first write, and return the stored response on replay.",
+    citedPostIds: ["post-15"],
+    createdAt: "2025-03-05T10:12:00.000Z",
+  },
+];
+
 export const seedUsers = users;
 export const seedTags = tags;
 export const seedPosts = posts;
 export const seedDrafts = drafts;
+export const seedChats = chats;
+export const seedChatMessages = chatMessages;

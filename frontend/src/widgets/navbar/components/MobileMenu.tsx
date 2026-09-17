@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
+import { Bot, LogOut, PenSquare, ShieldCheck, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/lib/cn";
@@ -20,6 +20,12 @@ const reviewNavigation = {
   to: "/review",
   label: "Review",
   icon: ShieldCheck,
+};
+
+const chatNavigation = {
+  to: "/chat",
+  label: "AI Chat",
+  icon: Bot,
 };
 
 const accountNavigation = {
@@ -57,7 +63,7 @@ function UserAvatar({ avatarUrl, label, initial, size = "default" }: UserAvatarP
       size={size}
       className={cn(
         "bg-transparent after:border-transparent after:mix-blend-normal",
-        size === "default" ? "size-10" : "size-9",
+        size === "default" ? "size-8" : "size-8",
       )}
     >
       <AvatarImage src={avatarUrl || undefined} alt={label} />
@@ -108,11 +114,12 @@ export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: Mob
   const isAuthenticated = !!user;
   const AuthoringIcon = authoringNavigation.icon;
   const ReviewIcon = reviewNavigation.icon;
+  const ChatIcon = chatNavigation.icon;
 
   return (
     <div className="relative border-t border-outline-variant/20 bg-surface-low md:hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+      <div className="mx-auto max-w-[88rem] px-4 py-4 sm:px-5 lg:px-6">
         <div className={cn(menuPanelSurfaceClassName, "p-3")}>
           <div className={menuPanelTintClassName} />
           <div className="relative space-y-4">
@@ -144,6 +151,14 @@ export function MobileMenu({ isOpen, onClose, user, displayName, onLogout }: Mob
                     >
                       <ReviewIcon className="h-4 w-4" />
                       {reviewNavigation.label}
+                    </Link>
+                    <Link
+                      to={chatNavigation.to}
+                      onClick={onClose}
+                      className={stackedMenuActionClassName}
+                    >
+                      <ChatIcon className="h-4 w-4" />
+                      {chatNavigation.label}
                     </Link>
                   </div>
                   <div className="space-y-1">

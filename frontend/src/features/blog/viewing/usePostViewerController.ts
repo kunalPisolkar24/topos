@@ -72,6 +72,13 @@ export const usePostViewerController = (
   const isValidId = isValidPostId(postId);
   const queryId = isValidId ? trimmedId : "";
 
+  // Same component instance serves every /blog/:id — reset transient UI
+  // when navigating between posts so edit mode or dialogs never leak over.
+  useEffect(() => {
+    setView("reading");
+    setDialog("closed");
+  }, [trimmedId]);
+
   const { data, loading, error, refetch, startPolling, stopPolling } =
     postRepository.useGet(queryId);
 

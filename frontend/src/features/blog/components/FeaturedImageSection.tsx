@@ -1,7 +1,8 @@
 import React, { useId } from "react";
-import { UploadCloud, ImageIcon } from "lucide-react";
+import { Shuffle, UploadCloud, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
 import { Label } from "@/shared/ui/primitives/label";
+import { Button } from "@/shared/ui/primitives/button";
 import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 
 interface FeaturedImageSectionProps {
@@ -11,6 +12,8 @@ interface FeaturedImageSectionProps {
   isUploading: boolean;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   inputRef: React.RefObject<HTMLInputElement>;
+  previewCoverUrl?: string | null;
+  onShufflePreviewCover?: () => void;
 }
 
 export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
@@ -20,9 +23,12 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
   isUploading,
   onFileChange,
   inputRef,
+  previewCoverUrl,
+  onShufflePreviewCover,
 }) => {
   const inputId = useId();
   const previewMode = isPreview();
+  const previewSample = previewMode ? previewCoverUrl : null;
   return (
     <Card className="gap-0 bg-surface-lowest py-0">
       <CardHeader className="bg-surface-low p-4 sm:p-5">
@@ -38,47 +44,78 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
         </p>
       </CardHeader>
       <CardContent className="p-4 sm:p-5">
-        <button
-          type="button"
-          aria-label={cardImage ? "Change cover image" : "Upload cover image"}
-          aria-controls={inputId}
-          title={previewMode ? PREVIEW_DISABLED_REASON : undefined}
-          disabled={previewMode}
-          className="interactive-hover-primary flex min-h-72 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-5 text-left disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={() => {
-            if (previewMode) return;
-            inputRef.current?.click();
-          }}
-        >
-          <div className="w-full space-y-4">
-            {preview ? (
-              <div className="bg-surface-lowest p-2 ring-1 ring-outline-variant/20">
-                <img
-                  src={preview}
-                  alt="Card preview"
-                  className="h-56 w-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="flex h-56 w-full items-center justify-center bg-surface-lowest ring-1 ring-outline-variant/20">
-                <UploadCloud className="h-12 w-12 text-primary" aria-hidden="true" />
-              </div>
-            )}
-            <div>
-              <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-foreground">
-                {cardImage ? "Change image" : "Upload cover image"}
-              </span>
+        {previewMode && previewSample ? (
+          <div className="space-y-3">
+            <div className="bg-surface-lowest p-2 ring-1 ring-outline-variant/20">
+              <img
+                src={previewSample}
+                alt="Preview sample cover"
+                className="h-40 w-full object-cover sm:h-56"
+              />
+            </div>
+            <div className="rounded-none border border-outline-variant/20 bg-surface-low p-3">
+              <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground">
+                Preview mode — sample cover attached
+              </p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Recommended ratio: 3:2 or wider. JPG, PNG, and WebP work best.
+                Uploads disabled. A varied sample is auto-attached for publish. Shuffle for a new one.
               </p>
             </div>
-            {cardImage && (
-              <p className="break-all font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
-                {cardImage.name}
-              </p>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onShufflePreviewCover}
+              aria-label="Shuffle sample cover"
+              className="w-full"
+            >
+              <Shuffle className="h-4 w-4" />
+              Shuffle cover
+            </Button>
           </div>
-        </button>
+        ) : (
+          <button
+            type="button"
+            aria-label={cardImage ? "Change cover image" : "Upload cover image"}
+            aria-controls={inputId}
+            title={previewMode ? PREVIEW_DISABLED_REASON : undefined}
+            disabled={previewMode}
+            className="interactive-hover-primary flex min-h-40 w-full cursor-pointer items-center justify-center border border-dashed border-outline-variant/40 bg-surface-low p-4 text-left disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-72 sm:p-5"
+            onClick={() => {
+              if (previewMode) return;
+              inputRef.current?.click();
+            }}
+          >
+            <div className="w-full space-y-4">
+              {preview ? (
+                <div className="bg-surface-lowest p-2 ring-1 ring-outline-variant/20">
+                  <img
+                    src={preview}
+                    alt="Card preview"
+                    className="h-40 w-full object-cover sm:h-56"
+                  />
+                </div>
+              ) : (
+                <div className="flex h-40 w-full items-center justify-center bg-surface-lowest ring-1 ring-outline-variant/20 sm:h-56">
+                  <UploadCloud className="h-12 w-12 text-primary" aria-hidden="true" />
+                </div>
+              )}
+              <div>
+                <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-foreground">
+                  {cardImage ? "Change image" : "Upload cover image"}
+                </span>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  Recommended ratio: 3:2 or wider. JPG, PNG, and WebP work best.
+                </p>
+              </div>
+              {cardImage && (
+                <p className="break-all font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">
+                  {cardImage.name}
+                </p>
+              )}
+            </div>
+          </button>
+        )}
         <Label htmlFor={inputId} className="sr-only">
           Featured image
         </Label>

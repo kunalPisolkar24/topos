@@ -188,6 +188,58 @@ describe("usePostViewerController", () => {
     expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
   });
 
+  it("resets transient view and dialog state when navigating between posts", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.query("Post", ({ variables }) =>
+        HttpResponse.json({
+          data: { post: { ...loadedPost, id: variables.id } },
+        }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/blog/abc"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => usePostViewerController(id),
+      { wrapper: localWrapper, initialProps: { id: "abc" } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("ready");
+    });
+
+    act(() => {
+      result.current.setView("editing");
+      result.current.setDialog("summary");
+    });
+
+    expect(result.current.state).toMatchObject({ kind: "ready", view: "editing", dialog: "summary" });
+
+    rerender({ id: "def" });
+
+    await waitFor(() => {
+      expect(result.current.state).toMatchObject({
+        kind: "ready",
+        view: "reading",
+        dialog: "closed",
+      });
+    });
+    if (result.current.state.kind === "ready") {
+      expect(result.current.state.post.id).toBe("def");
+    }
+  });
+
   it("shows loading state when post is not yet loaded", () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(

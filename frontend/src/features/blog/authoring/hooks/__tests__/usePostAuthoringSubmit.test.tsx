@@ -7,7 +7,7 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
-import { PostsDocument } from "@/shared/graphql/content-documents";
+import { PostDocument, PostsDocument } from "@/shared/graphql/content-documents";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
 const noopUnauthorized = async () => {};
@@ -414,6 +414,37 @@ describe("usePostAuthoringSubmit", () => {
     });
     const refetchSpy = vi.spyOn(localClient, "refetchQueries");
     writeStalePostsCache(localClient, "stale-update");
+    localClient.writeQuery({
+      query: PostDocument,
+      variables: { id: "abc" },
+      data: {
+        post: {
+          __typename: "Post",
+          id: "abc",
+          title: "old title",
+          body: "<p>old body</p>",
+          slug: "old-title",
+          imageUrl: "https://x/y.png",
+          summary: null,
+          summaryStatus: "COMPLETED",
+          createdAt: "2024-01-01T00:00:00Z",
+          updatedAt: "2024-01-01T00:00:00Z",
+          likedByMe: false,
+          savedByMe: false,
+          author: {
+            __typename: "User",
+            id: "author-1",
+            username: "alice",
+            name: "Alice",
+            email: "alice@x.com",
+            bio: null,
+            avatarUrl: null,
+          },
+          tags: [],
+          related: [],
+        },
+      },
+    });
 
     expect(
       localClient.readQuery({
@@ -459,6 +490,13 @@ describe("usePostAuthoringSubmit", () => {
       localClient.readQuery({
         query: PostsDocument,
         variables: postListVariables,
+      }),
+    ).toBeNull();
+    // The single-post cache entry is evicted so the detail view refetches.
+    expect(
+      localClient.readQuery({
+        query: PostDocument,
+        variables: { id: "abc" },
       }),
     ).toBeNull();
   });

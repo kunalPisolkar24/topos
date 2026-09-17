@@ -26,15 +26,25 @@ interface ApproveDraftDialogProps {
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (draft: PostDraft, edits: ApproveDraftFormValues) => void;
+  dialogTitle?: string;
+  dialogDescription?: string;
+  confirmLabel?: string;
+  confirmingLabel?: string;
 }
 
 // Reviewers edit the generated payload before resuming the workflow;
 // untouched fields are sent back as-is so approval is a single action.
+// The same form doubles as the author's resubmit editor via the optional
+// copy props; defaults preserve the approve wording.
 export const ApproveDraftDialog: React.FC<ApproveDraftDialogProps> = ({
   draft,
   isSubmitting,
   onOpenChange,
   onConfirm,
+  dialogTitle = "Review & approve draft",
+  dialogDescription = "Approving resumes the paused AI workflow and publishes this post under its author's name. Edit anything before you confirm.",
+  confirmLabel = "Approve & Publish",
+  confirmingLabel = "Approving...",
 }) => {
   const form = useForm<ApproveDraftFormValues>({
     resolver: zodResolver(approveDraftSchema),
@@ -60,11 +70,10 @@ export const ApproveDraftDialog: React.FC<ApproveDraftDialogProps> = ({
     <Dialog open={Boolean(draft)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Review &amp; approve draft</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <DialogDescription className="text-sm leading-6 text-muted-foreground">
-          Approving resumes the paused AI workflow and publishes this post
-          under its author's name. Edit anything before you confirm.
+          {dialogDescription}
         </DialogDescription>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
@@ -116,7 +125,7 @@ export const ApproveDraftDialog: React.FC<ApproveDraftDialogProps> = ({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Approving..." : "Approve & Publish"}
+              {isSubmitting ? confirmingLabel : confirmLabel}
             </Button>
           </DialogFooter>
         </form>

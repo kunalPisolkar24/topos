@@ -24,31 +24,44 @@ import {
   togglePostSave,
   updatePost,
   updateProfile,
+  type MockUser,
 } from "./data";
 import {
   previewApprovePostDraft,
+  previewAskChat,
   previewAuthenticate,
+  previewCreateChat,
+  previewCreateContentDraft,
   previewCreatePost,
   previewCreatePostDraft,
+  previewDeleteChat,
   previewDeletePost,
   previewDeletePostDraft,
   previewGeneratePostContent,
   previewGenerateTags,
+  previewGetChat,
   previewGetPost,
   previewGetUserFromToken,
+  previewListChatMessages,
+  previewListChats,
   previewListMyPostDrafts,
   previewListMyPosts,
   previewListPostDrafts,
   previewListPosts,
   previewListPostsByTag,
+  previewListRecommendedPosts,
   previewListTags,
+  previewRecordSignal,
   previewRejectPostDraft,
+  previewRenameChat,
+  previewResubmitContentDraft,
   previewSearchPosts,
   previewToggleLike,
   previewToggleSave,
   previewUpdatePost,
   previewUpdateProfile,
 } from "./preview/preview-store";
+import { previewDB } from "./preview/preview-db";
 
 const gql = graphql.link("http://localhost:4000/graphql");
 
@@ -225,10 +238,16 @@ export const handlers = [
 
   gql.query("RecommendedPosts", async ({ request, variables }) => {
     if (isPreviewEnv) {
-      if (!isAuthenticated(request)) {
-        return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
-      }
-      const data = await previewListPosts(variables?.page ?? 1, variables?.limit ?? 6);
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      const data = await previewListRecommendedPosts(
+        user.id,
+        variables?.page ?? 1,
+        variables?.limit ?? 6,
+        variables?.mode ?? null,
+        variables?.seed ?? null,
+      );
       return HttpResponse.json({ data: { recommendedPosts: data } });
     }
     return HttpResponse.json(
@@ -278,15 +297,29 @@ export const handlers = [
     });
   }),
 
-  gql.mutation("RecordPostView", () =>
-    HttpResponse.json({
-      data: { recordPostView: recordPostView() },
-    }),
-  ),
-
-  gql.mutation("LikePost", async ({ variables }) => {
+  gql.mutation("RecordPostView", async ({ request, variables }) => {
     if (isPreviewEnv) {
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (user && variables?.postId) {
+        await previewRecordSignal(user.id, variables.postId, "view", variables?.mode ?? null);
+      }
+      return HttpResponse.json({ data: { recordPostView: true } });
+    }
+    return HttpResponse.json({
+      data: { recordPostView: recordPostView() },
+    });
+  }),
+
+  gql.mutation("LikePost", async ({ request, variables }) => {
+    if (isPreviewEnv) {
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
       const result = await previewToggleLike(variables?.postId);
+      if (user && result && variables?.postId) {
+        // Toggle-on publishes signal like production; toggle-off is a no-op.
+        await previewRecordSignal(user.id, variables.postId, "like", variables?.mode ?? null);
+      }
       return HttpResponse.json({ data: { likePost: result } });
     }
     return HttpResponse.json({
@@ -294,9 +327,14 @@ export const handlers = [
     });
   }),
 
-  gql.mutation("SavePost", async ({ variables }) => {
+  gql.mutation("SavePost", async ({ request, variables }) => {
     if (isPreviewEnv) {
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
       const result = await previewToggleSave(variables?.postId);
+      if (user && result && variables?.postId) {
+        await previewRecordSignal(user.id, variables.postId, "save", variables?.mode ?? null);
+      }
       return HttpResponse.json({ data: { savePost: result } });
     }
     return HttpResponse.json({
@@ -326,9 +364,16 @@ export const handlers = [
     });
   }),
 
-  gql.query("PostDrafts", async ({ variables }) => {
+  gql.query("PostDrafts", async ({ request, variables }) => {
     if (isPreviewEnv) {
-      const data = await previewListPostDrafts(variables?.page ?? 1, variables?.limit ?? 6);
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      const data = await previewListPostDrafts(
+        variables?.page ?? 1,
+        variables?.limit ?? 6,
+        user.id,
+      );
       return HttpResponse.json({ data: { postDrafts: data } });
     }
     return HttpResponse.json({
@@ -362,34 +407,168 @@ export const handlers = [
     });
   }),
 
-  gql.mutation("ApprovePostDraft", async ({ variables }) => {
+  gql.mutation("CreateContentDraft", async ({ request, variables }) => {
     if (isPreviewEnv) {
-      const draft = await previewApprovePostDraft(variables?.id, variables?.input);
-      return HttpResponse.json({ data: { approvePostDraft: draft } });
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      try {
+        const draft = await previewCreateContentDraft(user.id, variables?.input ?? {});
+        return HttpResponse.json({ data: { createContentDraft: draft } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not submit draft";
+        return HttpResponse.json({ errors: [{ message }] });
+      }
+    }
+    return HttpResponse.json({ errors: [{ message: "not available outside preview" }] });
+  }),
+
+  gql.mutation("ResubmitContentDraft", async ({ request, variables }) => {
+    if (isPreviewEnv) {
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      try {
+        const draft = await previewResubmitContentDraft(
+          variables?.id,
+          user.id,
+          variables?.input ?? {},
+        );
+        return HttpResponse.json({ data: { resubmitContentDraft: draft } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not resubmit draft";
+        return HttpResponse.json({ errors: [{ message }] });
+      }
+    }
+    return HttpResponse.json({ errors: [{ message: "not available outside preview" }] });
+  }),
+
+  gql.mutation("ApprovePostDraft", async ({ request, variables }) => {
+    if (isPreviewEnv) {
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      try {
+        const draft = await previewApprovePostDraft(variables?.id, user.id, variables?.input);
+        return HttpResponse.json({ data: { approvePostDraft: draft } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not approve draft";
+        return HttpResponse.json({ errors: [{ message }] });
+      }
     }
     return HttpResponse.json({
       data: { approvePostDraft: approvePostDraft(variables?.id, variables?.input) },
     });
   }),
 
-  gql.mutation("RejectPostDraft", async ({ variables }) => {
+  gql.mutation("RejectPostDraft", async ({ request, variables }) => {
     if (isPreviewEnv) {
-      const draft = await previewRejectPostDraft(variables?.id);
-      return HttpResponse.json({ data: { rejectPostDraft: draft } });
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      try {
+        const draft = await previewRejectPostDraft(variables?.id, user.id, variables?.reason);
+        return HttpResponse.json({ data: { rejectPostDraft: draft } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not reject draft";
+        return HttpResponse.json({ errors: [{ message }] });
+      }
     }
     return HttpResponse.json({
       data: { rejectPostDraft: rejectPostDraft(variables?.id) },
     });
   }),
 
-  gql.mutation("DeletePostDraft", async ({ variables }) => {
+  gql.mutation("DeletePostDraft", async ({ request, variables }) => {
     if (isPreviewEnv) {
-      const result = await previewDeletePostDraft(variables?.id);
-      return HttpResponse.json({ data: { deletePostDraft: result } });
+      const token = getToken(request);
+      const user = await previewGetUserFromToken(token);
+      if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+      try {
+        const result = await previewDeletePostDraft(variables?.id, user.id);
+        return HttpResponse.json({ data: { deletePostDraft: result } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not withdraw draft";
+        return HttpResponse.json({ errors: [{ message }] });
+      }
     }
     return HttpResponse.json({
       data: { deletePostDraft: deletePostDraft(variables?.id) },
     });
+  }),
+
+  gql.query("Chats", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    const data = await previewListChats(user.id, variables?.page ?? 1, variables?.limit ?? 10);
+    return HttpResponse.json({ data: { chats: data } });
+  }),
+
+  gql.query("Chat", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    const chat = await previewGetChat(variables?.id, user.id);
+    return HttpResponse.json({ data: { chat } });
+  }),
+
+  gql.query("ChatMessages", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    try {
+      const data = await previewListChatMessages(
+        variables?.chatId,
+        user.id,
+        variables?.page ?? 1,
+        variables?.limit ?? 20,
+      );
+      return HttpResponse.json({ data: { chatMessages: data } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "not found";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
+  }),
+
+  gql.mutation("CreateChat", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    const chat = await previewCreateChat(user.id, variables?.title);
+    return HttpResponse.json({ data: { createChat: chat } });
+  }),
+
+  gql.mutation("RenameChat", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    try {
+      const chat = await previewRenameChat(variables?.id, user.id, variables?.title);
+      return HttpResponse.json({ data: { renameChat: chat } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "rename failed";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
+  }),
+
+  gql.mutation("DeleteChat", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    try {
+      const result = await previewDeleteChat(variables?.id, user.id);
+      return HttpResponse.json({ data: { deleteChat: result } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "delete failed";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
+  }),
+
+  gql.mutation("AskChat", async ({ request, variables }) => {
+    const user = await resolveChatUser(request);
+    if (!user) return HttpResponse.json({ errors: [{ message: "unauthorized" }] });
+    try {
+      const message = await previewAskChat(variables?.chatId, user.id, variables?.query);
+      return HttpResponse.json({ data: { askChat: message } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "ask failed";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
   }),
 
   http.post("https://api.cloudinary.com/v1_1/:cloudName/image/upload", () =>
@@ -398,3 +577,14 @@ export const handlers = [
     }),
   ),
 ];
+
+const resolveChatUser = async (request: Request): Promise<MockUser | null> => {
+  const token = getToken(request);
+  const previewUser = await previewGetUserFromToken(token);
+  if (previewUser) return previewUser;
+  if (!isPreviewEnv) {
+    const users = await previewDB.getAll<MockUser>("users");
+    return users[0] ?? null;
+  }
+  return null;
+};

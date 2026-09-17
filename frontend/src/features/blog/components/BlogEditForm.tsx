@@ -11,6 +11,7 @@ import {
   type PostForEditing,
 } from "../authoring";
 import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
+import { isPreview } from "@/shared/config/preview";
 
 export interface BlogEditFormEditorProps {
   value: string;
@@ -47,6 +48,7 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
     cardImage: state.cardImage,
     cardImageUrl: state.cardImageUrl,
     cardImagePreview: state.cardImagePreview,
+    previewCoverUrl: state.previewCoverUrl,
     tags: state.tags,
   });
   const { contentText } = state;
@@ -69,6 +71,8 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
           isUploading={state.isUploadingCardImage}
           onFileChange={handlers.handleCardImageChange}
           inputRef={cardImageInputRef}
+          previewCoverUrl={state.previewCoverUrl}
+          onShufflePreviewCover={handlers.shufflePreviewCover}
         />
 
         {renderEditor
@@ -130,9 +134,11 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
               Revision Rule
             </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              All post fields are validated prior to save. Changes are instantly published.
-            </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {isPreview()
+                  ? "All post fields are validated prior to save. Changes stay pending until a peer approves them."
+                  : "All post fields are validated prior to save. Changes are instantly published."}
+              </p>
           </div>
 
           <div className="mt-5 grid gap-3">

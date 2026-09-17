@@ -41,6 +41,7 @@ export const userRepository = {
     return useQuery<MyPostsQuery, MyPostsQueryVariables>(MyPostsDocument, {
       variables: { page, limit },
       skip: opts?.skip,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },

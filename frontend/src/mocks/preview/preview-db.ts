@@ -1,8 +1,8 @@
 import { PREVIEW_DB_NAME, PREVIEW_DB_VERSION, PREVIEW_SEED_VERSION } from "@/shared/config/preview";
 
-type PreviewStoreName = "users" | "posts" | "drafts" | "tags" | "meta";
+type PreviewStoreName = "users" | "posts" | "drafts" | "tags" | "chats" | "messages" | "meta" | "profiles";
 
-const STORE_NAMES: PreviewStoreName[] = ["users", "posts", "drafts", "tags", "meta"];
+const STORE_NAMES: PreviewStoreName[] = ["users", "posts", "drafts", "tags", "chats", "messages", "meta", "profiles"];
 
 function isIndexedDBAvailable(): boolean {
   return typeof indexedDB !== "undefined" && indexedDB !== null;
@@ -65,8 +65,17 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("tags")) {
         db.createObjectStore("tags", { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains("chats")) {
+        db.createObjectStore("chats", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("messages")) {
+        db.createObjectStore("messages", { keyPath: "id" });
+      }
       if (!db.objectStoreNames.contains("meta")) {
         db.createObjectStore("meta", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("profiles")) {
+        db.createObjectStore("profiles", { keyPath: "id" });
       }
     };
     request.onsuccess = () => resolve(request.result);

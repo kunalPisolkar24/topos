@@ -19,12 +19,14 @@ export interface UsePostImageUploaderResult {
   file: File | null;
   url: string | null;
   preview: string | null;
+  previewCoverUrl: string | null;
   isCardUploading: boolean;
   isRichTextUploading: boolean;
   quillRef: React.MutableRefObject<ReactQuill | null>;
   handleFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   uploadCardImage: (options?: UploadCardImageOptions) => Promise<string | null>;
   richTextImageHandler: () => Promise<void>;
+  shufflePreviewCover: () => void;
 }
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -55,6 +57,9 @@ const validateImageFile = (
   return true;
 };
 
+const buildPreviewCoverUrl = () =>
+  `https://picsum.photos/seed/preview-${Date.now()}-${Math.random().toString(36).slice(2, 7)}/1200/630`;
+
 export const usePostImageUploader = ({
   initialImageUrl = null,
   isEdit = false,
@@ -63,6 +68,12 @@ export const usePostImageUploader = ({
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState<string | null>(initialImageUrl);
   const [preview, setPreview] = useState<string | null>(initialImageUrl);
+  const [previewCoverUrl, setPreviewCoverUrl] = useState<string | null>(() => {
+    if (isPreview() && !isEdit && !initialImageUrl) {
+      return buildPreviewCoverUrl();
+    }
+    return null;
+  });
   const quillRef = useRef<ReactQuill | null>(null);
   const readerRef = useRef<FileReader | null>(null);
 
@@ -171,15 +182,22 @@ export const usePostImageUploader = ({
     input.click();
   }, [uploadRichText, toast]);
 
+  const shufflePreviewCover = useCallback(() => {
+    if (!isPreview()) return;
+    setPreviewCoverUrl(buildPreviewCoverUrl());
+  }, []);
+
   return {
     file,
     url,
     preview,
+    previewCoverUrl,
     isCardUploading,
     isRichTextUploading,
     quillRef,
     handleFileChange,
     uploadCardImage,
     richTextImageHandler,
+    shufflePreviewCover,
   };
 };

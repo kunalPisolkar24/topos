@@ -28,7 +28,7 @@ export const ProfileViewInfo: React.FC<ProfileViewInfoProps> = ({
         <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
           Profile // Identity
         </p>
-        <h1 className="max-w-full break-words text-4xl font-semibold leading-none tracking-[-0.045em] text-foreground md:text-6xl">
+        <h1 className="max-w-full break-words text-3xl font-semibold leading-none tracking-[-0.045em] text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
           {displayName}
         </h1>
         <div className="flex w-full flex-wrap items-center gap-2">
@@ -41,7 +41,7 @@ export const ProfileViewInfo: React.FC<ProfileViewInfoProps> = ({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.42fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.42fr)]">
         <div className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20 sm:p-5">
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             About
@@ -51,7 +51,7 @@ export const ProfileViewInfo: React.FC<ProfileViewInfoProps> = ({
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1">
           <ProfileMetric
             icon={FileText}
             label="Published"

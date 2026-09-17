@@ -31,12 +31,12 @@ const Home: React.FC = () => {
               role="status"
               aria-live="polite"
               data-slot="filter-chip"
-              className="inline-flex items-center gap-1 bg-surface-highest p-1 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+              className="inline-flex max-w-full flex-wrap items-center gap-1 bg-surface-highest p-1 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
             >
               <span className="px-2 py-1">Filtering by:</span>
               <span
                 data-slot="filter-chip-tag"
-                className="bg-primary-container px-2 py-1 text-primary-foreground"
+                className="max-w-[calc(100vw-4rem)] truncate bg-primary-container px-2 py-1 text-primary-foreground sm:max-w-xs"
               >
                 {selectedTag}
               </span>
@@ -45,7 +45,7 @@ const Home: React.FC = () => {
                 onClick={() => handleTagSelect(null)}
                 size="icon-xs"
                 variant="ghost"
-                className="ml-1 text-muted-foreground hover:bg-surface-high hover:text-foreground"
+                className="ml-1 shrink-0 text-muted-foreground hover:bg-surface-high hover:text-foreground"
                 aria-label={`Clear filter for ${selectedTag}`}
               >
                 <X className="h-3.5 w-3.5" />

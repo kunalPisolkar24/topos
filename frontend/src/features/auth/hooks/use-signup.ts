@@ -51,7 +51,7 @@ export const useSignup = () => {
         throw new Error("Signup response was empty.");
       }
 
-      authenticate(payload.token, payload.user);
+      await authenticate(payload.token, payload.user);
 
       toast({
         title: "Success",

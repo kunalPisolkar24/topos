@@ -1,8 +1,15 @@
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { ApolloProvider } from "@apollo/client/react";
+import type { ApolloClient } from "@apollo/client";
+import { createApolloClient } from "@/shared/api";
+import { env } from "@/shared/config/env";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
+import { postRepository } from "@/entities/post/api/postRepository";
 
 const toastMock = vi.fn();
 const updateProfileMock = vi.fn();
+const noopUnauthorized = async () => {};
 
 vi.mock("@/shared/ui/hooks/useToast", () => ({
   useToast: () => ({ toast: toastMock }),
@@ -36,7 +43,15 @@ const mockUser: UserCoreFragment = {
 };
 
 function renderProfileEditor(currentUser: UserCoreFragment | null = mockUser) {
-  return renderHook(() => useProfileEditorController({ currentUser }));
+  const client: ApolloClient = createApolloClient({
+    uri: env.VITE_GRAPHQL_URL,
+    getToken: () => null,
+    onUnauthorized: noopUnauthorized,
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <ApolloProvider client={client}>{children}</ApolloProvider>
+  );
+  return renderHook(() => useProfileEditorController({ currentUser }), { wrapper });
 }
 
 describe("useProfileEditorController", () => {
@@ -169,6 +184,27 @@ describe("useProfileEditorController", () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Success" }),
     );
+  });
+
+  it("revalidates post lists after a successful save", async () => {
+    updateProfileMock.mockResolvedValueOnce({
+      data: { updateProfile: true },
+    });
+    const refreshSpy = vi.spyOn(postRepository, "refreshLists");
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "name", value: "Changed Name" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(refreshSpy).toHaveBeenCalled();
+    refreshSpy.mockRestore();
   });
 
   it("shows error toast when mutation fails", async () => {

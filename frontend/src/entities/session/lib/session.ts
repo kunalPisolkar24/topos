@@ -46,13 +46,16 @@ export function writeCurrentUserToCache(
   });
 }
 
-export function authenticateSession(
+export async function authenticateSession(
   client: ApolloClient,
   token: string,
   user: UserCoreFragment,
 ) {
   sessionStoreActions.markAuthenticated(token);
   writeCurrentUserToCache(client, user);
+  // Drop any anonymous/previous-user cached data so the new session
+  // starts fresh; active queries refetch under the new token.
+  await client.resetStore();
 }
 
 export async function logoutSession(client: ApolloClient) {

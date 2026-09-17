@@ -7,6 +7,7 @@ export interface PublishReadinessInput {
   cardImage?: File | null;
   cardImageUrl?: string | null;
   cardImagePreview?: string | null;
+  previewCoverUrl?: string | null;
   tags: string[];
   isUploadingCardImage?: boolean;
   isCreatingPost?: boolean;
@@ -33,7 +34,7 @@ export function evaluatePublishReadiness(
   const titleReady = trimmedTitle.length > 0;
   const contentReady = contentText.length > 0;
   const imageReady = Boolean(
-    input.cardImage || input.cardImageUrl || input.cardImagePreview,
+    input.cardImage || input.cardImageUrl || input.cardImagePreview || input.previewCoverUrl,
   );
   const tagsReady = input.tags.length > 0;
 

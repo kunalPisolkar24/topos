@@ -3,9 +3,12 @@ import { z } from "zod";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
 import { type UpdatePostInput } from "@/shared/graphql/content-documents";
+import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
 import { postRepository } from "@/entities/post/api/postRepository";
+import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
+import { isPreview } from "@/shared/config/preview";
 import {
   createPostSchema,
   updatePostSchema,
@@ -49,6 +52,7 @@ export interface UsePostAuthoringSubmitArgs {
   contentText: string;
   imageFile: File | null;
   imageUrl: string | null;
+  previewCoverUrl?: string | null;
   tags: string[];
   summary: string | null;
   uploadCardImage: () => Promise<string | null>;
@@ -68,6 +72,7 @@ export const usePostAuthoringSubmit = ({
   contentText,
   imageFile,
   imageUrl,
+  previewCoverUrl,
   tags,
   summary,
   uploadCardImage,
@@ -82,6 +87,7 @@ export const usePostAuthoringSubmit = ({
 
   const [createPost] = postRepository.useCreate();
   const [updatePost] = postRepository.useUpdate();
+  const [createContentDraft] = draftRepository.useCreateContentDraft();
 
   const handleCreateSubmit = useCallback(
     async (event: React.FormEvent) => {
@@ -109,6 +115,10 @@ export const usePostAuthoringSubmit = ({
           }
         }
 
+        if (!finalImageUrl && isPreview() && previewCoverUrl) {
+          finalImageUrl = previewCoverUrl;
+        }
+
         if (!finalImageUrl) {
           toast({
             title: "Missing Card Image",
@@ -116,6 +126,43 @@ export const usePostAuthoringSubmit = ({
             variant: "destructive",
           });
           dispatch({ type: "resolveIdle" });
+          return;
+        }
+
+        if (isPreview()) {
+          // Preview-first review gating: every publish enters the queue as
+          // PENDING. Nothing goes live until a peer approves it.
+          const draftInput: ContentDraftInput = {
+            title: trimmedTitle,
+            body: content,
+            summary: summary?.trim() || null,
+            tags,
+            imageUrl: finalImageUrl,
+            postId: null,
+          };
+          try {
+            dispatch({ type: "beginCreate" });
+            await createContentDraft({ variables: { input: draftInput } });
+            await draftRepository.refreshDraftLists(client);
+            toast({
+              title: "Submitted for review",
+              description: "Your post is pending. It goes live after peer approval.",
+            });
+            dispatch({ type: "resolveIdle" });
+            navigate("/review");
+          } catch (error) {
+            toast({
+              title: "Error",
+              description: getGraphQLErrorMessage(
+                error,
+                "Failed to submit the post for review.",
+              ),
+              variant: "destructive",
+            });
+            dispatch({ type: "fail", message: "create" });
+          } finally {
+            isSubmittingRef.current = false;
+          }
           return;
         }
 
@@ -161,11 +208,13 @@ export const usePostAuthoringSubmit = ({
       contentText,
       imageFile,
       imageUrl,
+      previewCoverUrl,
       tags,
       summary,
       uploadCardImage,
       toast,
       createPost,
+      createContentDraft,
       client,
       navigate,
     ],
@@ -204,11 +253,45 @@ export const usePostAuthoringSubmit = ({
           return;
         }
 
+        if (isPreview()) {
+          // Preview-first review gating: edits become a revision proposal.
+          // The live post is untouched until a peer approves it.
+          const revisionInput: ContentDraftInput = {
+            title,
+            body: content,
+            summary: null,
+            tags,
+            imageUrl: finalImageUrl,
+            postId: post.id,
+          };
+          try {
+            dispatch({ type: "beginUpdate" });
+            await createContentDraft({ variables: { input: revisionInput } });
+            await draftRepository.refreshDraftLists(client);
+            toast({
+              title: "Revision submitted",
+              description: "Your changes are pending. They go live after peer approval.",
+            });
+            dispatch({ type: "resolveIdle" });
+            onComplete?.();
+          } catch (error) {
+            toast({
+              title: "Update Failed",
+              description: getGraphQLErrorMessage(error, "Could not submit the revision."),
+              variant: "destructive",
+            });
+            dispatch({ type: "fail", message: "update" });
+          } finally {
+            isSubmittingRef.current = false;
+          }
+          return;
+        }
+
         try {
           const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
           dispatch({ type: "beginUpdate" });
           await updatePost({ variables: { id: post.id, input: parsedInput } });
-          await postRepository.refreshLists(client);
+          await postRepository.refreshLists(client, { postId: post.id });
           toast({ title: "Success", description: "Post updated successfully." });
           dispatch({ type: "resolveIdle" });
           onComplete?.();
@@ -239,6 +322,7 @@ export const usePostAuthoringSubmit = ({
       uploadCardImage,
       toast,
       updatePost,
+      createContentDraft,
       client,
       onComplete,
     ],

@@ -38,7 +38,7 @@ export const StickyNavbar = () => {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(77,68,227,0.06),transparent_24%,transparent_76%,rgba(77,68,227,0.06))]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
 
-      <div className="relative mx-auto flex h-[var(--app-navbar-height)] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
+      <div className="relative mx-auto flex h-[var(--app-navbar-height)] max-w-[88rem] items-center justify-between gap-4 px-3 sm:px-5 lg:px-6">
         <div className="flex min-w-0 items-center gap-4">
           <NavBrand />
         </div>

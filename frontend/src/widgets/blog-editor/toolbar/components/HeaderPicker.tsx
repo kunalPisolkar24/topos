@@ -26,7 +26,7 @@ export function HeaderPicker({ value, label, onChange }: HeaderPickerProps) {
           title="Heading style"
           data-active={value !== "0" || undefined}
           className={cn(
-            "min-w-[7.5rem] justify-between gap-2 text-foreground data-[active]:bg-primary-container data-[active]:text-primary-foreground",
+            "min-w-[6rem] justify-between gap-2 text-foreground data-[active]:bg-primary-container data-[active]:text-primary-foreground sm:min-w-[7.5rem]",
             value !== "0" && "bg-primary-container text-primary-foreground",
           )}
         >

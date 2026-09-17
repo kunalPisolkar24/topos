@@ -38,6 +38,18 @@ const ReviewQueuePage = lazy(() =>
   })),
 );
 
+const DraftDetailPage = lazy(() =>
+  import("@/pages/DraftDetailPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
+const ChatPage = lazy(() =>
+  import("@/pages/ChatPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 export default function App() {
   if (!hasValidEnv) {
     return (
@@ -94,10 +106,26 @@ export default function App() {
           }
         />
         <Route
+          path="/review/:draftId"
+          element={
+            <ProtectedRoute>
+              <DraftDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/review"
           element={
             <ProtectedRoute>
               <ReviewQueuePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <ChatPage />
             </ProtectedRoute>
           }
         />

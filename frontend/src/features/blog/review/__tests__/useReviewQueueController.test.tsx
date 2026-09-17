@@ -160,8 +160,49 @@ describe("useReviewQueueController", () => {
     expect(refetchSpy).toHaveBeenCalledWith({
       include: ["PostDrafts", "MyPostDrafts"],
     });
+    // Approving publishes a live post, so post lists revalidate too.
+    expect(refetchSpy).toHaveBeenCalledWith({
+      include: expect.arrayContaining(["Posts", "MyPosts"]),
+    });
     // The list refetched with server truth.
     expect(result.current.community.data.drafts[0]?.status).toBe("PENDING");
+  });
+
+  it("revalidates queues on remount instead of serving stale cache", async () => {
+    let postDraftsRequests = 0;
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    setupHandlers();
+    server.use(
+      graphqlApi.query("PostDrafts", () => {
+        postDraftsRequests += 1;
+        return HttpResponse.json({
+          data: {
+            postDrafts: {
+              __typename: "PaginatedPostDrafts",
+              drafts: [communityDraft],
+              totalPages: 1,
+              currentPage: 1,
+              totalDrafts: 1,
+            },
+          },
+        });
+      }),
+    );
+    const { wrapper } = createWrapper();
+
+    const first = renderHook(() => useReviewQueueController(), { wrapper });
+    await waitFor(() => {
+      expect(first.result.current.community.section).toBe("ready");
+    });
+    expect(postDraftsRequests).toBe(1);
+    first.unmount();
+
+    const second = renderHook(() => useReviewQueueController(), { wrapper });
+    await waitFor(() => {
+      expect(second.result.current.community.section).toBe("ready");
+    });
+    expect(postDraftsRequests).toBe(2);
+    second.unmount();
   });
 
   it("rolls the optimistic status back when approval fails", async () => {
@@ -181,5 +222,52 @@ describe("useReviewQueueController", () => {
     });
 
     expect(result.current.community.data.drafts[0]?.status).toBe("PENDING");
+  });
+
+  it("resubmits a rejected draft back to pending", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    const rejectedMine = buildDraft({ id: "d9", status: "REJECTED", authorId: "me-1" });
+    const resubmittedVariables: unknown[] = [];
+    setupHandlers({ myPostDrafts: [rejectedMine] });
+    server.use(
+      graphqlApi.mutation("ResubmitContentDraft", async ({ variables }) => {
+        resubmittedVariables.push(variables);
+        return HttpResponse.json({
+          data: {
+            resubmitContentDraft: { ...rejectedMine, imageUrl: null, status: "PENDING" },
+          },
+        });
+      }),
+    );
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useReviewQueueController(), {
+      wrapper,
+    });
+    await waitFor(() => {
+      expect(result.current.mine.section).toBe("ready");
+    });
+    expect(result.current.mine.data.drafts[0]?.status).toBe("REJECTED");
+
+    await act(async () => {
+      await result.current.resubmit("d9", {
+        title: "Fixed title",
+        body: "<p>body</p>",
+        summary: null,
+        tags: ["go"],
+        postId: null,
+      });
+    });
+
+    expect(resubmittedVariables[0]).toEqual({
+      id: "d9",
+      input: {
+        title: "Fixed title",
+        body: "<p>body</p>",
+        summary: null,
+        tags: ["go"],
+        postId: null,
+      },
+    });
   });
 });

@@ -13,6 +13,7 @@ import {
 } from "@/features/blog";
 import { PublishChecklistItem } from "@/features/blog/components/PublishChecklistItem";
 import { useCreatePostDraft } from "@/features/blog/review";
+import { isPreview } from "@/shared/config/preview";
 
 const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs } = usePostAuthoringController({
@@ -31,8 +32,8 @@ const CreateNewBlog: React.FC = () => {
     <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
 
-      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[88rem]">
           <header className="relative overflow-hidden bg-surface-low p-5 ring-1 ring-outline-variant/20 sm:p-8 lg:p-10">
             <div
               className="absolute inset-0 opacity-30 [background-image:linear-gradient(to_right,rgb(var(--outline-variant)/0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgb(var(--outline-variant)/0.12)_1px,transparent_1px)] [background-size:4rem_4rem]"
@@ -46,7 +47,7 @@ const CreateNewBlog: React.FC = () => {
                   Authoring Console
                 </span>
               </div>
-              <h1 className="text-4xl font-semibold leading-none tracking-[-0.05em] text-foreground md:text-6xl">
+              <h1 className="break-words text-3xl font-semibold leading-none tracking-[-0.05em] text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
                 Compose a precise Topos post.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
@@ -59,7 +60,7 @@ const CreateNewBlog: React.FC = () => {
             onSubmit={handlers.handleSubmit}
             className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
           >
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               <BlogTitleSection
                 value={state.title}
                 onChange={setters.setTitle}
@@ -86,6 +87,8 @@ const CreateNewBlog: React.FC = () => {
                 isUploading={state.isUploadingCardImage}
                 onFileChange={handlers.handleCardImageChange}
                 inputRef={refs.cardImageInputRef}
+                previewCoverUrl={state.previewCoverUrl}
+                onShufflePreviewCover={handlers.shufflePreviewCover}
               />
 
               <BlogEditor
@@ -146,7 +149,9 @@ const CreateNewBlog: React.FC = () => {
                     Publishing Rule
                   </p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Title, body, and cover image are required. Tags improve discovery but remain optional.
+                    {isPreview()
+                      ? "Title, body, and cover image are required. Submitting sends the post to peer review — it goes live after approval."
+                      : "Title, body, and cover image are required. Tags improve discovery but remain optional."}
                   </p>
                 </div>
 

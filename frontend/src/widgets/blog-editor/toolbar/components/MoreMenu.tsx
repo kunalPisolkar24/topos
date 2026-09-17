@@ -59,7 +59,7 @@ export function MoreMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="w-60 border border-outline-variant/20 bg-surface-low p-0 text-foreground shadow-none ring-1 ring-outline-variant/20"
+        className="w-60 max-w-[calc(100vw-2rem)] border border-outline-variant/20 bg-surface-low p-0 text-foreground shadow-none ring-1 ring-outline-variant/20"
       >
         <DropdownMenuLabel className="border-b border-outline-variant/20 px-3 py-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
           Formatting
@@ -107,7 +107,7 @@ export function MoreMenu({
         <DropdownMenuLabel className="px-3 py-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
           Text color
         </DropdownMenuLabel>
-        <div className="grid grid-cols-9 gap-1 px-3 pb-3">
+        <div className="grid grid-cols-6 gap-1 px-3 pb-3 sm:grid-cols-9">
           {TEXT_COLORS.map((color) => (
             <ColorSwatch
               key={color.value}
@@ -122,7 +122,7 @@ export function MoreMenu({
         <DropdownMenuLabel className="px-3 py-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
           Background
         </DropdownMenuLabel>
-        <div className="grid grid-cols-9 gap-1 px-3 pb-3">
+        <div className="grid grid-cols-6 gap-1 px-3 pb-3 sm:grid-cols-9">
           {BACKGROUND_COLORS.map((color) => (
             <ColorSwatch
               key={color.value}

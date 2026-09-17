@@ -207,9 +207,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <div
       ref={commandWrapperRef}
-      className="mx-auto mt-6 w-full max-w-3xl px-4 sm:mt-8 sm:px-6"
+      className="mx-auto mt-6 w-full max-w-2xl px-4 sm:mt-8 sm:px-5"
     >
-      <Card className="gap-0 overflow-hidden rounded-none border-0 bg-surface-lowest py-0 shadow-none">
+      <Card className="gap-0 overflow-hidden rounded-none border border-outline-variant/20 bg-surface-lowest py-0 shadow-none">
         <div
           role="tablist"
           aria-label="Search mode"
@@ -224,13 +224,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             aria-controls={panelId}
             tabIndex={searchMode === "tags" ? 0 : -1}
             onClick={() => setSearchMode("tags")}
-            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
+            className={
               searchMode === "tags"
-                ? "bg-primary-container text-primary-foreground"
-                : "text-muted-foreground hover:bg-surface-high hover:text-foreground"
-            }`}
+                ? "flex items-center gap-1.5 bg-primary-container px-2.5 py-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-primary-foreground focus:outline-none focus-visible:bg-primary-container sm:px-3"
+                : "flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground hover:bg-surface-high hover:text-foreground focus:outline-none focus-visible:bg-primary-container sm:px-3"
+            }
           >
-            <Hash className="h-3.5 w-3.5" /> Tags
+            <Hash className="h-3 w-3" /> Tags
           </button>
           <button
             id={postsTabId}
@@ -240,13 +240,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             aria-controls={panelId}
             tabIndex={searchMode === "posts" ? 0 : -1}
             onClick={() => setSearchMode("posts")}
-            className={`flex items-center gap-2 px-3 py-2 font-mono text-[0.75rem] font-medium uppercase tracking-[0.16em] focus:outline-none focus-visible:bg-primary-container sm:px-3.5 ${
+            className={
               searchMode === "posts"
-                ? "bg-primary-container text-primary-foreground"
-                : "text-muted-foreground hover:bg-surface-high hover:text-foreground"
-            }`}
+                ? "flex items-center gap-1.5 bg-primary-container px-2.5 py-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-primary-foreground focus:outline-none focus-visible:bg-primary-container sm:px-3"
+                : "flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground hover:bg-surface-high hover:text-foreground focus:outline-none focus-visible:bg-primary-container sm:px-3"
+            }
           >
-            <BookText className="h-3.5 w-3.5" /> Posts
+            <BookText className="h-3 w-3" /> Posts
           </button>
         </div>
         <div className="relative">
@@ -257,7 +257,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             onKeyDownCapture={handleCommandKeyDownCapture}
             className="bg-transparent p-0"
           >
-            <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4">
+            <div className="flex items-center gap-2 px-3 py-2 sm:px-3">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <CommandInput
                 showIcon={false}
@@ -290,7 +290,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     blurTimeoutRef.current = null;
                   }, 150);
                 }}
-                className="flex h-10 w-full rounded-none border-none bg-transparent py-0 text-[0.95rem] text-foreground shadow-none outline-none placeholder:text-muted-foreground sm:h-11"
+                className="flex h-9 w-full rounded-none border-none bg-transparent py-0 text-[0.875rem] text-foreground shadow-none outline-none placeholder:text-muted-foreground sm:h-9"
               />
             </div>
             <CommandList

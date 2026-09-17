@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type ReactQuill from "react-quill-new";
 import { useNavigate } from "react-router-dom";
+import { isPreview } from "@/shared/config/preview";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { toPlainText } from "@/entities/post/lib";
 import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
@@ -37,6 +38,7 @@ export interface PostAuthoringState {
   cardImage: File | null;
   cardImageUrl: string | null;
   cardImagePreview: string | null;
+  previewCoverUrl: string | null;
   isUploadingCardImage: boolean;
   isUploadingRichText: boolean;
   tags: string[];
@@ -67,6 +69,7 @@ export interface PostAuthoringHandlers {
   handleCancel: () => void;
   handleGeneratePost: () => Promise<void>;
   richTextimageHandler: () => Promise<void>;
+  shufflePreviewCover: () => void;
   clearAIDraft: () => void;
   toggleSummary: () => void;
 }
@@ -129,6 +132,7 @@ export const usePostAuthoringController = ({
     contentText,
     imageFile: imageUploader.file,
     imageUrl: imageUploader.url,
+    previewCoverUrl: imageUploader.previewCoverUrl,
     tags: tagInput.tags,
     summary: aiDraft.summary,
     uploadCardImage: () => imageUploader.uploadCardImage(),
@@ -152,6 +156,7 @@ export const usePostAuthoringController = ({
         cardImage: imageUploader.file,
         cardImageUrl: imageUploader.url,
         cardImagePreview: imageUploader.preview,
+        previewCoverUrl: imageUploader.previewCoverUrl,
         tags: tagInput.tags,
         isUploadingCardImage: imageUploader.isCardUploading,
         isCreatingPost: isSubmitInFlight(submitController.submit),
@@ -162,11 +167,22 @@ export const usePostAuthoringController = ({
       imageUploader.file,
       imageUploader.url,
       imageUploader.preview,
+      imageUploader.previewCoverUrl,
       imageUploader.isCardUploading,
       tagInput.tags,
       submitController.submit,
     ],
   );
+
+  const baseSubmitLabel = deriveSubmitLabel(submitController.submit, isEdit);
+  // Preview-first review gating: nothing publishes directly, so the
+  // action reads as a review submission while in-flight labels stay.
+  const submitLabel =
+    isPreview() && baseSubmitLabel === "Publish Post"
+      ? "Submit for Review"
+      : isPreview() && baseSubmitLabel === "Save Changes"
+        ? "Submit Revision"
+        : baseSubmitLabel;
 
   return {
     state: {
@@ -176,6 +192,7 @@ export const usePostAuthoringController = ({
       cardImage: imageUploader.file,
       cardImageUrl: imageUploader.url,
       cardImagePreview: imageUploader.preview,
+      previewCoverUrl: imageUploader.previewCoverUrl,
       isUploadingCardImage: imageUploader.isCardUploading,
       isUploadingRichText: imageUploader.isRichTextUploading,
       tags: tagInput.tags,
@@ -184,7 +201,7 @@ export const usePostAuthoringController = ({
       isGeneratingTags: tagInput.isGenerating,
       canGenerateTags: tagInput.canGenerate,
       isSubmitting: isSubmitInFlight(submitController.submit),
-      submitLabel: deriveSubmitLabel(submitController.submit, isEdit),
+      submitLabel,
       submit: submitController.submit,
       postPrompt: aiDraft.prompt,
       generatedSummary: aiDraft.summary,
@@ -214,6 +231,7 @@ export const usePostAuthoringController = ({
       handleCancel,
       handleGeneratePost: aiDraft.generate,
       richTextimageHandler: imageUploader.richTextImageHandler,
+      shufflePreviewCover: imageUploader.shufflePreviewCover,
       clearAIDraft: aiDraft.clear,
       toggleSummary: aiDraft.toggleSummary,
     },

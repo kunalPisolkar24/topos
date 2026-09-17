@@ -277,8 +277,13 @@ html, body {
 .prose {
   font-family: 'Merriweather', serif;
   color: rgb(var(--foreground));
-  line-height: 1.8;
+  font-size: 0.94rem;
+  line-height: 1.75;
   letter-spacing: 0.3px;
+}
+
+.prose.prose-lg {
+  font-size: 1.02rem;
 }
 
 .prose h1,
@@ -293,15 +298,15 @@ html, body {
 }
 
 .prose h1 {
-  font-size: 2.25em;
+  font-size: 2em;
   margin-bottom: 0.8em;
 }
 .prose h2 {
-  font-size: 1.8em;
+  font-size: 1.6em;
   margin-bottom: 0.7em;
 }
 .prose h3 {
-  font-size: 1.5em;
+  font-size: 1.3em;
   margin-bottom: 0.6em;
 }
 

@@ -16,7 +16,6 @@ import {
   SavePostDocument,
   SearchPostsDocument,
   UpdatePostDocument,
-  type CreatePostInput,
   type CreatePostMutation,
   type CreatePostMutationVariables,
   type DeletePostMutation,
@@ -41,7 +40,6 @@ import {
   type SavePostMutationVariables,
   type SearchPostsQuery,
   type SearchPostsQueryVariables,
-  type UpdatePostInput,
   type UpdatePostMutation,
   type UpdatePostMutationVariables,
 } from "@/shared/graphql/content-documents";
@@ -57,6 +55,7 @@ export const postRepository = {
     return useQuery<PostsQuery, PostsQueryVariables>(PostsDocument, {
       variables: { page, limit },
       skip,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -65,6 +64,7 @@ export const postRepository = {
     return useQuery<PostsByTagQuery, PostsByTagQueryVariables>(PostsByTagDocument, {
       variables: { tag, page, limit },
       skip: skip || !tag,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -73,6 +73,7 @@ export const postRepository = {
     return useQuery<SearchPostsQuery, SearchPostsQueryVariables>(SearchPostsDocument, {
       variables: { query, page, limit },
       skip: query.length === 0,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -81,6 +82,7 @@ export const postRepository = {
     return useQuery<PostQuery, PostQueryVariables>(PostDocument, {
       variables: { id },
       skip: !id,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -132,6 +134,7 @@ export const postRepository = {
     return useQuery<RecommendedPostsQuery, RecommendedPostsQueryVariables>(RecommendedPostsDocument, {
       variables: { page, limit, mode, seed },
       skip,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },
@@ -170,31 +173,6 @@ export const postRepository = {
       query: RecommendedPostsDocument,
       variables: { page, limit },
       fetchPolicy: "cache-first",
-    });
-  },
-
-  async createOnce(client: ReturnType<typeof useApolloClient>, input: CreatePostInput) {
-    return client.mutate<CreatePostMutation, CreatePostMutationVariables>({
-      mutation: CreatePostDocument,
-      variables: { input },
-    });
-  },
-
-  async updateOnce(
-    client: ReturnType<typeof useApolloClient>,
-    id: string,
-    input: UpdatePostInput,
-  ) {
-    return client.mutate<UpdatePostMutation, UpdatePostMutationVariables>({
-      mutation: UpdatePostDocument,
-      variables: { id, input },
-    });
-  },
-
-  async deleteOnce(client: ReturnType<typeof useApolloClient>, id: string) {
-    return client.mutate<DeletePostMutation, DeletePostMutationVariables>({
-      mutation: DeletePostDocument,
-      variables: { id },
     });
   },
 

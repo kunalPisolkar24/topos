@@ -94,7 +94,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
                 <div className="space-y-2">
                   <h2
                     data-slot="blog-card-title"
-                    className="line-clamp-2 text-[1.3rem] font-semibold leading-[1.12] tracking-[-0.028em] text-foreground sm:text-[1.5rem] lg:text-[1.65rem]"
+                    className="line-clamp-2 break-words text-[1.3rem] font-semibold leading-[1.12] tracking-[-0.028em] text-foreground sm:text-[1.5rem] lg:text-[1.65rem]"
                   >
                     {title}
                   </h2>

@@ -46,8 +46,8 @@ const SearchResultsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-surface">
         <StickyNavbar />
-        <main className="container mx-auto pb-8 pt-app-navbar-offset">
-          <div className="max-w-[88rem] px-4 sm:px-5 lg:mx-auto lg:px-6">
+        <main className="container mx-auto px-4 pb-8 pt-app-navbar-offset sm:px-5 lg:px-6">
+          <div className="mx-auto max-w-[88rem]">
             <p className="text-sm text-destructive">{getGraphQLErrorMessage(error, "Could not load search results.")}</p>
           </div>
         </main>
@@ -58,18 +58,18 @@ const SearchResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface">
       <StickyNavbar />
-      <main className="container mx-auto pb-8 pt-app-navbar-offset">
+      <main className="container mx-auto px-4 pb-8 pt-app-navbar-offset sm:px-5 lg:px-6">
         {loading ? (
-          <div className="m-6 grid max-w-[88rem] grid-cols-1 gap-8 px-4 sm:px-5 lg:mx-auto lg:px-6">
+          <div className="mx-auto grid max-w-[88rem] grid-cols-1 gap-8">
             {Array.from({ length: 5 }).map((_, index) => (
               <BlogCardSkeleton key={index} />
             ))}
           </div>
         ) : (
           <>
-            <div className="max-w-[88rem] px-4 sm:px-5 lg:mx-auto lg:px-6">
-              <h1 className="mb-2 text-3xl font-semibold tracking-[-0.02em] text-foreground">
-                Search Results for "{query}"
+            <div className="mx-auto max-w-[88rem] min-w-0">
+              <h1 className="mb-2 break-words text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+                Search Results for "<span className="break-all">{query}</span>"
               </h1>
               <p className="mb-8 text-sm text-muted-foreground">
                 {data?.searchPosts?.total ?? 0} posts found.
@@ -77,7 +77,7 @@ const SearchResultsPage: React.FC = () => {
             </div>
 
             {results.length > 0 ? (
-              <div className="m-6 grid max-w-[88rem] grid-cols-1 gap-8 px-4 sm:px-5 lg:mx-auto lg:px-6">
+              <div className="mx-auto grid max-w-[88rem] grid-cols-1 gap-8">
                 {results.map((post) => (
                   <BlogCard key={post.id} {...post} />
                 ))}

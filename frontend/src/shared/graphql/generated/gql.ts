@@ -14,6 +14,17 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  fragment ChatFields on Chat {\n    id\n    title\n    createdAt\n    updatedAt\n  }\n": typeof types.ChatFieldsFragmentDoc,
+    "\n  fragment ChatMessageFields on ChatMessage {\n    id\n    chatId\n    role\n    content\n    citedPostIds\n    createdAt\n  }\n": typeof types.ChatMessageFieldsFragmentDoc,
+    "\n  query Chats($page: Int, $limit: Int) {\n    chats(page: $page, limit: $limit) {\n      chats {\n        ...ChatFields\n      }\n      totalPages\n      currentPage\n      totalChats\n    }\n  }\n  \n": typeof types.ChatsDocument,
+    "\n  query Chat($id: ID!) {\n    chat(id: $id) {\n      ...ChatFields\n    }\n  }\n  \n": typeof types.ChatDocument,
+    "\n  query ChatMessages($chatId: ID!, $page: Int, $limit: Int) {\n    chatMessages(chatId: $chatId, page: $page, limit: $limit) {\n      messages {\n        ...ChatMessageFields\n      }\n      totalPages\n      currentPage\n      totalMessages\n    }\n  }\n  \n": typeof types.ChatMessagesDocument,
+    "\n  mutation CreateChat($title: String) {\n    createChat(title: $title) {\n      ...ChatFields\n    }\n  }\n  \n": typeof types.CreateChatDocument,
+    "\n  mutation RenameChat($id: ID!, $title: String!) {\n    renameChat(id: $id, title: $title) {\n      ...ChatFields\n    }\n  }\n  \n": typeof types.RenameChatDocument,
+    "\n  mutation DeleteChat($id: ID!) {\n    deleteChat(id: $id)\n  }\n": typeof types.DeleteChatDocument,
+    "\n  mutation AskChat($chatId: ID!, $query: String!) {\n    askChat(chatId: $chatId, query: $query) {\n      ...ChatMessageFields\n    }\n  }\n  \n": typeof types.AskChatDocument,
+    "\n  fragment PostDraftStatus on PostDraft {\n    status\n  }\n": typeof types.PostDraftStatusFragmentDoc,
+    "\n  fragment PostInteractionState on Post {\n    likedByMe\n    savedByMe\n  }\n": typeof types.PostInteractionStateFragmentDoc,
     "\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n": typeof types.ForceNetworkDocument,
     "\n  fragment PostCardFields on Post {\n    id\n    title\n    body\n    imageUrl\n    createdAt\n    likedByMe\n    savedByMe\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": typeof types.PostCardFieldsFragmentDoc,
     "\n  fragment PostDetailFields on Post {\n    id\n    title\n    body\n    slug\n    imageUrl\n    summary\n    summaryStatus\n    createdAt\n    updatedAt\n    likedByMe\n    savedByMe\n    author {\n      id\n      username\n      email\n      name\n      bio\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n    related {\n      ...PostCardFields\n    }\n  }\n  \n": typeof types.PostDetailFieldsFragmentDoc,
@@ -48,6 +59,17 @@ type Documents = {
     "mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": typeof types.UpdateProfileDocument,
 };
 const documents: Documents = {
+    "\n  fragment ChatFields on Chat {\n    id\n    title\n    createdAt\n    updatedAt\n  }\n": types.ChatFieldsFragmentDoc,
+    "\n  fragment ChatMessageFields on ChatMessage {\n    id\n    chatId\n    role\n    content\n    citedPostIds\n    createdAt\n  }\n": types.ChatMessageFieldsFragmentDoc,
+    "\n  query Chats($page: Int, $limit: Int) {\n    chats(page: $page, limit: $limit) {\n      chats {\n        ...ChatFields\n      }\n      totalPages\n      currentPage\n      totalChats\n    }\n  }\n  \n": types.ChatsDocument,
+    "\n  query Chat($id: ID!) {\n    chat(id: $id) {\n      ...ChatFields\n    }\n  }\n  \n": types.ChatDocument,
+    "\n  query ChatMessages($chatId: ID!, $page: Int, $limit: Int) {\n    chatMessages(chatId: $chatId, page: $page, limit: $limit) {\n      messages {\n        ...ChatMessageFields\n      }\n      totalPages\n      currentPage\n      totalMessages\n    }\n  }\n  \n": types.ChatMessagesDocument,
+    "\n  mutation CreateChat($title: String) {\n    createChat(title: $title) {\n      ...ChatFields\n    }\n  }\n  \n": types.CreateChatDocument,
+    "\n  mutation RenameChat($id: ID!, $title: String!) {\n    renameChat(id: $id, title: $title) {\n      ...ChatFields\n    }\n  }\n  \n": types.RenameChatDocument,
+    "\n  mutation DeleteChat($id: ID!) {\n    deleteChat(id: $id)\n  }\n": types.DeleteChatDocument,
+    "\n  mutation AskChat($chatId: ID!, $query: String!) {\n    askChat(chatId: $chatId, query: $query) {\n      ...ChatMessageFields\n    }\n  }\n  \n": types.AskChatDocument,
+    "\n  fragment PostDraftStatus on PostDraft {\n    status\n  }\n": types.PostDraftStatusFragmentDoc,
+    "\n  fragment PostInteractionState on Post {\n    likedByMe\n    savedByMe\n  }\n": types.PostInteractionStateFragmentDoc,
     "\n  query ForceNetwork {\n    __typename\n    posts {\n      posts {\n        id\n      }\n    }\n  }\n": types.ForceNetworkDocument,
     "\n  fragment PostCardFields on Post {\n    id\n    title\n    body\n    imageUrl\n    createdAt\n    likedByMe\n    savedByMe\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n  }\n": types.PostCardFieldsFragmentDoc,
     "\n  fragment PostDetailFields on Post {\n    id\n    title\n    body\n    slug\n    imageUrl\n    summary\n    summaryStatus\n    createdAt\n    updatedAt\n    likedByMe\n    savedByMe\n    author {\n      id\n      username\n      email\n      name\n      bio\n      avatarUrl\n    }\n    tags {\n      id\n      name\n    }\n    related {\n      ...PostCardFields\n    }\n  }\n  \n": types.PostDetailFieldsFragmentDoc,
@@ -96,6 +118,50 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  fragment ChatFields on Chat {\n    id\n    title\n    createdAt\n    updatedAt\n  }\n"): (typeof documents)["\n  fragment ChatFields on Chat {\n    id\n    title\n    createdAt\n    updatedAt\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  fragment ChatMessageFields on ChatMessage {\n    id\n    chatId\n    role\n    content\n    citedPostIds\n    createdAt\n  }\n"): (typeof documents)["\n  fragment ChatMessageFields on ChatMessage {\n    id\n    chatId\n    role\n    content\n    citedPostIds\n    createdAt\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query Chats($page: Int, $limit: Int) {\n    chats(page: $page, limit: $limit) {\n      chats {\n        ...ChatFields\n      }\n      totalPages\n      currentPage\n      totalChats\n    }\n  }\n  \n"): (typeof documents)["\n  query Chats($page: Int, $limit: Int) {\n    chats(page: $page, limit: $limit) {\n      chats {\n        ...ChatFields\n      }\n      totalPages\n      currentPage\n      totalChats\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query Chat($id: ID!) {\n    chat(id: $id) {\n      ...ChatFields\n    }\n  }\n  \n"): (typeof documents)["\n  query Chat($id: ID!) {\n    chat(id: $id) {\n      ...ChatFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ChatMessages($chatId: ID!, $page: Int, $limit: Int) {\n    chatMessages(chatId: $chatId, page: $page, limit: $limit) {\n      messages {\n        ...ChatMessageFields\n      }\n      totalPages\n      currentPage\n      totalMessages\n    }\n  }\n  \n"): (typeof documents)["\n  query ChatMessages($chatId: ID!, $page: Int, $limit: Int) {\n    chatMessages(chatId: $chatId, page: $page, limit: $limit) {\n      messages {\n        ...ChatMessageFields\n      }\n      totalPages\n      currentPage\n      totalMessages\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateChat($title: String) {\n    createChat(title: $title) {\n      ...ChatFields\n    }\n  }\n  \n"): (typeof documents)["\n  mutation CreateChat($title: String) {\n    createChat(title: $title) {\n      ...ChatFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation RenameChat($id: ID!, $title: String!) {\n    renameChat(id: $id, title: $title) {\n      ...ChatFields\n    }\n  }\n  \n"): (typeof documents)["\n  mutation RenameChat($id: ID!, $title: String!) {\n    renameChat(id: $id, title: $title) {\n      ...ChatFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation DeleteChat($id: ID!) {\n    deleteChat(id: $id)\n  }\n"): (typeof documents)["\n  mutation DeleteChat($id: ID!) {\n    deleteChat(id: $id)\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation AskChat($chatId: ID!, $query: String!) {\n    askChat(chatId: $chatId, query: $query) {\n      ...ChatMessageFields\n    }\n  }\n  \n"): (typeof documents)["\n  mutation AskChat($chatId: ID!, $query: String!) {\n    askChat(chatId: $chatId, query: $query) {\n      ...ChatMessageFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  fragment PostDraftStatus on PostDraft {\n    status\n  }\n"): (typeof documents)["\n  fragment PostDraftStatus on PostDraft {\n    status\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  fragment PostInteractionState on Post {\n    likedByMe\n    savedByMe\n  }\n"): (typeof documents)["\n  fragment PostInteractionState on Post {\n    likedByMe\n    savedByMe\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
