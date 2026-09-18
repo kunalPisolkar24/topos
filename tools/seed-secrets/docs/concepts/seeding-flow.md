@@ -37,7 +37,7 @@ sequenceDiagram
     Main->>Main: Parse CLI args → SeedConfig
     Main->>Main: Load Settings, print banner
 
-    Main->>Loader: resolve_path("infra/docker/prod/.env")
+    Main->>Loader: resolve_path("infrastructure/docker/prod/.env")
     Loader-->>Main: /full/path/to/.env
 
     Main->>Loader: load(path)
@@ -190,7 +190,7 @@ sequenceDiagram
     Store-->>UseCase: raise SecretsWriteError
 
     UseCase-->>main.py: raise SecretsWriteError
-    main.py-->>You: "ERROR: failed to upsert detectai/web/secrets: ..."
+    main.py-->>You: "ERROR: failed to upsert /topos/frontend/config: ..."
 ```
 
 ### EnvParseError

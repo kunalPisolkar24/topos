@@ -26,7 +26,7 @@ These are read by the Settings provider from OS environment or `.env`:
 |----------|------|---------|-------------|
 | `AWS_ENDPOINT_URL` | string | `None` (real AWS) | Floci: `http://localhost:4566`; real AWS: empty/omit |
 | `AWS_REGION` | string | `ap-south-1` | AWS region for Secrets Manager |
-| `ENV_FILE` | string | `infra/docker/prod/.env` | Path to the dotenv file to read |
+| `ENV_FILE` | string | `infrastructure/docker/prod/.env` | Path to the dotenv file to read |
 
 ## CLI Arguments (Override Settings)
 
@@ -36,7 +36,7 @@ These override the corresponding settings:
 |----------|-----------|---------|-------------|
 | `--endpoint-url` | `AWS_ENDPOINT_URL` | `None` | AWS endpoint URL |
 | `--region` | `AWS_REGION` | `ap-south-1` | AWS region |
-| `--env-file` | `ENV_FILE` | `infra/docker/prod/.env` | Path to dotenv file |
+| `--env-file` | `ENV_FILE` | `infrastructure/docker/prod/.env` | Path to dotenv file |
 
 **Precedence:** CLI argument > OS environment variable > `.env` file value
 
@@ -58,14 +58,14 @@ These override the corresponding settings:
 ```bash
 # Via CLI
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url http://localhost:4566 \
   --region ap-south-1
 
 # Via environment variables
 export AWS_ENDPOINT_URL=http://localhost:4566
 export AWS_REGION=ap-south-1
-export ENV_FILE=infra/docker/prod/.env
+export ENV_FILE=infrastructure/docker/prod/.env
 python main.py
 ```
 
@@ -74,7 +74,7 @@ python main.py
 ```bash
 # Via CLI
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url "" \
   --region ap-south-1 \
   --confirm-prod
@@ -91,7 +91,7 @@ python main.py --confirm-prod
 # tools/seed-secrets/.env
 AWS_ENDPOINT_URL=http://localhost:4566
 AWS_REGION=ap-south-1
-ENV_FILE=infra/docker/prod/.env
+ENV_FILE=infrastructure/docker/prod/.env
 ```
 
 Then just run:
@@ -179,7 +179,7 @@ For dry-run:
 
 ### "No allowlisted keys found"
 
-The `.env` file doesn't contain keys the tool knows about. Ensure you're pointing to `infra/docker/prod/.env` and it contains keys like `NEXTAUTH_SECRET`, `GOOGLE_ID`, etc.
+The `.env` file doesn't contain keys the tool knows about. Ensure you're pointing to `infrastructure/docker/prod/.env` and it contains keys like `NEXTAUTH_SECRET`, `GOOGLE_ID`, etc.
 
 ### Settings not updating
 

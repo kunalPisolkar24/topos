@@ -21,25 +21,23 @@ class FakeStore(ISecretsStore):
         return []
 
 
-def test_shared_keys_synced() -> None:
+def test_frontend_payload_built() -> None:
     env = {
-        "GITHUB_ID": "a",
-        "GITHUB_SECRET": "b",
-        "PADDLE_API_KEY": "c",
-        "PADDLE_WEBHOOK_SECRET": "d",
+        "VITE_GRAPHQL_URL": "https://example.com/graphql",
+        "VITE_ENV_TYPE": "prod",
+        "APP_NETWORK": "topos_network",
     }
     store = FakeStore()
     seeder = Seeder(store)
     payloads = seeder.build_payloads(env)
-    web = next(p for p in payloads if p.name == "detectai/web/secrets")
-    gateway = next(p for p in payloads if p.name == "detectai/gateway/secrets")
-    inference = next(p for p in payloads if p.name == "detectai/inference/secrets")
-    assert web.data["INTERNAL_API_KEY"] == gateway.data["INTERNAL_API_KEY"]
-    assert web.data["AI_SERVICE_API_KEY"] == inference.data["API_KEY"]
+    assert len(payloads) == 1
+    p = payloads[0]
+    assert p.name == "/topos/frontend/config"
+    assert p.data["VITE_GRAPHQL_URL"] == "https://example.com/graphql"
 
 
 def test_real_aws_guard() -> None:
-    env = {"GITHUB_ID": "a"}
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
     seeder = Seeder(FakeStore())
     cfg = SeedConfig(env_file="/tmp/x", endpoint_url=None, dry_run=False)
     try:
@@ -53,19 +51,19 @@ def test_real_aws_guard() -> None:
     assert all(s == "dry-run" for _, s in results)
 
 
-def test_tf_managed_guard() -> None:
-    env = {"GITHUB_ID": "a"}
+def test_unknown_secret_guard() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
     seeder = Seeder(FakeStore())
-    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", only=frozenset({"detectai/pg/urls"}))
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", only=frozenset({"unknown/secret"}))
     try:
         seeder.seed(cfg, env)
         raise AssertionError("should have raised GuardError")
-    except GuardError:
-        pass
+    except GuardError as e:
+        assert "unknown secret" in str(e).lower()
 
 
 def test_allowlist_ignores_infra_keys() -> None:
-    env = {"GITHUB_ID": "a", "DATABASE_URL": "postgresql://...", "REDIS_URL": "redis://..."}
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql", "DATABASE_URL": "postgresql://...", "REDIS_URL": "redis://..."}
     seeder = Seeder(FakeStore())
     payloads = seeder.build_payloads(env)
     for p in payloads:

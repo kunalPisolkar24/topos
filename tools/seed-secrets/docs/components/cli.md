@@ -1,6 +1,4 @@
-# CLI Reference
-
-This document explains all command-line options for the Seed Secrets tool.
+# CLI Reference — Topos
 
 ## Usage
 
@@ -12,166 +10,95 @@ python main.py [options]
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `--env-file` | No | `infra/docker/prod/.env` | Path to the dotenv file to read |
-| `--endpoint-url` | No | `None` (real AWS) | AWS endpoint URL. Empty string = real AWS |
-| `--region` | No | `ap-south-1` | AWS region for Secrets Manager |
-| `--dry-run` | No | `false` | Preview mode, no writes |
-| `--only` | No | `None` (all secrets) | Comma-separated secret name filter |
-| `--force` | No | `false` | Allow overwriting Terraform-managed secrets |
-| `--confirm-prod` | No | `false` | Required for real AWS writes without `--dry-run` |
-| `--verbose` | No | `false` | Enable verbose logging |
+| `--env-file` | No | `infrastructure/docker/prod/.env` | Path to dotenv file |
+| `--endpoint-url` | No | `None` (real AWS) | AWS endpoint URL. Empty = real AWS |
+| `--region` | No | `ap-south-1` | AWS region |
+| `--dry-run` | No | `false` | Preview, no writes |
+| `--only` | No | `None` (all) | Comma-separated param/secret filter |
+| `--force` | No | `false` | Allow TF-managed overwrite |
+| `--confirm-prod` | No | `false` | Required for real AWS |
+| `--verbose` | No | `false` | Verbose logging |
 
 ## Examples
 
-### Seed to Floci (Local Development)
+### Seed to Floci
 
 ```bash
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url http://localhost:4566
 ```
 
-### Dry-Run (Preview)
+### Dry-Run
 
 ```bash
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url http://localhost:4566 \
   --dry-run
 ```
 
-### Seed to Real AWS
+### Real AWS
 
 ```bash
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url "" \
   --region ap-south-1 \
   --confirm-prod
 ```
 
-### Seed Only Specific Secrets
+### Only Frontend
 
 ```bash
 python main.py \
-  --env-file infra/docker/prod/.env \
+  --env-file infrastructure/docker/prod/.env \
   --endpoint-url http://localhost:4566 \
-  --only detectai/web/secrets,detectai/gateway/secrets
+  --only /topos/frontend/config
 ```
 
-### Verbose Output
-
-```bash
-python main.py \
-  --env-file infra/docker/prod/.env \
-  --endpoint-url http://localhost:4566 \
-  --verbose
-```
-
-### All Options Combined
-
-```bash
-python main.py \
-  --env-file infra/docker/prod/.env \
-  --endpoint-url http://localhost:4566 \
-  --region ap-south-1 \
-  --only detectai/web/secrets \
-  --dry-run \
-  --verbose
-```
-
-## Makefile Shortcuts
-
-### Root Makefile (from project root)
-
-| Command | Equivalent To | Description |
-|---------|---------------|-------------|
-| `make seed-install` | `poetry -C tools/seed-secrets install` | Install dependencies |
-| `make seed-floci` | `poetry run main.py --endpoint-url http://localhost:4566` | Seed to Floci |
-| `make seed-floci-dry` | `poetry run main.py --endpoint-url http://localhost:4566 --dry-run` | Preview Floci seed |
-| `make seed-aws` | `poetry run main.py --endpoint-url "" --confirm-prod` | Seed to real AWS |
-| `make seed-dry` | `poetry run main.py --dry-run` | Preview against current endpoint |
-
-### Per-Tool Makefile
+## Makefile
 
 | Command | Description |
 |---------|-------------|
-| `make install` | Install dependencies with Poetry |
-| `make lint` | Run ruff linter |
-| `make test` | Run unit tests (no network) |
-| `make test-all` | Run all tests (unit + integration) |
-| `make test-cov` | Run tests with coverage report (65% gate) |
-| `make dry-run` | Floci dry-run |
-| `make seed-floci` | Seed to Floci |
-| `make clean` | Remove cache and coverage files |
+| `make install` | Poetry install |
+| `make lint` | ruff check |
+| `make test` | Unit tests |
+| `make test-all` | All tests |
+| `make test-cov` | Coverage 65% gate |
+| `make dry-run` | Floci dry-run (frontend only) |
+| `make seed-floci` | Seed to Floci (frontend only) |
+| `make clean` | Remove caches |
 
 ## Output
 
-### Success Output (Floci)
+### Success (Floci)
 
 ```
-target=Floci (http://localhost:4566) region=ap-south-1 env-file=infra/docker/prod/.env
-found 8 allowlisted keys in .env: GITHUB_ID, GITHUB_SECRET, GOOGLE_ID, ...
-created    detectai/web/secrets (8 keys)
-created    detectai/gateway/secrets (2 keys)
-created    detectai/inference/secrets (2 keys)
+target=Floci (http://localhost:4566) region=ap-south-1 env-file=infrastructure/docker/prod/.env
+found 11 allowlisted keys in .env: APP_NETWORK, FRONTEND_CONTAINER, VITE_GRAPHQL_URL, ...
+created    /topos/frontend/config (11 keys)
 
-Done. Wrote 3 secrets to Floci (http://localhost:4566).
+Done. Wrote 1 secrets to Floci (http://localhost:4566).
 
-Verify: aws --endpoint-url http://localhost:4566 --region ap-south-1 secretsmanager list-secrets --query 'SecretList[].Name'
+Verify SM: aws --endpoint-url http://localhost:4566 --region ap-south-1 secretsmanager list-secrets --query 'SecretList[].Name'
+Verify SSM: aws --endpoint-url http://localhost:4566 --region ap-south-1 ssm describe-parameters --query 'Parameters[].Name' | grep topos
 ```
 
-### Dry-Run Output
+### Dry-Run
 
 ```
-[dry-run] target=Floci (http://localhost:4566) region=ap-south-1 env-file=infra/docker/prod/.env
-found 8 allowlisted keys in .env: GITHUB_ID, GITHUB_SECRET, GOOGLE_ID, ...
-dry-run     detectai/web/secrets (8 keys)
-dry-run     detectai/gateway/secrets (2 keys)
-dry-run     detectai/inference/secrets (2 keys)
-
-Generated 3 keys (not in .env, created once and synced):
-  - INTERNAL_API_KEY (synced to web + gateway)
-  - AI_SERVICE_API_KEY/API_KEY (synced to web + inference)
-  - NEXTAUTH_SECRET
-
-Hint: add generated values to your .env to keep them stable across runs.
+[dry-run] target=Floci (http://localhost:4566) region=ap-south-1 env-file=infrastructure/docker/prod/.env
+found 11 allowlisted keys in .env: APP_NETWORK, ...
+dry-run     /topos/frontend/config (11 keys)
 
 [dry-run] no secrets were written.
 ```
 
-### Error Output
-
-```
-ERROR: refusing to write to real AWS without --confirm-prod (or use --dry-run to preview)
-```
-
-```
-ERROR: refusing to touch TF-managed secret detectai/pg/urls without --force
-```
-
-```
-ERROR: failed to upsert detectai/web/secrets: Secrets Manager error (redacted — contains secret material)
-```
-
 ## Exit Codes
 
-| Code | Meaning | When |
-|------|---------|------|
-| `0` | Success | Seed completed (or dry-run previewed) |
-| `1` | Runtime error | AWS write failed (`SecretsWriteError`) |
-| `2` | Usage/config error | Bad args, missing env file, guard blocked, unknown secret |
-
-## Tips
-
-1. **Always dry-run first** — Use `--dry-run` before any real seed to see what would happen
-2. **Use `--only` for partial seeds** — Seed just one service without touching others
-3. **Check the banner** — The tool prints target, region, and env file before doing anything
-4. **Generated keys are shown by name** — Never by value; add them to `.env` manually
-
-## Related Documentation
-
-- [Configuration](../getting-started/configuration.md) - Environment variables and settings
-- [Validation & Guards](validation.md) - Safety guard rules
-- [Secrets Mapping](secrets-mapping.md) - Which keys go to which secret
-- [Seeding Flow](../concepts/seeding-flow.md) - What happens during a seed
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Runtime (AWS write failed) |
+| `2` | Usage/config (bad args, guard, unknown) |

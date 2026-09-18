@@ -223,7 +223,7 @@ def test_build_payloads_filters_to_allowlist(tmp_path):
 
     # Assert
     assert len(payloads) == 1  # Only web secret has matching keys
-    assert payloads[0].name == "detectai/web/secrets"
+    assert payloads[0].name == "/topos/frontend/config"
     assert "NEXTAUTH_SECRET" in payloads[0].data
     assert "GOOGLE_ID" in payloads[0].data
     assert "DATABASE_URL" not in payloads[0].data  # Filtered out
@@ -253,7 +253,7 @@ def test_composition_build_and_dry_run(tmp_path, tmp_assets):
 def test_guard_blocks_tf_managed_without_force():
     config = SeedConfig(
         env_file=".env",
-        only=frozenset({"detectai/pg/urls"}),
+        only=frozenset({"topos/pg/urls"}),
         force=False,
     )
 

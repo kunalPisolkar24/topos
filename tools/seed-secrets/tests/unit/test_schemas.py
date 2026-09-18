@@ -7,7 +7,7 @@ from src.domain.schemas import SecretPayload, SeedConfig
 
 
 def test_seed_config_defaults() -> None:
-    cfg = SeedConfig(env_file="infra/docker/prod/.env", endpoint_url="http://localhost:4566")
+    cfg = SeedConfig(env_file="infrastructure/docker/prod/.env", endpoint_url="http://localhost:4566")
     assert cfg.region == "ap-south-1"
     assert cfg.dry_run is False
     assert cfg.only is None
@@ -32,8 +32,8 @@ def test_seed_config_validates_env_file() -> None:
 
 
 def test_seed_config_parses_only_string() -> None:
-    cfg = SeedConfig(env_file="x", endpoint_url=None, only="detectai/web/secrets, detectai/gateway/secrets")
-    assert cfg.only == frozenset({"detectai/web/secrets", "detectai/gateway/secrets"})
+    cfg = SeedConfig(env_file="x", endpoint_url=None, only="/topos/frontend/config")
+    assert cfg.only == frozenset({"/topos/frontend/config"})
 
 
 def test_seed_config_parses_only_frozenset() -> None:
@@ -54,9 +54,9 @@ def test_seed_config_region_strip() -> None:
 
 
 def test_secret_payload_is_empty() -> None:
-    p = SecretPayload(name="detectai/web/secrets", data={})
+    p = SecretPayload(name="/topos/frontend/config", data={})
     assert p.is_empty() is True
-    p2 = SecretPayload(name="detectai/web/secrets", data={"a": "b"})
+    p2 = SecretPayload(name="/topos/frontend/config", data={"a": "b"})
     assert p2.is_empty() is False
 
 
@@ -68,5 +68,5 @@ def test_secret_payload_validates_name() -> None:
 
 
 def test_secret_payload_trims_name() -> None:
-    p = SecretPayload(name="  detectai/web/secrets  ", data={})
-    assert p.name == "detectai/web/secrets"
+    p = SecretPayload(name="  /topos/frontend/config  ", data={})
+    assert p.name == "/topos/frontend/config"

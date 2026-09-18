@@ -6,8 +6,8 @@ from src.cli.parser import build_parser, parse_args
 
 
 def test_parse_minimal() -> None:
-    cfg, verbose = parse_args(["--env-file", "infra/docker/prod/.env", "--endpoint-url", "http://localhost:4566"])
-    assert cfg.env_file == "infra/docker/prod/.env"
+    cfg, verbose = parse_args(["--env-file", "infrastructure/docker/prod/.env", "--endpoint-url", "http://localhost:4566"])
+    assert cfg.env_file == "infrastructure/docker/prod/.env"
     assert cfg.endpoint_url == "http://localhost:4566"
     assert cfg.region == "ap-south-1"
     assert cfg.dry_run is False
@@ -25,7 +25,7 @@ def test_parse_all_flags() -> None:
             "eu-west-1",
             "--dry-run",
             "--only",
-            "detectai/web/secrets,detectai/gateway/secrets",
+            "/topos/frontend/config",
             "--force",
             "--confirm-prod",
             "--verbose",
@@ -36,7 +36,7 @@ def test_parse_all_flags() -> None:
     assert cfg.is_real_aws is True
     assert cfg.region == "eu-west-1"
     assert cfg.dry_run is True
-    assert cfg.only == frozenset({"detectai/web/secrets", "detectai/gateway/secrets"})
+    assert cfg.only == frozenset({"/topos/frontend/config"})
     assert cfg.force is True
     assert cfg.confirm_prod is True
     assert verbose is True

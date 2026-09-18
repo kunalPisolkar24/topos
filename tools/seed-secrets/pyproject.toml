@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "detectai-seed-secrets"
+name = "topos-seed-secrets"
 version = "0.1.0"
-description = "Env-driven seeder for app-only Secrets Manager secrets (Floci + real AWS)"
-authors = ["DetectAI <hello@detectai.com>"]
+description = "Env-driven seeder for Topos frontend config (SSM) and secrets (Floci + real AWS)"
+authors = ["Topos <hello@topos.dev>"]
 package-mode = false
 
 [tool.poetry.dependencies]

@@ -40,17 +40,17 @@ def test_loader_raises_for_missing() -> None:
 
 @pytest.mark.integration
 def test_loader_resolves_relative_to_repo_root(tmp_path: Path) -> None:
-    # Create repo-like structure: tmp_path/infra/docker/prod/.env
-    prod_env = tmp_path / "infra" / "docker" / "prod" / ".env"
+    # Create repo-like structure: tmp_path/infrastructure/docker/prod/.env
+    prod_env = tmp_path / "infrastructure" / "docker" / "prod" / ".env"
     prod_env.parent.mkdir(parents=True)
-    prod_env.write_text("GITHUB_ID=from_repo_root\n", encoding="utf-8")
+    prod_env.write_text("VITE_GRAPHQL_URL=https://example.com/graphql\n", encoding="utf-8")
     loader = LocalEnvLoader(repo_root=tmp_path)
     # Pass relative path that exists only relative to repo_root
-    data = loader.load("infra/docker/prod/.env")
-    assert data["GITHUB_ID"] == "from_repo_root"
+    data = loader.load("infrastructure/docker/prod/.env")
+    assert data["VITE_GRAPHQL_URL"] == "https://example.com/graphql"
     # resolve_path should give absolute repo_root path
-    resolved = loader.resolve_path("infra/docker/prod/.env")
-    assert resolved == (tmp_path / "infra/docker/prod/.env").resolve()
+    resolved = loader.resolve_path("infrastructure/docker/prod/.env")
+    assert resolved == (tmp_path / "infrastructure/docker/prod/.env").resolve()
 
 
 @pytest.mark.integration

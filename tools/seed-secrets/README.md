@@ -1,10 +1,10 @@
-# Seed Secrets
+# Seed Secrets — Topos
 
-Reads an allowlisted subset of keys from a `.env` file and upserts them as JSON blobs into AWS Secrets Manager. Targets both **Floci/LocalStack** (local development) and **real AWS** (production, guarded by `--confirm-prod`).
+Reads an allowlisted subset of keys from a `.env` file and upserts them as JSON blobs into AWS **SSM Parameter Store** (frontend config) and **Secrets Manager** (future backend secrets). Targets both **Floci/LocalStack** (`http://localhost:4566`) and **real AWS** (guarded by `--confirm-prod`).
 
 ```mermaid
 graph LR
-    A[".env File"] -->|Allowlist Filter| B[Secrets Manager]
+    A[".env File"] -->|Allowlist Filter| B[SSM / Secrets Manager]
     C[CLI] -->|Validate & Seed| B
 ```
 
@@ -23,40 +23,36 @@ make -C tools/seed-secrets seed-floci
 
 ## What Gets Seeded
 
-| Secret Name | Keys | Service |
-|-------------|------|---------|
-| `detectai/web/secrets` | NEXTAUTH_SECRET, INTERNAL_API_KEY, GOOGLE_ID, GITHUB_ID, ... (11 keys) | Web App |
-| `detectai/gateway/secrets` | PADDLE_WEBHOOK_SECRET, INTERNAL_API_KEY | Gateway |
-| `detectai/workers/secrets` | PADDLE_API_KEY, PADDLE_ENVIRONMENT | Workers |
-| `detectai/inference/secrets` | API_KEY, HF_TOKEN | Inference |
-| `detectai/document-parser/secrets` | (empty by default) | Doc Parser |
+| Parameter / Secret Name | Keys | Service | Store |
+|-------------|------|---------|-------|
+| `/topos/frontend/config` | `VITE_ENV_TYPE`, `VITE_GRAPHQL_URL`, `VITE_BACKEND_URL`, `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`, `VITE_ENABLE_MOCKS`, `FRONTEND_CONTAINER`, `FRONTEND_INT_PORT`, `FRONTEND_EXT_PORT`, `APP_NETWORK`, `GATEWAY_*` | Frontend | SSM Parameter Store (String, JSON) |
 
-Everything else (`DATABASE_URL`, `REDIS_URL`, `MONGO_URI`, etc.) is ignored.
+Everything else (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, etc.) is ignored for now — backend secrets will be added as `topos/*` SM secrets gradually.
 
 ## CLI Usage
 
 ```bash
-# Seed to Floci
-python main.py --env-file infra/docker/prod/.env --endpoint-url http://localhost:4566
+# Seed to Floci (SSM)
+python main.py --env-file infrastructure/docker/prod/.env --endpoint-url http://localhost:4566
 
 # Dry-run (preview, no writes)
-python main.py --env-file infra/docker/prod/.env --endpoint-url http://localhost:4566 --dry-run
+python main.py --env-file infrastructure/docker/prod/.env --endpoint-url http://localhost:4566 --dry-run
 
 # Real AWS (requires --confirm-prod)
-python main.py --env-file infra/docker/prod/.env --endpoint-url "" --region ap-south-1 --confirm-prod
+python main.py --env-file infrastructure/docker/prod/.env --endpoint-url "" --region ap-south-1 --confirm-prod
 
-# Seed only specific secrets
-python main.py --env-file infra/docker/prod/.env --endpoint-url http://localhost:4566 \
-  --only detectai/web/secrets,detectai/gateway/secrets
+# Seed only frontend
+python main.py --env-file infrastructure/docker/prod/.env --endpoint-url http://localhost:4566 \
+  --only /topos/frontend/config
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--env-file` | `infra/docker/prod/.env` | Path to dotenv file |
+| `--env-file` | `infrastructure/docker/prod/.env` | Path to dotenv file |
 | `--endpoint-url` | `None` (real AWS) | `http://localhost:4566` for Floci |
 | `--region` | `ap-south-1` | AWS region |
 | `--dry-run` | `false` | Preview mode, no writes |
-| `--only` | All secrets | Comma-separated secret name filter |
+| `--only` | All secrets | Comma-separated secret/param name filter |
 | `--force` | `false` | Allow overwriting Terraform-managed secrets |
 | `--confirm-prod` | `false` | Required for real AWS writes |
 | `--verbose` | `false` | Debug logging |
@@ -67,11 +63,9 @@ python main.py --env-file infra/docker/prod/.env --endpoint-url http://localhost
 |----------|---------|-------------|
 | `AWS_ENDPOINT_URL` | `None` (real AWS) | Floci: `http://localhost:4566` |
 | `AWS_REGION` | `ap-south-1` | AWS region |
-| `ENV_FILE` | `infra/docker/prod/.env` | Dotenv file path |
+| `ENV_FILE` | `infrastructure/docker/prod/.env` | Dotenv file path |
 
 ## Safety Guards
-
-The tool has built-in safety checks:
 
 | Guard | What It Prevents | Override |
 |-------|------------------|----------|
@@ -81,8 +75,6 @@ The tool has built-in safety checks:
 | Error redaction | Secret values leaking in error messages | — |
 
 ## Architecture
-
-Clean architecture with strict dependency rules — domain never imports infrastructure.
 
 ```mermaid
 graph TB
@@ -106,7 +98,9 @@ graph TB
     end
 
     subgraph "Infrastructure"
-        Boto3[Boto3SecretsManager]
+        Boto3SSM[Boto3ParameterStore]
+        Boto3SM[Boto3SecretsManager]
+        Hybrid[HybridStore]
         FS[LocalEnvLoader]
         Config[Settings]
         Wire[Composition Root]
@@ -115,9 +109,13 @@ graph TB
     Main --> Parser --> UseCase
     UseCase --> SecretsPort
     UseCase --> LoaderPort
-    Boto3 --> SecretsPort
+    Boto3SSM --> SecretsPort
+    Boto3SM --> SecretsPort
+    Hybrid --> SecretsPort
     FS --> LoaderPort
-    Wire --> Boto3
+    Wire --> Boto3SSM
+    Wire --> Boto3SM
+    Wire --> Hybrid
     Wire --> FS
     Wire --> Config
     Wire --> UseCase
@@ -129,22 +127,10 @@ src/
   domain/           allowlists, secret names, schemas (pure Pydantic)
   interfaces/       ports: ISecretsStore, IEnvLoader
   application/      DTOs, env parser, use-case (orchestrates ports)
-  infrastructure/   adapters: Boto3, filesystem, config, wiring
+  infrastructure/   adapters: Boto3 SSM/SM, filesystem, config, wiring
   cli/              argparse parser
 main.py             bootstrap: parse → settings → wire → load env → seed
 ```
-
-## Shared Key Sync
-
-If shared keys are missing from `.env`, the tool generates them and writes the **same value** to every secret that needs them:
-
-| Key | Synced Between |
-|-----|----------------|
-| `INTERNAL_API_KEY` | web, gateway |
-| `AI_SERVICE_API_KEY` / `API_KEY` | web, inference (same value) |
-| `NEXTAUTH_SECRET` | web only |
-
-Generated keys are reported by name (never by value). Add them to `.env` for stability.
 
 ## Development
 
@@ -156,20 +142,20 @@ make -C tools/seed-secrets test-cov   # unit + coverage (65% gate)
 make -C tools/seed-secrets clean      # remove caches
 ```
 
-## CI
-
-GitHub Actions workflow (`.github/workflows/tools-seed-secrets.yaml`) runs on `staging`/`main` (path-filtered): ruff lint + pytest with 65% coverage gate. Feature branches targeting `dev` paste local `make lint/test` output in PR.
-
 ## Verify
 
 ```bash
-# List all secrets in Floci
+# List all SSM params in Floci
+aws --endpoint-url http://localhost:4566 --region ap-south-1 \
+  ssm describe-parameters --query 'Parameters[].Name'
+
+# Check frontend param
+aws --endpoint-url http://localhost:4566 --region ap-south-1 \
+  ssm get-parameter --name /topos/frontend/config --query Parameter.Value
+
+# List SM secrets (future backend)
 aws --endpoint-url http://localhost:4566 --region ap-south-1 \
   secretsmanager list-secrets --query 'SecretList[].Name'
-
-# Check a specific secret
-aws --endpoint-url http://localhost:4566 --region ap-south-1 \
-  secretsmanager get-secret-value --secret-id detectai/web/secrets --query SecretString
 ```
 
 ## Documentation
@@ -184,5 +170,5 @@ Detailed docs in [`docs/`](docs/):
 | [Seeding Flow](docs/concepts/seeding-flow.md) | Step-by-step lifecycle |
 | [CLI Reference](docs/components/cli.md) | All arguments and examples |
 | [Validation & Guards](docs/components/validation.md) | Safety rules and allowlists |
-| [Secrets Mapping](docs/components/secrets-mapping.md) | Which keys go to which secret |
+| [Secrets Mapping](docs/components/secrets-mapping.md) | Which keys go to which param/secret |
 | [Testing](docs/testing/overview.md) | How to run and write tests |

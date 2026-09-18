@@ -203,7 +203,7 @@ Every other file only knows about interfaces, never concrete classes.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `env_file` | string | `infra/docker/prod/.env` | Path to dotenv file |
+| `env_file` | string | `infrastructure/docker/prod/.env` | Path to dotenv file |
 | `endpoint_url` | string \| None | `None` | AWS endpoint (None = real AWS) |
 | `region` | string | `ap-south-1` | AWS region |
 | `dry_run` | bool | `false` | Preview mode |
@@ -217,7 +217,7 @@ Every other file only knows about interfaces, never concrete classes.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Secret name (e.g., `detectai/web/secrets`) |
+| `name` | string | Secret name (e.g., `/topos/frontend/config`) |
 | `data` | dict[str, str] | Key-value pairs stored as JSON |
 
 ### SeedResult (Output)

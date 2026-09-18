@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--only",
         default=None,
-        help="Comma-separated secret/param names to limit (e.g. /topos/frontend/config,detectai/web/secrets)",
+        help="Comma-separated secret/param names to limit (e.g. /topos/frontend/config)",
     )
     p.add_argument("--force", action="store_true", help="Allow overwriting TF-managed secrets")
     p.add_argument(

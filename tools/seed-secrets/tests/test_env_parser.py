@@ -16,30 +16,30 @@ def _write(content: str) -> str:
 
 def test_quoted_and_spaced_values() -> None:
     path = _write(
-        'GITHUB_ID="Ov23li9qopShAhV4dTnJ"\n'
-        'GOOGLE_SECRET= "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"\n'
-        'NEXT_PUBLIC_PADDLE_CLIENT_TOKEN="test_a56b5de2890056c6b9585f65634"\n'
+        'VITE_GRAPHQL_URL="https://example.com/graphql"\n'
+        'VITE_CLOUDINARY_CLOUD_NAME= "my-cloud"\n'
+        'FRONTEND_CONTAINER="prod-frontend"\n'
     )
     data = parse_env_file(path)
-    assert data["GITHUB_ID"] == "Ov23li9qopShAhV4dTnJ"
-    assert data["GOOGLE_SECRET"] == "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"
-    assert data["NEXT_PUBLIC_PADDLE_CLIENT_TOKEN"] == "test_a56b5de2890056c6b9585f65634"
+    assert data["VITE_GRAPHQL_URL"] == "https://example.com/graphql"
+    assert data["VITE_CLOUDINARY_CLOUD_NAME"] == "my-cloud"
+    assert data["FRONTEND_CONTAINER"] == "prod-frontend"
 
 
 def test_export_and_inline_comment() -> None:
     path = _write(
-        "export PADDLE_ENVIRONMENT=sandbox # inline comment\n"
+        "export VITE_ENV_TYPE=prod # inline comment\n"
         'QUOTED_HASH="a#b#c" # comment after quoted\n'
         "UNQUOTED_SPACE=val # comment\n"
     )
     data = parse_env_file(path)
-    assert data["PADDLE_ENVIRONMENT"] == "sandbox"
+    assert data["VITE_ENV_TYPE"] == "prod"
     assert data["QUOTED_HASH"] == "a#b#c"
     assert data["UNQUOTED_SPACE"] == "val"
 
 
 def test_empty_values_are_preserved_as_empty() -> None:
-    path = _write("NEXTAUTH_SECRET=\nINTERNAL_API_KEY= # empty with comment\n")
+    path = _write("VITE_CLOUDINARY_CLOUD_NAME=\nVITE_CLOUDINARY_UPLOAD_PRESET= # empty with comment\n")
     data = parse_env_file(path)
-    assert data["NEXTAUTH_SECRET"] == ""
-    assert data["INTERNAL_API_KEY"] == ""
+    assert data["VITE_CLOUDINARY_CLOUD_NAME"] == ""
+    assert data["VITE_CLOUDINARY_UPLOAD_PRESET"] == ""

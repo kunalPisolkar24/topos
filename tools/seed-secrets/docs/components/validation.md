@@ -12,16 +12,16 @@ The tool refuses to touch secrets owned by Terraform without explicit override.
 
 | Secret Name | Owner |
 |-------------|-------|
-| `detectai/pg/urls` | Terraform |
-| `detectai/pg/master` | Terraform |
-| `detectai/docdb/urls` | Terraform |
-| `detectai/redis/chat/urls` | Terraform |
-| `detectai/redis/events/urls` | Terraform |
-| `detectai/redis/users/urls` | Terraform |
-| `detectai/mq/urls` | Terraform |
+| `topos/pg/urls` | Terraform |
+| `topos/pg/master` | Terraform |
+| `topos/docdb/urls` | Terraform |
+| `topos/redis/chat/urls` | Terraform |
+| `topos/redis/events/urls` | Terraform |
+| `topos/redis/users/urls` | Terraform |
+| `topos/mq/urls` | Terraform |
 
 **When it triggers:**
-- You use `--only detectai/pg/urls` without `--force`
+- You use `--only topos/pg/urls` without `--force`
 - The `.env` file contains keys that map to a TF-managed secret
 
 **How to fix:**
@@ -30,7 +30,7 @@ The tool refuses to touch secrets owned by Terraform without explicit override.
 
 **Error message:**
 ```
-ERROR: refusing to touch TF-managed secret detectai/pg/urls without --force
+ERROR: refusing to touch TF-managed secret topos/pg/urls without --force
 ```
 
 ### Guard #2: Real AWS Writes
@@ -56,7 +56,7 @@ ERROR: refusing to write to real AWS without --confirm-prod (or use --dry-run to
 The tool validates that `--only` values are known secret names.
 
 **When it triggers:**
-- You use `--only detectai/unknown/secrets`
+- You use `--only topos/unknown/secrets`
 
 **How to fix:**
 - Use a valid secret name from `APP_SECRETS` or `TF_MANAGED_SECRETS`
@@ -64,7 +64,7 @@ The tool validates that `--only` values are known secret names.
 
 **Error message:**
 ```
-ERROR: unknown secret detectai/unknown/secrets
+ERROR: unknown secret topos/unknown/secrets
 ```
 
 ## Guard Flow Diagram
@@ -147,7 +147,7 @@ AWS error messages are redacted if they contain sensitive material:
 
 **Example:**
 ```
-Original: "Token hf_abc123 is invalid for secret detectai/web/secrets"
+Original: "Token hf_abc123 is invalid for secret /topos/frontend/config"
 Redacted: "Secrets Manager error (redacted — contains secret material)"
 ```
 

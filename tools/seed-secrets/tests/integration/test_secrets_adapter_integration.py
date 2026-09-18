@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 
 from src.core.exceptions import SecretsWriteError
 from src.domain.schemas import SecretPayload
-from src.infrastructure.secrets_manager import Boto3SecretsManager
+from src.infrastructure.secrets_manager import Boto3ParameterStore, Boto3SecretsManager
 
 
 def _client_error(code: str, msg: str = "error") -> ClientError:
@@ -20,7 +20,7 @@ def test_upsert_create_when_not_found() -> None:
     client.describe_secret.side_effect = _client_error("ResourceNotFoundException")
     client.create_secret.return_value = {"ARN": "arn:created"}
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url="http://localhost:4566", client=client)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     status = mgr.upsert(payload)
     assert status == "created"
     client.create_secret.assert_called_once()
@@ -30,9 +30,9 @@ def test_upsert_create_when_not_found() -> None:
 @pytest.mark.integration
 def test_upsert_update_when_exists() -> None:
     client = MagicMock()
-    client.describe_secret.return_value = {"Name": "detectai/web/secrets"}
+    client.describe_secret.return_value = {"Name": "topos/test/secret"}
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url="http://localhost:4566", client=client)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     status = mgr.upsert(payload)
     assert status == "updated"
     client.put_secret_value.assert_called_once()
@@ -46,7 +46,7 @@ def test_upsert_handles_resource_exists_race() -> None:
     client.create_secret.side_effect = _client_error("ResourceExistsException")
     client.put_secret_value.return_value = {"ARN": "updated"}
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url="http://localhost:4566", client=client)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     status = mgr.upsert(payload)
     assert status == "updated"
     client.put_secret_value.assert_called_once()
@@ -56,7 +56,7 @@ def test_upsert_handles_resource_exists_race() -> None:
 def test_upsert_dry_run_no_client_call() -> None:
     client = MagicMock()
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url=None, client=client)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     status = mgr.upsert(payload, dry_run=True)
     assert status == "dry-run"
     client.describe_secret.assert_not_called()
@@ -67,21 +67,20 @@ def test_upsert_wraps_other_error_with_secret_name() -> None:
     client = MagicMock()
     client.describe_secret.side_effect = Exception("boom secretstring leak")
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url=None, client=client)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     with pytest.raises(SecretsWriteError) as ei:
         mgr.upsert(payload)
-    assert ei.value.secret_name == "detectai/web/secrets"
-    # redacted message contains hint
+    assert ei.value.secret_name == "topos/test/secret"
     assert "redacted" in str(ei.value).lower()
 
 
 @pytest.mark.integration
 def test_list_secrets_delegates() -> None:
     client = MagicMock()
-    client.list_secrets.return_value = {"SecretList": [{"Name": "detectai/web/secrets"}, {"Name": "other"}]}
+    client.list_secrets.return_value = {"SecretList": [{"Name": "topos/test/secret"}, {"Name": "other"}]}
     mgr = Boto3SecretsManager(region="ap-south-1", endpoint_url=None, client=client)
     names = mgr.list_secrets()
-    assert "detectai/web/secrets" in names
+    assert "topos/test/secret" in names
 
 
 @pytest.mark.integration
@@ -97,7 +96,31 @@ def test_client_factory_injection() -> None:
         return m
 
     mgr = Boto3SecretsManager(region="eu-west-1", endpoint_url="http://localhost:4566", client_factory=factory)
-    payload = SecretPayload(name="detectai/web/secrets", data={"A": "b"})
+    payload = SecretPayload(name="topos/test/secret", data={"A": "b"})
     status = mgr.upsert(payload)
     assert status == "created"
     assert called["region"] == "eu-west-1"
+
+
+@pytest.mark.integration
+def test_ssm_upsert_create_when_not_found() -> None:
+    client = MagicMock()
+    client.get_parameter.side_effect = _client_error("ParameterNotFound")
+    client.put_parameter.return_value = {"Version": 1}
+    mgr = Boto3ParameterStore(region="ap-south-1", endpoint_url="http://localhost:4566", client=client)
+    payload = SecretPayload(name="/topos/frontend/config", data={"VITE_GRAPHQL_URL": "https://example.com/graphql"})
+    status = mgr.upsert(payload)
+    assert status == "created"
+    client.put_parameter.assert_called_once()
+
+
+@pytest.mark.integration
+def test_ssm_upsert_update_when_exists() -> None:
+    client = MagicMock()
+    client.get_parameter.return_value = {"Parameter": {"Name": "/topos/frontend/config", "Value": "{}"}}
+    client.put_parameter.return_value = {"Version": 2}
+    mgr = Boto3ParameterStore(region="ap-south-1", endpoint_url="http://localhost:4566", client=client)
+    payload = SecretPayload(name="/topos/frontend/config", data={"VITE_GRAPHQL_URL": "https://example.com/graphql"})
+    status = mgr.upsert(payload)
+    assert status == "updated"
+    client.put_parameter.assert_called_once()
