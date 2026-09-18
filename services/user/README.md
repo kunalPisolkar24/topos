@@ -65,10 +65,8 @@ backwards-compatible aliases for `up` / `down` / `logs` / `clean`.
 ## Docker
 
 `compose.yml` is the single-instance topology (one Postgres, one Redis) used
-both standalone and when included via `infrastructure/docker/prod/docker-compose.yml`
-and `infrastructure/docker/local/docker-compose.local.yml`. Env is documented
-in `.env.example` (standalone) and `infrastructure/docker/local/.env.local.example`
-(local full stack).
+standalone. Env is documented in `.env.example` (standalone) and
+`infrastructure/docker/local/.env.local.example` (local full stack).
 
 - `DATABASE_URL` is the app pool URL; `DATABASE_URL_MIGRATE` is used by the
   `user-migrator` and `prisma.config.ts`. They default to the same value
