@@ -1,0 +1,30 @@
+services:
+  user-postgres:
+    image: postgres:16-alpine
+    container_name: ${USER_POSTGRES_CONTAINER:-local-user-postgres}
+    restart: unless-stopped
+    ports:
+      - "${USER_POSTGRES_EXT_PORT:-5432}:${USER_POSTGRES_INT_PORT:-5432}"
+    environment:
+      - POSTGRES_USER=${USER_POSTGRES_USER:-topos_user}
+      - POSTGRES_PASSWORD=${USER_POSTGRES_PASSWORD:-topos_pass}
+      - POSTGRES_DB=${USER_POSTGRES_DB:-topos_users}
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER:-topos_user} -d ${USER_POSTGRES_DB:-topos_users}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${USER_POSTGRES_MEM:-512M}
+        reservations:
+          memory: 256M
+
+volumes:
+  user_postgres_data:

@@ -1,0 +1,26 @@
+services:
+  user-redis:
+    image: redis:7.2-alpine
+    container_name: ${USER_REDIS_CONTAINER:-local-user-redis}
+    restart: unless-stopped
+    command: ["redis-server", "--save", "${USER_REDIS_SAVE-3600 1 300 100 60 10000}", "--appendonly", "${USER_REDIS_APPENDONLY:-yes}"]
+    ports:
+      - "${USER_REDIS_EXT_PORT:-6380}:6379"
+    volumes:
+      - user_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${USER_REDIS_MEM:-128M}
+        reservations:
+          memory: 64M
+
+volumes:
+  user_redis_data:

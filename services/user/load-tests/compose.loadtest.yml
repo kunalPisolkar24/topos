@@ -1,5 +1,9 @@
 name: topos-user-loadtest
 
+include:
+  - path: ../../../infrastructure/docker/users-postgres/postgres.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
+
 x-user-service-env: &user-service-env
   NODE_ENV: production
   PORT: 4001
@@ -11,52 +15,6 @@ x-user-service-env: &user-service-env
   LOG_LEVEL: ${USER_LOG_LEVEL:-info}
 
 services:
-  user-postgres:
-    image: postgres:16-alpine
-    container_name: loadtest-user-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: topos_user
-      POSTGRES_PASSWORD: topos_pass
-      POSTGRES_DB: topos_users
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U topos_user -d topos_users"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - loadtest-net
-    deploy:
-      resources:
-        limits:
-          memory: ${PG_MEM:-512M}
-        reservations:
-          memory: 256M
-
-  user-redis:
-    image: redis:7-alpine
-    container_name: loadtest-user-redis
-    restart: unless-stopped
-    command:
-      - redis-server
-      - --save
-      - ""
-      - --appendonly
-      - "no"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - loadtest-net
-    deploy:
-      resources:
-        limits:
-          memory: ${REDIS_MEM:-384M}
-        reservations:
-          memory: 64M
-
   user-migrator:
     build:
       context: ..
@@ -70,7 +28,7 @@ services:
       user-postgres:
         condition: service_healthy
     networks:
-      - loadtest-net
+      - app-network
 
   user-service:
     build:
@@ -94,7 +52,7 @@ services:
       retries: 20
       start_period: 10s
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -120,7 +78,7 @@ services:
     volumes:
       - ./k6:/load-tests/k6:ro
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -129,6 +87,6 @@ services:
           memory: 64M
 
 networks:
-  loadtest-net:
+  app-network:
     name: topos-user-loadtest-net
     driver: bridge
