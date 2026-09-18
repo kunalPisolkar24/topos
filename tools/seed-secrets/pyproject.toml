@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "detectai-seed-secrets"
+version = "0.1.0"
+description = "Env-driven seeder for app-only Secrets Manager secrets (Floci + real AWS)"
+authors = ["DetectAI <hello@detectai.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.35.0"
+pydantic = "2.12.5"
+pydantic-settings = "2.12.0"
+python-dotenv = "1.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "9.0.2"
+pytest-mock = "3.15.1"
+pytest-cov = "4.1.0"
+ruff = "0.1.15"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+addopts = "--cov=src --cov-report=term-missing -m 'not integration'"
+markers = [
+    "integration: marks tests as integration (run with '-m integration' or deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "src/application/seeder.py",
+]
+
+[tool.coverage.report]
+fail_under = 65
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F", "E"]
+ignore = ["E501"]
