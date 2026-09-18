@@ -1,7 +1,7 @@
 services:
   frontend:
     build:
-      context: ..
+      context: ../..
       dockerfile: frontend/Dockerfile
       args:
         VITE_ENV_TYPE: ${VITE_ENV_TYPE:-dev}
@@ -15,8 +15,6 @@ services:
       - "${FRONTEND_EXT_PORT:-3000}:${FRONTEND_INT_PORT:-3000}"
     environment:
       PORT: ${FRONTEND_INT_PORT:-3000}
-    depends_on:
-      - gateway
     networks:
       - app-network
 
