@@ -1,26 +1,8 @@
 import { Redis } from 'ioredis';
 import { env } from '../config/env.js';
 
-interface SentinelNode {
-  host: string;
-  port: number;
-}
-
 const MAX_RECONNECT_ATTEMPTS = 5;
 const PING_TIMEOUT_MS = 2000;
-
-function parseSentinels(value: string | undefined): SentinelNode[] {
-  if (!value) {
-    return [];
-  }
-  return value
-    .split(',')
-    .map((entry) => {
-      const [host, port] = entry.trim().split(':');
-      return { host, port: Number(port) };
-    })
-    .filter((node) => node.host && Number.isInteger(node.port));
-}
 
 function retryStrategy(times: number): number | null {
   if (times > MAX_RECONNECT_ATTEMPTS) {
@@ -41,23 +23,6 @@ function baseOptions(): Record<string, unknown> {
 }
 
 function createClient(): Redis | null {
-  const sentinels = parseSentinels(env.REDIS_SENTINELS);
-
-  if (sentinels.length > 0 && env.REDIS_SENTINEL_NAME) {
-    const options: Record<string, string | number | SentinelNode[]> = {
-      ...baseOptions(),
-      sentinels,
-      name: env.REDIS_SENTINEL_NAME,
-    };
-    if (env.REDIS_SENTINEL_PASSWORD) {
-      options.sentinelPassword = env.REDIS_SENTINEL_PASSWORD;
-    }
-    if (env.REDIS_PASSWORD) {
-      options.password = env.REDIS_PASSWORD;
-    }
-    return new Redis(options);
-  }
-
   if (env.REDIS_URL) {
     return new Redis(env.REDIS_URL, baseOptions());
   }

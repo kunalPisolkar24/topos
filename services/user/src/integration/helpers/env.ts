@@ -11,7 +11,6 @@ export function applyTestEnv(postgres: StartedTestContainer, redis: StartedTestC
 
   process.env.DATABASE_URL = databaseUrl;
   process.env.DATABASE_URL_MIGRATE = databaseUrl;
-  process.env.DATABASE_URL_REPLICA = '';
   process.env.REDIS_URL = redisUrl;
   process.env.JWT_SECRET = JWT_SECRET;
   process.env.JWT_ISSUER = 'user-service';

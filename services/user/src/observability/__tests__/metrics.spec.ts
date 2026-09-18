@@ -108,16 +108,12 @@ describe('Metrics', () => {
 
   it('exposes db pool connections from registered pools on scrape', async () => {
     const metrics = new Metrics();
-    metrics.registerDbPools([
-      { node: 'primary', pool: fakePool({ total: 5, idle: 3, waiting: 1 }) },
-      { node: 'replica', pool: fakePool({ total: 2, idle: 2, waiting: 0 }) },
-    ]);
+    metrics.registerDbPools([{ node: 'primary', pool: fakePool({ total: 5, idle: 3, waiting: 1 }) }]);
 
     const output = await metrics.getMetrics();
     expect(output).toContain('db_pool_connections{node="primary",state="total"} 5');
     expect(output).toContain('db_pool_connections{node="primary",state="idle"} 3');
     expect(output).toContain('db_pool_connections{node="primary",state="waiting"} 1');
-    expect(output).toContain('db_pool_connections{node="replica",state="total"} 2');
   });
 
   it('tracks redis connectivity from client events', async () => {

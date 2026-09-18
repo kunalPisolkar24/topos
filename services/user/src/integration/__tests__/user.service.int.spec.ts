@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { UserService } from '../../user.service.js';
-import { prisma, primaryDb } from '../../lib/prisma.js';
+import { prisma } from '../../lib/prisma.js';
 import { redis as rawRedis } from '../../lib/redis.js';
 import { verifyToken } from '../../utils/token.js';
 import { CacheManager } from '../../lib/cache.js';
@@ -16,7 +16,7 @@ describe('UserService integration', () => {
 
   beforeAll(() => {
     service = new UserService(
-      new UserRepository(prisma, primaryDb()),
+      new UserRepository(prisma),
       new CacheManager(redis),
       env.REDIS_CACHE_TTL_MS,
     );

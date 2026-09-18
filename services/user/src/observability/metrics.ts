@@ -10,7 +10,7 @@ export type DbQueryStatus = 'success' | 'error';
 const HTTP_DURATION_BUCKETS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5];
 
 export interface DbPoolRegistration {
-  node: 'primary' | 'replica';
+  node: 'primary';
   pool: Pool;
 }
 

@@ -12,7 +12,6 @@ import type { UpdateProfileInput } from '../schemas.js';
 export class UserRepository {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly primary: PrismaClient,
     private readonly metrics?: Metrics,
   ) {}
 
@@ -40,7 +39,7 @@ export class UserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.retried('findByEmail', () => this.primary.user.findUnique({ where: { email } }));
+    return this.retried('findByEmail', () => this.prisma.user.findUnique({ where: { email } }));
   }
 
   async findByEmailOrUsername(email: string, username: string): Promise<User | null> {

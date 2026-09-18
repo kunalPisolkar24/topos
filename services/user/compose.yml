@@ -1,48 +1,86 @@
-include:
-  - path: infra/postgres.yml
-  - path: infra/redis.yml
-
 services:
+  user-postgres:
+    image: postgres:16-alpine
+    container_name: ${USER_POSTGRES_CONTAINER:-local-user-postgres}
+    restart: unless-stopped
+    ports:
+      - "${USER_POSTGRES_EXT_PORT:-5432}:${USER_POSTGRES_INT_PORT:-5432}"
+    environment:
+      - POSTGRES_USER=${USER_POSTGRES_USER:-topos_user}
+      - POSTGRES_PASSWORD=${USER_POSTGRES_PASSWORD:-topos_pass}
+      - POSTGRES_DB=${USER_POSTGRES_DB:-topos_users}
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER:-topos_user} -d ${USER_POSTGRES_DB:-topos_users}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  user-redis:
+    image: redis:7.2-alpine
+    container_name: ${USER_REDIS_CONTAINER:-local-user-redis}
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${USER_REDIS_EXT_PORT:-6380}:6379"
+    volumes:
+      - user_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
   user-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ${USER_SERVICE_CONTAINER:?USER_SERVICE_CONTAINER is required}
+    container_name: ${USER_SERVICE_CONTAINER:-local-user-service}
     restart: unless-stopped
     ports:
-      - "${USER_SERVICE_EXT_PORT:?USER_SERVICE_EXT_PORT is required}:${USER_SERVICE_INT_PORT:?USER_SERVICE_INT_PORT is required}"
+      - "${USER_SERVICE_EXT_PORT:-4001}:${USER_SERVICE_INT_PORT:-4001}"
     environment:
-      - NODE_ENV=production
-      - PORT=${USER_SERVICE_INT_PORT:?USER_SERVICE_INT_PORT is required}
-      - DATABASE_URL=${USER_DATABASE_URL:?USER_DATABASE_URL is required}
-      - DATABASE_URL_REPLICA=${USER_DATABASE_URL_REPLICA:?USER_DATABASE_URL_REPLICA is required}
-      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:?USER_DATABASE_URL is required}}
-      - JWT_SECRET=${USER_JWT_SECRET:?USER_JWT_SECRET is required}
+      - PORT=${USER_SERVICE_INT_PORT:-4001}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
+      - JWT_SECRET=${USER_JWT_SECRET:-local-dev-secret-0123456789abcdef0123456789abcdef}
       - JWT_ISSUER=${USER_JWT_ISSUER:-user-service}
       - JWT_AUDIENCE=${USER_JWT_AUDIENCE:-topos}
       - JWT_EXPIRES_IN=${USER_JWT_EXPIRES_IN:-7d}
-      - REDIS_SENTINELS=${USER_REDIS_SENTINEL_HOSTS:?USER_REDIS_SENTINEL_HOSTS is required}
-      - REDIS_SENTINEL_NAME=${USER_REDIS_MASTER_NAME:-mymaster}
-      - REDIS_PASSWORD=${USER_REDIS_PASSWORD:?USER_REDIS_PASSWORD is required}
-      - REDIS_SENTINEL_PASSWORD=${USER_REDIS_SENTINEL_PASSWORD:?USER_REDIS_SENTINEL_PASSWORD is required}
+      - REDIS_URL=${USER_REDIS_URL:-redis://user-redis:6379}
       - REDIS_CACHE_TTL_MS=${USER_CACHE_TTL_MS:-3600000}
       - REDIS_MISSING_CACHE_TTL_MS=${USER_MISSING_CACHE_TTL_MS:-60000}
       - LOG_LEVEL=${USER_LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${USER_OTLP_ENDPOINT:-}
       - OTEL_SERVICE_NAME=user-service
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:${USER_SERVICE_INT_PORT:?USER_SERVICE_INT_PORT is required}/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${USER_SERVICE_INT_PORT:-4001}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
     depends_on:
-      user-postgres-pool:
+      user-postgres:
         condition: service_healthy
-      user-redis-sentinel-1:
-        condition: service_healthy
-      user-redis-sentinel-2:
-        condition: service_healthy
-      user-redis-sentinel-3:
+      user-redis:
         condition: service_healthy
       user-migrator:
         condition: service_completed_successfully
@@ -54,16 +92,19 @@ services:
       context: .
       dockerfile: Dockerfile
       target: migrator
-    container_name: ${USER_MIGRATOR_CONTAINER:?USER_MIGRATOR_CONTAINER is required}
+    container_name: ${USER_MIGRATOR_CONTAINER:-local-user-migrator}
     environment:
-      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:?USER_DATABASE_URL is required}}
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
     depends_on:
-      user-postgres-pool:
+      user-postgres:
         condition: service_healthy
     networks:
       - app-network
 
+volumes:
+  user_postgres_data:
+  user_redis_data:
+
 networks:
   app-network:
-    external: true
-    name: ${APP_NETWORK}
+    name: ${APP_NETWORK:-topos_local_network}

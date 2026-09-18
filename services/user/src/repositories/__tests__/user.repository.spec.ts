@@ -41,16 +41,11 @@ type PrismaUserMocks = ReturnType<typeof createUserMocks>;
 describe('UserRepository', () => {
   let repository: UserRepository;
   let prisma: PrismaUserMocks;
-  let primary: PrismaUserMocks;
 
   beforeEach(() => {
     vi.resetAllMocks();
     prisma = createUserMocks();
-    primary = createUserMocks();
-    repository = new UserRepository(
-      prisma as unknown as PrismaClient,
-      primary as unknown as PrismaClient,
-    );
+    repository = new UserRepository(prisma as unknown as PrismaClient);
   });
 
   describe('create', () => {
@@ -98,30 +93,29 @@ describe('UserRepository', () => {
   });
 
   describe('findByEmail', () => {
-    it('looks the user up on the primary client', async () => {
+    it('looks the user up', async () => {
       const user = makeUser();
-      primary.user.findUnique.mockResolvedValue(user);
+      prisma.user.findUnique.mockResolvedValue(user);
 
       await expect(repository.findByEmail('alice@example.com')).resolves.toEqual(user);
-      expect(primary.user.findUnique).toHaveBeenCalledWith({
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'alice@example.com' },
       });
-      expect(prisma.user.findUnique).not.toHaveBeenCalled();
     });
 
     it('returns null when the user does not exist', async () => {
-      primary.user.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(repository.findByEmail('nobody@example.com')).resolves.toBeNull();
     });
 
     it('retries transient read errors', async () => {
-      primary.user.findUnique
+      prisma.user.findUnique
         .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
         .mockResolvedValueOnce(makeUser());
 
       await expect(repository.findByEmail('alice@example.com')).resolves.toEqual(makeUser());
-      expect(primary.user.findUnique).toHaveBeenCalledTimes(2);
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
     });
   });
 

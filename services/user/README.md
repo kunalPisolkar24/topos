@@ -2,8 +2,7 @@
 
 GraphQL (Apollo Federation subgraph) service for the Topos platform: account
 signup/signin and user profiles. Written in TypeScript (Node 22) with Prisma
-over Postgres — a primary + 2 replicas fronted by a Pgpool-II pool — and a
-Redis sentinel cache.
+over Postgres and a Redis cache.
 
 ## API
 
@@ -27,7 +26,7 @@ src/
 ├── graphql/              # typeDefs + resolvers (federation subgraph)
 ├── domain/               # user model, password hashing
 ├── repositories/         # Prisma data access
-├── lib/                  # prisma, redis (sentinel), cache, shutdown
+├── lib/                  # prisma, redis, cache, shutdown
 ├── observability/        # logging, metrics, tracing
 ├── utils/                # token (JWT) helpers
 ├── integration/          # container tests (testcontainers)
@@ -37,68 +36,46 @@ src/
 ## Quick start
 
 ```bash
-docker compose -f compose.local.yml up -d --build
+docker compose up -d --build
 ```
 
-Starts a single Postgres + Redis + migrator + the service on `:4001` with
-defaults — no env file needed (equivalent to `make local-up`). For bare-metal
-dev: `npm ci`, copy the user block from
-`infrastructure/docker/prod/.env.example` into `.env`, then `npm run dev`.
+Starts Postgres + Redis + migrator + the service on `:4001` with defaults — no
+env file needed (equivalent to `make up`). For bare-metal dev: `npm ci`, copy
+the user block from `infrastructure/docker/local/.env.local.example` into
+`.env`, then `npm run dev`.
 
-## Running the stacks
+## Running the stack
 
-The service can run in three standalone modes, all scoped to `services/user`:
-
-### 1. Local stack (single Postgres + Redis + service) — `compose.local.yml`
+The service runs as a single Postgres + Redis + service stack (`compose.yml`):
 
 ```bash
-make local-up     # builds and starts postgres + redis + migrator + service
-make local-logs   # tail the logs
-make local-down   # stop (keeps volumes)
-make local-clean  # stop and delete volumes
+make up     # builds and starts postgres + redis + migrator + service
+make logs   # tail the logs
+make down   # stop (keeps volumes)
+make clean  # stop and delete volumes
 ```
 
-No env file needed — defaults come from `compose.local.yml`. The service is on
+No env file needed — defaults come from `compose.yml`. The service is on
 `:4001`; Postgres `:5432` (external port `USER_POSTGRES_EXT_PORT`), Redis
 `:6380`.
 
-### 2. Standalone HA stack (Postgres tripod + Pgpool-II + Redis sentinels) — `compose.yml`
-
-```bash
-cp .env.ha.example .env.ha   # then fill in the <password> placeholders
-make ha-up                   # creates the network, builds, starts, migrates
-make ha-logs
-make ha-down                 # stops and deletes volumes + network
-make ha-clean                # alias for ha-down
-```
-
-Prod-identical topology with prod host ports (`4001`, `5432`): the app talks
-only to the pool, migrations run against the primary directly. Uses the
-dedicated `topos-user-ha` network and `userha-*` container names so it never
-clashes with a root-level prod stack.
-
-### 3. HA failover drill (semi-manual) — `.env.ha-test`
-
-`make ha-test-up` / `ha-test-stop` exercise the failover/rejoin flow against
-the same compose files (see `.env.ha-test.example`).
-
-> Local and HA stacks are exclusive by design (same host ports) — run only
-> one at a time.
+`make local-up` / `local-down` / `local-logs` / `local-clean` are kept as
+backwards-compatible aliases for `up` / `down` / `logs` / `clean`.
 
 ## Docker
 
-`compose.yml` is the production topology and includes `infra/postgres.yml`
-(primary + replicas + pool) and `infra/redis.yml` (sentinel trio) via compose
-`include`. Env comes from `infrastructure/docker/prod/.env.example` at the
-repo root.
+`compose.yml` is the single-instance topology (one Postgres, one Redis) used
+both standalone and when included via `infrastructure/docker/prod/docker-compose.yml`
+and `infrastructure/docker/local/docker-compose.local.yml`. Env is documented
+in `.env.example` (standalone) and `infrastructure/docker/local/.env.local.example`
+(local full stack).
 
-- The app talks **only to the pool** (`user-postgres-pool:5432`) — it fronts
-  the tripod and promotes a replica automatically on primary failure.
-- Migrations (`user-migrator`) run against the **primary directly**
-  (`DATABASE_URL_MIGRATE`): through the pool, Prisma's persistence checks can
-  land on a replica that has not caught up yet.
-- `make ha-test-up` / `ha-test-stop` drill the full failover/rejoin flow
-  against the same compose files (see `.env.ha-test.example`).
+- `DATABASE_URL` is the app pool URL; `DATABASE_URL_MIGRATE` is used by the
+  `user-migrator` and `prisma.config.ts`. They default to the same value
+  (single Postgres) but are kept as separate vars so a future pooler (e.g.
+  PgBouncer) can be inserted without code changes.
+- `REDIS_URL` is a single Redis URL (e.g. `redis://user-redis:6379`);
+  password, if needed, is encoded in the URL.
 
 ## Testing
 
