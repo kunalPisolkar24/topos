@@ -9,7 +9,8 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/primitives/alert-dialog";
 import { Label } from "@/shared/ui/primitives/label";
-import { isPreview, PREVIEW_NOTICE_DISMISSED_KEY } from "@/shared/config/preview";
+import { isPreview, previewNoticeDismissedKey } from "@/shared/config/preview";
+import { useCurrentUser } from "@/entities/session";
 
 interface PreviewNoticeDialogProps {
   open?: boolean;
@@ -24,13 +25,19 @@ export const PreviewNoticeDialog = ({ open, onOpenChange, trigger }: PreviewNoti
   const isControlled = open !== undefined && onOpenChange !== undefined;
   const dialogOpen = isControlled ? open! : internalOpen;
   const setDialogOpen = isControlled ? onOpenChange! : setInternalOpen;
+  const { user } = useCurrentUser();
+  const storageKey = previewNoticeDismissedKey(user?.id ?? null);
+
+  useEffect(() => {
+    setDontShowAgain(false);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isPreview()) return;
     if (isControlled) return;
     const dismissed = (() => {
       try {
-        return localStorage.getItem(PREVIEW_NOTICE_DISMISSED_KEY) === "true";
+        return localStorage.getItem(storageKey) === "true";
       } catch {
         return false;
       }
@@ -38,12 +45,12 @@ export const PreviewNoticeDialog = ({ open, onOpenChange, trigger }: PreviewNoti
     if (dismissed) return;
     const timer = setTimeout(() => setInternalOpen(true), trigger === "landing" ? 600 : 200);
     return () => clearTimeout(timer);
-  }, [isControlled, trigger]);
+  }, [isControlled, trigger, storageKey]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && dontShowAgain) {
       try {
-        localStorage.setItem(PREVIEW_NOTICE_DISMISSED_KEY, "true");
+        localStorage.setItem(storageKey, "true");
       } catch {
         // ignore
       }
