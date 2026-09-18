@@ -1,7 +1,9 @@
 .PHONY: help install build build-preview build-prod dev dev-mock dev-preview preview serve codegen lint test test-integration test-coverage clean
+.PHONY: compose-up compose-down compose-logs compose-config compose-build compose-restart compose-ps compose-clean
 
 VITE_ENV_TYPE ?= dev
 NPM ?= npm
+COMPOSE := docker compose -f infra/compose.yml
 
 help:
 	@echo "Frontend — cd frontend && make <target> (e.g. make dev-preview)"
@@ -20,6 +22,16 @@ help:
 	@echo "  make test-coverage    - Coverage"
 	@echo "  make install          - npm ci"
 	@echo "  make clean            - Remove dist/coverage/.vite"
+	@echo ""
+	@echo "  Docker (infra/compose.yml):"
+	@echo "  make compose-up       - Build and start frontend container"
+	@echo "  make compose-down     - Stop and remove frontend container"
+	@echo "  make compose-logs     - Tail frontend logs"
+	@echo "  make compose-config   - Validate and view compose config"
+	@echo "  make compose-build    - Build frontend image"
+	@echo "  make compose-restart  - Restart frontend container"
+	@echo "  make compose-ps       - List frontend container"
+	@echo "  make compose-clean    - Stop and remove container + volumes"
 
 install:
 	$(NPM) ci
@@ -65,3 +77,30 @@ test-coverage:
 
 clean:
 	rm -rf dist coverage node_modules/.vite
+
+# --- Docker Compose (frontend/infra/compose.yml) ---
+
+compose-config:
+	$(COMPOSE) config
+
+compose-build:
+	$(COMPOSE) build
+
+compose-up:
+	$(COMPOSE) up -d --build
+
+compose-down:
+	$(COMPOSE) down
+
+compose-logs:
+	$(COMPOSE) logs -f
+
+compose-ps:
+	$(COMPOSE) ps
+
+compose-restart:
+	$(COMPOSE) down
+	$(COMPOSE) up -d --build
+
+compose-clean:
+	$(COMPOSE) down -v --remove-orphans
