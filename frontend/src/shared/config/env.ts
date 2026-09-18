@@ -10,13 +10,23 @@ const envSchema = z.object({
   VITE_ENABLE_MOCKS: z.string().optional(),
 });
 
+// Runtime config injected by nginx entrypoint (/config.js -> window.__APP_CONFIG__).
+// Lets one built image serve dev/preview/prod: container env wins, baked values are fallback.
+const runtimeConfig: Record<string, string | undefined> | undefined =
+  typeof window !== "undefined" ? window.__APP_CONFIG__ : undefined;
+
+const pick = (key: string): string | undefined => {
+  if (runtimeConfig && key in runtimeConfig) return runtimeConfig[key];
+  return (import.meta.env as Record<string, string | undefined>)[key];
+};
+
 const parsed = envSchema.safeParse({
-  VITE_ENV_TYPE: import.meta.env.VITE_ENV_TYPE,
-  VITE_GRAPHQL_URL: import.meta.env.VITE_GRAPHQL_URL,
-  VITE_BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
-  VITE_CLOUDINARY_CLOUD_NAME: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
-  VITE_CLOUDINARY_UPLOAD_PRESET: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
-  VITE_ENABLE_MOCKS: import.meta.env.VITE_ENABLE_MOCKS,
+  VITE_ENV_TYPE: pick("VITE_ENV_TYPE"),
+  VITE_GRAPHQL_URL: pick("VITE_GRAPHQL_URL"),
+  VITE_BACKEND_URL: pick("VITE_BACKEND_URL"),
+  VITE_CLOUDINARY_CLOUD_NAME: pick("VITE_CLOUDINARY_CLOUD_NAME"),
+  VITE_CLOUDINARY_UPLOAD_PRESET: pick("VITE_CLOUDINARY_UPLOAD_PRESET"),
+  VITE_ENABLE_MOCKS: pick("VITE_ENABLE_MOCKS"),
 });
 
 if (!parsed.success) {
