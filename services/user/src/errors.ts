@@ -54,6 +54,31 @@ export class UnauthorizedError extends DomainError {
   }
 }
 
+export class ServiceUnavailableError extends DomainError {
+  readonly code = 'SERVICE_UNAVAILABLE';
+  readonly httpStatus = 503;
+  constructor(message = 'Service temporarily unavailable') {
+    super(message);
+  }
+}
+
+function isDbUnavailableError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === 'P1001' || error.code === 'P1002' || error.code === 'P1017';
+  }
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return (
+      /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|ECONNRESET|Connection terminated|Service temporarily unavailable/i.test(
+        error.message,
+      ) || error.name === 'ServiceUnavailableError'
+    );
+  }
+  return false;
+}
+
 export function toDomainError(error: unknown): DomainError {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
@@ -65,9 +90,18 @@ export function toDomainError(error: unknown): DomainError {
     if (error.code === 'P2025') {
       return new UserNotFoundError();
     }
+    if (error.code === 'P1001' || error.code === 'P1002' || error.code === 'P1017') {
+      return new ServiceUnavailableError();
+    }
+  }
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return new ServiceUnavailableError();
   }
   if (error instanceof DomainError) {
     return error;
+  }
+  if (isDbUnavailableError(error)) {
+    return new ServiceUnavailableError();
   }
   throw error;
 }

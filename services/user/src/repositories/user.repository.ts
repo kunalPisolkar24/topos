@@ -1,5 +1,5 @@
 import type { PrismaClient, User } from '../generated/prisma/client.js';
-import { toDomainError } from '../errors.js';
+import { DomainError, ServiceUnavailableError, toDomainError } from '../errors.js';
 import type { PaginationArgs } from '../domain/user.js';
 import {
   isConnectionEstablishmentError,
@@ -8,6 +8,17 @@ import {
 } from '../lib/retry.js';
 import type { Metrics } from '../observability/metrics.js';
 import type { UpdateProfileInput } from '../schemas.js';
+
+const DB_TIMEOUT_MS = 7000;
+
+function withDbTimeout<T>(promise: Promise<T>, ms = DB_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new ServiceUnavailableError()), ms),
+    ),
+  ]);
+}
 
 export class UserRepository {
   constructor(
@@ -27,6 +38,9 @@ export class UserRepository {
         try {
           return await this.prisma.user.create({ data });
         } catch (error) {
+          if (isConnectionEstablishmentError(error)) {
+            throw error;
+          }
           throw toDomainError(error);
         }
       },
@@ -72,6 +86,9 @@ export class UserRepository {
         try {
           return await this.prisma.user.update({ where: { id }, data });
         } catch (error) {
+          if (isConnectionEstablishmentError(error)) {
+            throw error;
+          }
           throw toDomainError(error);
         }
       },
@@ -86,7 +103,16 @@ export class UserRepository {
     run: () => Promise<T>,
     options: { retryOn?: RetryErrorCheck } = {},
   ): Promise<T> {
-    return withRetry(() => this.timed(operation, run), options);
+    return withDbTimeout(withRetry(() => this.timed(operation, run), options)).catch((error) => {
+      try {
+        throw toDomainError(error);
+      } catch (e) {
+        if (e instanceof DomainError) {
+          throw e;
+        }
+        throw error;
+      }
+    });
   }
 
   private async timed<T>(operation: string, run: () => Promise<T>): Promise<T> {

@@ -130,6 +130,20 @@ export function healthHandler({ pingDb, pingRedis }: HealthPings): MiddlewareHan
     c.json({ status: 'ok', db: await pingDb(), redis: await pingRedis() });
 }
 
+export interface ReadyPings {
+  pingDb: () => Promise<'ok' | 'unavailable'>;
+}
+
+export function readyHandler({ pingDb }: ReadyPings): MiddlewareHandler {
+  return async (c) => {
+    const db = await pingDb();
+    if (db !== 'ok') {
+      return c.json({ status: 'degraded', db }, 503);
+    }
+    return c.json({ status: 'ok', db: 'ok' });
+  };
+}
+
 export function metricsHandler(metrics: Metrics): MiddlewareHandler {
   return async (c) =>
     c.body(await metrics.getMetrics(), 200, { 'Content-Type': metrics.getContentType() });

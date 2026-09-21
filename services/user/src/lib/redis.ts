@@ -1,14 +1,11 @@
 import { Redis } from 'ioredis';
 import { env } from '../config/env.js';
 
-const MAX_RECONNECT_ATTEMPTS = 5;
 const PING_TIMEOUT_MS = 2000;
 
-function retryStrategy(times: number): number | null {
-  if (times > MAX_RECONNECT_ATTEMPTS) {
-    return null;
-  }
-  return Math.min(times * 200, 1000);
+function retryStrategy(times: number): number {
+  const base = Math.min(times * 200, 3000);
+  return base + Math.random() * base * 0.2;
 }
 
 function baseOptions(): Record<string, unknown> {
@@ -24,7 +21,11 @@ function baseOptions(): Record<string, unknown> {
 
 function createClient(): Redis | null {
   if (env.REDIS_URL) {
-    return new Redis(env.REDIS_URL, baseOptions());
+    const client = new Redis(env.REDIS_URL, baseOptions());
+    client.on('error', () => {
+      // Prevent unhandled error crashes; fail-open via CacheManager and metrics gauge.
+    });
+    return client;
   }
 
   return null;

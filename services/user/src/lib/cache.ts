@@ -5,6 +5,7 @@ export class CacheManager {
   constructor(
     private readonly redis: Redis | null,
     private readonly metrics?: Metrics,
+    private readonly missingTtlMs?: number,
   ) {}
 
   async read<T>(key: string, ttlMs: number, miss: () => Promise<T | null>): Promise<T | null> {
@@ -36,6 +37,12 @@ export class CacheManager {
       } catch {
         this.metrics?.recordCacheRead('write_error');
       }
+    } else if (this.missingTtlMs !== undefined && this.missingTtlMs > 0) {
+      try {
+        await this.redis.set(key, JSON.stringify(null), 'PX', this.missingTtlMs);
+      } catch {
+        this.metrics?.recordCacheRead('write_error');
+      }
     }
     return value;
   }
@@ -57,9 +64,29 @@ export class CacheManager {
       return;
     }
     try {
-      const keys = await this.redis.keys('users:*');
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
+      const maybeScan = this.redis as unknown as { scan?: (c: string, ...a: unknown[]) => Promise<[string, string[]]> };
+      if (typeof maybeScan.scan === 'function') {
+        let cursor = '0';
+        const toDelete: string[] = [];
+        do {
+          const [nextCursor, keys] = await maybeScan.scan(cursor, 'MATCH', 'users:*', 'COUNT', '500');
+          cursor = nextCursor;
+          if (keys.length > 0) {
+            toDelete.push(...keys);
+          }
+          if (toDelete.length >= 500) {
+            await this.redis.del(...toDelete);
+            toDelete.length = 0;
+          }
+        } while (cursor !== '0');
+        if (toDelete.length > 0) {
+          await this.redis.del(...toDelete);
+        }
+      } else {
+        const keys = await this.redis.keys('users:*');
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+        }
       }
       this.metrics?.recordCacheInvalidation('lists', 'ok');
     } catch {

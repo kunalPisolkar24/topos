@@ -17,7 +17,7 @@ export function createServices(): Services {
   metrics.registerRedis(redis);
   const userService = new UserService(
     new UserRepository(prisma, metrics),
-    new CacheManager(redis, metrics),
+    new CacheManager(redis, metrics, env.REDIS_MISSING_CACHE_TTL_MS),
     env.REDIS_CACHE_TTL_MS,
     metrics,
   );
