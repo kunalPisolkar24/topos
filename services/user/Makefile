@@ -41,7 +41,7 @@ run:
 
 # --- Load Tests ---
 
-COMPOSE_LT := docker compose -f load-tests/compose.loadtest.yml --project-name topos-user-loadtest
+COMPOSE_LT := docker compose -f infra/compose.loadtest.yml --project-name topos-user-loadtest
 
 RPS             ?= 50
 VUS             ?= 20
@@ -116,7 +116,7 @@ load-test-tail:
 
 # --- Standalone Stack (single Postgres + Redis + service) ---
 
-COMPOSE := docker compose -f compose.yml --project-name topos-user-local
+COMPOSE := docker compose -f infra/compose.yml --project-name topos-user-local
 
 up:
 	$(COMPOSE) up -d --build --wait user-service

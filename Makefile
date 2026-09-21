@@ -5,7 +5,7 @@ help:
 	@echo ""
 	@echo "  Infrastructure compose files have been removed."
 	@echo "  Run each service individually via its own compose.yml:"
-	@echo "    services/user:    docker compose -f services/user/compose.yml up -d"
+	@echo "    services/user:    docker compose -f services/user/infra/compose.yml up -d"
 	@echo "    services/content: docker compose -f services/content/compose.local.yml up -d"
 	@echo "    services/ai:      docker compose -f services/ai/compose.local.yml up -d"
 	@echo "    gateway:          docker compose -f gateway/compose.yml up -d"

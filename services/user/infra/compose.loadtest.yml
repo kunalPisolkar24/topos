@@ -76,7 +76,7 @@ services:
       user-service:
         condition: service_healthy
     volumes:
-      - ./k6:/load-tests/k6:ro
+      - ../load-tests/k6:/load-tests/k6:ro
     networks:
       - app-network
     deploy:

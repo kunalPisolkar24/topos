@@ -46,7 +46,7 @@ the user block from `infrastructure/docker/local/.env.local.example` into
 
 ## Running the stack
 
-The service runs as a single Postgres + Redis + service stack (`compose.yml`):
+The service runs as a single Postgres + Redis + service stack (`infra/compose.yml`):
 
 ```bash
 make up     # builds and starts postgres + redis + migrator + service
@@ -55,7 +55,7 @@ make down   # stop (keeps volumes)
 make clean  # stop and delete volumes
 ```
 
-No env file needed — defaults come from `compose.yml`. The service is on
+No env file needed — defaults come from `infra/compose.yml`. The service is on
 `:4001`; Postgres `:5432` (external port `USER_POSTGRES_EXT_PORT`), Redis
 `:6380`.
 
@@ -64,7 +64,7 @@ backwards-compatible aliases for `up` / `down` / `logs` / `clean`.
 
 ## Docker
 
-`compose.yml` is the single-instance topology (one Postgres, one Redis) used
+`infra/compose.yml` is the single-instance topology (one Postgres, one Redis) used
 standalone. Env is documented in `.env.example` (standalone) and
 `infrastructure/docker/local/.env.local.example` (local full stack).
 

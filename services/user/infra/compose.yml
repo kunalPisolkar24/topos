@@ -1,11 +1,11 @@
 include:
-  - path: ../../infrastructure/docker/users-postgres/postgres.yml
-  - path: ../../infrastructure/docker/users-redis/redis.yml
+  - path: ../../../infrastructure/docker/users-postgres/postgres.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
 
 services:
   user-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: ${USER_SERVICE_CONTAINER:-local-user-service}
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
 
   user-migrator:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       target: migrator
     container_name: ${USER_MIGRATOR_CONTAINER:-local-user-migrator}
