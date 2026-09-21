@@ -3,7 +3,14 @@ import { requestId } from 'hono/request-id';
 import { createServices } from './container.js';
 import { DomainError } from './errors.js';
 import { createApolloServer } from './graphql/server.js';
-import { graphqlHandler, healthHandler, metricsHandler, readyHandler } from './http/handlers.js';
+import {
+  graphqlHandler,
+  healthHandler,
+  healthzHandler,
+  metricsHandler,
+  readyHandler,
+  readyzHandler,
+} from './http/handlers.js';
 import { pingDb } from './lib/prisma.js';
 import { pingRedis } from './lib/redis.js';
 import { logger } from './observability/logger.js';
@@ -31,8 +38,10 @@ export async function buildApp(): Promise<Hono> {
   app.post('/graphql', graphqlHandler({ apollo, userService, metrics }));
   app.get('/metrics', metricsHandler(metrics));
   app.get('/', (c) => c.text('user service running'));
-  app.get('/health', healthHandler({ pingDb, pingRedis }));
-  app.get('/ready', readyHandler({ pingDb }));
+  app.get('/health', healthHandler({ pingDb, pingRedis, metrics }));
+  app.get('/healthz', healthzHandler(metrics));
+  app.get('/ready', readyHandler({ pingDb, pingRedis, metrics }));
+  app.get('/readyz', readyzHandler({ pingDb, pingRedis, metrics }));
 
   return app;
 }

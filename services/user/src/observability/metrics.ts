@@ -84,6 +84,25 @@ export class Metrics {
     help: '1 when Redis is connected, 0 otherwise',
   });
 
+  private readonly dependencyUp = new client.Gauge({
+    name: 'dependency_up',
+    help: '1 when a dependency is up, 0 otherwise',
+    labelNames: ['dep'],
+  });
+
+  private readonly dependencyPingDuration = new client.Histogram({
+    name: 'dependency_ping_duration_seconds',
+    help: 'Latency of dependency pings',
+    labelNames: ['dep'],
+    buckets: HTTP_DURATION_BUCKETS,
+  });
+
+  private readonly probeChecks = new client.Counter({
+    name: 'probe_checks_total',
+    help: 'Total number of probe checks',
+    labelNames: ['probe', 'result'],
+  });
+
   private readonly cacheReads = new client.Counter({
     name: 'cache_operations_total',
     help: 'Total number of cache read operations',
@@ -157,12 +176,33 @@ export class Metrics {
   registerRedis(redis: Redis | null): void {
     if (!redis) {
       this.redisConnected.set(0);
+      this.dependencyUp.set({ dep: 'redis' }, 0);
       return;
     }
-    redis.on('ready', () => this.redisConnected.set(1));
-    redis.on('close', () => this.redisConnected.set(0));
-    redis.on('end', () => this.redisConnected.set(0));
-    redis.on('error', () => this.redisConnected.set(0));
+    const r = redis as unknown as { status?: string };
+    if (r.status === 'ready') {
+      this.redisConnected.set(1);
+      this.dependencyUp.set({ dep: 'redis' }, 1);
+    } else {
+      this.redisConnected.set(0);
+      this.dependencyUp.set({ dep: 'redis' }, 0);
+    }
+    redis.on('ready', () => {
+      this.redisConnected.set(1);
+      this.dependencyUp.set({ dep: 'redis' }, 1);
+    });
+    redis.on('close', () => {
+      this.redisConnected.set(0);
+      this.dependencyUp.set({ dep: 'redis' }, 0);
+    });
+    redis.on('end', () => {
+      this.redisConnected.set(0);
+      this.dependencyUp.set({ dep: 'redis' }, 0);
+    });
+    redis.on('error', () => {
+      this.redisConnected.set(0);
+      this.dependencyUp.set({ dep: 'redis' }, 0);
+    });
   }
 
   recordCacheRead(result: CacheReadResult): void {
@@ -171,6 +211,15 @@ export class Metrics {
 
   recordCacheInvalidation(operation: 'key' | 'lists', result: CacheInvalidationResult): void {
     this.cacheInvalidations.inc({ operation, result });
+  }
+
+  recordDependencyPing(dep: 'db' | 'redis', durationSeconds: number, success: boolean): void {
+    this.dependencyUp.set({ dep }, success ? 1 : 0);
+    this.dependencyPingDuration.observe({ dep }, durationSeconds);
+  }
+
+  recordProbeCheck(probe: 'liveness' | 'readiness', result: 'ok' | 'degraded' | 'shutting_down'): void {
+    this.probeChecks.inc({ probe, result });
   }
 
   recordDbQuery(operation: string, status: DbQueryStatus, durationSeconds: number): void {

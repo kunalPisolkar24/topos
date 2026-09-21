@@ -1,6 +1,7 @@
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
+import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { env } from '../config/env.js';
@@ -19,7 +20,7 @@ export function setupTracing(): void {
   const sdk = new NodeSDK({
     serviceName: env.OTEL_SERVICE_NAME,
     spanProcessors: [new BatchSpanProcessor(exporter)],
-    instrumentations: [new HttpInstrumentation(), new IORedisInstrumentation()],
+    instrumentations: [new HttpInstrumentation(), new IORedisInstrumentation(), new PgInstrumentation()],
   });
 
   sdk.start();

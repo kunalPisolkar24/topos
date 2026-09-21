@@ -2,11 +2,11 @@ import type { MiddlewareHandler } from 'hono';
 import type { Logger } from './logger.js';
 import type { Metrics } from './metrics.js';
 
-const EXCLUDED_PATH = '/metrics';
+const EXCLUDED_PATHS = new Set(['/metrics', '/health', '/healthz', '/ready', '/readyz']);
 
 export function requestLogging(logger: Logger): MiddlewareHandler {
   return async (c, next) => {
-    if (c.req.path === EXCLUDED_PATH) {
+    if (EXCLUDED_PATHS.has(c.req.path)) {
       return next();
     }
     const start = performance.now();
@@ -29,7 +29,7 @@ export function requestLogging(logger: Logger): MiddlewareHandler {
 
 export function requestMetrics(metrics: Metrics): MiddlewareHandler {
   return async (c, next) => {
-    if (c.req.path === EXCLUDED_PATH) {
+    if (EXCLUDED_PATHS.has(c.req.path)) {
       return next();
     }
     metrics.recordRequestStart();

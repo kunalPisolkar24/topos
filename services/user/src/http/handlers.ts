@@ -4,6 +4,7 @@ import { createContext } from '../context.js';
 import { DomainError, PayloadTooLargeError, ValidationError } from '../errors.js';
 import { hasErrors, operationName, sanitizeOperationName } from '../graphql/formatError.js';
 import { extractErrorCodes, type Metrics } from '../observability/metrics.js';
+import { isShuttingDown } from '../lib/shutdownState.js';
 import type { UserService } from '../user.service.js';
 
 const MAX_GRAPHQL_BODY_BYTES = 256 * 1024;
@@ -85,62 +86,136 @@ export function graphqlHandler({
 }: GraphqlHandlerDeps): MiddlewareHandler {
   return async (c) => {
     const body = await readJsonBody(c.req.raw);
-
-    const start = performance.now();
-    const response = await withTimeout(
-      apollo.executeHTTPGraphQLRequest({
-        httpGraphQLRequest: {
-          method: c.req.method,
-          headers: new HeaderMap(c.req.raw.headers),
-          search: new URL(c.req.url).search,
-          body,
-        },
-        context: () => createContext(c, userService),
-      }),
-      timeoutMs,
-    );
     const operation = sanitizeOperationName(operationName(body));
-    const hasBodyErrors =
-      response.body.kind === 'complete' && hasErrors(response.body.string);
-    metrics.recordGraphqlOperation(
-      operation,
-      hasBodyErrors ? 'error' : 'success',
-      (performance.now() - start) / 1000,
-    );
-    if (response.body.kind === 'complete' && hasBodyErrors) {
-      for (const code of extractErrorCodes(response.body.string)) {
-        metrics.recordGraphqlError(operation, code);
+    const start = performance.now();
+    try {
+      const response = await withTimeout(
+        apollo.executeHTTPGraphQLRequest({
+          httpGraphQLRequest: {
+            method: c.req.method,
+            headers: new HeaderMap(c.req.raw.headers),
+            search: new URL(c.req.url).search,
+            body,
+          },
+          context: () => createContext(c, userService),
+        }),
+        timeoutMs,
+      );
+      const hasBodyErrors =
+        response.body.kind === 'complete' && hasErrors(response.body.string);
+      metrics.recordGraphqlOperation(
+        operation,
+        hasBodyErrors ? 'error' : 'success',
+        (performance.now() - start) / 1000,
+      );
+      if (response.body.kind === 'complete' && hasBodyErrors) {
+        for (const code of extractErrorCodes(response.body.string)) {
+          metrics.recordGraphqlError(operation, code);
+        }
       }
-    }
 
-    return new Response(response.body.kind === 'complete' ? response.body.string : null, {
-      status: response.status ?? 200,
-      headers: Object.fromEntries(response.headers),
-    });
+      return new Response(response.body.kind === 'complete' ? response.body.string : null, {
+        status: response.status ?? 200,
+        headers: Object.fromEntries(response.headers),
+      });
+    } catch (error) {
+      if (error instanceof GraphqlTimeoutError) {
+        metrics.recordGraphqlOperation(operation, 'error', (performance.now() - start) / 1000);
+        metrics.recordGraphqlError(operation, error.code);
+      }
+      throw error;
+    }
   };
 }
 
 export interface HealthPings {
   pingDb: () => Promise<'ok' | 'unavailable'>;
   pingRedis: () => Promise<'ok' | 'unavailable'>;
+  metrics?: Metrics;
 }
 
-export function healthHandler({ pingDb, pingRedis }: HealthPings): MiddlewareHandler {
-  return async (c) =>
-    c.json({ status: 'ok', db: await pingDb(), redis: await pingRedis() });
+export function healthHandler({ pingDb, pingRedis, metrics }: HealthPings): MiddlewareHandler {
+  return async (c) => {
+    if (isShuttingDown) {
+      metrics?.recordProbeCheck('liveness', 'shutting_down');
+      return c.json({ status: 'shutting_down', db: 'unavailable', redis: 'unavailable' }, 503);
+    }
+    const [db, redis] = await Promise.all([
+      (async () => {
+        const s = performance.now();
+        const r = await pingDb();
+        if (metrics) metrics.recordDependencyPing('db', (performance.now() - s) / 1000, r === 'ok');
+        return r;
+      })(),
+      (async () => {
+        const s = performance.now();
+        const r = await pingRedis();
+        if (metrics) metrics.recordDependencyPing('redis', (performance.now() - s) / 1000, r === 'ok');
+        return r;
+      })(),
+    ]);
+    metrics?.recordProbeCheck('liveness', 'ok');
+    return c.json({ status: 'ok', db, redis });
+  };
+}
+
+export function healthzHandler(metrics?: Metrics): MiddlewareHandler {
+  return async (c) => {
+    if (isShuttingDown) {
+      metrics?.recordProbeCheck('liveness', 'shutting_down');
+      return c.json({ status: 'shutting_down' }, 503);
+    }
+    metrics?.recordProbeCheck('liveness', 'ok');
+    return c.json({ status: 'ok' });
+  };
 }
 
 export interface ReadyPings {
   pingDb: () => Promise<'ok' | 'unavailable'>;
+  pingRedis?: () => Promise<'ok' | 'unavailable'>;
+  metrics?: Metrics;
 }
 
-export function readyHandler({ pingDb }: ReadyPings): MiddlewareHandler {
+export function readyHandler({ pingDb, pingRedis, metrics }: ReadyPings): MiddlewareHandler {
+  return readyzHandler({ pingDb, pingRedis, metrics });
+}
+
+export function readyzHandler({
+  pingDb,
+  pingRedis,
+  metrics,
+}: {
+  pingDb: () => Promise<'ok' | 'unavailable'>;
+  pingRedis?: () => Promise<'ok' | 'unavailable'>;
+  metrics?: Metrics;
+}): MiddlewareHandler {
   return async (c) => {
-    const db = await pingDb();
-    if (db !== 'ok') {
-      return c.json({ status: 'degraded', db }, 503);
+    if (isShuttingDown) {
+      metrics?.recordProbeCheck('readiness', 'shutting_down');
+      return c.json({ status: 'shutting_down', db: 'unavailable', redis: 'unavailable' }, 503);
     }
-    return c.json({ status: 'ok', db: 'ok' });
+    const dbStart = performance.now();
+    const redisStart = performance.now();
+    const [db, redis] = await Promise.all([
+      (async () => {
+        const r = await pingDb();
+        if (metrics) metrics.recordDependencyPing('db', (performance.now() - dbStart) / 1000, r === 'ok');
+        return r;
+      })(),
+      pingRedis
+        ? (async () => {
+            const r = await pingRedis();
+            if (metrics) metrics.recordDependencyPing('redis', (performance.now() - redisStart) / 1000, r === 'ok');
+            return r;
+          })()
+        : Promise.resolve<'ok' | 'unavailable'>('ok'),
+    ]);
+    if (db !== 'ok') {
+      metrics?.recordProbeCheck('readiness', 'degraded');
+      return c.json({ status: 'degraded', db, redis }, 503);
+    }
+    metrics?.recordProbeCheck('readiness', 'ok');
+    return c.json({ status: 'ok', db: 'ok', redis });
   };
 }
 
