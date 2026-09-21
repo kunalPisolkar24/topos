@@ -29,11 +29,24 @@ class SeedUseCase:
     def _generate_hex(self, nbytes: int) -> str:
         return self._key_gen(nbytes)
 
+    # USER_ alias mapping for local .env -> canonical SM/SSM keys
+    _USER_ALIASES: dict[str, list[str]] = {
+        "DATABASE_URL": ["USER_DATABASE_URL"],
+        "DATABASE_URL_MIGRATE": ["USER_DATABASE_URL_MIGRATE"],
+        "REDIS_URL": ["USER_REDIS_URL"],
+        "JWT_SECRET": ["USER_JWT_SECRET"],
+        "LOG_LEVEL": ["USER_LOG_LEVEL"],
+        "REDIS_CACHE_TTL_MS": ["USER_CACHE_TTL_MS"],
+        "REDIS_MISSING_CACHE_TTL_MS": ["USER_MISSING_CACHE_TTL_MS"],
+        "PORT": ["USER_SERVICE_INT_PORT", "USER_SERVICE_EXT_PORT"],
+    }
+
     def build_payloads(self, env: dict[str, str], only: frozenset[str] | None = None) -> list[SecretPayload]:
         """Build per-secret payloads from parsed env dict.
 
         - Only keys in allowlist are considered.
         - Empty values are skipped.
+        - USER_ prefixed aliases are resolved to canonical keys.
         """
         present: dict[str, str] = {k: v for k, v in env.items() if v != ""}
 
@@ -44,8 +57,15 @@ class SeedUseCase:
             data: dict[str, str] = {}
             for k in keys:
                 v = present.get(k, "")
-                if v != "":
+                if v != "" and v is not None:
                     data[k] = v
+                    continue
+                # Check aliases for this canonical key
+                for alias in self._USER_ALIASES.get(k, []):
+                    av = present.get(alias, "")
+                    if av != "" and av is not None:
+                        data[k] = av
+                        break
             if not data:
                 continue
             payloads.append(SecretPayload(name=secret_name, data=data))

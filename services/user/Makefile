@@ -161,3 +161,18 @@ local-up: up
 local-down: down
 local-logs: logs
 local-clean: clean
+
+# --- Floci (AWS emulation via Floci on host.docker.internal:4566) ---
+COMPOSE_FLOCI := docker compose -f infra/compose.yml -f infra/compose.floci.yml --project-name topos-user-floci
+
+up-floci:
+	$(COMPOSE_FLOCI) up -d --build --wait user-service
+
+down-floci:
+	$(COMPOSE_FLOCI) down
+
+logs-floci:
+	$(COMPOSE_FLOCI) logs -f
+
+clean-floci:
+	$(COMPOSE_FLOCI) down -v --remove-orphans

@@ -1,16 +1,30 @@
 """Single source of truth for secret names, keys and guard lists — Topos."""
 
 # Terraform-managed secrets — never overwritten without --force
-# Topos currently has no TF-managed secrets; add here if needed (e.g., "topos/pg/urls")
-TF_MANAGED_SECRETS: frozenset[str] = frozenset()
+# RDS master and ElastiCache auth are TF-managed (random_password); seed-secrets
+# must not overwrite them without --force.
+TF_MANAGED_SECRETS: frozenset[str] = frozenset(
+    {
+        "topos-user-floci/master",
+        "topos-user-floci/redis-auth",
+        "topos-user-dev/master",
+        "topos-user-dev/redis-auth",
+        "topos-user-prod/master",
+        "topos-user-prod/redis-auth",
+    }
+)
 
 # Frontend — SSM Parameter Store (public config, String, hierarchical)
 # Stored as JSON blob in one SSM parameter
 FRONTEND_SSM_PARAM = "/topos/frontend/config"
 
-APP_SECRETS = frozenset({FRONTEND_SSM_PARAM})
+# User — SSM (config) + SM (secrets)
+USER_SSM_PARAM = "/topos/user/config"
+USER_SM_SECRET = "topos/user/secrets"
 
-# Mapping: SSM parameter name -> env keys that belong to it
+APP_SECRETS = frozenset({FRONTEND_SSM_PARAM, USER_SSM_PARAM, USER_SM_SECRET})
+
+# Mapping: SSM/SM name -> env keys that belong to it
 SECRET_KEY_MAP: dict[str, list[str]] = {
     FRONTEND_SSM_PARAM: [
         "VITE_ENV_TYPE",
@@ -26,6 +40,23 @@ SECRET_KEY_MAP: dict[str, list[str]] = {
         "GATEWAY_CONTAINER",
         "GATEWAY_INT_PORT",
         "GATEWAY_EXT_PORT",
+    ],
+    USER_SSM_PARAM: [
+        "PORT",
+        "LOG_LEVEL",
+        "OTEL_SERVICE_NAME",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "JWT_ISSUER",
+        "JWT_AUDIENCE",
+        "JWT_EXPIRES_IN",
+        "REDIS_CACHE_TTL_MS",
+        "REDIS_MISSING_CACHE_TTL_MS",
+    ],
+    USER_SM_SECRET: [
+        "DATABASE_URL",
+        "DATABASE_URL_MIGRATE",
+        "REDIS_URL",
+        "JWT_SECRET",
     ],
 }
 

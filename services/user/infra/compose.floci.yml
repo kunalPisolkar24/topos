@@ -1,0 +1,36 @@
+# Floci override — user service in prod mode against Floci (http://host.docker.internal:4566)
+# Usage:
+#   make -C tools/seed-secrets seed-floci   # populates Floci SM/SSM from local .env
+#   docker compose -f infra/compose.yml -f infra/compose.floci.yml --project-name topos-user-floci up -d --build --wait user-service
+#   curl http://localhost:4001/healthz && curl http://localhost:4001/readyz
+#
+# This file makes the container talk to Floci on the host via host.docker.internal
+# (Floci itself is on the host at localhost:4566, not on app-network). The app's
+# ENV_TYPE=prod bootstrap will fetch topos/user/secrets + /topos/user/config from Floci.
+
+services:
+  user-service:
+    environment:
+      ENV_TYPE: prod
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
+      USER_SECRETS_NAME: ${USER_SECRETS_NAME:-topos/user/secrets}
+      USER_CONFIG_PARAM: ${USER_CONFIG_PARAM:-/topos/user/config}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      user-migrator:
+        condition: service_completed_successfully
+
+  # Floci is external (host), not a compose service. This override only adds the
+  # host mapping so the container can reach http://host.docker.internal:4566.
+  # If you run Floci as a compose service on app-network, replace extra_hosts with:
+  #   networks:
+  #     - app-network
+  # and set AWS_ENDPOINT_URL=http://floci:4566

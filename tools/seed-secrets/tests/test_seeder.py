@@ -66,6 +66,12 @@ def test_allowlist_ignores_infra_keys() -> None:
     env = {"VITE_GRAPHQL_URL": "https://example.com/graphql", "DATABASE_URL": "postgresql://...", "REDIS_URL": "redis://..."}
     seeder = Seeder(FakeStore())
     payloads = seeder.build_payloads(env)
-    for p in payloads:
+    # Frontend must not contain infra keys; user SM must contain them
+    frontend = [p for p in payloads if p.name == "/topos/frontend/config"]
+    for p in frontend:
         assert "DATABASE_URL" not in p.data
         assert "REDIS_URL" not in p.data
+    user = [p for p in payloads if p.name == "topos/user/secrets"]
+    assert len(user) == 1
+    assert "DATABASE_URL" in user[0].data
+    assert "REDIS_URL" in user[0].data

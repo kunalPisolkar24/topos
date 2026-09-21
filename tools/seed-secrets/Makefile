@@ -26,7 +26,7 @@ format:
 	$(POETRY) run ruff format --check .
 
 test:
-	$(POETRY) run pytest -q -m "not integration"
+	$(POETRY) run pytest -q -o addopts="" -m "not integration"
 
 test-all:
 	$(POETRY) run pytest -q -o addopts=""
@@ -35,10 +35,10 @@ test-cov:
 	$(POETRY) run pytest -m "not integration" --cov=src --cov-report=term-missing --cov-fail-under=65
 
 dry-run:
-	$(RUN) --env-file infrastructure/docker/prod/.env --endpoint-url http://localhost:4566 --only /topos/frontend/config --dry-run
+	$(RUN) --env-file infrastructure/docker/local/.env.local.example --endpoint-url http://localhost:4566 --dry-run
 
 seed-floci:
-	$(RUN) --env-file infrastructure/docker/prod/.env --endpoint-url http://localhost:4566 --only /topos/frontend/config
+	$(RUN) --env-file infrastructure/docker/local/.env.local.example --endpoint-url http://localhost:4566
 
 dry-run-floci: dry-run
 
