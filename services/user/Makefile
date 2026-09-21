@@ -118,8 +118,34 @@ load-test-tail:
 
 COMPOSE := docker compose -f infra/compose.yml --project-name topos-user-local
 
+# Optional deps — caps canonical, lowercase alias. Keep Redis URL pointing at the
+# stopped host when disabled so reconnect is tested (empty USER_REDIS_URL disables
+# the client entirely). Postgres disabled leaves DATABASE_URL pointing at the
+# stopped host (GraphQL -> SERVICE_UNAVAILABLE, /ready 503); override with
+# USER_DATABASE_URL for an external DB.
+WITH_POSTGRES ?= 1
+WITH_REDIS ?= 1
+with_postgres ?= $(WITH_POSTGRES)
+with_redis ?= $(WITH_REDIS)
+WITH_POSTGRES := $(if $(filter 0,$(WITH_POSTGRES) $(with_postgres)),0,1)
+WITH_REDIS := $(if $(filter 0,$(WITH_REDIS) $(with_redis)),0,1)
+
 up:
-	$(COMPOSE) up -d --build --wait user-service
+	@if [ "$(WITH_POSTGRES)" = "1" ] && [ "$(WITH_REDIS)" = "1" ]; then \
+		echo "up: with postgres and redis"; \
+		$(COMPOSE) up -d --build --wait user-service; \
+	elif [ "$(WITH_POSTGRES)" = "1" ] && [ "$(WITH_REDIS)" = "0" ]; then \
+		echo "up: with postgres, without redis (fail-open, keep USER_REDIS_URL for reconnect)"; \
+		$(COMPOSE) up -d --build --wait user-postgres user-migrator; \
+		$(COMPOSE) up -d --build --no-deps --wait user-service; \
+	elif [ "$(WITH_POSTGRES)" = "0" ] && [ "$(WITH_REDIS)" = "1" ]; then \
+		echo "up: without postgres (SERVICE_UNAVAILABLE, /ready 503), with redis"; \
+		$(COMPOSE) up -d --build --wait user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait user-service; \
+	else \
+		echo "up: without postgres and redis (fully degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait user-service; \
+	fi
 
 down:
 	$(COMPOSE) down

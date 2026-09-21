@@ -62,6 +62,25 @@ No env file needed — defaults come from `infra/compose.yml`. The service is on
 `make local-up` / `local-down` / `local-logs` / `local-clean` are kept as
 backwards-compatible aliases for `up` / `down` / `logs` / `clean`.
 
+### Independent run
+
+`make up` accepts optional flags to skip dependencies (caps canonical,
+lowercase alias). The service stays up and degrades gracefully:
+
+```bash
+make up WITH_POSTGRES=0              # without postgres: GraphQL -> SERVICE_UNAVAILABLE (503), /ready 503, /health 200
+make up WITH_REDIS=0                 # without redis: fail-open to postgres, reconnect on restart
+make up WITH_POSTGRES=0 WITH_REDIS=0 # fully degraded
+
+# lowercase aliases also work
+make up with_postgres=0 with_redis=0
+```
+
+When postgres is disabled `DATABASE_URL` still points at the stopped host;
+override with `USER_DATABASE_URL` for an external DB. When redis is disabled
+`REDIS_URL` is kept for reconnect testing; set `USER_REDIS_URL=` (empty) to
+disable the client entirely.
+
 ## Docker
 
 `infra/compose.yml` is the single-instance topology (one Postgres, one Redis) used
