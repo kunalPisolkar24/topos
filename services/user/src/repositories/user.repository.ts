@@ -53,28 +53,39 @@ export class UserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.retried('findByEmail', () => this.prisma.user.findUnique({ where: { email } }));
+    return this.retried('findByEmail', () =>
+      this.prisma.user.findFirst({ where: { email, deletedAt: null } }),
+    );
   }
 
   async findByEmailOrUsername(email: string, username: string): Promise<User | null> {
     return this.retried('findByEmailOrUsername', () =>
       this.prisma.user.findFirst({
-        where: { OR: [{ email }, { username }] },
+        where: { deletedAt: null, OR: [{ email }, { username }] },
       }),
     );
   }
 
   async findById(id: string): Promise<User | null> {
-    return this.retried('findById', () => this.prisma.user.findUnique({ where: { id } }));
+    return this.retried('findById', () =>
+      this.prisma.user.findFirst({ where: { id, deletedAt: null } }),
+    );
+  }
+
+  async findByIdIncludingDeleted(id: string): Promise<User | null> {
+    return this.retried('findByIdIncludingDeleted', () =>
+      this.prisma.user.findFirst({ where: { id } }),
+    );
   }
 
   async findAll({ limit, cursor }: PaginationArgs): Promise<User[]> {
     return this.retried('findAll', () =>
       this.prisma.user.findMany({
+        where: { deletedAt: null },
         take: limit,
         skip: cursor ? 1 : 0,
         cursor: cursor ? { id: cursor } : undefined,
-        orderBy: { id: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
     );
   }

@@ -9,6 +9,7 @@ const makeContext = (overrides: Partial<GraphQLContext> = {}): GraphQLContext =>
   user: null,
   userService: {
     findById: vi.fn(),
+    findByIdForReference: vi.fn(),
     findAll: vi.fn(),
     signup: vi.fn(),
     signin: vi.fn(),
@@ -160,12 +161,27 @@ describe('Mutation.updateProfile', () => {
 describe('User.__resolveReference', () => {
   it('resolves a federated reference by id', async () => {
     const ctx = makeContext();
-    vi.mocked(ctx.userService.findById).mockResolvedValue({ id: 'u1' } as never);
+    vi.mocked(ctx.userService.findByIdForReference).mockResolvedValue({ id: 'u1' } as never);
 
     await expect(resolvers.User.__resolveReference({ id: 'u1' }, ctx)).resolves.toEqual({
       id: 'u1',
     });
-    expect(ctx.userService.findById).toHaveBeenCalledWith('u1');
+    expect(ctx.userService.findByIdForReference).toHaveBeenCalledWith('u1');
+  });
+
+  it('returns a tombstone for a deleted user', async () => {
+    const ctx = makeContext();
+    vi.mocked(ctx.userService.findByIdForReference).mockResolvedValue({
+      id: 'u1',
+      username: 'deleted_user',
+      name: 'Deleted User',
+    } as never);
+
+    await expect(resolvers.User.__resolveReference({ id: 'u1' }, ctx)).resolves.toEqual({
+      id: 'u1',
+      username: 'deleted_user',
+      name: 'Deleted User',
+    });
   });
 });
 

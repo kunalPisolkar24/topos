@@ -47,7 +47,7 @@ export const resolvers = {
   },
   User: {
     __resolveReference: (ref: { id: string }, ctx: GraphQLContext) =>
-      ctx.userService.findById(ref.id),
+      ctx.userService.findByIdForReference(ref.id),
     email: (obj: { id: string; email: string | null }, ctx: GraphQLContext) =>
       ctx.user?.id === obj.id ? obj.email : null,
   },

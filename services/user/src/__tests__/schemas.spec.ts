@@ -81,7 +81,7 @@ describe('updateProfileSchema', () => {
   });
 
   it('rejects an over-long bio', () => {
-    expect(updateProfileSchema.safeParse({ bio: 'x'.repeat(501) }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ bio: 'x'.repeat(281) }).success).toBe(false);
   });
 
   it('rejects a non-URL avatar', () => {

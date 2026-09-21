@@ -17,6 +17,7 @@ const makeUser = (overrides: Partial<User> = {}): User => ({
   bannerUrl: null,
   createdAt: new Date('2024-01-01T00:00:00.000Z'),
   updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+  deletedAt: null,
   ...overrides,
 });
 
@@ -95,27 +96,27 @@ describe('UserRepository', () => {
   describe('findByEmail', () => {
     it('looks the user up', async () => {
       const user = makeUser();
-      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.findFirst.mockResolvedValue(user);
 
       await expect(repository.findByEmail('alice@example.com')).resolves.toEqual(user);
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'alice@example.com' },
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { email: 'alice@example.com', deletedAt: null },
       });
     });
 
     it('returns null when the user does not exist', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.findFirst.mockResolvedValue(null);
 
       await expect(repository.findByEmail('nobody@example.com')).resolves.toBeNull();
     });
 
     it('retries transient read errors', async () => {
-      prisma.user.findUnique
+      prisma.user.findFirst
         .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
         .mockResolvedValueOnce(makeUser());
 
       await expect(repository.findByEmail('alice@example.com')).resolves.toEqual(makeUser());
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+      expect(prisma.user.findFirst).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -128,7 +129,7 @@ describe('UserRepository', () => {
         user,
       );
       expect(prisma.user.findFirst).toHaveBeenCalledWith({
-        where: { OR: [{ email: 'alice@example.com' }, { username: 'alice' }] },
+        where: { deletedAt: null, OR: [{ email: 'alice@example.com' }, { username: 'alice' }] },
       });
     });
 
@@ -141,14 +142,14 @@ describe('UserRepository', () => {
 
   describe('findById', () => {
     it('returns the user', async () => {
-      prisma.user.findUnique.mockResolvedValue(makeUser());
+      prisma.user.findFirst.mockResolvedValue(makeUser());
 
       await expect(repository.findById('u1')).resolves.toEqual(makeUser());
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'u1' } });
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({ where: { id: 'u1', deletedAt: null } });
     });
 
     it('returns null when the user does not exist', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.findFirst.mockResolvedValue(null);
 
       await expect(repository.findById('u1')).resolves.toBeNull();
     });
@@ -161,10 +162,11 @@ describe('UserRepository', () => {
 
       await expect(repository.findAll({ limit: 10 })).resolves.toEqual(users);
       expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { deletedAt: null },
         take: 10,
         skip: 0,
         cursor: undefined,
-        orderBy: { id: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
     });
 
@@ -174,10 +176,11 @@ describe('UserRepository', () => {
       await repository.findAll({ limit: 10, cursor: 'u2' });
 
       expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { deletedAt: null },
         take: 10,
         skip: 1,
         cursor: { id: 'u2' },
-        orderBy: { id: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
     });
   });

@@ -53,6 +53,26 @@ export class UserService {
     });
   }
 
+  async findByIdForReference(id: string): Promise<UserResponse | null> {
+    const user = await this.users.findByIdIncludingDeleted(id);
+    if (!user) {
+      return null;
+    }
+    if (user.deletedAt) {
+      return {
+        id: user.id,
+        username: 'deleted_user',
+        email: '',
+        name: 'Deleted User',
+        bio: null,
+        avatarUrl: null,
+        bannerUrl: null,
+        createdAt: user.createdAt.toISOString(),
+      };
+    }
+    return toUserResponse(user);
+  }
+
   async findAll({ limit, cursor }: PaginationArgs): Promise<UserResponse[]> {
     const key = `users:${limit}:${cursor ?? ''}`;
     return (await this.cache.read(key, this.cacheTtlMs, async () => {

@@ -8,14 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  name      String?
-  bio       String?
-  avatarUrl String?
-  bannerUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  username  String    @unique @db.VarChar(30)
+  email     String    @unique @db.VarChar(254)
+  password  String    @db.VarChar(255)
+  name      String?   @db.VarChar(50)
+  bio       String?   @db.VarChar(280)
+  avatarUrl String?   @db.VarChar(2048)
+  bannerUrl String?   @db.VarChar(2048)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@index([createdAt, id])
+  @@index([deletedAt])
 }
