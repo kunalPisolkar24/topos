@@ -13,7 +13,7 @@ export interface Services {
 
 export function createServices(): Services {
   const metrics = new Metrics();
-  metrics.registerDbPools([{ node: 'primary', pool }]);
+  metrics.registerDbPool(pool);
   metrics.registerRedis(redis);
   const userService = new UserService(
     new UserRepository(prisma, metrics),

@@ -1,32 +1,8 @@
-import { Prisma } from '../generated/prisma/client.js';
+import { isConnectionEstablishmentError, isTransientDbError } from '../errors.js';
 
 export type RetryErrorCheck = (error: unknown) => boolean;
 
-const CONNECTION_ESTABLISHMENT_PATTERN =
-  /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|connect ECONNREFUSED/i;
-
-const TRANSIENT_PATTERN =
-  /ECONNRESET|Connection terminated|Connection terminated unexpectedly/i;
-
-export function isConnectionEstablishmentError(error: unknown): boolean {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return error.code === 'P1001';
-  }
-  if (error instanceof Prisma.PrismaClientInitializationError) {
-    return true;
-  }
-  return error instanceof Error && CONNECTION_ESTABLISHMENT_PATTERN.test(error.message);
-}
-
-export function isTransientDbError(error: unknown): boolean {
-  if (isConnectionEstablishmentError(error)) {
-    return true;
-  }
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return error.code === 'P1002' || error.code === 'P1017';
-  }
-  return error instanceof Error && TRANSIENT_PATTERN.test(error.message);
-}
+export { isConnectionEstablishmentError, isTransientDbError };
 
 export interface RetryOptions {
   maxRetries?: number;

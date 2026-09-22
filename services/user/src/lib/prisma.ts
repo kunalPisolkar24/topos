@@ -15,15 +15,9 @@ pool.on('error', (err: Error) => {
   logger.error({ error: err.message, stack: err.stack }, 'pg pool error');
 });
 
-export const primaryPool = pool;
-
 export const prisma = new PrismaClient({
   adapter: new PrismaPg(pool),
 });
-
-export function primaryDb(): PrismaClient {
-  return prisma;
-}
 
 export async function closeDb(): Promise<void> {
   try {

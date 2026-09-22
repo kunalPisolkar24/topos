@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import client from 'prom-client';
 import { EventEmitter } from 'node:events';
-import { Metrics, extractErrorCodes } from '../metrics.js';
+import { extractErrorCodes } from '../../graphql/formatError.js';
+import { Metrics } from '../metrics.js';
 import type { Pool } from 'pg';
 
 const mocks = vi.hoisted(() => ({
-  env: { NODE_ENV: 'test' },
+  env: { NODE_ENV: 'test', LOG_LEVEL: 'info', DATABASE_URL: 'postgresql://test:test@localhost:5432/test', JWT_SECRET: 'test-secret-0123456789abcdef0123456789abcdef' },
 }));
 
 vi.mock('../../config/env.js', () => ({ env: mocks.env }));

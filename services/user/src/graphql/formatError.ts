@@ -37,6 +37,18 @@ export function unwrapDomain(error: unknown): DomainError | null {
   return inner instanceof DomainError ? inner : null;
 }
 
+export function extractErrorCodes(body: string): string[] {
+  try {
+    const parsed = JSON.parse(body) as { errors?: Array<{ extensions?: { code?: string } }> };
+    if (!Array.isArray(parsed.errors)) {
+      return [];
+    }
+    return parsed.errors.map((error) => error?.extensions?.code ?? 'UNKNOWN');
+  } catch {
+    return [];
+  }
+}
+
 export function formatError(
   formatted: GraphQLFormattedError,
   error: unknown,

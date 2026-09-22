@@ -11,9 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../config/env.js', () => ({ env: mocks.env }));
 vi.mock('../lib/prisma.js', () => ({
   prisma: {},
-  primaryDb: () => ({}),
   pool: { totalCount: 0, idleCount: 0, waitingCount: 0 },
-  primaryPool: { totalCount: 0, idleCount: 0, waitingCount: 0 },
 }));
 vi.mock('../lib/redis.js', () => ({ redis: null }));
 

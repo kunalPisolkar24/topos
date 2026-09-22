@@ -2,11 +2,12 @@ import type { ServerType } from '@hono/node-server';
 import { closeDb } from './prisma.js';
 import { closeRedis } from './redis.js';
 import { setShuttingDown } from './shutdownState.js';
+import { logger } from '../observability/logger.js';
 
 export function setupGracefulShutdown(server: ServerType): void {
   for (const signal of ['SIGTERM', 'SIGINT']) {
     process.on(signal, async () => {
-      console.log(`${signal} received, shutting down`);
+      logger.info(`${signal} received, shutting down`);
       setShuttingDown(true);
       server.close(async () => {
         await closeRedis();
@@ -14,7 +15,7 @@ export function setupGracefulShutdown(server: ServerType): void {
         process.exit(0);
       });
       setTimeout(() => {
-        console.error('shutdown timed out, forcing exit');
+        logger.error('shutdown timed out, forcing exit');
         process.exit(1);
       }, 10_000).unref();
     });

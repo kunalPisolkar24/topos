@@ -64,29 +64,23 @@ export class CacheManager {
       return;
     }
     try {
-      const maybeScan = this.redis as unknown as { scan?: (c: string, ...a: unknown[]) => Promise<[string, string[]]> };
-      if (typeof maybeScan.scan === 'function') {
-        let cursor = '0';
-        const toDelete: string[] = [];
-        do {
-          const [nextCursor, keys] = await maybeScan.scan(cursor, 'MATCH', 'users:*', 'COUNT', '500');
-          cursor = nextCursor;
-          if (keys.length > 0) {
-            toDelete.push(...keys);
-          }
-          if (toDelete.length >= 500) {
-            await this.redis.del(...toDelete);
-            toDelete.length = 0;
-          }
-        } while (cursor !== '0');
-        if (toDelete.length > 0) {
-          await this.redis.del(...toDelete);
-        }
-      } else {
-        const keys = await this.redis.keys('users:*');
+      let cursor = '0';
+      const toDelete: string[] = [];
+      do {
+        const [nextCursor, keys] = await (
+          this.redis as unknown as { scan: (c: string, ...a: unknown[]) => Promise<[string, string[]]> }
+        ).scan(cursor, 'MATCH', 'users:*', 'COUNT', '500');
+        cursor = nextCursor;
         if (keys.length > 0) {
-          await this.redis.del(...keys);
+          toDelete.push(...keys);
         }
+        if (toDelete.length >= 500) {
+          await this.redis.del(...toDelete);
+          toDelete.length = 0;
+        }
+      } while (cursor !== '0');
+      if (toDelete.length > 0) {
+        await this.redis.del(...toDelete);
       }
       this.metrics?.recordCacheInvalidation('lists', 'ok');
     } catch {

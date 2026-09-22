@@ -14,18 +14,6 @@ export interface DbPoolRegistration {
   pool: Pool;
 }
 
-export function extractErrorCodes(body: string): string[] {
-  try {
-    const parsed = JSON.parse(body) as { errors?: Array<{ extensions?: { code?: string } }> };
-    if (!Array.isArray(parsed.errors)) {
-      return [];
-    }
-    return parsed.errors.map((error) => error?.extensions?.code ?? 'UNKNOWN');
-  } catch {
-    return [];
-  }
-}
-
 export class Metrics {
   private readonly httpRequests = new client.Counter({
     name: 'http_requests_total',
@@ -167,6 +155,10 @@ export class Metrics {
 
   recordGraphqlError(operation: string, code: string): void {
     this.graphqlErrors.inc({ operation, code });
+  }
+
+  registerDbPool(pool: Pool): void {
+    this.dbPools.push({ node: 'primary', pool });
   }
 
   registerDbPools(pools: DbPoolRegistration[]): void {

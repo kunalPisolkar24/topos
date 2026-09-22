@@ -62,6 +62,40 @@ export class ServiceUnavailableError extends DomainError {
   }
 }
 
+export class GraphqlTimeoutError extends DomainError {
+  readonly code = 'GRAPHQL_TIMEOUT';
+  readonly httpStatus = 504;
+  constructor() {
+    super('GraphQL operation timed out');
+  }
+}
+
+const CONNECTION_ESTABLISHMENT_PATTERN =
+  /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|connect ECONNREFUSED/i;
+
+const TRANSIENT_PATTERN =
+  /ECONNRESET|Connection terminated|Connection terminated unexpectedly/i;
+
+export function isConnectionEstablishmentError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === 'P1001';
+  }
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return true;
+  }
+  return error instanceof Error && CONNECTION_ESTABLISHMENT_PATTERN.test(error.message);
+}
+
+export function isTransientDbError(error: unknown): boolean {
+  if (isConnectionEstablishmentError(error)) {
+    return true;
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === 'P1002' || error.code === 'P1017';
+  }
+  return error instanceof Error && TRANSIENT_PATTERN.test(error.message);
+}
+
 function isDbUnavailableError(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return error.code === 'P1001' || error.code === 'P1002' || error.code === 'P1017';
@@ -70,10 +104,8 @@ function isDbUnavailableError(error: unknown): boolean {
     return true;
   }
   if (error instanceof Error) {
-    return (
-      /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|ECONNRESET|Connection terminated|Service temporarily unavailable/i.test(
-        error.message,
-      ) || error.name === 'ServiceUnavailableError'
+    return /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|ECONNRESET|Connection terminated|Service temporarily unavailable/i.test(
+      error.message,
     );
   }
   return false;

@@ -6,7 +6,7 @@ const createRedisMocks = () => ({
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
-  keys: vi.fn(),
+  scan: vi.fn(),
 });
 
 type RedisMocks = ReturnType<typeof createRedisMocks>;
@@ -112,16 +112,16 @@ describe('CacheManager', () => {
 
   describe('invalidateUserLists', () => {
     it('deletes all matching list keys', async () => {
-      redis.keys.mockResolvedValue(['users:10:', 'users:20:u1']);
+      redis.scan.mockResolvedValue(['0', ['users:10:', 'users:20:u1']]);
 
       await cache.invalidateUserLists();
 
-      expect(redis.keys).toHaveBeenCalledWith('users:*');
+      expect(redis.scan).toHaveBeenCalledWith('0', 'MATCH', 'users:*', 'COUNT', '500');
       expect(redis.del).toHaveBeenCalledWith('users:10:', 'users:20:u1');
     });
 
     it('does nothing when there are no matching keys', async () => {
-      redis.keys.mockResolvedValue([]);
+      redis.scan.mockResolvedValue(['0', []]);
 
       await cache.invalidateUserLists();
 
@@ -129,7 +129,7 @@ describe('CacheManager', () => {
     });
 
     it('swallows redis failures', async () => {
-      redis.keys.mockRejectedValue(new Error('redis unavailable'));
+      redis.scan.mockRejectedValue(new Error('redis unavailable'));
 
       await expect(cache.invalidateUserLists()).resolves.toBeUndefined();
     });
@@ -141,6 +141,6 @@ describe('CacheManager', () => {
     await expect(noop.invalidateKey('user:u1')).resolves.toBeUndefined();
     await expect(noop.invalidateUserLists()).resolves.toBeUndefined();
     expect(redis.del).not.toHaveBeenCalled();
-    expect(redis.keys).not.toHaveBeenCalled();
+    expect(redis.scan).not.toHaveBeenCalled();
   });
 });

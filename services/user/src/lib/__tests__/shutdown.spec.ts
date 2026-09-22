@@ -4,10 +4,20 @@ import { setupGracefulShutdown } from '../shutdown.js';
 const mocks = vi.hoisted(() => ({
   closeRedis: vi.fn(),
   closeDb: vi.fn(),
+  env: {
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'info',
+    DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+    JWT_SECRET: 'test-secret-0123456789abcdef0123456789abcdef',
+  },
 }));
 
 vi.mock('../redis.js', () => ({ closeRedis: mocks.closeRedis }));
 vi.mock('../prisma.js', () => ({ closeDb: mocks.closeDb }));
+vi.mock('../../config/env.js', () => ({ env: mocks.env }));
+vi.mock('../../observability/logger.js', () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
 
 describe('setupGracefulShutdown', () => {
   beforeEach(() => {
@@ -23,7 +33,7 @@ describe('setupGracefulShutdown', () => {
 
   it('closes the server, disconnects redis and db, and exits cleanly on SIGTERM', async () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { logger } = await import('../../observability/logger.js');
     const close = vi.fn((callback: () => void) => callback());
     setupGracefulShutdown({ close } as never);
 
@@ -33,13 +43,13 @@ describe('setupGracefulShutdown', () => {
     expect(close).toHaveBeenCalledOnce();
     expect(mocks.closeRedis).toHaveBeenCalledOnce();
     expect(mocks.closeDb).toHaveBeenCalledOnce();
-    expect(consoleLog).toHaveBeenCalledWith('SIGTERM received, shutting down');
+    expect(logger.info).toHaveBeenCalledWith('SIGTERM received, shutting down');
   });
 
   it('forces exit when the server does not close in time', async () => {
     vi.useFakeTimers();
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { logger } = await import('../../observability/logger.js');
     const close = vi.fn();
     setupGracefulShutdown({ close } as never);
 
@@ -49,6 +59,7 @@ describe('setupGracefulShutdown', () => {
     expect(exit).toHaveBeenCalledWith(1);
     expect(close).toHaveBeenCalledOnce();
     expect(mocks.closeRedis).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith('shutdown timed out, forcing exit');
   });
 
   it('does not close the server on unrelated signals', () => {
