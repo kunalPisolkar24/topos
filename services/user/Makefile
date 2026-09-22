@@ -163,10 +163,12 @@ local-logs: logs
 local-clean: clean
 
 # --- Floci (AWS emulation via Floci on host.docker.internal:4566) ---
-COMPOSE_FLOCI := docker compose -f infra/compose.yml -f infra/compose.floci.yml --project-name topos-user-floci
+# compose.yml now carries Floci-friendly defaults (ENV_TYPE, AWS_*, extra_hosts),
+# so Floci is just ENV_TYPE=prod on the same compose file.
+COMPOSE_FLOCI := docker compose -f infra/compose.yml --project-name topos-user-floci
 
 up-floci:
-	$(COMPOSE_FLOCI) up -d --build --wait user-service
+	ENV_TYPE=prod $(COMPOSE_FLOCI) up -d --build --wait user-service
 
 down-floci:
 	$(COMPOSE_FLOCI) down

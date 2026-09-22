@@ -59,9 +59,10 @@ make -C tools/seed-secrets dry-run
 make -C tools/seed-secrets seed-floci   # writes /topos/user/config + topos/user/secrets to Floci
 
 # Run user-service against Floci (see services/user README Independent run)
-# The service's ENV_TYPE=prod bootstrap fetches SM/SSM via AWS SDK when ENV_TYPE=prod.
-AWS_ENDPOINT_URL=http://host.docker.internal:4566 make -C services/user up WITH_POSTGRES=0 WITH_REDIS=0 ENV_TYPE=prod
-# Or via compose override: see services/user/infra/compose.floci.yml (to be added)
+# compose.yml now carries Floci-friendly defaults, so Floci is just ENV_TYPE=prod
+make -C services/user up-floci
+# or: ENV_TYPE=prod make -C services/user up
+# or: docker compose -f services/user/infra/compose.yml --project-name topos-user-floci up -d --build --wait user-service
 ```
 
 ## Design notes

@@ -26,6 +26,14 @@ services:
       - LOG_LEVEL=${USER_LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${USER_OTLP_ENDPOINT:-}
       - OTEL_SERVICE_NAME=user-service
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
+      - USER_SECRETS_NAME=${USER_SECRETS_NAME:-topos/user/secrets}
+      - USER_CONFIG_PARAM=${USER_CONFIG_PARAM:-/topos/user/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:4001/health || exit 1"]
       interval: 30s
