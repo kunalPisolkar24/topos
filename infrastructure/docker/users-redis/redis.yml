@@ -1,9 +1,8 @@
 services:
   user-redis:
     image: redis:7.2-alpine
-    container_name: ${USER_REDIS_CONTAINER:-local-user-redis}
     restart: unless-stopped
-    command: ["redis-server", "--save", "${USER_REDIS_SAVE-3600 1 300 100 60 10000}", "--appendonly", "${USER_REDIS_APPENDONLY:-yes}"]
+    command: ["redis-server", "--save", "${USER_REDIS_SAVE:-3600 1 300 100 60 10000}", "--appendonly", "${USER_REDIS_APPENDONLY:-yes}"]
     ports:
       - "${USER_REDIS_EXT_PORT:-6380}:6379"
     volumes:

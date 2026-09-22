@@ -7,13 +7,13 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: ${USER_SERVICE_CONTAINER:-local-user-service}
     restart: unless-stopped
     ports:
-      - "${USER_SERVICE_EXT_PORT:-4001}:${USER_SERVICE_INT_PORT:-4001}"
+      - "${USER_SERVICE_EXT_PORT:-4001}:4001"
     environment:
-      - PORT=${USER_SERVICE_INT_PORT:-4001}
+      - PORT=4001
       - NODE_ENV=${NODE_ENV:-production}
+      - ENV_TYPE=${ENV_TYPE:-dev}
       - DATABASE_URL=${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}
       - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
       - JWT_SECRET=${USER_JWT_SECRET:-local-dev-secret-0123456789abcdef0123456789abcdef}
@@ -27,7 +27,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=${USER_OTLP_ENDPOINT:-}
       - OTEL_SERVICE_NAME=user-service
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:${USER_SERVICE_INT_PORT:-4001}/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4001/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,7 +46,6 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: migrator
-    container_name: ${USER_MIGRATOR_CONTAINER:-local-user-migrator}
     environment:
       - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
     depends_on:
@@ -57,4 +56,4 @@ services:
 
 networks:
   app-network:
-    name: ${APP_NETWORK:-topos_local_network}
+    name: topos_local_network
