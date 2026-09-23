@@ -69,6 +69,14 @@ var (
 		Help:      "Redis cache command failures, swallowed by the degrading cache.",
 	})
 
+	// CacheBreakerState reports the cache circuit breaker state: 0 = closed, 1 = open, 2 = half-open.
+	CacheBreakerState = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "content",
+		Subsystem: "cache",
+		Name:      "breaker_state",
+		Help:      "Cache circuit breaker state (0 closed, 1 open, 2 half-open).",
+	})
+
 	// AIFallbackEngaged counts AI calls served from the degraded path:
 	// fallback results returned, or errors surfaced because the primary
 	// failed or its circuit breaker was open, by operation.

@@ -41,19 +41,29 @@ const (
 	maxRetries      = 3
 	minRetryBackoff = 50 * time.Millisecond
 	maxRetryBackoff = 500 * time.Millisecond
+
+	cacheFailureThreshold = 3
+	cacheSuccessThreshold = 1
+	cacheResetWindow      = 10 * time.Second
 )
 
 // Cache is a thin, best-effort Redis cache. Every call swallows errors so
 // the cache can never break the service, but Redis failures are logged at
 // warn level and counted in content_cache_errors_total so degradation is
-// observable instead of invisible.
+// observable instead of invisible. A circuit breaker prevents a dead Redis
+// from adding seconds of timeout to every request.
 type Cache struct {
 	client *redis.Client
+	opts   Options
+	breaker *cacheBreaker
 
 	// coalesceMu guards inFlight, the single-flight registry that
 	// merges concurrent fills of the same key into one.
 	coalesceMu sync.Mutex
 	inFlight   map[string]*inFlightCall
+
+	stopCh chan struct{}
+	once   sync.Once
 }
 
 // inFlightCall is a shared fill in progress; waiters block on done and
@@ -82,7 +92,42 @@ func New(ctx context.Context, opts Options) (*Cache, error) {
 		return nil, err
 	}
 
-	return &Cache{client: client}, nil
+	c := &Cache{
+		client:  client,
+		opts:    opts,
+		breaker: newCacheBreaker(),
+		inFlight: make(map[string]*inFlightCall),
+		stopCh:  make(chan struct{}),
+	}
+	c.breaker.recordSuccess()
+	go c.reconnectLoop()
+	return c, nil
+}
+
+// NewResilient dials redis and returns a cache that degrades gracefully
+// and recovers automatically. Unlike New it never returns an error: when
+// redis is unavailable at startup it returns a degraded cache whose
+// breaker is open and which probes in the background, so callers do not
+// need to handle a nil cache and the service recovers without a restart.
+func NewResilient(ctx context.Context, opts Options) *Cache {
+	client := newClient(opts)
+	c := &Cache{
+		client:  client,
+		opts:    opts,
+		breaker: newCacheBreaker(),
+		inFlight: make(map[string]*inFlightCall),
+		stopCh:  make(chan struct{}),
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx).Err(); err != nil {
+		c.breaker.forceOpen()
+	} else {
+		c.breaker.recordSuccess()
+	}
+	go c.reconnectLoop()
+	return c
 }
 
 func newClient(opts Options) *redis.Client {
@@ -99,23 +144,84 @@ func newClient(opts Options) *redis.Client {
 }
 
 func (c *Cache) Close() error {
-	return c.client.Close()
+	if c == nil {
+		return nil
+	}
+	c.once.Do(func() { close(c.stopCh) })
+	if c.client != nil {
+		return c.client.Close()
+	}
+	return nil
+}
+
+// Degraded reports whether the cache is currently in a degraded state
+// (breaker open or half-open). It is used for logging at startup.
+func (c *Cache) Degraded() bool {
+	if c == nil {
+		return true
+	}
+	return c.breaker.getState() != stateClosed
+}
+
+// Healthy reports whether the cache can serve requests (breaker closed and
+// a recent ping succeeded).
+func (c *Cache) Healthy() bool {
+	if c == nil {
+		return false
+	}
+	if c.breaker.getState() != stateClosed {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return c.client.Ping(ctx).Err() == nil
+}
+
+func (c *Cache) reconnectLoop() {
+	ticker := time.NewTicker(cacheResetWindow)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if c.breaker.getState() != stateOpen {
+				continue
+			}
+			if !c.breaker.canProceed() {
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			err := c.client.Ping(ctx).Err()
+			cancel()
+			if err == nil {
+				c.breaker.recordSuccess()
+			} else {
+				c.breaker.recordFailure()
+			}
+		case <-c.stopCh:
+			return
+		}
+	}
 }
 
 // Get returns the cached value for key, if present and decodable. A
 // missing key is a normal miss and stays silent; any other Redis error
 // is logged at warn level and counted as a cache error so degradation
-// is observable.
+// is observable. When the breaker is open the call fails fast as a miss.
 func Get[T any](c *Cache, ctx context.Context, key string) (*T, bool) {
 	if c == nil {
+		return nil, false
+	}
+	if !c.breaker.canProceed() {
 		return nil, false
 	}
 
 	data, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
+			c.breaker.recordSuccess()
 			return nil, false
 		}
+		c.breaker.recordFailure()
 		cacheError("get", "key", key, err)
 		return nil, false
 	}
@@ -123,14 +229,19 @@ func Get[T any](c *Cache, ctx context.Context, key string) (*T, bool) {
 	var value T
 	if err := json.Unmarshal(data, &value); err != nil {
 		slog.Debug("cache: unmarshal failed", "key", key, "error", err)
+		c.breaker.recordSuccess()
 		return nil, false
 	}
+	c.breaker.recordSuccess()
 	return &value, true
 }
 
 // Set stores value under key with the given ttl.
 func Set(c *Cache, ctx context.Context, key string, value any, ttl time.Duration) {
 	if c == nil {
+		return
+	}
+	if !c.breaker.canProceed() {
 		return
 	}
 
@@ -141,8 +252,11 @@ func Set(c *Cache, ctx context.Context, key string, value any, ttl time.Duration
 	}
 
 	if err := c.client.Set(ctx, key, data, ttl).Err(); err != nil {
+		c.breaker.recordFailure()
 		cacheError("set", "key", key, err)
+		return
 	}
+	c.breaker.recordSuccess()
 }
 
 // Del removes a single key.
@@ -150,32 +264,46 @@ func Del(c *Cache, ctx context.Context, key string) {
 	if c == nil {
 		return
 	}
-	if err := c.client.Del(ctx, key).Err(); err != nil {
-		cacheError("del", "key", key, err)
+	if !c.breaker.canProceed() {
+		return
 	}
+	if err := c.client.Del(ctx, key).Err(); err != nil {
+		c.breaker.recordFailure()
+		cacheError("del", "key", key, err)
+		return
+	}
+	c.breaker.recordSuccess()
 }
 
 // MarkSeen atomically marks key as seen: it returns true when the key
 // was newly set (the caller is the first to see it) and false when the
 // key already exists. Redis failures fail open - the key is treated as
 // unseen so a dedupe outage degrades to publishing duplicates instead
-// of dropping signals. A nil cache never dedupes.
+// of dropping signals. When the breaker is open it fails open instantly.
 func MarkSeen(c *Cache, ctx context.Context, key string, ttl time.Duration) bool {
 	if c == nil {
+		return true
+	}
+	if !c.breaker.canProceed() {
 		return true
 	}
 
 	ok, err := c.client.SetNX(ctx, key, "1", ttl).Result()
 	if err != nil {
+		c.breaker.recordFailure()
 		cacheError("setnx", "key", key, err)
 		return true
 	}
+	c.breaker.recordSuccess()
 	return ok
 }
 
 // DelPattern removes every key matching the glob pattern.
 func DelPattern(c *Cache, ctx context.Context, pattern string) {
 	if c == nil {
+		return
+	}
+	if !c.breaker.canProceed() {
 		return
 	}
 
@@ -185,16 +313,21 @@ func DelPattern(c *Cache, ctx context.Context, pattern string) {
 		keys = append(keys, iter.Val())
 	}
 	if err := iter.Err(); err != nil {
+		c.breaker.recordFailure()
 		cacheError("scan", "pattern", pattern, err)
 		return
 	}
 	if len(keys) == 0 {
+		c.breaker.recordSuccess()
 		return
 	}
 
 	if err := c.client.Del(ctx, keys...).Err(); err != nil {
+		c.breaker.recordFailure()
 		cacheError("del", "pattern", pattern, err)
+		return
 	}
+	c.breaker.recordSuccess()
 }
 
 // cacheError logs a Redis failure at warn level and counts it, so a
@@ -286,4 +419,104 @@ func KeyRecommended(userID string, mode string, seed uint32, page, limit int) st
 
 func KeySeenView(userID, postID string) string {
 	return fmt.Sprintf("seen:%s:%s", userID, postID)
+}
+
+// circuitState models the breaker lifecycle.
+type circuitState int
+
+const (
+	stateClosed circuitState = iota
+	stateOpen
+	stateHalfOpen
+)
+
+type cacheBreaker struct {
+	mu              sync.Mutex
+	state           circuitState
+	failureCount    int
+	successCount    int
+	inFlight        int
+	lastFailureTime time.Time
+}
+
+func newCacheBreaker() *cacheBreaker {
+	b := &cacheBreaker{state: stateClosed}
+	metrics.CacheBreakerState.Set(float64(stateClosed))
+	return b
+}
+
+func (b *cacheBreaker) getState() circuitState {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.state
+}
+
+func (b *cacheBreaker) setState(s circuitState) {
+	b.state = s
+	metrics.CacheBreakerState.Set(float64(s))
+}
+
+func (b *cacheBreaker) canProceed() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch b.state {
+	case stateOpen:
+		if time.Since(b.lastFailureTime) > cacheResetWindow {
+			b.setState(stateHalfOpen)
+			b.successCount = 0
+			b.inFlight = 1
+			return true
+		}
+		return false
+	case stateHalfOpen:
+		if b.inFlight > 0 {
+			return false
+		}
+		b.inFlight = 1
+		return true
+	default:
+		return true
+	}
+}
+
+func (b *cacheBreaker) recordSuccess() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.inFlight = 0
+	switch b.state {
+	case stateHalfOpen:
+		b.successCount++
+		if b.successCount >= cacheSuccessThreshold {
+			b.setState(stateClosed)
+			b.failureCount = 0
+		}
+	case stateClosed:
+		b.failureCount = 0
+	}
+}
+
+func (b *cacheBreaker) recordFailure() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.inFlight = 0
+	b.failureCount++
+	b.lastFailureTime = time.Now()
+	switch b.state {
+	case stateClosed:
+		if b.failureCount >= cacheFailureThreshold {
+			b.setState(stateOpen)
+		}
+	case stateHalfOpen:
+		b.setState(stateOpen)
+	}
+}
+
+func (b *cacheBreaker) forceOpen() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.failureCount = cacheFailureThreshold
+	b.lastFailureTime = time.Now()
+	b.setState(stateOpen)
+	b.inFlight = 0
+	b.successCount = 0
 }

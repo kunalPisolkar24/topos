@@ -18,7 +18,8 @@ import (
 )
 
 // Dependencies holds the shared infrastructure used by the services.
-// Cache is nil when redis is unavailable; every other field is required.
+// Cache is always non-nil; when redis is unavailable it operates in
+// degraded mode and falls through to MongoDB.
 type Dependencies struct {
 	Mongo           *mongo.Client
 	Cache           *cache.Cache
@@ -28,8 +29,8 @@ type Dependencies struct {
 }
 
 // New connects to mongo, redis, the AI service and Kafka, and wires the
-// OpenTelemetry SDK. A redis failure only disables caching; any other
-// failure aborts startup.
+// OpenTelemetry SDK. Redis is resilient: when unavailable it runs in
+// degraded mode and recovers automatically without a restart.
 func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependencies, error) {
 	shutdownTracing, err := observability.SetupTracing(ctx, cfg.OtelEndpoint, serviceName)
 	if err != nil {
@@ -50,13 +51,13 @@ func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependenc
 	}
 	slog.Info("mongo indexes ready")
 
-	var cacheClient *cache.Cache
 	cacheOpts := cache.Options{
 		Addr:     cfg.RedisAddr,
 		Password: cfg.RedisPassword,
 	}
-	if cacheClient, err = cache.New(ctx, cacheOpts); err != nil {
-		slog.Warn("redis unavailable, caching disabled", "addr", cfg.RedisAddr, "error", err)
+	cacheClient := cache.NewResilient(ctx, cacheOpts)
+	if cacheClient.Degraded() {
+		slog.Warn("redis degraded, caching in fail-open mode", "addr", cfg.RedisAddr)
 	} else {
 		slog.Info("connected to redis", "addr", cfg.RedisAddr)
 	}
