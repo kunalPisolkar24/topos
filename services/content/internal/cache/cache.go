@@ -64,20 +64,14 @@ type inFlightCall struct {
 	err    error
 }
 
-// Options configures the redis connection. Either a single Addr or a
-// sentinel-managed master (MasterName + Sentinels) must be provided.
+// Options configures the redis connection for a single standalone node.
 type Options struct {
-	Addr             string   // single-node address, used when Sentinels is empty
-	MasterName       string   // sentinel master name, used when Sentinels is set
-	Sentinels        []string // sentinel addresses
-	Password         string   // optional auth password
-	SentinelPassword string   // optional sentinel auth password (failover only)
+	Addr     string // redis address, e.g. "localhost:6379"
+	Password string // optional auth password
 }
 
-// New dials redis and returns a ready cache. When sentinels are configured
-// it connects through them (failover-aware); otherwise it connects to the
-// single address. It fails fast so the caller can decide whether to
-// disable caching.
+// New dials redis and returns a ready cache. It fails fast so the caller
+// can decide whether to disable caching.
 func New(ctx context.Context, opts Options) (*Cache, error) {
 	client := newClient(opts)
 
@@ -92,21 +86,6 @@ func New(ctx context.Context, opts Options) (*Cache, error) {
 }
 
 func newClient(opts Options) *redis.Client {
-	if len(opts.Sentinels) > 0 {
-		return redis.NewFailoverClient(&redis.FailoverOptions{
-			MasterName:       opts.MasterName,
-			SentinelAddrs:    opts.Sentinels,
-			Password:         opts.Password,
-			SentinelPassword: opts.SentinelPassword,
-			DialTimeout:      dialTimeout,
-			ReadTimeout:      commandTimeout,
-			WriteTimeout:     commandTimeout,
-			MaxRetries:       maxRetries,
-			MinRetryBackoff:  minRetryBackoff,
-			MaxRetryBackoff:  maxRetryBackoff,
-		})
-	}
-
 	return redis.NewClient(&redis.Options{
 		Addr:            opts.Addr,
 		Password:        opts.Password,

@@ -115,14 +115,6 @@ func TestRedisUnreachable(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSentinelsUnreachable(t *testing.T) {
-	_, err := New(context.Background(), Options{
-		MasterName: "mymaster",
-		Sentinels:  []string{"localhost:1"},
-	})
-	require.Error(t, err)
-}
-
 func TestClientOptionsAreExplicit(t *testing.T) {
 	opts := newClient(Options{Addr: "localhost:6379"}).Options()
 	assert.Equal(t, dialTimeout, opts.DialTimeout)
@@ -131,11 +123,6 @@ func TestClientOptionsAreExplicit(t *testing.T) {
 	assert.Equal(t, maxRetries, opts.MaxRetries)
 	assert.Equal(t, minRetryBackoff, opts.MinRetryBackoff)
 	assert.Equal(t, maxRetryBackoff, opts.MaxRetryBackoff)
-}
-
-func TestClientOptionsAreExplicitForSentinels(t *testing.T) {
-	client := newClient(Options{MasterName: "mymaster", Sentinels: []string{"localhost:26379"}})
-	assert.NotNil(t, client)
 }
 
 func TestCacheErrorsAreCounted(t *testing.T) {

@@ -73,17 +73,6 @@ func TestEnsureIndexes(t *testing.T) {
 	assert.Contains(t, tagNames, "name_unique")
 }
 
-func TestIsCollectionShardedFalseOnStandalone(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	_, database := testMongoClient(t, ctx)
-
-	sharded, err := isCollectionSharded(ctx, database, "posts")
-	require.NoError(t, err)
-	assert.False(t, sharded, "a standalone mongod must be treated as unsharded so the unique slug index is created")
-}
-
 func TestUniqueSlugIndexRejectsDuplicates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

@@ -1,0 +1,153 @@
+include:
+  - path: ../../../infrastructure/docker/content-mongo/mongo.yml
+  - path: ../../../infrastructure/docker/content-kafka/kafka.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
+
+services:
+  content-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CONTENT_SERVICE_EXT_PORT:-4002}:${CONTENT_SERVICE_INT_PORT:-4002}"
+    environment:
+      - PORT=${CONTENT_SERVICE_INT_PORT:-4002}
+      - MONGO_URI=${CONTENT_MONGO_URI:-mongodb://content-mongo:27017}
+      - DB_NAME=${CONTENT_DB_NAME:-blog_content}
+      - REDIS_ADDR=${CONTENT_REDIS_ADDR:-user-redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-local-dev-secret}
+      - JWT_ISSUER=${JWT_ISSUER:-user-service}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-topos}
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-local-internal-secret}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      content-mongo:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  content-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-worker"]
+    expose:
+      - "${CONTENT_WORKER_INT_PORT:-4003}"
+    environment:
+      - PORT=${CONTENT_WORKER_INT_PORT:-4003}
+      - MONGO_URI=${CONTENT_MONGO_URI:-mongodb://content-mongo:27017}
+      - DB_NAME=${CONTENT_DB_NAME:-blog_content}
+      - REDIS_ADDR=${CONTENT_REDIS_ADDR:-user-redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_CONSUMER_GROUP_ID=${KAFKA_CONSUMER_GROUP_ID:-content-summary-worker-group}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_WORKER_INT_PORT:-4003}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      content-mongo:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  content-search-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-search-worker"]
+    expose:
+      - "${CONTENT_SEARCH_WORKER_INT_PORT:-4004}"
+    environment:
+      - PORT=${CONTENT_SEARCH_WORKER_INT_PORT:-4004}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_SEARCH_CONSUMER_GROUP_ID=${KAFKA_SEARCH_CONSUMER_GROUP_ID:-content-search-worker-group}
+      - WORKER_CONCURRENCY=${SEARCH_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SEARCH_WORKER_INT_PORT:-4004}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      kafka:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  content-personalizer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-personalizer"]
+    expose:
+      - "${CONTENT_PERSONALIZER_INT_PORT:-4005}"
+    environment:
+      - PORT=${CONTENT_PERSONALIZER_INT_PORT:-4005}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_PERSONALIZER_CONSUMER_GROUP_ID=${KAFKA_PERSONALIZER_CONSUMER_GROUP_ID:-content-personalizer-worker-group}
+      - WORKER_CONCURRENCY=${PERSONALIZER_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_PERSONALIZER_INT_PORT:-4005}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      kafka:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: ${APP_NETWORK:-topos_local_network}

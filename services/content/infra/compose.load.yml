@@ -1,10 +1,28 @@
-name: topos-content-worker-loadtest
+name: topos-content-loadtest
+
+include:
+  - path: ../../../infrastructure/docker/content-mongo/mongo.yml
+  - path: ../../../infrastructure/docker/content-kafka/kafka.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
+
+x-content-service-env: &content-service-env
+  PORT: ${CONTENT_SERVICE_INT_PORT:-4002}
+  MONGO_URI: mongodb://content-mongo:27017
+  DB_NAME: ${CONTENT_DB_NAME:-blog_content}
+  REDIS_ADDR: user-redis:6379
+  JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+  JWT_ISSUER: ${JWT_ISSUER:-user-service}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-topos}
+  KAFKA_BROKERS: kafka-1:9092
+  KAFKA_TOPIC: ${KAFKA_TOPIC:-posts}
+  KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC:-posts-dlq}
+  AI_SERVICE_URL: ai-service:50051
 
 x-content-worker-env: &content-worker-env
   PORT: ${CONTENT_WORKER_INT_PORT:-4003}
   MONGO_URI: mongodb://content-mongo:27017
   DB_NAME: ${CONTENT_DB_NAME:-blog_content}
-  REDIS_ADDR: content-redis:6379
+  REDIS_ADDR: user-redis:6379
   KAFKA_BROKERS: kafka-1:9092
   KAFKA_TOPIC: ${KAFKA_TOPIC:-posts}
   KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC:-posts-dlq}
@@ -12,105 +30,8 @@ x-content-worker-env: &content-worker-env
   WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-3}
 
 services:
-  content-mongo:
-    image: mongo:7
-    container_name: loadtest-worker-mongo
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongosh --quiet"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - loadtest-net
-    deploy:
-      resources:
-        limits:
-          memory: ${MONGO_MEM:-768M}
-        reservations:
-          memory: 256M
-
-  content-redis:
-    image: redis:7-alpine
-    container_name: loadtest-worker-redis
-    restart: unless-stopped
-    command:
-      - redis-server
-      - --save
-      - ""
-      - --appendonly
-      - "no"
-      - --maxmemory
-      - ${REDIS_MEM:-512mb}
-      - --maxmemory-policy
-      - allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - loadtest-net
-    deploy:
-      resources:
-        limits:
-          memory: ${REDIS_MEM:-640M}
-        reservations:
-          memory: 128M
-
-  kafka:
-    image: apache/kafka:3.7.0
-    container_name: loadtest-worker-kafka
-    hostname: kafka-1
-    restart: unless-stopped
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_MIN_INSYNC_REPLICAS: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-MkU3OEVBNTcwNTJENDM2Qk}
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
-      interval: 10s
-      timeout: 15s
-      start_period: 20s
-      retries: 5
-    networks:
-      - loadtest-net
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: ${KAFKA_MEM:-512M}
-        reservations:
-          memory: 256M
-
-  init-kafka:
-    image: apache/kafka:3.7.0
-    container_name: loadtest-worker-init-kafka
-    restart: "no"
-    depends_on:
-      kafka:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic ${KAFKA_TOPIC:-posts} --replication-factor 1 --partitions ${PARTITIONS:-3}
-       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic ${KAFKA_DLQ_TOPIC:-posts-dlq} --replication-factor 1 --partitions 1
-       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic ${KAFKA_USER_INTERACTED_TOPIC:-user-interacted} --replication-factor 1 --partitions ${PARTITIONS:-3}"
-    networks:
-      - loadtest-net
-
   qdrant:
     image: qdrant/qdrant:v1.19.0
-    container_name: loadtest-worker-qdrant
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
@@ -118,7 +39,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -126,36 +47,103 @@ services:
         reservations:
           memory: 64M
 
+  ollama:
+    image: ollama/ollama:${OLLAMA_TAG:-0.9.6}
+    restart: unless-stopped
+    profiles:
+      - embedding-real
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3; ollama pull $$OLLAMA_MODEL; wait"]
+    environment:
+      OLLAMA_MODEL: ${EMBEDDING_MODEL:-snowflake-arctic-embed2:568m}
+    healthcheck:
+      test: ["CMD", "ollama", "show", "${EMBEDDING_MODEL:-snowflake-arctic-embed2:568m}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    volumes:
+      - ollama-models:/root/.ollama
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEM:-2G}
+        reservations:
+          memory: 512M
+
   ai-service:
     build:
       context: ../../ai
       dockerfile: Dockerfile
-    container_name: loadtest-worker-ai
     restart: unless-stopped
     environment:
       PORT: 50051
-      LLM_MODE: fake
-      EMBEDDING_MODE: fake
+      LLM_MODE: ${LLM_MODE:-fake}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      EMBEDDING_MODE: ${EMBEDDING_MODE:-fake}
+      EMBEDDING_URL: http://ollama:11434
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-snowflake-arctic-embed2:568m}
+      VECTOR_MODE: ${VECTOR_MODE:-qdrant}
       QDRANT_URL: http://qdrant:6333
-      LOG_LEVEL: WARNING
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
       METRICS_PORT: 12666
     depends_on:
       qdrant:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "/healthcheck.py"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    volumes:
+      - ../../ai/load-tests/healthcheck.py:/healthcheck.py:ro
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
-          memory: ${SVC_MEM:-512M}
+          memory: ${AI_MEM:-512M}
         reservations:
           memory: 128M
+
+  content-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment: *content-service-env
+    depends_on:
+      content-mongo:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${SVC_MEM:-768M}
+        reservations:
+          memory: 256M
 
   content-worker:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: loadtest-content-worker
     restart: unless-stopped
     command: ["./content-worker"]
     environment: *content-worker-env
@@ -164,7 +152,7 @@ services:
     depends_on:
       content-mongo:
         condition: service_healthy
-      content-redis:
+      user-redis:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -177,7 +165,7 @@ services:
       retries: 20
       start_period: 10s
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -189,7 +177,6 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: loadtest-content-search-worker
     restart: unless-stopped
     command: ["./content-search-worker"]
     environment:
@@ -216,7 +203,7 @@ services:
       retries: 20
       start_period: 10s
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -228,7 +215,6 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: loadtest-content-personalizer
     restart: unless-stopped
     command: ["./content-personalizer"]
     environment:
@@ -255,7 +241,7 @@ services:
       retries: 20
       start_period: 10s
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -265,9 +251,8 @@ services:
 
   producer:
     build:
-      context: ./producer
+      context: ../load-tests/producer
       dockerfile: Dockerfile
-    container_name: loadtest-content-producer
     restart: "no"
     environment:
       BROKERS: kafka-1:9092
@@ -280,7 +265,7 @@ services:
       init-kafka:
         condition: service_completed_successfully
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -290,9 +275,8 @@ services:
 
   producer-interactions:
     build:
-      context: ./producer
+      context: ../load-tests/producer
       dockerfile: Dockerfile
-    container_name: loadtest-content-interaction-producer
     restart: "no"
     environment:
       BROKERS: kafka-1:9092
@@ -305,7 +289,7 @@ services:
       init-kafka:
         condition: service_completed_successfully
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -315,7 +299,40 @@ services:
 
   k6:
     image: grafana/k6:latest
-    container_name: loadtest-worker-k6
+    restart: "no"
+    command: ["run", "--summary-trend-stats=avg,med,p(90),p(95),p(99),max", "/load-tests/k6/${SCRIPT:-mixed}.js"]
+    environment:
+      TARGET: http://content-service:${CONTENT_SERVICE_INT_PORT:-4002}
+      TARGET_AI: ai-service:50051
+      VUS: ${VUS:-20}
+      DURATION: ${DURATION:-30s}
+      RPS: ${RPS:-50}
+      WEIGHTS: ${WEIGHTS:-posts:30,post:20,tag:10,author:10,create:15,update:10,delete:5,chat:5}
+      SEED_POST_COUNT: ${SEED_POST_COUNT:-1000}
+      SEED_USERS: ${SEED_USERS:-20}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      JWT_ISSUER: ${JWT_ISSUER:-user-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-topos}
+      EMBEDDING_MODE: ${EMBEDDING_MODE:-fake}
+      CHAT_P95: ${CHAT_P95:-500}
+      CHAT_P99: ${CHAT_P99:-1500}
+    depends_on:
+      content-service:
+        condition: service_healthy
+    volumes:
+      - ../load-tests/k6:/load-tests/k6:ro
+      - ../proto:/proto:ro
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${K6_MEM:-384M}
+        reservations:
+          memory: 64M
+
+  k6-worker:
+    image: grafana/k6:latest
     restart: "no"
     command: ["run", "--summary-trend-stats=avg,med,p(90),p(95),p(99),max", "/load-tests/k6/worker.js"]
     environment:
@@ -329,9 +346,9 @@ services:
       content-search-worker:
         condition: service_healthy
     volumes:
-      - ./k6:/load-tests/k6:ro
+      - ../load-tests/k6:/load-tests/k6:ro
     networks:
-      - loadtest-net
+      - app-network
     deploy:
       resources:
         limits:
@@ -340,6 +357,9 @@ services:
           memory: 32M
 
 networks:
-  loadtest-net:
+  app-network:
     name: loadtest-net
     driver: bridge
+
+volumes:
+  ollama-models:

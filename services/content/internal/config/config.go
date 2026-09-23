@@ -14,10 +14,7 @@ type Config struct {
 	MongoURI                         string
 	DbName                           string
 	RedisAddr                        string
-	RedisMasterName                  string
-	RedisSentinels                   []string
 	RedisPassword                    string
-	RedisSentinelPassword            string
 	JwtSecret                        string
 	JwtIssuer                        string
 	JwtAudience                      string
@@ -48,10 +45,7 @@ func LoadConfig() Config {
 		MongoURI:                         getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DbName:                           getEnv("DB_NAME", "blog_content"),
 		RedisAddr:                        getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisMasterName:                  getEnv("REDIS_MASTER_NAME", "mymaster"),
-		RedisSentinels:                   splitAndTrim(getEnv("REDIS_SENTINELS", "")),
 		RedisPassword:                    getEnv("REDIS_PASSWORD", ""),
-		RedisSentinelPassword:            getEnv("REDIS_SENTINEL_PASSWORD", ""),
 		JwtSecret:                        getEnv("JWT_SECRET", ""),
 		JwtIssuer:                        getEnv("JWT_ISSUER", "user-service"),
 		JwtAudience:                      getEnv("JWT_AUDIENCE", "topos"),
