@@ -43,8 +43,8 @@ output "user_redis_endpoint" {
 }
 
 output "user_redis_reader_endpoint" {
-  value       = module.user_cache.reader_endpoint
-  sensitive   = true
+  value     = module.user_cache.reader_endpoint
+  sensitive = true
 }
 
 output "user_redis_url" {
@@ -54,8 +54,8 @@ output "user_redis_url" {
 }
 
 output "user_redis_auth_token_secret_arn" {
-  value       = module.user_cache.auth_token_secret_arn
-  sensitive   = true
+  value     = module.user_cache.auth_token_secret_arn
+  sensitive = true
 }
 
 output "user_config_param_name" {
@@ -64,4 +64,38 @@ output "user_config_param_name" {
 
 output "user_secrets_name" {
   value = aws_secretsmanager_secret.user_secrets.name
+}
+
+output "content_docdb_cluster_endpoint" {
+  description = "DocumentDB cluster endpoint"
+  value       = module.content_database.cluster_endpoint
+  sensitive   = true
+}
+
+output "content_docdb_reader_endpoint" {
+  value     = module.content_database.reader_endpoint
+  sensitive = true
+}
+
+output "content_docdb_master_secret_arn" {
+  value     = module.content_database.master_secret_arn
+  sensitive = true
+}
+
+output "content_msk_bootstrap_brokers" {
+  description = "MSK bootstrap brokers (plaintext)"
+  value       = module.content_streaming.bootstrap_brokers
+  sensitive   = true
+}
+
+output "content_msk_cluster_arn" {
+  value = module.content_streaming.cluster_arn
+}
+
+output "content_config_param_name" {
+  value = aws_ssm_parameter.content_config.name
+}
+
+output "content_secrets_name" {
+  value = aws_secretsmanager_secret.content_secrets.name
 }

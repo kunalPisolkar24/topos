@@ -11,6 +11,12 @@ TF_MANAGED_SECRETS: frozenset[str] = frozenset(
         "topos-user-dev/redis-auth",
         "topos-user-prod/master",
         "topos-user-prod/redis-auth",
+        "topos-content-floci/docdb-master",
+        "topos-content-floci/msk-kafka",
+        "topos-content-dev/docdb-master",
+        "topos-content-dev/msk-kafka",
+        "topos-content-prod/docdb-master",
+        "topos-content-prod/msk-kafka",
     }
 )
 
@@ -22,7 +28,11 @@ FRONTEND_SSM_PARAM = "/topos/frontend/config"
 USER_SSM_PARAM = "/topos/user/config"
 USER_SM_SECRET = "topos/user/secrets"
 
-APP_SECRETS = frozenset({FRONTEND_SSM_PARAM, USER_SSM_PARAM, USER_SM_SECRET})
+# Content — SSM (config) + SM (secrets)
+CONTENT_SSM_PARAM = "/topos/content/config"
+CONTENT_SM_SECRET = "topos/content/secrets"
+
+APP_SECRETS = frozenset({FRONTEND_SSM_PARAM, USER_SSM_PARAM, USER_SM_SECRET, CONTENT_SSM_PARAM, CONTENT_SM_SECRET})
 
 # Mapping: SSM/SM name -> env keys that belong to it
 SECRET_KEY_MAP: dict[str, list[str]] = {
@@ -57,6 +67,32 @@ SECRET_KEY_MAP: dict[str, list[str]] = {
         "DATABASE_URL_MIGRATE",
         "REDIS_URL",
         "JWT_SECRET",
+    ],
+    CONTENT_SSM_PARAM: [
+        "PORT",
+        "DB_NAME",
+        "LOG_LEVEL",
+        "LOG_FORMAT",
+        "OTEL_SERVICE_NAME",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "JWT_ISSUER",
+        "JWT_AUDIENCE",
+        "KAFKA_TOPIC",
+        "KAFKA_USER_INTERACTED_TOPIC",
+        "KAFKA_DLQ_TOPIC",
+        "KAFKA_CONSUMER_GROUP_ID",
+        "KAFKA_SEARCH_CONSUMER_GROUP_ID",
+        "KAFKA_PERSONALIZER_CONSUMER_GROUP_ID",
+        "WORKER_CONCURRENCY",
+    ],
+    CONTENT_SM_SECRET: [
+        "MONGO_URI",
+        "KAFKA_BROKERS",
+        "REDIS_ADDR",
+        "REDIS_PASSWORD",
+        "JWT_SECRET",
+        "INTERNAL_TOKEN",
+        "AI_SERVICE_URL",
     ],
 }
 

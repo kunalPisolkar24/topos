@@ -24,9 +24,11 @@ provider "aws" {
   endpoints {
     apigateway     = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     cloudformation = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
+    docdb          = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     ec2            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     elasticache    = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     iam            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
+    kafka          = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     kms            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     rds            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     s3             = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null

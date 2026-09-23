@@ -125,6 +125,74 @@ variable "redis_snapshot_retention_limit" {
   default     = 0
 }
 
+# Content — DocumentDB (MongoDB-compatible)
+variable "docdb_engine_version" {
+  description = "DocumentDB engine version"
+  type        = string
+  default     = "5.0.0"
+}
+
+variable "docdb_instance_class" {
+  description = "DocumentDB instance class"
+  type        = string
+  default     = "db.t3.medium"
+}
+
+variable "docdb_master_username" {
+  description = "DocumentDB master username"
+  type        = string
+  default     = "topos_content"
+}
+
+variable "docdb_port" {
+  description = "DocumentDB port"
+  type        = number
+  default     = 27017
+}
+
+variable "docdb_backup_retention_period" {
+  description = "DocumentDB backup retention"
+  type        = number
+  default     = 1
+}
+
+variable "docdb_deletion_protection" {
+  description = "DocumentDB deletion protection"
+  type        = bool
+  default     = false
+}
+
+variable "docdb_skip_final_snapshot" {
+  description = "Skip final snapshot on deletion (true for Floci)"
+  type        = bool
+  default     = true
+}
+
+# Content — MSK (Kafka)
+variable "msk_kafka_version" {
+  description = "MSK Kafka version"
+  type        = string
+  default     = "3.7.0"
+}
+
+variable "msk_instance_type" {
+  description = "MSK broker instance type"
+  type        = string
+  default     = "kafka.t3.small"
+}
+
+variable "msk_number_of_broker_nodes" {
+  description = "Number of broker nodes (1 for Floci)"
+  type        = number
+  default     = 1
+}
+
+variable "msk_ebs_volume_size" {
+  description = "MSK EBS volume size per broker"
+  type        = number
+  default     = 10
+}
+
 # Names
 variable "name_prefix" {
   description = "Prefix for resource names"

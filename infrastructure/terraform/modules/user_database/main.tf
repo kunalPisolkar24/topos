@@ -86,26 +86,26 @@ resource "aws_db_instance" "user" {
   engine_version = var.engine_version
   instance_class = var.instance_class
 
-  allocated_storage     = var.allocated_storage
-  storage_type          = "gp3"
-  storage_encrypted     = true
-  db_name               = var.db_name
-  username              = var.username
-  password              = random_password.master.result
-  port                  = var.port
-  parameter_group_name  = aws_db_parameter_group.postgres16.name
-  db_subnet_group_name  = aws_db_subnet_group.user.name
+  allocated_storage      = var.allocated_storage
+  storage_type           = "gp3"
+  storage_encrypted      = true
+  db_name                = var.db_name
+  username               = var.username
+  password               = random_password.master.result
+  port                   = var.port
+  parameter_group_name   = aws_db_parameter_group.postgres16.name
+  db_subnet_group_name   = aws_db_subnet_group.user.name
   vpc_security_group_ids = [aws_security_group.db.id]
 
-  multi_az                   = var.multi_az
-  deletion_protection        = var.deletion_protection
-  backup_retention_period    = var.backup_retention_period
-  backup_window              = "03:00-04:00"
-  maintenance_window         = "sun:04:30-sun:05:30"
-  copy_tags_to_snapshot      = true
-  delete_automated_backups   = true
-  skip_final_snapshot        = var.environment == "floci" ? true : false
-  final_snapshot_identifier  = var.environment == "floci" ? null : "${var.name_prefix}-final-${var.environment}"
+  multi_az                  = var.multi_az
+  deletion_protection       = var.deletion_protection
+  backup_retention_period   = var.backup_retention_period
+  backup_window             = "03:00-04:00"
+  maintenance_window        = "sun:04:30-sun:05:30"
+  copy_tags_to_snapshot     = true
+  delete_automated_backups  = true
+  skip_final_snapshot       = var.environment == "floci" ? true : false
+  final_snapshot_identifier = var.environment == "floci" ? null : "${var.name_prefix}-final-${var.environment}"
 
   performance_insights_enabled = var.environment == "prod" ? true : false
 
@@ -190,7 +190,7 @@ resource "aws_db_proxy_default_target_group" "user" {
 resource "aws_db_proxy_target" "user" {
   count = var.aws_endpoint_url == "" ? 1 : 0
 
-  db_proxy_name     = aws_db_proxy.user[0].name
-  target_group_name = aws_db_proxy_default_target_group.user[0].name
+  db_proxy_name          = aws_db_proxy.user[0].name
+  target_group_name      = aws_db_proxy_default_target_group.user[0].name
   db_instance_identifier = aws_db_instance.user.identifier
 }

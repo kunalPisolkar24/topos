@@ -28,6 +28,8 @@ help:
 	@echo "  make clean              — stop and remove volumes"
 	@echo "  make logs [SERVICE=]    — tail logs (all or one service)"
 	@echo "  make ps                 — list running services"
+	@echo "  make up-floci           — content-service via Floci (ENV_TYPE=prod, DocumentDB/MSK mocked)"
+	@echo "  make down-floci         — stop Floci stack"
 	@echo ""
 	@echo "Flags (caps canonical, lowercase alias; 0 disables):"
 	@echo "  WITH_MONGO=0  with_mongo=0   — without mongo (boot degraded, /ready 503)"
@@ -39,6 +41,7 @@ help:
 	@echo "  make up-worker WITH_MONGO=0"
 	@echo "  make up-search WITH_KAFKA=0"
 	@echo "  make logs SERVICE=content-service"
+	@echo "  make up-floci           — Floci: ENV_TYPE=prod, fetches MONGO_URI/KAFKA_BROKERS from SM via Floci"
 	@echo ""
 	@echo "Dev:"
 	@echo "  make test / test-integration / vet / fmt / coverage / generate"
@@ -193,6 +196,21 @@ clean:
 
 ps:
 	$(COMPOSE) ps
+
+# --- Floci (AWS emulation via Floci on host.docker.internal:4566) ---
+COMPOSE_FLOCI := docker compose -f infra/compose.yml --project-name topos-content-floci
+
+up-floci:
+	ENV_TYPE=prod $(COMPOSE_FLOCI) up -d --build --wait
+
+down-floci:
+	$(COMPOSE_FLOCI) down
+
+logs-floci:
+	$(COMPOSE_FLOCI) logs -f
+
+clean-floci:
+	$(COMPOSE_FLOCI) down -v --remove-orphans
 
 # Backwards-compat aliases
 local-up: up

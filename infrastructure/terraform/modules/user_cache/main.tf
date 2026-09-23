@@ -96,8 +96,8 @@ resource "aws_elasticache_replication_group" "user" {
   transit_encryption_enabled = true
   auth_token                 = random_password.auth.result
 
-  snapshot_retention_limit = var.snapshot_retention_limit
-  apply_immediately        = true
+  snapshot_retention_limit   = var.snapshot_retention_limit
+  apply_immediately          = true
   auto_minor_version_upgrade = true
 
   tags = var.tags
