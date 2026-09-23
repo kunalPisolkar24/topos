@@ -20,7 +20,7 @@ visible as an experiment on the uploaded dataset; it requires
 ``LANGSMITH_API_KEY`` and a dataset pushed with ``make eval-dataset``.
 
 Driven by ``scripts/run_evals.py`` (--suite chat); needs the service-level
-stack up (services/ai/compose.local.yml).
+stack up (services/ai/infra/compose.yml).
 """
 
 from __future__ import annotations

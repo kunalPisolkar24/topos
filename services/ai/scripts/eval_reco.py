@@ -35,7 +35,7 @@ bring the service up with AGENT_MODE=fake (scripted picks) or agent before
 recording/comparing -- DEFAULT-mode rows then reflect the decided presets.
 
 Driven by ``scripts/run_evals.py`` (--suite reco); needs the service-level
-stack up (services/ai/compose.local.yml).
+stack up (services/ai/infra/compose.yml).
 """
 
 from __future__ import annotations

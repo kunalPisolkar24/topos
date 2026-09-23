@@ -36,7 +36,7 @@ eval-dataset-local:
 
 # Verify the curated corpus is actually retrievable by the running service.
 # Requires the service-level stack:
-#   docker compose -f services/ai/compose.local.yml up -d --build
+#   docker compose -f services/ai/infra/compose.yml up -d --build
 eval-verify:
 	poetry run python scripts/verify_eval_dataset.py
 
@@ -103,7 +103,7 @@ docker-logs:
 
 # --- Load Test Targets ---
 
-COMPOSE_LT := docker compose -f load-tests/compose.loadtest.yml --project-name topos-ai-loadtest
+COMPOSE_LT := docker compose -f infra/compose.load.yml --project-name topos-ai-loadtest
 
 RPS       ?= 100
 VUS       ?= 20
@@ -170,7 +170,7 @@ load-test: load-test-build
 		echo "unknown EMBEDDING_MODE=$(EMBEDDING_MODE). valid: fake ollama"; exit 2; \
 	fi
 	@if [ "$(EMBEDDING_MODE)" = "ollama" ]; then \
-		$(LT_VARS) $(COMPOSE_LT) --profile embedding-real up -d --wait ollama; \
+		$(LT_VARS) $(COMPOSE_LT) --profile embedding-real up -d --wait embedding-service embedding-model-init; \
 	fi
 	$(LT_VARS) $(COMPOSE_LT) up -d --wait ai-service
 	$(LT_VARS) $(COMPOSE_LT) run --rm k6

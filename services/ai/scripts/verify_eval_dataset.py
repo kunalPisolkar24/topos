@@ -14,7 +14,7 @@ enforced here because the dense threshold can still surface loosely related
 posts -- citation suppression for those is the LLM's job at chat time.
 
 Requires the service-level stack:
-    docker compose -f services/ai/compose.local.yml up -d --build
+    docker compose -f services/ai/infra/compose.yml up -d --build
 
 Usage:
     poetry run python scripts/verify_eval_dataset.py

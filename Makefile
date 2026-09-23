@@ -7,7 +7,7 @@ help:
 	@echo "  Run each service individually via its own compose.yml:"
 	@echo "    services/user:    docker compose -f services/user/infra/compose.yml up -d"
 	@echo "    services/content: docker compose -f services/content/infra/compose.yml up -d"
-	@echo "    services/ai:      docker compose -f services/ai/compose.local.yml up -d"
+	@echo "    services/ai:      docker compose -f services/ai/infra/compose.yml up -d"
 	@echo "    gateway:          docker compose -f gateway/compose.yml up -d"
 	@echo "    frontend:         docker compose -f frontend/infra/compose.yml up -d"
 	@echo ""

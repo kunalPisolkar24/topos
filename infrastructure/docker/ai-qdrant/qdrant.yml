@@ -1,7 +1,6 @@
 services:
   qdrant:
     image: qdrant/qdrant:v1.19.0
-    container_name: ${QDRANT_CONTAINER:-local-qdrant}
     restart: unless-stopped
     ports:
       - "${QDRANT_EXT_PORT:-6333}:${QDRANT_INT_PORT:-6333}"
@@ -18,14 +17,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: ${QDRANT_MEM:-1G}
         reservations:
           memory: 512M
 
 volumes:
   qdrant_data:
-
-networks:
-  app-network:
-    external: true
-    name: ${APP_NETWORK:-topos_prod_network}

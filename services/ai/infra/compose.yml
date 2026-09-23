@@ -12,7 +12,7 @@ x-ai-service-env: &ai-service-env
   LANGCHAIN_TRACING: ${AI_LANGCHAIN_TRACING:-false}
   LANGCHAIN_API_KEY: ${AI_LANGCHAIN_API_KEY:-}
   LANGCHAIN_PROJECT: ${AI_LANGCHAIN_PROJECT:-topos-ai}
-  CHECKPOINT_DB_URL: ${AI_CHECKPOINT_DB_URL:-postgresql://ai_checkpointer:ai_checkpointer_pass@ai-postgres:5432/ai_checkpoints}
+  CHECKPOINT_DB_URL: ${AI_CHECKPOINT_DB_URL:-postgresql://${AI_POSTGRES_USER:-ai_checkpointer}:${AI_POSTGRES_PASSWORD:-ai_checkpointer_pass}@user-postgres:5432/${AI_POSTGRES_DB:-ai_checkpoints}}
   QDRANT_URL: ${AI_QDRANT_URL:-http://qdrant:6333}
   QDRANT_API_KEY: ${AI_QDRANT_API_KEY:-}
   QDRANT_VECTOR_SIZE: ${AI_QDRANT_VECTOR_SIZE:-1024}
@@ -23,36 +23,21 @@ x-ai-service-env: &ai-service-env
   OTEL_EXPORTER_OTLP_ENDPOINT: ${AI_OTLP_ENDPOINT:-}
 
 include:
-  - path: infra/qdrant.yml
-  - path: infra/embedding.yml
+  - path: ../../../infrastructure/docker/ai-qdrant/qdrant.yml
+  - path: ../../../infrastructure/docker/ai-embeddings/embedding.yml
+  - path: ../../../infrastructure/docker/users-postgres/postgres.yml
 
 services:
-  ai-postgres:
-    image: postgres:16-alpine
-    container_name: ${AI_POSTGRES_CONTAINER:-prod-ai-postgres}
-    restart: unless-stopped
+  # Shared instance (see infrastructure/docker/users-postgres): remap the
+  # host port so the ai and user stacks can run side by side.
+  user-postgres:
     ports:
       - "${AI_POSTGRES_EXT_PORT:-5433}:5432"
-    environment:
-      - POSTGRES_USER=${AI_POSTGRES_USER:-ai_checkpointer}
-      - POSTGRES_PASSWORD=${AI_POSTGRES_PASSWORD:-ai_checkpointer_pass}
-      - POSTGRES_DB=${AI_POSTGRES_DB:-ai_checkpoints}
-    volumes:
-      - ai_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AI_POSTGRES_USER:-ai_checkpointer} -d ${AI_POSTGRES_DB:-ai_checkpoints}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - app-network
 
   ai-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    container_name: ${AI_SERVICE_CONTAINER:-local-ai-service}
     restart: unless-stopped
     ports:
       - "${AI_SERVICE_EXT_PORT:-50051}:${AI_SERVICE_INT_PORT:-50051}"
@@ -65,7 +50,7 @@ services:
         condition: service_healthy
       embedding-model-init:
         condition: service_completed_successfully
-      ai-postgres:
+      user-postgres:
         condition: service_healthy
     healthcheck:
       test:
@@ -87,10 +72,6 @@ services:
     networks:
       - app-network
 
-volumes:
-  ai_postgres_data:
-
 networks:
   app-network:
-    external: true
     name: ${APP_NETWORK:-topos_local_network}

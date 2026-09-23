@@ -67,7 +67,7 @@ call at read time. Unknown post ids yield an empty result.
 ## Docker
 
 ```bash
-docker compose up -d --build
+docker compose -f infra/compose.yml up -d --build
 ```
 
 Runs the service as `ai-service` (resolvable by other services on the
@@ -112,7 +112,7 @@ stack first, then:
 make eval-verify   # indexes the corpus and asserts expected posts are retrieved
 ```
 
-This needs real embeddings, so run it against the `compose.local.yml` stack
+This needs real embeddings, so run it against the `infra/compose.yml` stack
 (Qdrant + Ollama), not the fake-embedding path.
 
 `scripts/verify_eval_chat.py` validates citations end-to-end via `ChatAnswer`

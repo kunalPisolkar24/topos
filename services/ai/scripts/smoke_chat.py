@@ -6,7 +6,7 @@ Usage
 Start the stack first (services/ai/.env must set ``LIGHTNING_AI_API_KEY``
 and ``AI_LLM_MODE=real`` for a real model):
 
-    docker compose -f services/ai/compose.local.yml up --build
+    docker compose -f services/ai/infra/compose.yml up --build
 
 then, from services/ai:
 

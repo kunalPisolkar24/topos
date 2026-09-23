@@ -8,8 +8,14 @@ services:
       - POSTGRES_USER=topos_user
       - POSTGRES_PASSWORD=topos_pass
       - POSTGRES_DB=topos_users
+      # Second role/database for the ai checkpointer (see init/); defaults
+      # keep docker and init in sync, overrides via AI_POSTGRES_*.
+      - AI_POSTGRES_USER=${AI_POSTGRES_USER:-ai_checkpointer}
+      - AI_POSTGRES_PASSWORD=${AI_POSTGRES_PASSWORD:-ai_checkpointer_pass}
+      - AI_POSTGRES_DB=${AI_POSTGRES_DB:-ai_checkpoints}
     volumes:
       - user_postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U topos_user -d topos_users"]
       interval: 10s

@@ -13,7 +13,7 @@ citation quality:
   suppression for loosely-retrieved posts is a retrieval/prompt concern, not a
   dataset defect (kept out of issue #160's scope).
 
-Requires the service-level stack up (services/ai/compose.local.yml). Set
+Requires the service-level stack up (services/ai/infra/compose.yml). Set
 AI_LLM_MODE=real with LIGHTNING_AI_API_KEY / AI_LIGHTNING_MODEL for a real-LLM
 run; otherwise it validates the fake-LLM path.
 
