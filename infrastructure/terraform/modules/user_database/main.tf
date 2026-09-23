@@ -115,15 +115,15 @@ resource "aws_db_instance" "user" {
 # ---------------------------------------------------------------------------
 # RDS Proxy — connection pooling for the app (DATABASE_URL)
 # On Floci this is mocked; on real AWS it requires IAM role + Secrets Manager.
-# We create the proxy only when not on Floci, to avoid Floci apply failures.
-# Floci's RDS proxy is not fully emulated; the app will still use the writer
-# endpoint directly when proxy_endpoint is empty, which is fine for testing.
+# Floci now supports proxy (verified via `aws rds create-db-proxy` → available
+# at 172.18.0.2), so we create it in both envs. App still falls back to writer
+# when proxy_endpoint is empty (main.tf:189).
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "proxy" {
-  count = var.aws_endpoint_url == "" ? 1 : 0
+  count = 1
 
   name = "${var.name_prefix}-proxy-role"
 
@@ -140,7 +140,7 @@ resource "aws_iam_role" "proxy" {
 }
 
 resource "aws_iam_role_policy" "proxy_secrets" {
-  count = var.aws_endpoint_url == "" ? 1 : 0
+  count = 1
 
   name = "${var.name_prefix}-proxy-secrets"
   role = aws_iam_role.proxy[0].id
@@ -156,7 +156,7 @@ resource "aws_iam_role_policy" "proxy_secrets" {
 }
 
 resource "aws_db_proxy" "user" {
-  count = var.aws_endpoint_url == "" ? 1 : 0
+  count = 1
 
   name                   = "${var.name_prefix}-proxy"
   engine_family          = "POSTGRESQL"
@@ -176,7 +176,7 @@ resource "aws_db_proxy" "user" {
 }
 
 resource "aws_db_proxy_default_target_group" "user" {
-  count = var.aws_endpoint_url == "" ? 1 : 0
+  count = 1
 
   db_proxy_name = aws_db_proxy.user[0].name
 
@@ -188,7 +188,7 @@ resource "aws_db_proxy_default_target_group" "user" {
 }
 
 resource "aws_db_proxy_target" "user" {
-  count = var.aws_endpoint_url == "" ? 1 : 0
+  count = 1
 
   db_proxy_name          = aws_db_proxy.user[0].name
   target_group_name      = aws_db_proxy_default_target_group.user[0].name
