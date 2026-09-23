@@ -89,26 +89,39 @@ func (r *statusRecorder) WriteHeader(status int) {
 	r.ResponseWriter.WriteHeader(status)
 }
 
-// MetricsMiddleware records request count and latency by route and
-// status class for every response it wraps.
+var excludedPaths = map[string]bool{
+	"/metrics": true,
+	"/health":  true,
+	"/healthz": true,
+	"/ready":   true,
+	"/readyz":  true,
+}
+
+// MetricsMiddleware records request count and latency by method, route and
+// status class for every response it wraps. Probes and metrics are excluded from counting.
 func MetricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if excludedPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
+		metrics.HTTPRequestsInFlight.Inc()
+		defer metrics.HTTPRequestsInFlight.Dec()
 		start := time.Now()
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
 		next.ServeHTTP(recorder, r)
 
-		metrics.HTTPRequestsTotal.WithLabelValues(r.URL.Path, statusClass(recorder.status)).Inc()
-		metrics.HTTPRequestDuration.WithLabelValues(r.URL.Path).Observe(time.Since(start).Seconds())
+		duration := time.Since(start).Seconds()
+		metrics.HTTPRequestsTotal.WithLabelValues(r.Method, r.URL.Path, statusClass(recorder.status)).Inc()
+		metrics.HTTPRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
 
-		if r.URL.Path != "/metrics" {
-			LoggerFromContext(r.Context()).Info("request",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", recorder.status,
-				"duration_ms", time.Since(start).Milliseconds(),
-			)
-		}
+		LoggerFromContext(r.Context()).Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", recorder.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
 	})
 }
 

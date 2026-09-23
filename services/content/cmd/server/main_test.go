@@ -33,9 +33,9 @@ func (f *fakeProducer) Ping(ctx context.Context) error { return f.err }
 func (f *fakeProducer) Close() error { return nil }
 
 func TestHealthOK(t *testing.T) {
-	h := health.ServiceHealthHandler(fakePinger{}, nil, &fakeProducer{})
+	h := health.LivenessHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
@@ -43,32 +43,32 @@ func TestHealthOK(t *testing.T) {
 }
 
 func TestHealthMongoDown(t *testing.T) {
-	h := health.ServiceHealthHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
+	h := health.LivenessHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
 	// Liveness always 200, even when mongo is down.
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), `"db":"unavailable"`)
+	assert.Contains(t, rec.Body.String(), `"status":"ok"`)
 }
 
 func TestHealthKafkaDown(t *testing.T) {
-	h := health.ServiceHealthHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
+	h := health.LivenessHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), `"kafka":"unavailable"`)
+	assert.Contains(t, rec.Body.String(), `"status":"ok"`)
 }
 
 func TestReadyOK(t *testing.T) {
-	h := health.ReadinessHandler(fakePinger{}, nil, &fakeProducer{})
+	h := health.ReadyzHandler(fakePinger{})
 
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
@@ -76,9 +76,9 @@ func TestReadyOK(t *testing.T) {
 }
 
 func TestReadyMongoDown(t *testing.T) {
-	h := health.ReadinessHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
+	h := health.ReadyzHandler(fakePinger{err: errors.New("mongo down")})
 
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
@@ -87,9 +87,9 @@ func TestReadyMongoDown(t *testing.T) {
 }
 
 func TestReadyKafkaDownStillReady(t *testing.T) {
-	h := health.ReadinessHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
+	h := health.ReadyzHandler(fakePinger{})
 
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 

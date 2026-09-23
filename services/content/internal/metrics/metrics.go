@@ -4,28 +4,52 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	// HTTPRequestsTotal counts handled requests by route and status
+	// HTTPRequestsTotal counts handled requests by method, route and status
 	// class (2xx, 4xx, 5xx).
 	HTTPRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "content",
 		Subsystem: "http",
 		Name:      "requests_total",
-		Help:      "HTTP requests handled, by route and status class.",
-	}, []string{"route", "status"})
+		Help:      "HTTP requests handled, by method, route and status class.",
+	}, []string{"method", "route", "status"})
 
-	// HTTPRequestDuration measures request latency by route.
+	// HTTPRequestDuration measures request latency by method and route.
 	HTTPRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "content",
 		Subsystem: "http",
 		Name:      "request_duration_seconds",
-		Help:      "HTTP request latency in seconds, by route.",
+		Help:      "HTTP request latency in seconds, by method and route.",
 		Buckets:   prometheus.DefBuckets,
-	}, []string{"route"})
+	}, []string{"method", "route"})
+
+	HTTPRequestsInFlight = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "content",
+		Subsystem: "http",
+		Name:      "requests_in_flight",
+		Help:      "HTTP requests currently being processed.",
+	})
+
+	GraphQLOperationsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "content",
+		Subsystem: "graphql",
+		Name:      "operations_total",
+		Help:      "GraphQL operations by operation and status.",
+	}, []string{"operation", "status"})
+
+	GraphQLOperationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "content",
+		Subsystem: "graphql",
+		Name:      "operation_duration_seconds",
+		Help:      "GraphQL operation latency in seconds, by operation and status.",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"operation", "status"})
 
 	// HTTPPanicsTotal counts panics recovered by RecoverMiddleware.
 	HTTPPanicsTotal = promauto.NewCounter(prometheus.CounterOpts{
@@ -76,6 +100,46 @@ var (
 		Name:      "breaker_state",
 		Help:      "Cache circuit breaker state (0 closed, 1 open, 2 half-open).",
 	})
+
+	CacheInvalidationsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "content",
+		Subsystem: "cache",
+		Name:      "invalidations_total",
+		Help:      "Cache invalidations by operation and result.",
+	}, []string{"operation", "result"})
+
+	RedisConnected = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "content",
+		Subsystem: "redis",
+		Name:      "connected",
+		Help:      "1 when Redis is connected, 0 otherwise.",
+	})
+
+	DependencyUp = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "content",
+		Name:      "dependency_up",
+		Help:      "1 when a dependency is up, 0 otherwise.",
+	}, []string{"dep"})
+
+	DependencyPingDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "content",
+		Name:      "dependency_ping_duration_seconds",
+		Help:      "Latency of dependency pings, by dep.",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"dep"})
+
+	ProbeChecksTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "content",
+		Name:      "probe_checks_total",
+		Help:      "Probe checks by probe and result.",
+	}, []string{"probe", "result"})
+
+	DBQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "content",
+		Name:      "db_query_duration_seconds",
+		Help:      "Database query latency, by operation and status.",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"operation", "status"})
 
 	// AIFallbackEngaged counts AI calls served from the degraded path:
 	// fallback results returned, or errors surfaced because the primary
@@ -178,3 +242,11 @@ var (
 		Help:      "Uncommitted messages per reader, from kafka-go stats.",
 	}, []string{"reader"})
 )
+
+func ObserveDBQuery(operation string, start time.Time, err error) {
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	DBQueryDuration.WithLabelValues(operation, status).Observe(time.Since(start).Seconds())
+}

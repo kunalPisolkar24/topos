@@ -11,8 +11,8 @@ import (
 )
 
 func TestCollectorsRegistered(t *testing.T) {
-	HTTPRequestsTotal.WithLabelValues("/query", "2xx").Inc()
-	HTTPRequestDuration.WithLabelValues("/query").Observe(0.01)
+	HTTPRequestsTotal.WithLabelValues("GET", "/query", "2xx").Inc()
+	HTTPRequestDuration.WithLabelValues("GET", "/query").Observe(0.01)
 	InteractionsTotal.WithLabelValues("view", "published").Inc()
 	WorkerMessagesTotal.WithLabelValues("completed").Inc()
 	WorkerLag.WithLabelValues("0").Set(1)

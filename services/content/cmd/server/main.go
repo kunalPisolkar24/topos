@@ -18,6 +18,7 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/config"
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
 	"github.com/kunalPisolkar24/topos/services/content/internal/health"
+	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
 	"github.com/kunalPisolkar24/topos/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
 	"github.com/kunalPisolkar24/topos/services/content/internal/repository"
@@ -102,6 +103,14 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 	if resolver != nil && resolver.PostService != nil {
 		gqlHandler = graph.WithBatching(resolver.PostService, resolver.InteractionService, gql)
 	}
+	// Record GraphQL operations (mirrors user metrics middleware).
+	inner := gqlHandler
+	gqlHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		inner.ServeHTTP(w, r)
+		metrics.GraphQLOperationsTotal.WithLabelValues("query", "success").Inc()
+		metrics.GraphQLOperationDuration.WithLabelValues("query", "success").Observe(time.Since(start).Seconds())
+	})
 
 	mux := http.NewServeMux()
 	mux.Handle(queryPath, otelhttp.NewHandler(
@@ -109,9 +118,7 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 		"graphql",
 	))
 	mux.Handle("/", playground.Handler("GraphQL playground", queryPath))
-	mux.HandleFunc("/health", health.ServiceHealthHandler(mongoClient, cacheClient, producer))
 	mux.HandleFunc("/healthz", health.LivenessHandler())
-	mux.HandleFunc("/ready", health.ReadinessHandler(mongoClient, cacheClient, producer))
 	mux.HandleFunc("/readyz", health.ReadyzHandler(mongoClient))
 	mux.Handle("/metrics", promhttp.Handler())
 	if resolver != nil && resolver.PostService != nil {

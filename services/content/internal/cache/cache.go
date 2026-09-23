@@ -265,14 +265,17 @@ func Del(c *Cache, ctx context.Context, key string) {
 		return
 	}
 	if !c.breaker.canProceed() {
+		metrics.CacheInvalidationsTotal.WithLabelValues("key", "error").Inc()
 		return
 	}
 	if err := c.client.Del(ctx, key).Err(); err != nil {
 		c.breaker.recordFailure()
 		cacheError("del", "key", key, err)
+		metrics.CacheInvalidationsTotal.WithLabelValues("key", "error").Inc()
 		return
 	}
 	c.breaker.recordSuccess()
+	metrics.CacheInvalidationsTotal.WithLabelValues("key", "ok").Inc()
 }
 
 // MarkSeen atomically marks key as seen: it returns true when the key
@@ -304,6 +307,7 @@ func DelPattern(c *Cache, ctx context.Context, pattern string) {
 		return
 	}
 	if !c.breaker.canProceed() {
+		metrics.CacheInvalidationsTotal.WithLabelValues("lists", "error").Inc()
 		return
 	}
 
@@ -315,19 +319,23 @@ func DelPattern(c *Cache, ctx context.Context, pattern string) {
 	if err := iter.Err(); err != nil {
 		c.breaker.recordFailure()
 		cacheError("scan", "pattern", pattern, err)
+		metrics.CacheInvalidationsTotal.WithLabelValues("lists", "error").Inc()
 		return
 	}
 	if len(keys) == 0 {
 		c.breaker.recordSuccess()
+		metrics.CacheInvalidationsTotal.WithLabelValues("lists", "ok").Inc()
 		return
 	}
 
 	if err := c.client.Del(ctx, keys...).Err(); err != nil {
 		c.breaker.recordFailure()
 		cacheError("del", "pattern", pattern, err)
+		metrics.CacheInvalidationsTotal.WithLabelValues("lists", "error").Inc()
 		return
 	}
 	c.breaker.recordSuccess()
+	metrics.CacheInvalidationsTotal.WithLabelValues("lists", "ok").Inc()
 }
 
 // cacheError logs a Redis failure at warn level and counts it, so a
