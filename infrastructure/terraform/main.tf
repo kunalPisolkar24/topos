@@ -215,6 +215,7 @@ resource "aws_ssm_parameter" "content_config" {
     LOG_LEVEL                            = "info"
     LOG_FORMAT                           = "json"
     OTEL_SERVICE_NAME                    = "content-service"
+    OTEL_EXPORTER_OTLP_ENDPOINT          = ""
     JWT_ISSUER                           = "user-service"
     JWT_AUDIENCE                         = "topos"
     KAFKA_TOPIC                          = "posts"
@@ -247,7 +248,7 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
       MONGO_URI      = "mongodb://content-mongo:27017"
       KAFKA_BROKERS  = "kafka-1:9092"
       REDIS_ADDR     = "user-redis:6379"
-      DB_NAME        = "blog_content"
+      REDIS_PASSWORD = ""
       JWT_SECRET     = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
       INTERNAL_TOKEN = "floci-internal-secret-0123456789abcdef0123456789abcdef-floci"
       AI_SERVICE_URL = "ai-service:50051"
@@ -259,7 +260,7 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
       )
       KAFKA_BROKERS  = try(coalesce(module.content_streaming.bootstrap_brokers, ""), "kafka-1:9092")
       REDIS_ADDR     = "user-redis:6379"
-      DB_NAME        = "blog_content"
+      REDIS_PASSWORD = ""
       JWT_SECRET     = random_password.jwt.result
       INTERNAL_TOKEN = random_password.internal_token.result
       AI_SERVICE_URL = "ai-service:50051"

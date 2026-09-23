@@ -12,11 +12,8 @@ TF_MANAGED_SECRETS: frozenset[str] = frozenset(
         "topos-user-prod/master",
         "topos-user-prod/redis-auth",
         "topos-content-floci/docdb-master",
-        "topos-content-floci/msk-kafka",
         "topos-content-dev/docdb-master",
-        "topos-content-dev/msk-kafka",
         "topos-content-prod/docdb-master",
-        "topos-content-prod/msk-kafka",
     }
 )
 

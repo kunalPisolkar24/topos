@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -48,6 +49,18 @@ type Config struct {
 
 var loadOnce sync.Once
 
+var contentAliases = map[string]string{
+	"CONTENT_MONGO_URI":      "MONGO_URI",
+	"CONTENT_DB_NAME":        "DB_NAME",
+	"CONTENT_REDIS_ADDR":     "REDIS_ADDR",
+	"CONTENT_REDIS_PASSWORD": "REDIS_PASSWORD",
+	"CONTENT_JWT_SECRET":     "JWT_SECRET",
+	"CONTENT_INTERNAL_TOKEN": "INTERNAL_TOKEN",
+	"CONTENT_AI_SERVICE_URL": "AI_SERVICE_URL",
+	"CONTENT_KAFKA_BROKERS":  "KAFKA_BROKERS",
+	"CONTENT_KAFKA_TOPIC":    "KAFKA_TOPIC",
+}
+
 // LoadConfig reads configuration from the environment, falling back to a
 // local .env file when present, then to sane defaults. When ENV_TYPE=prod
 // it hydrates missing vars from SSM (/topos/content/config) and SM
@@ -55,9 +68,12 @@ var loadOnce sync.Once
 // or real AWS), mirroring the user service.
 func LoadConfig() Config {
 	loadEnvFile()
+	normalizeAliases()
 	envType := strings.TrimSpace(os.Getenv("ENV_TYPE"))
 	if envType == "prod" {
 		loadFromAWS()
+		// Re-normalize after AWS hydrate (SSM/SM may still use CONTENT_ prefix on Floci).
+		normalizeAliases()
 	}
 
 	return Config{
@@ -90,6 +106,14 @@ func LoadConfig() Config {
 	}
 }
 
+func normalizeAliases() {
+	for aliased, canonical := range contentAliases {
+		if v := strings.TrimSpace(os.Getenv(aliased)); v != "" && strings.TrimSpace(os.Getenv(canonical)) == "" {
+			_ = os.Setenv(canonical, v)
+		}
+	}
+}
+
 func loadFromAWS() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -99,20 +123,28 @@ func loadFromAWS() {
 	secretsName := getEnv("CONTENT_SECRETS_NAME", "topos/content/secrets")
 	configParam := getEnv("CONTENT_CONFIG_PARAM", "/topos/content/config")
 
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
+	// Build AWS config with explicit creds for Floci before LoadDefaultConfig reads env.
+	var loadOpts []func(*awsconfig.LoadOptions) error
+	loadOpts = append(loadOpts, awsconfig.WithRegion(region))
+	if endpoint != "" {
+		// Floci uses dummy creds; inject before load so SDK picks them up.
+		accessKey := strings.TrimSpace(os.Getenv("AWS_ACCESS_KEY_ID"))
+		secretKey := strings.TrimSpace(os.Getenv("AWS_SECRET_ACCESS_KEY"))
+		if accessKey == "" {
+			accessKey = "test"
+		}
+		if secretKey == "" {
+			secretKey = "test"
+		}
+		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")))
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
 	if err != nil {
 		slog.Warn("content config: AWS load failed", "error", err)
 		return
 	}
 	if endpoint != "" {
 		cfg.BaseEndpoint = aws.String(endpoint)
-		// Floci uses dummy creds.
-		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
-			_ = os.Setenv("AWS_ACCESS_KEY_ID", "test")
-		}
-		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-			_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
-		}
 	}
 
 	// SSM — JSON blob
@@ -126,8 +158,12 @@ func loadFromAWS() {
 		}
 		out, err := client.GetParameter(ctx, &ssm.GetParameterInput{Name: aws.String(configParam)})
 		if err != nil {
-			// NotFound is not fatal; just warn if other error.
-			slog.Debug("content config: SSM fetch failed", "param", configParam, "error", err)
+			msg := err.Error()
+			if strings.Contains(msg, "ParameterNotFound") || strings.Contains(strings.ToLower(msg), "not found") {
+				slog.Debug("content config: SSM param not found", "param", configParam)
+			} else {
+				slog.Warn("content config: SSM fetch failed", "param", configParam, "error", err)
+			}
 			return
 		}
 		if out.Parameter != nil && out.Parameter.Value != nil {
@@ -152,7 +188,12 @@ func loadFromAWS() {
 		}
 		out, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(secretsName)})
 		if err != nil {
-			slog.Debug("content config: SM fetch failed", "secret", secretsName, "error", err)
+			msg := err.Error()
+			if strings.Contains(msg, "ResourceNotFoundException") || strings.Contains(strings.ToLower(msg), "not found") {
+				slog.Debug("content config: SM secret not found", "secret", secretsName)
+			} else {
+				slog.Warn("content config: SM fetch failed", "secret", secretsName, "error", err)
+			}
 			return
 		}
 		if out.SecretString != nil {
