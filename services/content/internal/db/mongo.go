@@ -39,6 +39,27 @@ func Connect(ctx context.Context, uri string) (*mongo.Client, error) {
 	return client, nil
 }
 
+// ConnectLazy dials mongo without verifying the connection. It never
+// pings, so it succeeds even when the server is down. Use it for
+// degraded boot (WITH_MONGO=0): health probes will report degraded
+// instead of crashing the process.
+func ConnectLazy(ctx context.Context, uri string) (*mongo.Client, error) {
+	return mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMonitor(otelmongo.NewMonitor()))
+}
+
+// PingMongo reports whether the client can reach the cluster.
+func PingMongo(ctx context.Context, client *mongo.Client) string {
+	if client == nil {
+		return "unavailable"
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
+		return "unavailable"
+	}
+	return "ok"
+}
+
 // ping verifies the client can reach the cluster.
 func ping(ctx context.Context, client *mongo.Client) error {
 	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)

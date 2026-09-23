@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/config"
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
 	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
+	"github.com/kunalPisolkar24/topos/services/content/internal/shutdown"
 	"github.com/kunalPisolkar24/topos/services/content/internal/worker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -76,6 +78,7 @@ func run() error {
 	slog.Info("personalizer worker started", "group", cfg.KafkaPersonalizerConsumerGroupID, "topic", cfg.KafkaUserInteractedTopic, "concurrency", cfg.WorkerConcurrency)
 
 	<-ctx.Done()
+	shutdown.SetShuttingDown(true)
 	slog.Info("shutting down personalizer worker")
 
 	select {
@@ -89,33 +92,83 @@ func run() error {
 	return server.Shutdown(shutdownCtx)
 }
 
-// newHealthHandler reports 200 when kafka, the worker loop and the AI
-// service are healthy, and serves Prometheus metrics on /metrics.
+func pingKafka(ctx context.Context, producer domain.EventProducer) string {
+	if producer == nil {
+		return "unavailable"
+	}
+	if err := producer.Ping(ctx); err != nil {
+		return "unavailable"
+	}
+	return "ok"
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// newHealthHandler reports liveness (always 200) and readiness (503 when kafka/worker/ai down).
 func newHealthHandler(producer domain.EventProducer, w *worker.PersonalizerWorker) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/health", func(rw http.ResponseWriter, r *http.Request) {
+		if shutdown.IsShuttingDown() {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
 		defer cancel()
-
-		checks := []struct {
-			name string
-			err  error
-		}{
-			{"kafka", producer.Ping(ctx)},
-			{"worker", w.Running()},
-			{"ai", w.Healthy(ctx)},
+		writeJSON(rw, http.StatusOK, map[string]string{
+			"status": "ok",
+			"kafka":  pingKafka(ctx, producer),
+			"worker": func() string {
+				if w.Running() == nil {
+					return "ok"
+				}
+				return "unavailable"
+			}(),
+			"ai": func() string {
+				if w.Healthy(ctx) == nil {
+					return "ok"
+				}
+				return "unavailable"
+			}(),
+		})
+	})
+	mux.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+		if shutdown.IsShuttingDown() {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
+			return
 		}
-
-		status := http.StatusOK
-		for _, check := range checks {
-			if check.err != nil {
-				slog.Warn("health check failed", "check", check.name, "error", check.err)
-				status = http.StatusServiceUnavailable
-			}
+		writeJSON(rw, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	mux.HandleFunc("/ready", func(rw http.ResponseWriter, r *http.Request) {
+		if shutdown.IsShuttingDown() {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
+			return
 		}
-
-		rw.WriteHeader(status)
+		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
+		defer cancel()
+		kafkaStatus := pingKafka(ctx, producer)
+		if kafkaStatus != "ok" || w.Running() != nil || w.Healthy(ctx) != nil {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "degraded", "kafka": kafkaStatus})
+			return
+		}
+		writeJSON(rw, http.StatusOK, map[string]string{"status": "ok", "kafka": kafkaStatus})
+	})
+	mux.HandleFunc("/readyz", func(rw http.ResponseWriter, r *http.Request) {
+		if shutdown.IsShuttingDown() {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
+		defer cancel()
+		if pingKafka(ctx, producer) != "ok" || w.Running() != nil || w.Healthy(ctx) != nil {
+			writeJSON(rw, http.StatusServiceUnavailable, map[string]string{"status": "degraded"})
+			return
+		}
+		writeJSON(rw, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	return mux
 }

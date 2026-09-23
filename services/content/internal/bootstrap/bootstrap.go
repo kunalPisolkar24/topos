@@ -29,8 +29,9 @@ type Dependencies struct {
 }
 
 // New connects to mongo, redis, the AI service and Kafka, and wires the
-// OpenTelemetry SDK. Redis is resilient: when unavailable it runs in
-// degraded mode and recovers automatically without a restart.
+// OpenTelemetry SDK. Mongo is best-effort: when unavailable the service
+// still boots in degraded mode (ready 503) so WITH_MONGO=0 can be
+// exercised without crash-looping. Redis is resilient via its breaker.
 func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependencies, error) {
 	shutdownTracing, err := observability.SetupTracing(ctx, cfg.OtelEndpoint, serviceName)
 	if err != nil {
@@ -39,17 +40,23 @@ func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependenc
 
 	mongoClient, err := db.Connect(ctx, cfg.MongoURI)
 	if err != nil {
-		shutdownTracing(context.Background())
-		return nil, fmt.Errorf("connect mongo: %w", err)
+		slog.Warn("mongo unavailable, running in degraded mode", "error", err)
+		// Keep a lazy client for health probes; real operations will fail
+		// with SERVICE_UNAVAILABLE until the server returns.
+		if lazy, lerr := db.ConnectLazy(ctx, cfg.MongoURI); lerr == nil {
+			mongoClient = lazy
+		} else {
+			shutdownTracing(context.Background())
+			return nil, fmt.Errorf("connect mongo (lazy): %w", lerr)
+		}
+	} else {
+		slog.Info("connected to mongo", "db", cfg.DbName)
+		if err := db.EnsureIndexes(ctx, mongoClient.Database(cfg.DbName)); err != nil {
+			slog.Warn("mongo ensure indexes failed, running degraded", "error", err)
+		} else {
+			slog.Info("mongo indexes ready")
+		}
 	}
-	slog.Info("connected to mongo", "db", cfg.DbName)
-
-	if err := db.EnsureIndexes(ctx, mongoClient.Database(cfg.DbName)); err != nil {
-		_ = mongoClient.Disconnect(ctx)
-		shutdownTracing(context.Background())
-		return nil, fmt.Errorf("ensure indexes: %w", err)
-	}
-	slog.Info("mongo indexes ready")
 
 	cacheOpts := cache.Options{
 		Addr:     cfg.RedisAddr,

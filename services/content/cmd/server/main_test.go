@@ -30,7 +30,7 @@ func (f *fakeProducer) Ping(ctx context.Context) error { return f.err }
 func (f *fakeProducer) Close() error { return nil }
 
 func TestHealthOK(t *testing.T) {
-	h := healthHandler(fakePinger{}, &fakeProducer{})
+	h := healthHandler(fakePinger{}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -40,30 +40,63 @@ func TestHealthOK(t *testing.T) {
 }
 
 func TestHealthMongoDown(t *testing.T) {
-	h := healthHandler(fakePinger{err: errors.New("mongo down")}, &fakeProducer{})
+	h := healthHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
-	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Contains(t, rec.Body.String(), "mongo unreachable")
+	// Liveness always 200, even when mongo is down.
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"db":"unavailable"`)
 }
 
 func TestHealthKafkaDown(t *testing.T) {
-	h := healthHandler(fakePinger{}, &fakeProducer{err: errors.New("kafka down")})
+	h := healthHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	h(rec, req)
 
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"kafka":"unavailable"`)
+}
+
+func TestReadyOK(t *testing.T) {
+	h := readyHandler(fakePinger{}, nil, &fakeProducer{})
+
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec := httptest.NewRecorder()
+	h(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestReadyMongoDown(t *testing.T) {
+	h := readyHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
+
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec := httptest.NewRecorder()
+	h(rec, req)
+
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Contains(t, rec.Body.String(), "kafka unreachable")
+	assert.Contains(t, rec.Body.String(), `"db":"unavailable"`)
+}
+
+func TestReadyKafkaDownStillReady(t *testing.T) {
+	h := readyHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
+
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec := httptest.NewRecorder()
+	h(rec, req)
+
+	// Readiness is gated on mongo only; kafka down still ready (degraded).
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
 func TestHandlerRoutes(t *testing.T) {
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil)
 
 	tests := []struct {
 		name       string
@@ -89,7 +122,7 @@ func TestHandlerRoutes(t *testing.T) {
 func TestHandlerQueryExecutesResolver(t *testing.T) {
 	resolver := newResolverWithMocks(t)
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, resolver, nil, nil)
+	h := newHandler(cfg, resolver, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/query",
 		bytes.NewBufferString(`{"query":"{ posts { posts { id } } }"}`))
@@ -103,7 +136,7 @@ func TestHandlerQueryExecutesResolver(t *testing.T) {
 
 func TestHandlerSetsRequestID(t *testing.T) {
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -116,7 +149,7 @@ func TestMetricsExposeInteractionCounter(t *testing.T) {
 	metrics.InteractionsTotal.WithLabelValues("view", "published").Inc()
 
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
