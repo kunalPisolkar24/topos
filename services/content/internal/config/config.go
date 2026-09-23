@@ -18,19 +18,19 @@ import (
 )
 
 type Config struct {
-	EnvType                          string
-	Port                             string
-	MongoURI                         string
-	DbName                           string
-	RedisAddr                        string
-	RedisPassword                    string
-	JwtSecret                        string
-	JwtIssuer                        string
-	JwtAudience                      string
-	InternalToken                    string
-	AIServiceURL                     string
-	KafkaBrokers                     []string
-	KafkaTopic                       string
+	EnvType              string
+	Port                 string
+	MongoURI             string
+	DbName               string
+	RedisAddr            string
+	RedisPassword        string
+	JwtSecret            string
+	JwtIssuer            string
+	JwtAudience          string
+	InternalToken        string
+	AIServiceURL         string
+	KafkaBrokers         []string
+	KafkaTopic           string
 	KafkaUserInteractedTopic         string
 	KafkaConsumerGroupID             string
 	KafkaSearchConsumerGroupID       string
@@ -40,6 +40,10 @@ type Config struct {
 	LogFormat                        string
 	LogLevel                         string
 	OtelEndpoint                     string
+	AwsRegion                        string
+	AwsEndpointURL                   string
+	ContentSecretsName               string
+	ContentConfigParam               string
 }
 
 var loadOnce sync.Once
@@ -51,7 +55,8 @@ var loadOnce sync.Once
 // or real AWS), mirroring the user service.
 func LoadConfig() Config {
 	loadEnvFile()
-	if strings.TrimSpace(os.Getenv("ENV_TYPE")) == "prod" {
+	envType := strings.TrimSpace(os.Getenv("ENV_TYPE"))
+	if envType == "prod" {
 		loadFromAWS()
 	}
 
@@ -78,6 +83,10 @@ func LoadConfig() Config {
 		LogFormat:                        getEnv("LOG_FORMAT", "json"),
 		LogLevel:                         getEnv("LOG_LEVEL", "info"),
 		OtelEndpoint:                     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		AwsRegion:                        getEnv("AWS_REGION", "ap-south-1"),
+		AwsEndpointURL:                   getEnv("AWS_ENDPOINT_URL", ""),
+		ContentSecretsName:               getEnv("CONTENT_SECRETS_NAME", "topos/content/secrets"),
+		ContentConfigParam:               getEnv("CONTENT_CONFIG_PARAM", "/topos/content/config"),
 	}
 }
 

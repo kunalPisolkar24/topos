@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kunalPisolkar24/topos/services/content/internal/config"
+	"github.com/kunalPisolkar24/topos/services/content/internal/health"
 	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
 	"github.com/kunalPisolkar24/topos/services/content/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,8 @@ type fakePinger struct{ err error }
 
 func (f fakePinger) Ping(ctx context.Context, rp *readpref.ReadPref) error { return f.err }
 
+var _ health.Pinger = fakePinger{}
+
 type fakeProducer struct {
 	testutil.MockEventPublisher
 	err error
@@ -30,7 +33,7 @@ func (f *fakeProducer) Ping(ctx context.Context) error { return f.err }
 func (f *fakeProducer) Close() error { return nil }
 
 func TestHealthOK(t *testing.T) {
-	h := healthHandler(fakePinger{}, nil, &fakeProducer{})
+	h := health.ServiceHealthHandler(fakePinger{}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -40,7 +43,7 @@ func TestHealthOK(t *testing.T) {
 }
 
 func TestHealthMongoDown(t *testing.T) {
-	h := healthHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
+	h := health.ServiceHealthHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -52,7 +55,7 @@ func TestHealthMongoDown(t *testing.T) {
 }
 
 func TestHealthKafkaDown(t *testing.T) {
-	h := healthHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
+	h := health.ServiceHealthHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -63,7 +66,7 @@ func TestHealthKafkaDown(t *testing.T) {
 }
 
 func TestReadyOK(t *testing.T) {
-	h := readyHandler(fakePinger{}, nil, &fakeProducer{})
+	h := health.ReadinessHandler(fakePinger{}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
@@ -73,7 +76,7 @@ func TestReadyOK(t *testing.T) {
 }
 
 func TestReadyMongoDown(t *testing.T) {
-	h := readyHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
+	h := health.ReadinessHandler(fakePinger{err: errors.New("mongo down")}, nil, &fakeProducer{})
 
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
@@ -84,7 +87,7 @@ func TestReadyMongoDown(t *testing.T) {
 }
 
 func TestReadyKafkaDownStillReady(t *testing.T) {
-	h := readyHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
+	h := health.ReadinessHandler(fakePinger{}, nil, &fakeProducer{err: errors.New("kafka down")})
 
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()

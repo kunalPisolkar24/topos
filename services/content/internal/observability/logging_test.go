@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
@@ -31,13 +32,13 @@ func TestSetupLogging(t *testing.T) {
 	SetupLogging("json", "debug", "test-service")
 
 	logger := slog.Default()
-	assert.True(t, logger.Handler().Enabled(nil, slog.LevelDebug))
+	assert.True(t, logger.Handler().Enabled(context.TODO(), slog.LevelDebug))
 }
 
 func TestSetupLoggingTextFormat(t *testing.T) {
 	SetupLogging("text", "error", "test-service")
 
 	logger := slog.Default()
-	assert.False(t, logger.Handler().Enabled(nil, slog.LevelInfo))
-	assert.True(t, logger.Handler().Enabled(nil, slog.LevelError))
+	assert.False(t, logger.Handler().Enabled(context.TODO(), slog.LevelInfo))
+	assert.True(t, logger.Handler().Enabled(context.TODO(), slog.LevelError))
 }

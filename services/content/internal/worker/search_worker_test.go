@@ -16,13 +16,12 @@ import (
 
 func newTestSearchWorker(t *testing.T, ai domain.AIService) *SearchWorker {
 	t.Helper()
-	return &SearchWorker{
-		aiService:  ai,
-		dlqTopic:   "dlq",
-		maxRetries: maxRetries,
-		retryBase:  retryBase,
-		done:       make(chan struct{}),
-	}
+	base, err := newBaseRunner([]string{"localhost:9092"}, "test-group", []string{"test-topic"}, "dlq", 1, ai, nil)
+	require.NoError(t, err)
+	base.maxRetries = maxRetries
+	base.retryBase = retryBase
+	base.done = make(chan struct{})
+	return &SearchWorker{baseRunner: base}
 }
 
 func searchEventMessage(t *testing.T, payload domain.PostEventPayload) kafka.Message {
@@ -219,7 +218,7 @@ func TestSearchWorkerLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = w.Close() })
 
-	assert.Equal(t, "search worker is not running", w.Running().Error())
+	assert.Equal(t, "worker is not running", w.Running().Error())
 
 	ctx, stop := context.WithCancel(context.Background())
 	go w.Start(ctx)

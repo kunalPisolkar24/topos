@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -18,13 +17,13 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/cache"
 	"github.com/kunalPisolkar24/topos/services/content/internal/config"
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
+	"github.com/kunalPisolkar24/topos/services/content/internal/health"
 	"github.com/kunalPisolkar24/topos/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
 	"github.com/kunalPisolkar24/topos/services/content/internal/repository"
 	"github.com/kunalPisolkar24/topos/services/content/internal/service"
 	"github.com/kunalPisolkar24/topos/services/content/internal/shutdown"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -110,10 +109,10 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 		"graphql",
 	))
 	mux.Handle("/", playground.Handler("GraphQL playground", queryPath))
-	mux.HandleFunc("/health", healthHandler(mongoClient, cacheClient, producer))
-	mux.HandleFunc("/healthz", healthzHandler())
-	mux.HandleFunc("/ready", readyHandler(mongoClient, cacheClient, producer))
-	mux.HandleFunc("/readyz", readyzHandler(mongoClient))
+	mux.HandleFunc("/health", health.ServiceHealthHandler(mongoClient, cacheClient, producer))
+	mux.HandleFunc("/healthz", health.LivenessHandler())
+	mux.HandleFunc("/ready", health.ReadinessHandler(mongoClient, cacheClient, producer))
+	mux.HandleFunc("/readyz", health.ReadyzHandler(mongoClient))
 	mux.Handle("/metrics", promhttp.Handler())
 	if resolver != nil && resolver.PostService != nil {
 		mux.Handle(
@@ -127,117 +126,7 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 }
 
 // pinger abstracts the mongo connectivity check so tests can fake it.
-type pinger interface {
-	Ping(ctx context.Context, rp *readpref.ReadPref) error
-}
-
-func pingMongo(ctx context.Context, p pinger) string {
-	if p == nil {
-		return "unavailable"
-	}
-	ctx2, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	if err := p.Ping(ctx2, readpref.Primary()); err != nil {
-		return "unavailable"
-	}
-	return "ok"
-}
-
-func pingRedis(ctx context.Context, c *cache.Cache) string {
-	if c == nil {
-		return "unavailable"
-	}
-	if c.Degraded() {
-		// Distinguish degraded vs unavailable via health ping.
-		if !c.Healthy() {
-			return "unavailable"
-		}
-		return "degraded"
-	}
-	if c.Healthy() {
-		return "ok"
-	}
-	return "unavailable"
-}
-
-func pingKafka(ctx context.Context, producer domain.EventProducer) string {
-	if producer == nil {
-		return "unavailable"
-	}
-	if err := producer.Ping(ctx); err != nil {
-		return "unavailable"
-	}
-	return "ok"
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-// healthHandler is liveness: always 200 unless shutting down, reports deps.
-func healthHandler(mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if shutdown.IsShuttingDown() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down", "db": "unavailable", "redis": "unavailable", "kafka": "unavailable"})
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
-		defer cancel()
-		dbStatus := pingMongo(ctx, mongoClient)
-		redisStatus := pingRedis(ctx, cacheClient)
-		kafkaStatus := pingKafka(ctx, producer)
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "db": dbStatus, "redis": redisStatus, "kafka": kafkaStatus})
-	}
-}
-
-func healthzHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if shutdown.IsShuttingDown() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	}
-}
-
-// readyHandler is readiness: 503 when mongo is unavailable (source of truth).
-func readyHandler(mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if shutdown.IsShuttingDown() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down", "db": "unavailable", "redis": "unavailable", "kafka": "unavailable"})
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
-		defer cancel()
-		dbStatus := pingMongo(ctx, mongoClient)
-		redisStatus := pingRedis(ctx, cacheClient)
-		kafkaStatus := pingKafka(ctx, producer)
-		if dbStatus != "ok" {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "degraded", "db": dbStatus, "redis": redisStatus, "kafka": kafkaStatus})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "db": dbStatus, "redis": redisStatus, "kafka": kafkaStatus})
-	}
-}
-
-func readyzHandler(mongoClient pinger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if shutdown.IsShuttingDown() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down", "db": "unavailable"})
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), healthTimeout)
-		defer cancel()
-		dbStatus := pingMongo(ctx, mongoClient)
-		if dbStatus != "ok" {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "degraded", "db": dbStatus})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "db": dbStatus})
-	}
-}
+type pinger = health.Pinger
 
 // newServer builds the HTTP server with routes attached.
 func newServer(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) *http.Server {

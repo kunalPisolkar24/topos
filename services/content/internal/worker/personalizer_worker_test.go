@@ -16,13 +16,12 @@ import (
 
 func newTestPersonalizerWorker(t *testing.T, ai domain.AIService) *PersonalizerWorker {
 	t.Helper()
-	return &PersonalizerWorker{
-		aiService:  ai,
-		dlqTopic:   "dlq",
-		maxRetries: maxRetries,
-		retryBase:  retryBase,
-		done:       make(chan struct{}),
-	}
+	base, err := newBaseRunner([]string{"localhost:9092"}, "test-group", []string{"test-topic"}, "dlq", 1, ai, nil)
+	require.NoError(t, err)
+	base.maxRetries = maxRetries
+	base.retryBase = retryBase
+	base.done = make(chan struct{})
+	return &PersonalizerWorker{baseRunner: base}
 }
 
 func interactionMessage(t *testing.T, payload domain.UserInteractedPayload) kafka.Message {
@@ -230,7 +229,7 @@ func TestPersonalizerWorkerLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = w.Close() })
 
-	assert.Equal(t, "personalizer worker is not running", w.Running().Error())
+	assert.Equal(t, "worker is not running", w.Running().Error())
 
 	ctx, stop := context.WithCancel(context.Background())
 	go w.Start(ctx)

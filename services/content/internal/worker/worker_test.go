@@ -16,15 +16,13 @@ import (
 
 func newTestWorker(t *testing.T, processor domain.SummaryProcessor, ai domain.AIService, producer domain.DLQPublisher) *Worker {
 	t.Helper()
-	return &Worker{
-		processor:  processor,
-		aiService:  ai,
-		producer:   producer,
-		dlqTopic:   "dlq",
-		maxRetries: maxRetries,
-		retryBase:  retryBase,
-		done:       make(chan struct{}),
-	}
+	base, err := newBaseRunner([]string{"localhost:9092"}, "test-group", []string{"test-topic"}, "dlq", 1, ai, producer)
+	require.NoError(t, err)
+	// Override for fast tests.
+	base.maxRetries = maxRetries
+	base.retryBase = retryBase
+	base.done = make(chan struct{})
+	return &Worker{baseRunner: base, processor: processor}
 }
 
 func eventMessage(t *testing.T, postID string) kafka.Message {

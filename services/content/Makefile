@@ -5,12 +5,9 @@
 # Default target shows help.
 .DEFAULT_GOAL := help
 
-# Excluded from the coverage report:
-#   - generated code (gqlgen, protobuf): no hand-written logic
-#   - db, repository: covered by the integration suite (testcontainers)
-#   - bootstrap, cmd: entrypoint wiring only
-#   - testutil: test doubles
-GENERATED_RE := 'graph/generated.go|graph/model/|proto/ai/|\.pb\.go|internal/db/|internal/repository/|internal/bootstrap/|internal/testutil/|cmd/'
+# Excluded from coverage: only generated code. Keep wiring (bootstrap/cmd) and
+# data layers (db/repository) visible so coverage gaps are not hidden.
+GENERATED_RE := 'graph/generated.go|graph/model/|proto/ai/|\.pb\.go'
 
 help:
 	@echo "Content Service — make help"
