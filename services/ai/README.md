@@ -51,7 +51,10 @@ with canned responses and no network access.
 Search requires a running Qdrant (`QDRANT_URL`, default
 `http://localhost:6333`). Set `EMBEDDING_MODE=ollama` for real embeddings;
 the default `fake` mode produces deterministic vectors (exact text matches
-score ~1.0, unrelated text ~0.0). Unrelated results are filtered by
+score ~1.0, unrelated text ~0.0). `EMBEDDING_MODE=inference` is the prod
+path: Qdrant Cloud embeds server-side from the raw text
+(`sentence-transformers/all-minilm-l6-v2`, 384 dims), so the service never
+handles dense vectors there. Unrelated results are filtered by
 `SEARCH_DENSE_SCORE_THRESHOLD` (default `0.3`).
 
 Set `VECTOR_MODE=fake` to swap Qdrant for a deterministic in-memory index

@@ -10,7 +10,11 @@ from prometheus_client import start_http_server
 from src.api.server import create_server
 from src.api.service import AIService
 from src.config import settings
-from src.embeddings import FakeEmbeddingClient, OllamaEmbeddingClient
+from src.embeddings import (
+    FakeEmbeddingClient,
+    NoopEmbeddingClient,
+    OllamaEmbeddingClient,
+)
 from src.graphs.chat_graph import ChatGraphs, build_chat_graph
 from src.graphs.checkpointer import (
     build_checkpointer,
@@ -96,8 +100,14 @@ async def serve() -> None:
     embeddings = (
         FakeEmbeddingClient()
         if settings.EMBEDDING_MODE == "fake"
-        else OllamaEmbeddingClient()
+        else (
+            NoopEmbeddingClient()
+            if settings.EMBEDDING_MODE == "inference"
+            else OllamaEmbeddingClient()
+        )
     )
+    if settings.EMBEDDING_MODE == "inference" and settings.VECTOR_MODE == "fake":
+        raise RuntimeError("EMBEDDING_MODE=inference requires VECTOR_MODE=qdrant")
     search: SearchStore = (
         MemoryIndex(embeddings)
         if settings.VECTOR_MODE == "fake"

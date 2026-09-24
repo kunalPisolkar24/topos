@@ -712,6 +712,11 @@ class AIService(ai_service_pb2_grpc.AIServiceServicer):
     async def Embed(
         self, request: ai_service_pb2.EmbedRequest, context: grpc.aio.ServicerContext
     ) -> ai_service_pb2.EmbedResponse:
+        if settings.EMBEDDING_MODE == "inference":
+            await context.abort(
+                grpc.StatusCode.UNIMPLEMENTED,
+                "Embed is unavailable in inference mode: Qdrant embeds server-side",
+            )
         text = request.text.strip()
         if not text:
             raise ValidationError("text must be a non-empty string")

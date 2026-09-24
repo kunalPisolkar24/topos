@@ -45,6 +45,8 @@ class DenseSource:
         self.weight = settings.CHAT_DENSE_SOURCE_WEIGHT if weight is None else weight
 
     async def fetch(self, query: str, top_k: int) -> list[RetrievedPost]:
+        if settings.EMBEDDING_MODE == "inference":
+            return await self._search.retrieve_by_text(query, top_k)
         vector = (await self._embeddings.embed([query]))[0]
         return await self._search.retrieve_by_vector(vector, top_k)
 

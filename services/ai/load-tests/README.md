@@ -56,6 +56,7 @@ deterministic or real — the scripts are identical either way.
 | `VECTOR_MODE=qdrant` | default | Real Qdrant roundtrip per search/related call |
 | `EMBEDDING_MODE=fake` | default | Deterministic unit-norm vectors; quality checks (gibberish filtered, twins on top) are exact |
 | `EMBEDDING_MODE=ollama` | default `fake` | Real model (`snowflake-arctic-embed2:568m`) via the profile-gated `ollama` container; the first run pulls the model. Checks are best-effort (semantic scores vary) and latency budgets default wider (`SEARCH_P95=2000`, `SEARCH_P99=4000`) |
+| `EMBEDDING_MODE=inference` | prod only | Qdrant Cloud embeds server-side (`sentence-transformers/all-minilm-l6-v2`); needs cloud `QDRANT_URL`/`QDRANT_API_KEY`, same widened budgets as `ollama` |
 
 The LLM is never in the search/related path, so `LLM_MODE` only matters
 for the `generate-*` LLM scenarios.
@@ -71,7 +72,7 @@ for the `generate-*` LLM scenarios.
 | `WEIGHTS` | `summary:40,tags:30,post:30` | Only used by `mixed` |
 | `LLM_MODE` | `fake` | Keep `fake` for local runs |
 | `VECTOR_MODE` | `qdrant` | `fake` = in-memory index, `qdrant` = real store |
-| `EMBEDDING_MODE` | `fake` | `fake` = deterministic, `ollama` = real model (starts the `ollama` container) |
+| `EMBEDDING_MODE` | `fake` | `fake` = deterministic, `ollama` = real model (starts the `ollama` container), `inference` = Qdrant Cloud server-side (prod only) |
 | `EMBEDDING_MODEL` | `snowflake-arctic-embed2:568m` | Model used by the `ollama` container |
 | `SEARCH_P95` `SEARCH_P99` | `250`/`600` | Search/related latency budgets; auto-widened to `2000`/`4000` for embedding-real runs, still overridable |
 | `RECOMMEND_P95` `RECOMMEND_P99` | `250`/`600` | Recommend latency budgets (one store ranking per call, like search); still overridable |

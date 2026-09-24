@@ -81,6 +81,20 @@ def _validate_embeddings(texts: list[str], vectors: list[list[float]]) -> None:
         )
 
 
+class NoopEmbeddingClient:
+    """Placeholder for inference mode, where Qdrant embeds server-side.
+
+    SearchIndex never calls the provider on that path; any call is a
+    wiring bug, so it fails loudly instead of returning junk vectors.
+    """
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        raise EmbeddingError("client-side embeddings are disabled in inference mode")
+
+    async def close(self) -> None:
+        return None
+
+
 class FakeEmbeddingClient:
     """Deterministic unit-norm vectors for tests and load testing.
 

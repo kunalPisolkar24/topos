@@ -117,11 +117,11 @@ K6_MEM    ?= 384M
 EMBEDDING_MODE ?= fake
 EMBEDDING_MODEL ?= snowflake-arctic-embed2:568m
 OLLAMA_MEM ?= 2G
-# Search/related RPCs hit the store per call; real embeddings (ollama)
-# add their own latency, so the default latency budget widens for
-# embedding-real runs. Both stay overridable from the command line.
-SEARCH_P95 ?= $(if $(filter ollama,$(EMBEDDING_MODE)),2000,250)
-SEARCH_P99 ?= $(if $(filter ollama,$(EMBEDDING_MODE)),4000,600)
+# Search/related RPCs hit the store per call; real embeddings (ollama or
+# cloud inference) add their own latency, so the default latency budget
+# widens for embedding-real runs. Both stay overridable from the command line.
+SEARCH_P95 ?= $(if $(filter ollama inference,$(EMBEDDING_MODE)),2000,250)
+SEARCH_P99 ?= $(if $(filter ollama inference,$(EMBEDDING_MODE)),4000,600)
 
 # Recommend hits the store once per call like search, so it shares the
 # plain budget; surprise relaxes its score threshold over many
@@ -139,8 +139,8 @@ EXPLORER_P99 ?= $(SURPRISE_P99)
 
 # Chat streams a full LLM answer per call, so budgets widen for real
 # embeddings and again for a real LLM.
-CHAT_P95 ?= $(if $(filter real,$(LLM_MODE)),15000,$(if $(filter ollama,$(EMBEDDING_MODE)),2000,500))
-CHAT_P99 ?= $(if $(filter real,$(LLM_MODE)),30000,$(if $(filter ollama,$(EMBEDDING_MODE)),4000,1500))
+CHAT_P95 ?= $(if $(filter real,$(LLM_MODE)),15000,$(if $(filter ollama inference,$(EMBEDDING_MODE)),2000,500))
+CHAT_P99 ?= $(if $(filter real,$(LLM_MODE)),30000,$(if $(filter ollama inference,$(EMBEDDING_MODE)),4000,1500))
 
 # The ollama container is profile-gated so fake runs never pull the
 # model; embedding-real runs start it first (see the load-test target).
@@ -166,8 +166,8 @@ load-test: load-test-build
 	@if echo " $(VALID_SCRIPTS) " | grep -q " $(SCRIPT) "; then :; else \
 		echo "unknown SCRIPT=$(SCRIPT). valid: $(VALID_SCRIPTS)"; exit 2; \
 	fi
-	@if echo " fake ollama " | grep -q " $(EMBEDDING_MODE) "; then :; else \
-		echo "unknown EMBEDDING_MODE=$(EMBEDDING_MODE). valid: fake ollama"; exit 2; \
+	@if echo " fake ollama inference " | grep -q " $(EMBEDDING_MODE) "; then :; else \
+		echo "unknown EMBEDDING_MODE=$(EMBEDDING_MODE). valid: fake ollama inference"; exit 2; \
 	fi
 	@if [ "$(EMBEDDING_MODE)" = "ollama" ]; then \
 		$(LT_VARS) $(COMPOSE_LT) --profile embedding-real up -d --wait embedding-service embedding-model-init; \

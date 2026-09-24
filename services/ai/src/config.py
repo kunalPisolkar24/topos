@@ -232,17 +232,21 @@ class Settings(BaseSettings):
     CHAT_HYBRID_SOURCE_WEIGHT: float = 0.8
     CHAT_RETRIEVAL_CONCURRENCY: int = 2
 
-    EMBEDDING_MODE: Literal["fake", "ollama"] = "fake"
+    # Which vector store backs search and related posts. "qdrant" is the
+    # real store; "fake" runs a deterministic in-memory index with the
+    # same semantics, for docker-free local dev and cheap load tests.
+    VECTOR_MODE: Literal["fake", "qdrant"] = "qdrant"
+
+    # Where dense vectors come from. "fake" and "ollama" embed client-side
+    # (deterministic vectors, or a self-hosted Ollama server); "inference"
+    # lets Qdrant Cloud embed server-side from the raw text, so the service
+    # never handles dense vectors on that path. Dev stays on docker.
+    EMBEDDING_MODE: Literal["fake", "ollama", "inference"] = "fake"
     EMBEDDING_URL: str = "http://embedding-service:11434"
     EMBEDDING_MODEL: str = "snowflake-arctic-embed2:568m"
     EMBEDDING_BATCH_SIZE: int = 64
     EMBEDDING_MAX_CHARS: int = 8000
     EMBEDDING_TIMEOUT_SECONDS: int = 30
-
-    # Which vector store backs search and related posts. "qdrant" is the
-    # real store; "fake" runs a deterministic in-memory index with the
-    # same semantics, for docker-free local dev and cheap load tests.
-    VECTOR_MODE: Literal["fake", "qdrant"] = "qdrant"
 
     SPARSE_MIN_TOKEN_LENGTH: int = 2
     SPARSE_PREFIX_MIN_LENGTH: int = 3

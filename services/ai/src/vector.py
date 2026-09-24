@@ -19,13 +19,23 @@ from qdrant_client import AsyncQdrantClient, models
 
 from src.config import settings
 from src.domain.text import clean_html
-from src.embeddings import EmbeddingProvider
+from src.embeddings import EmbeddingError, EmbeddingProvider
 from src.sparse import embed as sparse_embed
 
 logger = logging.getLogger(__name__)
 
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
+
+
+def _inference_mode() -> bool:
+    """True when Qdrant embeds server-side instead of a local provider."""
+    return settings.EMBEDDING_MODE == "inference"
+
+
+def _dense_document(text: str) -> models.Document:
+    """Server-side embedding request for the configured inference model."""
+    return models.Document(text=text, model=settings.EMBEDDING_MODEL)
 
 
 def _point_id(post_id: str) -> uuid.UUID:
@@ -106,7 +116,15 @@ class SearchIndex:
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
             timeout=settings.QDRANT_TIMEOUT_SECONDS,
+            cloud_inference=_inference_mode(),
         )
+
+    async def _dense_for_text(self, text: str) -> list[float] | models.Document:
+        """Dense channel value: an inferred document in inference mode,
+        otherwise a client-side embedded vector."""
+        if _inference_mode():
+            return _dense_document(text)
+        return (await self._embeddings.embed([text]))[0]
 
     async def ensure_collection(self) -> None:
         """Create the collections backing search and recommendations.
@@ -154,7 +172,7 @@ class SearchIndex:
         created_at: str,
     ) -> None:
         text = _embedding_text(title, body, summary)
-        dense = (await self._embeddings.embed([text]))[0]
+        dense = await self._dense_for_text(text)
         # The cleaned body is stored as payload so the chat assistant can
         # ground its answers in the retrieved excerpts without a round
         # trip to any other service.
@@ -218,7 +236,7 @@ class SearchIndex:
         return response.count
 
     async def search(self, query: str, offset: int, limit: int) -> SearchResult:
-        dense = (await self._embeddings.embed([query]))[0]
+        dense = await self._dense_for_text(query)
         # Same threshold as retrieve_by_vector so unrelated queries cannot
         # surface weak-similarity posts through the hybrid channel.
         post_ids = await self._rank_window(
@@ -233,7 +251,7 @@ class SearchIndex:
 
     async def _rank_window(
         self,
-        dense: list[float],
+        dense: list[float] | models.Document,
         sparse_weights: dict[str, float],
         query_filter: models.Filter | None,
         dense_score_threshold: float | None = None,
@@ -298,6 +316,37 @@ class SearchIndex:
         response = await self._client.query_points(
             collection_name=settings.QDRANT_COLLECTION,
             query=vector,
+            using=DENSE_VECTOR,
+            limit=top_k,
+            score_threshold=settings.SEARCH_DENSE_SCORE_THRESHOLD,
+        )
+
+        posts: list[RetrievedPost] = []
+        for point in response.points:
+            payload = point.payload or {}
+            posts.append(
+                RetrievedPost(
+                    post_id=_post_id_from_point(point.id),
+                    title=payload.get("title", ""),
+                    body=payload.get("body", ""),
+                )
+            )
+        return posts
+
+    async def retrieve_by_text(self, text: str, top_k: int) -> list[RetrievedPost]:
+        """Dense-channel grounding without a client-side embedding round.
+
+        Sends the raw text for server-side inference (inference mode only);
+        otherwise falls back to embedding locally first. Mirrors
+        retrieve_by_vector, including the score threshold.
+        """
+        if not _inference_mode():
+            return await self.retrieve_by_vector(
+                (await self._embeddings.embed([text]))[0], top_k
+            )
+        response = await self._client.query_points(
+            collection_name=settings.QDRANT_COLLECTION,
+            query=_dense_document(text),
             using=DENSE_VECTOR,
             limit=top_k,
             score_threshold=settings.SEARCH_DENSE_SCORE_THRESHOLD,
@@ -815,6 +864,14 @@ class MemoryIndex:
             for post, score in scored[:top_k]
             if score >= settings.SEARCH_DENSE_SCORE_THRESHOLD
         ]
+
+    async def retrieve_by_text(self, text: str, top_k: int) -> list[RetrievedPost]:
+        """Mirror SearchIndex.retrieve_by_text over in-memory posts."""
+        if _inference_mode():
+            raise EmbeddingError("inference mode requires the qdrant store")
+        return await self.retrieve_by_vector(
+            (await self._embeddings.embed([text]))[0], top_k
+        )
 
     async def get_posts(self, post_ids: list[str]) -> list[RetrievedPost]:
         """Mirror SearchIndex.get_posts over in-memory posts."""
