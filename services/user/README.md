@@ -87,10 +87,21 @@ disable the client entirely.
 standalone. Env is documented in `.env.example` (standalone) and
 `infrastructure/docker/local/.env.local.example` (local full stack).
 
-- `DATABASE_URL` is the app pool URL; `DATABASE_URL_MIGRATE` is used by the
-  `user-migrator` and `prisma.config.ts`. They default to the same value
-  (single Postgres) but are kept as separate vars so a future pooler (e.g.
-  PgBouncer) can be inserted without code changes.
+- `DATABASE_URL` is the pooled app URL (RDS Proxy in prod, with
+  `?sslmode=require`); `DATABASE_URL_MIGRATE` is used by the `user-migrator`
+  and `prisma.config.ts` and must stay on the direct writer (never a pooler:
+  DDL pins or breaks behind one). They default to the same host in local
+  docker but are separate vars so the proxy can sit in front of the app pool.
+- Pool bounds come from `PG_POOL_MAX` / `PG_POOL_IDLE_TIMEOUT_MS` /
+  `PG_POOL_CONNECTION_TIMEOUT_MS` (`USER_PG_*` locally, SSM
+  `/topos/user/config` in prod). No `SET`-based options are used on purpose:
+  `SET` pins RDS Proxy sessions.
+- The `user-migrator` entrypoint (`scripts/migrator-entrypoint.sh`) first runs
+  `scripts/bootstrap-ai-db.mjs`, which ensures the AI `ai_checkpointer` role
+  + `ai_checkpoints` database exist on the shared instance (idempotent, safe
+  to run every deploy; warns and continues on failure so user migrations are
+  never blocked). Needs `AI_CHECKPOINTER_PASSWORD` (`AI_POSTGRES_PASSWORD`
+  in local docker, `topos/user/secrets` in prod).
 - `REDIS_URL` is a single Redis URL (e.g. `redis://user-redis:6379`);
   password, if needed, is encoded in the URL.
 

@@ -28,6 +28,9 @@ DEFAULTS = {
     "LLM_MODEL": "lightning-ai/gpt-oss-20b",
     "LLM_TIMEOUT_SECONDS": 60,
     "CHECKPOINT_DB_URL": "",
+    "CHECKPOINT_DB_URL_MIGRATE": "",
+    "CHECKPOINT_POOL_MIN_SIZE": 1,
+    "CHECKPOINT_POOL_MAX_SIZE": 10,
     "CHECKPOINT_STARTUP_RETRIES": 12,
     "LANGCHAIN_TRACING": False,
     "LANGCHAIN_API_KEY": "",
@@ -85,6 +88,9 @@ OVERRIDES = {
     "LLM_MODEL": "some-other-model",
     "LLM_TIMEOUT_SECONDS": 30,
     "CHECKPOINT_DB_URL": "postgresql://db:5432/checkpoints",
+    "CHECKPOINT_DB_URL_MIGRATE": "postgresql://db:5432/checkpoints-direct",
+    "CHECKPOINT_POOL_MIN_SIZE": 2,
+    "CHECKPOINT_POOL_MAX_SIZE": 5,
     "CHECKPOINT_STARTUP_RETRIES": 3,
     "LANGCHAIN_TRACING": True,
     "LANGCHAIN_API_KEY": "lsv2_test",
@@ -138,20 +144,56 @@ def test_invalid_grace_seconds_raises(monkeypatch: pytest.MonkeyPatch) -> None:
         Settings()
 
 
+def test_invalid_pool_bounds_raise(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHECKPOINT_POOL_MIN_SIZE", "5")
+    monkeypatch.setenv("CHECKPOINT_POOL_MAX_SIZE", "2")
+
+    with pytest.raises(ValueError):
+        Settings()
+
+
 def test_ai_aliases_resolve_to_canonical(monkeypatch: pytest.MonkeyPatch) -> None:
-    for canonical in ("LLM_API_KEY", "LLM_MODEL", "LLM_MODE", "QDRANT_URL"):
+    for canonical in (
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_MODE",
+        "QDRANT_URL",
+        "CHECKPOINT_DB_URL",
+        "CHECKPOINT_DB_URL_MIGRATE",
+        "CHECKPOINT_POOL_MIN_SIZE",
+        "CHECKPOINT_POOL_MAX_SIZE",
+    ):
         monkeypatch.delenv(canonical, raising=False)
     monkeypatch.setenv("LIGHTNING_AI_API_KEY", "alias-key")
     monkeypatch.setenv("AI_LIGHTNING_MODEL", "alias-model")
     monkeypatch.setenv("AI_LLM_MODE", "fake")
     monkeypatch.setenv("AI_QDRANT_URL", "http://alias-qdrant:6333")
+    monkeypatch.setenv("AI_CHECKPOINT_DB_URL", "postgresql://alias:5432/checkpoints")
+    monkeypatch.setenv(
+        "AI_CHECKPOINT_DB_URL_MIGRATE", "postgresql://alias:5432/checkpoints-direct"
+    )
+    monkeypatch.setenv("AI_CHECKPOINT_POOL_MIN_SIZE", "2")
+    monkeypatch.setenv("AI_CHECKPOINT_POOL_MAX_SIZE", "5")
 
     s = Settings()
     assert s.LLM_API_KEY == "alias-key"
     assert s.LLM_MODEL == "alias-model"
     assert s.LLM_MODE == "fake"
     assert s.QDRANT_URL == "http://alias-qdrant:6333"
-    for canonical in ("LLM_API_KEY", "LLM_MODEL", "LLM_MODE", "QDRANT_URL"):
+    assert s.CHECKPOINT_DB_URL == "postgresql://alias:5432/checkpoints"
+    assert s.CHECKPOINT_DB_URL_MIGRATE == "postgresql://alias:5432/checkpoints-direct"
+    assert s.CHECKPOINT_POOL_MIN_SIZE == 2
+    assert s.CHECKPOINT_POOL_MAX_SIZE == 5
+    for canonical in (
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_MODE",
+        "QDRANT_URL",
+        "CHECKPOINT_DB_URL",
+        "CHECKPOINT_DB_URL_MIGRATE",
+        "CHECKPOINT_POOL_MIN_SIZE",
+        "CHECKPOINT_POOL_MAX_SIZE",
+    ):
         os.environ.pop(canonical, None)
 
 

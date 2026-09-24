@@ -146,14 +146,17 @@ resource "aws_ssm_parameter" "user_config" {
   name = "/topos/user/config"
   type = "String"
   value = jsonencode({
-    PORT                       = "4001"
-    LOG_LEVEL                  = "info"
-    OTEL_SERVICE_NAME          = "user-service"
-    JWT_ISSUER                 = "user-service"
-    JWT_AUDIENCE               = "topos"
-    JWT_EXPIRES_IN             = "7d"
-    REDIS_CACHE_TTL_MS         = "3600000"
-    REDIS_MISSING_CACHE_TTL_MS = "60000"
+    PORT                          = "4001"
+    LOG_LEVEL                     = "info"
+    OTEL_SERVICE_NAME             = "user-service"
+    JWT_ISSUER                    = "user-service"
+    JWT_AUDIENCE                  = "topos"
+    JWT_EXPIRES_IN                = "7d"
+    REDIS_CACHE_TTL_MS            = "3600000"
+    REDIS_MISSING_CACHE_TTL_MS    = "60000"
+    PG_POOL_MAX                   = "10"
+    PG_POOL_IDLE_TIMEOUT_MS       = "30000"
+    PG_POOL_CONNECTION_TIMEOUT_MS = "5000"
   })
   description = "User service non-secret config"
   tags        = local.common_tags
@@ -169,7 +172,7 @@ resource "aws_ssm_parameter" "user_config" {
 
 resource "aws_secretsmanager_secret" "user_secrets" {
   name        = "topos/user/secrets"
-  description = "User service secrets: DATABASE_URL, DATABASE_URL_MIGRATE, REDIS_URL, JWT_SECRET"
+  description = "User service secrets: DATABASE_URL, DATABASE_URL_MIGRATE, AI_CHECKPOINTER_PASSWORD, REDIS_URL, JWT_SECRET"
 
   tags = local.common_tags
 }
@@ -183,17 +186,83 @@ resource "aws_secretsmanager_secret_version" "user_secrets" {
       # reachable from the app network; use the real docker service names on app-network.
       DATABASE_URL         = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
       DATABASE_URL_MIGRATE = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
-      REDIS_URL            = "redis://user-redis:6379"
-      JWT_SECRET           = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
+      # Consumed by the user-migrator entrypoint to bootstrap the AI
+      # checkpointer role/database (see services/user/scripts/).
+      AI_CHECKPOINTER_PASSWORD = "ai_checkpointer_pass"
+      REDIS_URL                = "redis://user-redis:6379"
+      JWT_SECRET               = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
       } : {
+      # Pooled app URL goes through the proxy (require_tls) with verified
+      # TLS; the migrate URL stays on the direct writer for DDL. The pg
+      # driver parses ?sslmode=require into verified TLS via the system CA
+      # bundle, and @prisma/adapter-pg uses unnamed statements, so no
+      # pgbouncer flag is needed (and it must never appear on the migrate URL).
       DATABASE_URL = (
         try(coalesce(module.user_database.proxy_endpoint, ""), "") != ""
-        ? "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.proxy_endpoint}:${var.postgres_port}/${var.postgres_db_name}"
-        : "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}"
+        ? "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.proxy_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
+        : "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
       )
-      DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}"
-      REDIS_URL            = module.user_cache.redis_url
-      JWT_SECRET           = random_password.jwt.result
+      DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
+      # Lets the user-migrator bootstrap the AI role/database on every
+      # deploy (services/user/scripts/bootstrap-ai-db.mjs).
+      AI_CHECKPOINTER_PASSWORD = module.user_database.ai_password
+      REDIS_URL                = module.user_cache.redis_url
+      JWT_SECRET               = random_password.jwt.result
+    }
+  )
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# ---------------------------------------------------------------------------
+# SSM Parameter Store — ai config (non-secret)
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_parameter" "ai_config" {
+  name = "/topos/ai/config"
+  type = "String"
+  value = jsonencode({
+    CHECKPOINT_POOL_MIN_SIZE   = "1"
+    CHECKPOINT_POOL_MAX_SIZE   = "10"
+    CHECKPOINT_STARTUP_RETRIES = "12"
+  })
+  description = "AI service non-secret config"
+  tags        = local.common_tags
+
+  # Floci's SSM is in-memory; no KMS.
+}
+
+# ---------------------------------------------------------------------------
+# Secrets Manager — ai secrets (placeholder, populated by seed-secrets or app)
+# CHECKPOINT_DB_URL is the pooled runtime URL (proxy); CHECKPOINT_DB_URL_MIGRATE
+# is the direct writer URL for saver.setup() DDL. Shared instance, separate
+# ai_checkpoints database + least-privilege ai_checkpointer role (created once
+# via modules/user_database/init-ai-db.sql).
+# ---------------------------------------------------------------------------
+
+resource "aws_secretsmanager_secret" "ai_secrets" {
+  name        = "topos/ai/secrets"
+  description = "AI service secrets: CHECKPOINT_DB_URL, CHECKPOINT_DB_URL_MIGRATE"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "ai_secrets" {
+  secret_id = aws_secretsmanager_secret.ai_secrets.id
+  secret_string = jsonencode(
+    var.environment == "floci" ? {
+      # Floci: docker compose service names on app-network, no TLS.
+      CHECKPOINT_DB_URL         = "postgresql://ai_checkpointer:ai_checkpointer_pass@user-postgres:5432/ai_checkpoints"
+      CHECKPOINT_DB_URL_MIGRATE = "postgresql://ai_checkpointer:ai_checkpointer_pass@user-postgres:5432/ai_checkpoints"
+      } : {
+      CHECKPOINT_DB_URL = (
+        try(coalesce(module.user_database.proxy_endpoint, ""), "") != ""
+        ? "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.proxy_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
+        : "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
+      )
+      CHECKPOINT_DB_URL_MIGRATE = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
     }
   )
 

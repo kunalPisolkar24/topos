@@ -9,6 +9,7 @@ from psycopg_pool import AsyncConnectionPool
 from src.graphs.checkpointer import (
     build_checkpointer,
     close_checkpointer,
+    setup_conninfo,
     start_checkpointer,
 )
 from src.main import _ensure_checkpointer_ready
@@ -21,6 +22,89 @@ def no_db(monkeypatch: pytest.MonkeyPatch):
 
 def test_build_memory_when_no_url(no_db) -> None:
     assert isinstance(build_checkpointer(), InMemorySaver)
+
+
+async def test_build_postgres_uses_configured_pool_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL",
+        "postgresql://ai_checkpointer:pass@localhost:5433/ai_checkpoints",
+    )
+    monkeypatch.setattr("src.config.settings.CHECKPOINT_DB_URL_MIGRATE", "")
+    monkeypatch.setattr("src.config.settings.CHECKPOINT_POOL_MIN_SIZE", 2)
+    monkeypatch.setattr("src.config.settings.CHECKPOINT_POOL_MAX_SIZE", 4)
+    saver = build_checkpointer()
+    try:
+        assert isinstance(saver, AsyncPostgresSaver)
+        assert saver.conn.min_size == 2
+        assert saver.conn.max_size == 4
+    finally:
+        await saver.conn.close()
+
+
+def test_setup_conninfo_falls_back_to_pooled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL", "postgresql://pooled/db"
+    )
+    monkeypatch.setattr("src.config.settings.CHECKPOINT_DB_URL_MIGRATE", "")
+
+    assert setup_conninfo() == "postgresql://pooled/db"
+
+
+def test_setup_conninfo_prefers_migrate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL", "postgresql://pooled/db"
+    )
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL_MIGRATE", "postgresql://direct/db"
+    )
+
+    assert setup_conninfo() == "postgresql://direct/db"
+
+
+async def test_start_runs_setup_on_migrate_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL", "postgresql://pooled/db"
+    )
+    monkeypatch.setattr(
+        "src.config.settings.CHECKPOINT_DB_URL_MIGRATE", "postgresql://direct/db"
+    )
+    opened: list[str] = []
+    setup_calls: list[str] = []
+
+    class FakeMigratePool:
+        def __init__(self, conninfo: str, **kwargs: Any) -> None:
+            self.conninfo = conninfo
+
+        async def open(self, wait: bool = True, timeout: float | None = None) -> None:
+            opened.append(self.conninfo)
+
+        async def close(self) -> None:
+            pass
+
+    async def fake_setup(self: Any) -> None:
+        pool = self.conn
+        setup_calls.append(
+            pool.conninfo if isinstance(pool, FakeMigratePool) else "runtime"
+        )
+
+    monkeypatch.setattr("src.graphs.checkpointer.AsyncConnectionPool", FakeMigratePool)
+    monkeypatch.setattr(AsyncPostgresSaver, "setup", fake_setup)
+    pool = FlakyPool(failures=0)
+    saver = _postgres_saver_with(pool)
+
+    await start_checkpointer(saver)
+
+    assert opened == ["postgresql://direct/db"]
+    assert setup_calls == ["postgresql://direct/db"]
+    assert pool.opens == 1
 
 
 async def test_build_postgres_when_url_set(

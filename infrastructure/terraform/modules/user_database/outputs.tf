@@ -23,6 +23,23 @@ output "master_password" {
   sensitive = true
 }
 
+output "ai_username" {
+  value = var.ai_username
+}
+
+output "ai_db_name" {
+  value = var.ai_db_name
+}
+
+output "ai_password" {
+  value     = random_password.ai.result
+  sensitive = true
+}
+
+output "ai_secret_arn" {
+  value = aws_secretsmanager_secret.ai.arn
+}
+
 output "security_group_id" {
   value = aws_security_group.db.id
 }

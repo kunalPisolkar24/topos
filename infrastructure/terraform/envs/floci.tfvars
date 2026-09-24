@@ -8,7 +8,8 @@ vpc_id              = "vpc-default-ap-south-1"
 private_subnet_ids  = ["subnet-default-ap-south-1-a", "subnet-default-ap-south-1-b"]
 allowed_cidr_blocks = ["172.31.0.0/16"]
 
-# RDS — single-AZ micro, no proxy on Floci
+# RDS — single-AZ micro (proxy resources are created; Floci app secrets
+# still point at the docker compose hosts, see main.tf secret_string logic)
 postgres_engine_version          = "16.3"
 postgres_instance_class          = "db.t4g.micro"
 postgres_allocated_storage       = 20

@@ -8,6 +8,9 @@ x-user-service-env: &user-service-env
   NODE_ENV: production
   PORT: 4001
   DATABASE_URL: postgresql://topos_user:topos_pass@user-postgres:5432/topos_users
+  PG_POOL_MAX: ${USER_PG_POOL_MAX:-10}
+  PG_POOL_IDLE_TIMEOUT_MS: ${USER_PG_POOL_IDLE_TIMEOUT_MS:-30000}
+  PG_POOL_CONNECTION_TIMEOUT_MS: ${USER_PG_POOL_CONNECTION_TIMEOUT_MS:-5000}
   JWT_SECRET: ${USER_JWT_SECRET:?USER_JWT_SECRET is required}
   REDIS_URL: redis://user-redis:6379
   REDIS_CACHE_TTL_MS: ${USER_CACHE_TTL_MS:-3600000}

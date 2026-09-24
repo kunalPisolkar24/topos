@@ -66,6 +66,30 @@ output "user_secrets_name" {
   value = aws_secretsmanager_secret.user_secrets.name
 }
 
+output "ai_db_name" {
+  description = "AI checkpoint database on the shared instance"
+  value       = module.user_database.ai_db_name
+}
+
+output "ai_db_username" {
+  description = "AI checkpoint database username"
+  value       = module.user_database.ai_username
+}
+
+output "ai_db_secret_arn" {
+  description = "ARN of the AI checkpointer secret (TF-managed, do not overwrite without --force)"
+  value       = module.user_database.ai_secret_arn
+  sensitive   = true
+}
+
+output "ai_config_param_name" {
+  value = aws_ssm_parameter.ai_config.name
+}
+
+output "ai_secrets_name" {
+  value = aws_secretsmanager_secret.ai_secrets.name
+}
+
 output "content_docdb_cluster_endpoint" {
   description = "DocumentDB cluster endpoint"
   value       = module.content_database.cluster_endpoint
