@@ -72,6 +72,7 @@ SECRET_KEY_MAP: dict[str, list[str]] = {
     USER_SM_SECRET: [
         "DATABASE_URL",
         "DATABASE_URL_MIGRATE",
+        "AI_CHECKPOINTER_PASSWORD",
         "REDIS_URL",
         "JWT_SECRET",
     ],

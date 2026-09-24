@@ -45,6 +45,7 @@ graph LR
 |-----|-------------|
 | `DATABASE_URL` | Pooled app URL. Prod: RDS Proxy endpoint + `?sslmode=require`. Never a pooler flag — `@prisma/adapter-pg` issues unnamed statements, which don't pin proxy sessions. |
 | `DATABASE_URL_MIGRATE` | Direct writer URL for `prisma migrate deploy` + `user-migrator`. Prod: writer endpoint + `?sslmode=require`, never through the proxy (DDL/advisory locks pin or break on a pooler). |
+| `AI_CHECKPOINTER_PASSWORD` | AI role password, consumed by the `user-migrator` entrypoint to bootstrap the `ai_checkpointer` role + `ai_checkpoints` database on every deploy (local alias `AI_POSTGRES_PASSWORD`). |
 | `REDIS_URL` | Redis URL |
 | `JWT_SECRET` | JWT signing secret |
 

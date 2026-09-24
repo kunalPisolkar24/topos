@@ -26,7 +26,8 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM deps AS migrator
 COPY prisma.config.ts ./
 COPY prisma ./prisma
-CMD ["npx", "prisma", "migrate", "deploy"]
+COPY scripts ./scripts
+CMD ["sh", "./scripts/migrator-entrypoint.sh"]
 
 FROM base AS runtime
 ARG GIT_REVISION=unknown

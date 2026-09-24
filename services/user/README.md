@@ -96,6 +96,12 @@ standalone. Env is documented in `.env.example` (standalone) and
   `PG_POOL_CONNECTION_TIMEOUT_MS` (`USER_PG_*` locally, SSM
   `/topos/user/config` in prod). No `SET`-based options are used on purpose:
   `SET` pins RDS Proxy sessions.
+- The `user-migrator` entrypoint (`scripts/migrator-entrypoint.sh`) first runs
+  `scripts/bootstrap-ai-db.mjs`, which ensures the AI `ai_checkpointer` role
+  + `ai_checkpoints` database exist on the shared instance (idempotent, safe
+  to run every deploy; warns and continues on failure so user migrations are
+  never blocked). Needs `AI_CHECKPOINTER_PASSWORD` (`AI_POSTGRES_PASSWORD`
+  in local docker, `topos/user/secrets` in prod).
 - `REDIS_URL` is a single Redis URL (e.g. `redis://user-redis:6379`);
   password, if needed, is encoded in the URL.
 

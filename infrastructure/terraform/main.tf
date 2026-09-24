@@ -172,7 +172,7 @@ resource "aws_ssm_parameter" "user_config" {
 
 resource "aws_secretsmanager_secret" "user_secrets" {
   name        = "topos/user/secrets"
-  description = "User service secrets: DATABASE_URL, DATABASE_URL_MIGRATE, REDIS_URL, JWT_SECRET"
+  description = "User service secrets: DATABASE_URL, DATABASE_URL_MIGRATE, AI_CHECKPOINTER_PASSWORD, REDIS_URL, JWT_SECRET"
 
   tags = local.common_tags
 }
@@ -186,8 +186,11 @@ resource "aws_secretsmanager_secret_version" "user_secrets" {
       # reachable from the app network; use the real docker service names on app-network.
       DATABASE_URL         = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
       DATABASE_URL_MIGRATE = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
-      REDIS_URL            = "redis://user-redis:6379"
-      JWT_SECRET           = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
+      # Consumed by the user-migrator entrypoint to bootstrap the AI
+      # checkpointer role/database (see services/user/scripts/).
+      AI_CHECKPOINTER_PASSWORD = "ai_checkpointer_pass"
+      REDIS_URL                = "redis://user-redis:6379"
+      JWT_SECRET               = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
       } : {
       # Pooled app URL goes through the proxy (require_tls) with verified
       # TLS; the migrate URL stays on the direct writer for DDL. The pg
@@ -200,8 +203,11 @@ resource "aws_secretsmanager_secret_version" "user_secrets" {
         : "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
       )
       DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
-      REDIS_URL            = module.user_cache.redis_url
-      JWT_SECRET           = random_password.jwt.result
+      # Lets the user-migrator bootstrap the AI role/database on every
+      # deploy (services/user/scripts/bootstrap-ai-db.mjs).
+      AI_CHECKPOINTER_PASSWORD = module.user_database.ai_password
+      REDIS_URL                = module.user_cache.redis_url
+      JWT_SECRET               = random_password.jwt.result
     }
   )
 
