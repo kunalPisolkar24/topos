@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim AS composer
+FROM debian:bookworm-slim AS composer
 
 RUN apt-get update && apt-get install -y curl ca-certificates
 
