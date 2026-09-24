@@ -6,14 +6,18 @@ the results with reciprocal rank fusion, giving ES-like full-text behaviour
 plus semantic recall.
 """
 
+import functools
 import hashlib
 import logging
 import math
 import random
 import struct
+import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from qdrant_client import AsyncQdrantClient, models
 
@@ -21,12 +25,50 @@ from src.config import settings
 from src.domain.models import RetrievedPost, SearchResult
 from src.domain.text import clean_html
 from src.embeddings import EmbeddingError, EmbeddingProvider
+from src.observability import metrics
 from src.sparse import embed as sparse_embed
 
 logger = logging.getLogger(__name__)
 
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
+
+
+def _record_qdrant(
+    operation: str,
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    """Record latency/status of one SearchIndex store operation.
+
+    Also maintains the qdrant dependency gauges so dashboards can alert
+    on store health without a separate probe loop.
+    """
+
+    def decorator(
+        fn: Callable[..., Awaitable[Any]],
+    ) -> Callable[..., Awaitable[Any]]:
+        @functools.wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter()
+            try:
+                result = await fn(*args, **kwargs)
+            except Exception:
+                metrics.QDRANT_REQUESTS.labels(
+                    operation=operation, status="error"
+                ).inc()
+                metrics.DEPENDENCY_UP.labels(dep="qdrant").set(0)
+                raise
+            duration = time.perf_counter() - start
+            metrics.QDRANT_REQUESTS.labels(operation=operation, status="success").inc()
+            metrics.QDRANT_REQUEST_DURATION.labels(
+                operation=operation, status="success"
+            ).observe(duration)
+            metrics.DEPENDENCY_UP.labels(dep="qdrant").set(1)
+            metrics.DEPENDENCY_PING_DURATION.labels(dep="qdrant").observe(duration)
+            return result
+
+        return wrapper
+
+    return decorator
 
 
 def _inference_mode() -> bool:
@@ -122,6 +164,7 @@ class SearchIndex:
             return _dense_document(text)
         return (await self._embeddings.embed([text]))[0]
 
+    @_record_qdrant("ensure_collection")
     async def ensure_collection(self) -> None:
         """Create the collections backing search and recommendations.
 
@@ -158,6 +201,7 @@ class SearchIndex:
             )
         logger.info("created qdrant collection %s", name)
 
+    @_record_qdrant("upsert")
     async def upsert(
         self,
         post_id: str,
@@ -192,12 +236,14 @@ class SearchIndex:
             ],
         )
 
+    @_record_qdrant("delete")
     async def delete(self, post_id: str) -> None:
         await self._client.delete(
             collection_name=settings.QDRANT_COLLECTION,
             points_selector=[_point_id(post_id)],
         )
 
+    @_record_qdrant("related")
     async def related(self, post_id: str, limit: int) -> list[str]:
         """Return the post_ids of the nearest neighbours of a stored post.
 
@@ -224,6 +270,7 @@ class SearchIndex:
         )
         return [_post_id_from_point(point.id) for point in response.points]
 
+    @_record_qdrant("count")
     async def count(self) -> int:
         """Number of indexed posts: the pool related results draw from."""
         response = await self._client.count(
@@ -231,6 +278,7 @@ class SearchIndex:
         )
         return response.count
 
+    @_record_qdrant("search")
     async def search(self, query: str, offset: int, limit: int) -> SearchResult:
         dense = await self._dense_for_text(query)
         # Same threshold as retrieve_by_vector so unrelated queries cannot
@@ -299,6 +347,7 @@ class SearchIndex:
             )
         return [_post_id_from_point(point.id) for point in response.points]
 
+    @_record_qdrant("retrieve_by_vector")
     async def retrieve_by_vector(
         self, vector: list[float], top_k: int
     ) -> list[RetrievedPost]:
@@ -322,6 +371,7 @@ class SearchIndex:
             posts.append(_retrieved_post(_post_id_from_point(point.id), point.payload))
         return posts
 
+    @_record_qdrant("retrieve_by_text")
     async def retrieve_by_text(self, text: str, top_k: int) -> list[RetrievedPost]:
         """Dense-channel grounding without a client-side embedding round.
 
@@ -346,6 +396,7 @@ class SearchIndex:
             posts.append(_retrieved_post(_post_id_from_point(point.id), point.payload))
         return posts
 
+    @_record_qdrant("get_posts")
     async def get_posts(self, post_ids: list[str]) -> list[RetrievedPost]:
         """Fetch stored posts by id, in the order requested.
 
@@ -368,6 +419,7 @@ class SearchIndex:
             if post_id in payload_by_id
         ]
 
+    @_record_qdrant("user_tag_weights")
     async def user_tag_weights(self, user_id: str) -> dict[str, float]:
         """The user's accumulated interest-tag weights; empty on cold start."""
         profile = await self._user_profile(user_id)
@@ -375,6 +427,7 @@ class SearchIndex:
             return {}
         return profile[1].get("tag_weights") or {}
 
+    @_record_qdrant("post_tags")
     async def post_tags(self, post_ids: list[str]) -> dict[str, list[str]]:
         """Map each known post id to its stored tags."""
         if not post_ids:
@@ -389,6 +442,7 @@ class SearchIndex:
             for record in records
         }
 
+    @_record_qdrant("update_user_profile")
     async def update_user_profile(
         self, user_id: str, post_id: str, weight: float
     ) -> None:
@@ -447,6 +501,7 @@ class SearchIndex:
             ],
         )
 
+    @_record_qdrant("recommend")
     async def recommend(
         self,
         user_id: str,
@@ -518,6 +573,7 @@ class SearchIndex:
             )
         return models.Filter(must=must, must_not=must_not)
 
+    @_record_qdrant("recommend_surprise")
     async def recommend_surprise(
         self, user_id: str, offset: int, limit: int, seed: int
     ) -> SearchResult:

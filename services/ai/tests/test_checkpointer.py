@@ -98,7 +98,6 @@ async def test_ensure_raises_after_exhausting_retries(
 
     with pytest.raises(ConnectionError):
         await _ensure_checkpointer_ready(saver)
-
     assert pool.opens == 2
 
 
@@ -109,6 +108,44 @@ async def test_close_closes_postgres_pool() -> None:
     await close_checkpointer(saver)
 
     assert pool.closed
+
+
+def _checkpoint_up() -> float | None:
+    from prometheus_client.registry import REGISTRY
+
+    return REGISTRY.get_sample_value("dependency_up", {"dep": "checkpoint"})
+
+
+def _checkpoint_ping_count() -> float:
+    from prometheus_client.registry import REGISTRY
+
+    return (
+        REGISTRY.get_sample_value(
+            "dependency_ping_duration_seconds_count", {"dep": "checkpoint"}
+        )
+        or 0.0
+    )
+
+
+async def test_start_marks_checkpoint_up() -> None:
+    pool = FlakyPool(failures=0)
+    saver = _postgres_saver_with(pool)
+    ping_before = _checkpoint_ping_count()
+
+    await start_checkpointer(saver)
+
+    assert _checkpoint_up() == 1.0
+    assert _checkpoint_ping_count() == ping_before + 1
+
+
+async def test_start_marks_checkpoint_down_on_failure() -> None:
+    pool = FlakyPool(failures=1)
+    saver = _postgres_saver_with(pool)
+
+    with pytest.raises(ConnectionError):
+        await start_checkpointer(saver)
+
+    assert _checkpoint_up() == 0.0
 
 
 async def _instant_sleep(_seconds: float) -> None:

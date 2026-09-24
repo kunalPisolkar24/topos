@@ -181,6 +181,11 @@ def make_judge_relevance(llm: LLMProvider):
                 relevant=True,
                 reason="judge unavailable or unparseable; proceeding",
             )
+            metrics.CHAT_JUDGE_VERDICTS.labels(verdict="unavailable").inc()
+        else:
+            metrics.CHAT_JUDGE_VERDICTS.labels(
+                verdict="relevant" if verdict.relevant else "irrelevant"
+            ).inc()
 
         logger.info(
             "retrieval judged",

@@ -54,12 +54,13 @@ CHAT_COMPACTS = Counter(
 EMBEDDING_REQUESTS = Counter(
     "embedding_requests_total",
     "Total number of embedding provider calls",
-    ["status"],
+    ["status", "mode"],
 )
 
 EMBEDDING_REQUEST_DURATION = Histogram(
     "embedding_request_duration_seconds",
     "Time spent waiting for the embedding provider",
+    ["mode"],
 )
 
 RECOMMEND_REQUESTS = Counter(
@@ -100,4 +101,52 @@ FEED_AGENT_DECISIONS = Counter(
     "feed_agent_decisions_total",
     "Feed agent blend decisions: cache hits, fresh LLM picks, and fallbacks to balanced",
     ["outcome"],
+)
+
+QDRANT_REQUESTS = Counter(
+    "qdrant_requests_total",
+    "Total number of Qdrant store operations",
+    ["operation", "status"],
+)
+
+QDRANT_REQUEST_DURATION = Histogram(
+    "qdrant_request_duration_seconds",
+    "Time spent on Qdrant store operations",
+    ["operation", "status"],
+)
+
+DEPENDENCY_UP = Gauge(
+    "dependency_up",
+    "1 when a dependency is up, 0 otherwise",
+    ["dep"],
+)
+
+DEPENDENCY_PING_DURATION = Histogram(
+    "dependency_ping_duration_seconds",
+    "Latency of dependency interactions, by dep",
+    ["dep"],
+)
+
+RETRIEVAL_FETCH_DURATION = Histogram(
+    "retrieval_fetch_duration_seconds",
+    "Time spent fetching grounding posts per retrieval source",
+    ["source"],
+)
+
+RETRIEVAL_FETCH_ERRORS = Counter(
+    "retrieval_fetch_errors_total",
+    "Failed grounding fetches per retrieval source",
+    ["source"],
+)
+
+CHAT_JUDGE_VERDICTS = Counter(
+    "chat_judge_verdicts_total",
+    "Relevance judge outcomes for retrieved grounding context",
+    ["verdict"],
+)
+
+POST_WORKFLOW_TRANSITIONS = Counter(
+    "post_workflow_transitions_total",
+    "Post generation workflow transitions by terminal action",
+    ["transition"],
 )

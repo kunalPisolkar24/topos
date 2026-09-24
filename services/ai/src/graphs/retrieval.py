@@ -7,12 +7,14 @@ into a single deduped context that fits the shared character budget.
 
 import asyncio
 import logging
+import time
 from collections.abc import Sequence
 from typing import Protocol
 
 from src.config import settings
 from src.domain.models import RetrievedPost
 from src.embeddings import EmbeddingProvider
+from src.observability import metrics
 from src.vector import SearchStore
 
 logger = logging.getLogger(__name__)
@@ -46,10 +48,19 @@ class DenseSource:
         self.weight = settings.CHAT_DENSE_SOURCE_WEIGHT if weight is None else weight
 
     async def fetch(self, query: str, top_k: int) -> list[RetrievedPost]:
-        if settings.EMBEDDING_MODE == "inference":
-            return await self._search.retrieve_by_text(query, top_k)
-        vector = (await self._embeddings.embed([query]))[0]
-        return await self._search.retrieve_by_vector(vector, top_k)
+        start = time.perf_counter()
+        try:
+            if settings.EMBEDDING_MODE == "inference":
+                return await self._search.retrieve_by_text(query, top_k)
+            vector = (await self._embeddings.embed([query]))[0]
+            return await self._search.retrieve_by_vector(vector, top_k)
+        except Exception:
+            metrics.RETRIEVAL_FETCH_ERRORS.labels(source=self.name).inc()
+            raise
+        finally:
+            metrics.RETRIEVAL_FETCH_DURATION.labels(source=self.name).observe(
+                time.perf_counter() - start
+            )
 
 
 class HybridSource:
@@ -62,8 +73,17 @@ class HybridSource:
         self.weight = settings.CHAT_HYBRID_SOURCE_WEIGHT if weight is None else weight
 
     async def fetch(self, query: str, top_k: int) -> list[RetrievedPost]:
-        result = await self._search.search(query, 0, top_k)
-        return await self._search.get_posts(result.post_ids)
+        start = time.perf_counter()
+        try:
+            result = await self._search.search(query, 0, top_k)
+            return await self._search.get_posts(result.post_ids)
+        except Exception:
+            metrics.RETRIEVAL_FETCH_ERRORS.labels(source=self.name).inc()
+            raise
+        finally:
+            metrics.RETRIEVAL_FETCH_DURATION.labels(source=self.name).observe(
+                time.perf_counter() - start
+            )
 
 
 async def fan_out(

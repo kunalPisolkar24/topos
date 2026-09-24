@@ -25,6 +25,7 @@ from src.graphs.post_graph import (
     post_graph_config_for,
     resume_with_decision,
 )
+from src.observability import metrics
 
 _STATUS_TO_PROTO = {
     STATUS_PENDING: ai_service_pb2.WORKFLOW_STATUS_PENDING,
@@ -79,6 +80,7 @@ class PostWorkflowMixin:
         result = await self._post_generation_graph.ainvoke(
             {"prompt": prompt}, config=post_graph_config_for(approval_id)
         )
+        metrics.POST_WORKFLOW_TRANSITIONS.labels(transition="drafted").inc()
         return self._workflow_state_pb(result, approval_id)
 
     @rpc_metrics("/ai.AIService/ApprovePost")
@@ -116,6 +118,7 @@ class PostWorkflowMixin:
             "approved",
             edits=edits,
         )
+        metrics.POST_WORKFLOW_TRANSITIONS.labels(transition="approved").inc()
         return self._workflow_state_pb(result, request.approval_id)
 
     @rpc_metrics("/ai.AIService/RejectPost")
@@ -148,4 +151,5 @@ class PostWorkflowMixin:
             post_graph_config_for(request.approval_id), updates
         )
         values.update(updates)
+        metrics.POST_WORKFLOW_TRANSITIONS.labels(transition="rejected").inc()
         return self._workflow_state_pb(values, request.approval_id)

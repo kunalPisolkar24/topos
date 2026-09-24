@@ -43,15 +43,20 @@ class OllamaEmbeddingClient:
         try:
             vectors = await self._embed(texts)
             _validate_embeddings(texts, vectors)
-            metrics.EMBEDDING_REQUESTS.labels(status="success").inc()
+            metrics.EMBEDDING_REQUESTS.labels(status="success", mode="ollama").inc()
+            metrics.DEPENDENCY_UP.labels(dep="embedding").set(1)
         except EmbeddingError:
-            metrics.EMBEDDING_REQUESTS.labels(status="error").inc()
+            metrics.EMBEDDING_REQUESTS.labels(status="error", mode="ollama").inc()
+            metrics.DEPENDENCY_UP.labels(dep="embedding").set(0)
             raise
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-            metrics.EMBEDDING_REQUESTS.labels(status="error").inc()
+            metrics.EMBEDDING_REQUESTS.labels(status="error", mode="ollama").inc()
+            metrics.DEPENDENCY_UP.labels(dep="embedding").set(0)
             raise EmbeddingError(str(exc)) from exc
         finally:
-            metrics.EMBEDDING_REQUEST_DURATION.observe(time.perf_counter() - start)
+            duration = time.perf_counter() - start
+            metrics.EMBEDDING_REQUEST_DURATION.labels(mode="ollama").observe(duration)
+            metrics.DEPENDENCY_PING_DURATION.labels(dep="embedding").observe(duration)
         return vectors
 
     async def _embed(self, texts: list[str]) -> list[list[float]]:

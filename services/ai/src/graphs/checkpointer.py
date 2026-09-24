@@ -7,6 +7,7 @@ a URL selects the durable AsyncPostgresSaver.
 """
 
 import logging
+import time
 from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -19,6 +20,7 @@ from psycopg_pool import AsyncConnectionPool
 from src.config import settings
 from src.domain.models import RetrievedPost
 from src.graphs.state import ChatMessage, RelevanceVerdict, ToolCall
+from src.observability import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +70,17 @@ async def start_checkpointer(saver: BaseCheckpointSaver) -> None:
     """Open the backing pool and create tables. No-op for in-memory."""
     if not isinstance(saver, AsyncPostgresSaver):
         return
+    start = time.perf_counter()
     pool = cast(AsyncConnectionPool, saver.conn)
-    await pool.open(wait=True, timeout=POOL_OPEN_TIMEOUT_SECONDS)
-    await saver.setup()
+    try:
+        await pool.open(wait=True, timeout=POOL_OPEN_TIMEOUT_SECONDS)
+        await saver.setup()
+    except Exception:
+        metrics.DEPENDENCY_UP.labels(dep="checkpoint").set(0)
+        raise
+    duration = time.perf_counter() - start
+    metrics.DEPENDENCY_UP.labels(dep="checkpoint").set(1)
+    metrics.DEPENDENCY_PING_DURATION.labels(dep="checkpoint").observe(duration)
 
 
 async def close_checkpointer(saver: BaseCheckpointSaver) -> None:

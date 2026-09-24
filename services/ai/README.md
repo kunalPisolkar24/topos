@@ -188,9 +188,11 @@ See issue #163.
 ## Observability
 
 - **Metrics**: Prometheus endpoint on `:12666` — RPC counters/durations
-  by method + status, active requests, LLM call metrics, and
-  recommendation metrics (`recommend_requests_total` by mode + status,
-  profile updates by kind, cold-start ratio).
+  by method + status, active requests, LLM call metrics, Qdrant store
+  operations by operation + status, dependency up/ping gauges (qdrant,
+  embedding, checkpoint), retrieval source latency/errors, judge verdicts,
+  workflow transitions, and recommendation metrics (`recommend_requests_total`
+  by mode + status, profile updates by kind, cold-start ratio).
 - **Logs**: JSON lines to stdout (`service=ai`, `method`, `duration_ms`,
   `trace_id`/`span_id`) — ready for Loki.
 - **Tracing**: optional OTLP export via `OTEL_EXPORTER_OTLP_ENDPOINT`.

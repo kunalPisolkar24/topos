@@ -3,13 +3,19 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import grpc
+import httpx
 import pytest
 from prometheus_client.registry import REGISTRY
+from qdrant_client import AsyncQdrantClient
 
 from src.config import settings
+from src.embeddings import FakeEmbeddingClient
 from src.generated import ai_service_pb2
 from src.generated import ai_service_pb2_grpc as ai_stubs
+from src.graphs.retrieval import DenseSource, HybridSource
 from src.llm import LLMError
+from src.vector import SearchIndex
+from tests.support.fake_llm import FakeLLM
 from tests.support.fakes import (
     FakeHTTPClient,
     FakeResponse,
@@ -373,3 +379,165 @@ async def test_metrics_recommend_counters_not_recorded_on_validation_error(
     assert _recommend_counter("default", "OK") == recommend_before
     assert _cold_start_total() == cold_before
     assert _profile_updates("view") == profile_before
+
+
+def _qdrant_counter(operation: str, status: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "qdrant_requests_total", {"operation": operation, "status": status}
+        )
+        or 0.0
+    )
+
+
+def _qdrant_duration_count(operation: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "qdrant_request_duration_seconds_count",
+            {"operation": operation, "status": "success"},
+        )
+        or 0.0
+    )
+
+
+def _dependency_up(dep: str) -> float | None:
+    return REGISTRY.get_sample_value("dependency_up", {"dep": dep})
+
+
+async def test_metrics_qdrant_records_operation_success() -> None:
+    client = AsyncQdrantClient(location=":memory:")
+    index = SearchIndex(FakeEmbeddingClient(), client)
+    try:
+        await index.ensure_collection()
+        ok_before = _qdrant_counter("upsert", "success")
+        duration_before = _qdrant_duration_count("upsert")
+
+        await index.upsert("6a75a41221a9752ec47bc60a", "t", "b", "s", [], "2026-01-01")
+
+        assert _qdrant_counter("upsert", "success") == ok_before + 1
+        assert _qdrant_duration_count("upsert") == duration_before + 1
+        assert _dependency_up("qdrant") == 1.0
+    finally:
+        await index.close()
+
+
+async def test_metrics_qdrant_records_operation_error() -> None:
+    from src.vector import _record_qdrant
+
+    @_record_qdrant("search")
+    async def failing() -> None:
+        raise RuntimeError("store down")
+
+    err_before = _qdrant_counter("search", "error")
+
+    with pytest.raises(RuntimeError):
+        await failing()
+
+    assert _qdrant_counter("search", "error") == err_before + 1
+    assert _dependency_up("qdrant") == 0.0
+
+
+async def test_metrics_embedding_records_mode_and_dependency(monkeypatch) -> None:
+    from src.embeddings import OllamaEmbeddingClient
+
+    labels = {"status": "success", "mode": "ollama"}
+    ok_before = REGISTRY.get_sample_value("embedding_requests_total", labels) or 0.0
+
+    transport_client = OllamaEmbeddingClient(
+        httpx.AsyncClient(
+            base_url="http://embedding-service:11434",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200, json={"embeddings": [[0.0] * settings.QDRANT_VECTOR_SIZE]}
+                )
+            ),
+        )
+    )
+    try:
+        await transport_client.embed(["hello"])
+    finally:
+        await transport_client.close()
+
+    assert (REGISTRY.get_sample_value("embedding_requests_total", labels) or 0.0) == (
+        ok_before + 1
+    )
+    assert _dependency_up("embedding") == 1.0
+
+
+def _fetch_duration_count(source: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "retrieval_fetch_duration_seconds_count", {"source": source}
+        )
+        or 0.0
+    )
+
+
+def _fetch_errors(source: str) -> float:
+    return (
+        REGISTRY.get_sample_value("retrieval_fetch_errors_total", {"source": source})
+        or 0.0
+    )
+
+
+async def test_metrics_retrieval_sources_record_fetch() -> None:
+    client = AsyncQdrantClient(location=":memory:")
+    index = SearchIndex(FakeEmbeddingClient(), client)
+    try:
+        await index.ensure_collection()
+        dense = DenseSource(index, FakeEmbeddingClient())
+        hybrid = HybridSource(index)
+        dense_before = _fetch_duration_count("dense")
+        hybrid_before = _fetch_duration_count("hybrid")
+
+        assert await dense.fetch("hello", 3) == []
+        assert await hybrid.fetch("hello", 3) == []
+
+        assert _fetch_duration_count("dense") == dense_before + 1
+        assert _fetch_duration_count("hybrid") == hybrid_before + 1
+        assert _fetch_errors("dense") == 0.0
+    finally:
+        await index.close()
+
+
+async def test_metrics_retrieval_source_records_error() -> None:
+    class BrokenSearch:
+        async def retrieve_by_vector(self, vector, top_k):
+            raise RuntimeError("store down")
+
+    dense = DenseSource(BrokenSearch(), FakeEmbeddingClient())  # type: ignore[arg-type]
+    err_before = _fetch_errors("dense")
+
+    with pytest.raises(RuntimeError):
+        await dense.fetch("hello", 3)
+
+    assert _fetch_errors("dense") == err_before + 1
+
+
+def _judge_verdicts(verdict: str) -> float:
+    return (
+        REGISTRY.get_sample_value("chat_judge_verdicts_total", {"verdict": verdict})
+        or 0.0
+    )
+
+
+async def test_metrics_judge_records_verdicts() -> None:
+    from src.graphs.nodes import make_judge_relevance
+
+    state = {"query": "q", "retrieved": []}
+    relevant_before = _judge_verdicts("relevant")
+    unavailable_before = _judge_verdicts("unavailable")
+
+    judge = make_judge_relevance(FakeLLM(response='{"relevant": true, "score": 0.9}'))
+    await judge(state)
+    assert _judge_verdicts("relevant") == relevant_before + 1
+
+    judge = make_judge_relevance(FakeLLM(response="not json at all"))
+    await judge(state)
+    assert _judge_verdicts("unavailable") == unavailable_before + 1
+
+    irrelevant_before = _judge_verdicts("irrelevant")
+    judge = make_judge_relevance(FakeLLM(response='{"relevant": false, "score": 0.1}'))
+    out = await judge(state)
+    assert _judge_verdicts("irrelevant") == irrelevant_before + 1
+    assert out["judge"].relevant is False

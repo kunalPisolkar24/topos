@@ -148,6 +148,37 @@ async def test_repeat_approve_is_idempotent(workflow_stub) -> None:
     assert second.title == first.title == "Draft title"
 
 
+def _workflow_transitions(transition: str) -> float:
+    from prometheus_client.registry import REGISTRY
+
+    return (
+        REGISTRY.get_sample_value(
+            "post_workflow_transitions_total", {"transition": transition}
+        )
+        or 0.0
+    )
+
+
+async def test_workflow_transitions_recorded(workflow_stub) -> None:
+    drafted_before = _workflow_transitions("drafted")
+    approved_before = _workflow_transitions("approved")
+    rejected_before = _workflow_transitions("rejected")
+
+    draft = await _generate_draft(workflow_stub)
+    assert _workflow_transitions("drafted") == drafted_before + 1
+
+    await workflow_stub.ApprovePost(
+        pb.ApprovePostRequest(approval_id=draft.approval_id)
+    )
+    assert _workflow_transitions("approved") == approved_before + 1
+
+    draft = await _generate_draft(workflow_stub)
+    await workflow_stub.RejectPost(
+        pb.RejectPostRequest(approval_id=draft.approval_id, reason="needs work")
+    )
+    assert _workflow_transitions("rejected") == rejected_before + 1
+
+
 # --- Rejection stays resumable ---
 
 
