@@ -94,6 +94,9 @@ const USER_ALIASES: Record<string, string> = {
   USER_LOG_LEVEL: 'LOG_LEVEL',
   USER_CACHE_TTL_MS: 'REDIS_CACHE_TTL_MS',
   USER_MISSING_CACHE_TTL_MS: 'REDIS_MISSING_CACHE_TTL_MS',
+  USER_PG_POOL_MAX: 'PG_POOL_MAX',
+  USER_PG_POOL_IDLE_TIMEOUT_MS: 'PG_POOL_IDLE_TIMEOUT_MS',
+  USER_PG_POOL_CONNECTION_TIMEOUT_MS: 'PG_POOL_CONNECTION_TIMEOUT_MS',
 };
 for (const [aliased, canonical] of Object.entries(USER_ALIASES)) {
   if (process.env[aliased] && !process.env[canonical]) {
@@ -111,6 +114,13 @@ const envSchema = z.object({
   OTEL_SERVICE_NAME: z.string().default('user-service'),
   DATABASE_URL: z.string().url(),
   DATABASE_URL_MIGRATE: z.string().url().optional(),
+  // App-pool tuning (SSM /topos/user/config in prod, USER_PG_* in local .env).
+  // Bounds keep tasks × pool_max within the RDS Proxy budget on a micro
+  // instance. Timeouts stay well under the proxy borrow timeout (120s) so
+  // the app fails fast instead of holding proxy connections.
+  PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  PG_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  PG_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   JWT_SECRET: z.string().min(32),
   JWT_ISSUER: z.string().default('user-service'),
   JWT_AUDIENCE: z.string().default('topos'),
@@ -124,6 +134,38 @@ const envSchema = z.object({
     .preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   USER_SECRETS_NAME: z.string().default('topos/user/secrets'),
   USER_CONFIG_PARAM: z.string().default('/topos/user/config'),
+}).superRefine((val, ctx) => {
+  // RDS Proxy guardrails (prod only; dev/docker use plaintext local Postgres).
+  // The proxy enforces require_tls, so the pooled and migrate URLs must
+  // request TLS. The migrate URL must stay direct (writer, no pgbouncer):
+  // DDL, advisory locks and long transactions pin or break on a pooler.
+  // Note: @prisma/adapter-pg issues unnamed prepared statements, which do
+  // not pin proxy sessions, so no pgbouncer flag is needed on the app URL.
+  if (val.ENV_TYPE === 'prod') {
+    if (!val.DATABASE_URL.toLowerCase().includes('sslmode=require')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'DATABASE_URL must include sslmode=require in prod (RDS Proxy requires TLS)',
+        path: ['DATABASE_URL'],
+      });
+    }
+    if (val.DATABASE_URL_MIGRATE) {
+      if (!val.DATABASE_URL_MIGRATE.toLowerCase().includes('sslmode=require')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'DATABASE_URL_MIGRATE must include sslmode=require in prod (RDS requires TLS)',
+          path: ['DATABASE_URL_MIGRATE'],
+        });
+      }
+      if (val.DATABASE_URL_MIGRATE.toLowerCase().includes('pgbouncer=true')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'DATABASE_URL_MIGRATE must not use pgbouncer (migrations need a direct writer connection)',
+          path: ['DATABASE_URL_MIGRATE'],
+        });
+      }
+    }
+  }
 });
 
 export const env = envSchema.parse(process.env);

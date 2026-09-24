@@ -25,6 +25,30 @@ resource "aws_secretsmanager_secret_version" "master" {
 }
 
 # ---------------------------------------------------------------------------
+# AI checkpointer credentials — least-privilege role for the second
+# database (ai_checkpoints) on the shared instance. The role/database are
+# created once via init-ai-db.sql against the writer endpoint; the password
+# lives here so the proxy can authenticate AI connections. Add this secret
+# name to TF_MANAGED_SECRETS in tools/seed-secrets (seed must not rotate it).
+# ---------------------------------------------------------------------------
+
+resource "random_password" "ai" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "ai" {
+  name        = "${var.name_prefix}/ai-checkpointer"
+  description = "AI checkpointer password for ${var.name_prefix}"
+  tags        = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ai" {
+  secret_id     = aws_secretsmanager_secret.ai.id
+  secret_string = jsonencode({ username = var.ai_username, password = random_password.ai.result })
+}
+
+# ---------------------------------------------------------------------------
 # Subnet group
 # ---------------------------------------------------------------------------
 
@@ -113,11 +137,10 @@ resource "aws_db_instance" "user" {
 }
 
 # ---------------------------------------------------------------------------
-# RDS Proxy — connection pooling for the app (DATABASE_URL)
-# On Floci this is mocked; on real AWS it requires IAM role + Secrets Manager.
-# Floci now supports proxy (verified via `aws rds create-db-proxy` → available
-# at 172.18.0.2), so we create it in both envs. App still falls back to writer
-# when proxy_endpoint is empty (main.tf:189).
+# RDS Proxy — connection pooling for the app (DATABASE_URL / CHECKPOINT_DB_URL)
+# One instance, two databases (topos_users + ai_checkpoints); the proxy
+# routes by username via its two auth entries. App still falls back to the
+# writer when proxy_endpoint is empty (main.tf user/ai secrets logic).
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
@@ -148,9 +171,12 @@ resource "aws_iam_role_policy" "proxy_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = aws_secretsmanager_secret.master.arn
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = [
+        aws_secretsmanager_secret.master.arn,
+        aws_secretsmanager_secret.ai.arn,
+      ]
     }]
   })
 }
@@ -163,13 +189,22 @@ resource "aws_db_proxy" "user" {
   role_arn               = aws_iam_role.proxy[0].arn
   vpc_subnet_ids         = var.private_subnet_ids
   vpc_security_group_ids = [aws_security_group.db.id]
-  require_tls            = true
-  idle_client_timeout    = 1800
+  require_tls            = var.proxy_require_tls
+  idle_client_timeout    = var.proxy_idle_client_timeout
 
   auth {
     auth_scheme = "SECRETS"
     iam_auth    = "DISABLED"
     secret_arn  = aws_secretsmanager_secret.master.arn
+  }
+
+  # Second auth entry so the proxy can authenticate the ai_checkpointer
+  # role (separate database, least privilege). The proxy routes by
+  # username in the connection string.
+  auth {
+    auth_scheme = "SECRETS"
+    iam_auth    = "DISABLED"
+    secret_arn  = aws_secretsmanager_secret.ai.arn
   }
 
   tags = var.tags
@@ -181,9 +216,9 @@ resource "aws_db_proxy_default_target_group" "user" {
   db_proxy_name = aws_db_proxy.user[0].name
 
   connection_pool_config {
-    max_connections_percent      = 100
-    max_idle_connections_percent = 50
-    connection_borrow_timeout    = 120
+    max_connections_percent      = var.proxy_max_connections_percent
+    max_idle_connections_percent = var.proxy_max_idle_connections_percent
+    connection_borrow_timeout    = var.proxy_connection_borrow_timeout
   }
 }
 

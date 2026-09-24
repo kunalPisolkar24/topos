@@ -10,10 +10,10 @@ terraform/
 ├── main.tf              # root: user_database + user_cache + SSM/SM
 ├── outputs.tf           # endpoints + secret ARNs
 ├── modules/
-│   ├── user_database/   # RDS Postgres, subnet/SG/param group, proxy (real only), master secret
+│   ├── user_database/   # RDS Postgres (2 DBs: users + ai_checkpoints), proxy, master + ai secrets
 │   └── user_cache/      # ElastiCache Redis, subnet/SG/param group, auth token
 ├── envs/
-│   └── floci.tfvars     # single-AZ micro, no proxy on Floci
+│   └── floci.tfvars     # single-AZ micro (proxy resources created, app uses docker hosts on Floci)
 ├── backend.hcl.example  # S3 backend for real AWS (provision bucket out-of-band)
 └── README.md
 ```
@@ -30,8 +30,8 @@ terraform -chdir=infrastructure/terraform init
 terraform -chdir=infrastructure/terraform plan -var-file=envs/floci.tfvars
 
 # Apply — on Floci this creates mocked RDS/ElastiCache + real SSM/SM entries.
-# If Floci's RDS Proxy is not emulated, the proxy resources are skipped
-# (count = 0 when endpoint != ""; see modules/user_database/main.tf).
+# The proxy resources are created in both envs; on Floci the app secrets
+# still point at the docker compose hosts (see main.tf secret_string logic).
 terraform -chdir=infrastructure/terraform apply -var-file=envs/floci.tfvars
 
 # Outputs hold the endpoints the app will use via SM/SSM.
@@ -68,9 +68,21 @@ make -C services/user up-floci
 ## Design notes
 
 - **VPC as inputs** — `vpc_id` + `private_subnet_ids` (Floci: `vpc-default-ap-south-1`, `subnet-default-ap-south-1-a/b`). No VPC creation in this stack.
-- **RDS Proxy** — created only for real AWS (`count = endpoint == ""`). On Floci the app falls back to the writer endpoint (see `main.tf` secret_string logic). Consult `outputs.tf` for which endpoint the app actually uses.
+- **RDS Proxy** — one proxy, two databases. The shared instance hosts `topos_users`
+  (user service) and `ai_checkpoints` (ai checkpointer); the proxy has an auth
+  entry per role and routes by username. Pooled app URLs (`DATABASE_URL`,
+  `CHECKPOINT_DB_URL`) use the proxy endpoint with `?sslmode=require`
+  (`require_tls=true`); migrate/setup URLs (`DATABASE_URL_MIGRATE`,
+  `CHECKPOINT_DB_URL_MIGRATE`) use the direct writer endpoint. On Floci the
+  secrets point at the docker compose hosts instead (see `main.tf`
+  secret_string logic). Consult `outputs.tf` for which endpoint the app uses.
+- **Second database** — RDS only creates the initial DB; after `apply` (real
+  AWS), run `modules/user_database/init-ai-db.sql` once against the writer
+  endpoint with master creds to create the `ai_checkpointer` role +
+  `ai_checkpoints` database (passwords from SM). Docker/local is covered by
+  `infrastructure/docker/users-postgres/init/10-ai-checkpoints.sh`.
 - **ElastiCache** — provisioned `7.0`, `cache.t4g.micro`, single node on Floci. TLS (`rediss://`) + auth token; the app's `REDIS_URL` handles both `redis://` (dev) and `rediss://` (prod) via ioredis.
-- **Secrets** — `aws_ssm_parameter.user_config` (String JSON) + `aws_secretsmanager_secret.user_secrets` (placeholder; real values are ignored on `apply` via `ignore_changes` and populated by `seed-secrets`). The RDS master secret is `topos-user-floci/master` (TF-managed, add to `TF_MANAGED_SECRETS` guard).
+- **Secrets** — `aws_ssm_parameter.user_config` (String JSON) + `aws_secretsmanager_secret.user_secrets` (placeholder; real values are ignored on `apply` via `ignore_changes` and populated by `seed-secrets`); same pattern for `ai_config` / `ai_secrets`. The RDS master secret is `topos-user-floci/master` and the AI secret `topos-user-floci/ai-checkpointer` (both TF-managed, add to `TF_MANAGED_SECRETS` guard).
 - **State** — local for Floci. S3 backend (`backend.hcl.example`) is for real AWS only; never commit real creds.
 
 ## Verify

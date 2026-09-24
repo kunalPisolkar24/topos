@@ -6,9 +6,15 @@ import { logger } from '../observability/logger.js';
 
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 30_000,
-  max: 10,
+  // Tunable via SSM /topos/user/config (prod) or USER_PG_* (local).
+  // pg parses ?sslmode=require from the URL into verified TLS (system CA
+  // bundle in the runtime image covers the public RDS cert), which the
+  // proxy's require_tls demands. No SET-based options here on purpose:
+  // SET pins RDS Proxy sessions and would defeat pooling.
+  connectionTimeoutMillis: env.PG_POOL_CONNECTION_TIMEOUT_MS,
+  idleTimeoutMillis: env.PG_POOL_IDLE_TIMEOUT_MS,
+  max: env.PG_POOL_MAX,
+  application_name: 'user-service',
 });
 
 pool.on('error', (err: Error) => {

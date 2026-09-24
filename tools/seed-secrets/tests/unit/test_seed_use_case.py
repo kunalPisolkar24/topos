@@ -107,15 +107,39 @@ def test_build_payloads_ai_aliases() -> None:
         "LIGHTNING_AI_API_KEY": "test-llm-key",
         "AI_QDRANT_URL": "http://qdrant:6333",
         "AI_CHECKPOINT_DB_URL": "postgresql://ai:pass@user-postgres:5432/ai_checkpoints",
+        "AI_CHECKPOINT_DB_URL_MIGRATE": "postgresql://ai:pass@writer:5432/ai_checkpoints",
+        "AI_CHECKPOINT_POOL_MIN_SIZE": "2",
+        "AI_CHECKPOINT_POOL_MAX_SIZE": "5",
     }
     seeder = SeedUseCase(FakeStore())
     payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config", "topos/ai/secrets"}))
     by_name = {p.name: p.data for p in payloads}
     assert by_name["/topos/ai/config"]["LLM_MODEL"] == "lightning-ai/gpt-oss-20b"
     assert by_name["/topos/ai/config"]["LLM_MODE"] == "fake"
+    assert by_name["/topos/ai/config"]["CHECKPOINT_POOL_MIN_SIZE"] == "2"
+    assert by_name["/topos/ai/config"]["CHECKPOINT_POOL_MAX_SIZE"] == "5"
     assert by_name["topos/ai/secrets"]["LLM_API_KEY"] == "test-llm-key"
     assert by_name["topos/ai/secrets"]["QDRANT_URL"] == "http://qdrant:6333"
     assert "ai_checkpoints" in by_name["topos/ai/secrets"]["CHECKPOINT_DB_URL"]
+    assert "writer" in by_name["topos/ai/secrets"]["CHECKPOINT_DB_URL_MIGRATE"]
+
+
+def test_build_payloads_user_pool_aliases() -> None:
+    env = {
+        "USER_DATABASE_URL": "postgresql://u:p@proxy:5432/topos_users?sslmode=require",
+        "USER_DATABASE_URL_MIGRATE": "postgresql://u:p@writer:5432/topos_users?sslmode=require",
+        "USER_PG_POOL_MAX": "8",
+        "USER_PG_POOL_IDLE_TIMEOUT_MS": "20000",
+        "USER_PG_POOL_CONNECTION_TIMEOUT_MS": "4000",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/user/config", "topos/user/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert "proxy" in by_name["topos/user/secrets"]["DATABASE_URL"]
+    assert "writer" in by_name["topos/user/secrets"]["DATABASE_URL_MIGRATE"]
+    assert by_name["/topos/user/config"]["PG_POOL_MAX"] == "8"
+    assert by_name["/topos/user/config"]["PG_POOL_IDLE_TIMEOUT_MS"] == "20000"
+    assert by_name["/topos/user/config"]["PG_POOL_CONNECTION_TIMEOUT_MS"] == "4000"
 
 
 def test_build_payloads_ai_canonical_wins() -> None:

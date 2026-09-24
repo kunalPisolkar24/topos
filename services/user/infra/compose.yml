@@ -16,6 +16,9 @@ services:
       - ENV_TYPE=${ENV_TYPE:-dev}
       - DATABASE_URL=${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}
       - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
+      - PG_POOL_MAX=${USER_PG_POOL_MAX:-10}
+      - PG_POOL_IDLE_TIMEOUT_MS=${USER_PG_POOL_IDLE_TIMEOUT_MS:-30000}
+      - PG_POOL_CONNECTION_TIMEOUT_MS=${USER_PG_POOL_CONNECTION_TIMEOUT_MS:-5000}
       - JWT_SECRET=${USER_JWT_SECRET:-local-dev-secret-0123456789abcdef0123456789abcdef}
       - JWT_ISSUER=${USER_JWT_ISSUER:-user-service}
       - JWT_AUDIENCE=${USER_JWT_AUDIENCE:-topos}

@@ -24,6 +24,9 @@ _AI_ALIASES = {
     "AI_LANGCHAIN_API_KEY": "LANGCHAIN_API_KEY",
     "AI_LANGCHAIN_PROJECT": "LANGCHAIN_PROJECT",
     "AI_CHECKPOINT_DB_URL": "CHECKPOINT_DB_URL",
+    "AI_CHECKPOINT_DB_URL_MIGRATE": "CHECKPOINT_DB_URL_MIGRATE",
+    "AI_CHECKPOINT_POOL_MIN_SIZE": "CHECKPOINT_POOL_MIN_SIZE",
+    "AI_CHECKPOINT_POOL_MAX_SIZE": "CHECKPOINT_POOL_MAX_SIZE",
     "AI_QDRANT_URL": "QDRANT_URL",
     "AI_QDRANT_API_KEY": "QDRANT_API_KEY",
     "AI_QDRANT_VECTOR_SIZE": "QDRANT_VECTOR_SIZE",
@@ -133,6 +136,15 @@ class Settings(BaseSettings):
     # LangGraph checkpoint store (Postgres). Empty keeps graphs on the
     # in-memory checkpointer, so local dev and tests need no database.
     CHECKPOINT_DB_URL: str = ""
+    # Direct writer URL used only for saver.setup() (DDL, including CREATE
+    # INDEX CONCURRENTLY). Empty falls back to CHECKPOINT_DB_URL. In prod
+    # this must be the RDS writer endpoint, never the proxy: DDL pins or
+    # breaks on a pooler. Both URLs need ?sslmode=require against RDS.
+    CHECKPOINT_DB_URL_MIGRATE: str = ""
+    # Runtime pool bounds (SSM /topos/ai/config in prod, AI_CHECKPOINT_*
+    # in local .env). Small: checkpoint writes are short transactions.
+    CHECKPOINT_POOL_MIN_SIZE: int = 1
+    CHECKPOINT_POOL_MAX_SIZE: int = 10
     # Attempts, 5s apart, before failing startup when the checkpoint
     # store is unreachable.
     CHECKPOINT_STARTUP_RETRIES: int = 12
@@ -257,6 +269,19 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         _normalize_ai_aliases()
         super().__init__(**kwargs)
+        if self.CHECKPOINT_POOL_MAX_SIZE < self.CHECKPOINT_POOL_MIN_SIZE:
+            raise ValueError(
+                "CHECKPOINT_POOL_MAX_SIZE must be >= CHECKPOINT_POOL_MIN_SIZE"
+            )
+        if (
+            self.ENV_TYPE == "prod"
+            and self.CHECKPOINT_DB_URL
+            and "sslmode=require" not in self.CHECKPOINT_DB_URL.lower()
+        ):
+            logger.warning(
+                "ai config: CHECKPOINT_DB_URL lacks sslmode=require; "
+                "RDS Proxy requires TLS"
+            )
 
 
 _normalize_ai_aliases()
