@@ -10,7 +10,7 @@ from src.config import settings
 from src.generated import ai_service_pb2
 from src.generated import ai_service_pb2_grpc as ai_stubs
 from src.llm import LLMError
-from tests.fakes import (
+from tests.support.fakes import (
     FakeHTTPClient,
     FakeResponse,
     make_client,

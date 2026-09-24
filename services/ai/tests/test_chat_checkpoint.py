@@ -3,10 +3,10 @@
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
+from src.domain.models import SearchResult
 from src.graphs.chat_graph import build_chat_graph, graph_config_for
 from src.graphs.state import ChatMessage
 from src.llm import FakeLLMClient
-from src.vector import SearchResult
 
 
 class StubEmbeddings:
@@ -19,7 +19,7 @@ class StubStore:
         return []
 
     async def search(self, query: str, offset: int, limit: int):
-        from src.vector import SearchResult
+        from src.domain.models import SearchResult
 
         return SearchResult(post_ids=[], total=0)
 
@@ -90,8 +90,8 @@ def test_checkpoint_serde_preserves_state_dataclasses() -> None:
     """Every custom type stored in ChatState channels must survive the
     checkpoint serializer: a missing msgpack allowlist entry silently
     degrades stored objects to raw dicts when a session reloads."""
+    from src.domain.models import RetrievedPost
     from src.graphs.checkpointer import build_checkpointer
-    from src.vector import RetrievedPost
 
     saver = build_checkpointer()
     blob, checksum = saver.serde.dumps_typed(

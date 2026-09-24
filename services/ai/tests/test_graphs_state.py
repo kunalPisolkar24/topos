@@ -1,6 +1,7 @@
 import pytest
 from langgraph.graph import END, START, StateGraph
 
+from src.domain.models import RetrievedPost
 from src.graphs.state import (
     AnswerOutput,
     ChatMessage,
@@ -13,7 +14,6 @@ from src.graphs.state import (
     ToolLoopOutput,
     merge_retrieved,
 )
-from src.vector import RetrievedPost
 
 
 def _post(post_id: str) -> RetrievedPost:

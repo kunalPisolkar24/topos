@@ -11,8 +11,9 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from src.config import settings
+from src.domain.models import RetrievedPost
 from src.embeddings import EmbeddingProvider
-from src.vector import RetrievedPost, SearchStore
+from src.vector import SearchStore
 
 logger = logging.getLogger(__name__)
 

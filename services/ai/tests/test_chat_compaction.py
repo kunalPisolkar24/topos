@@ -148,7 +148,7 @@ class StubStore:
         return []
 
     async def search(self, query: str, offset: int, limit: int):
-        from src.vector import SearchResult
+        from src.domain.models import SearchResult
 
         return SearchResult(post_ids=[], total=0)
 

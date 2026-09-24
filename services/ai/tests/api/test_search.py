@@ -6,7 +6,7 @@ import pytest
 
 from src.generated import ai_service_pb2
 from src.generated import ai_service_pb2_grpc as ai_stubs
-from tests.scripted_embedding import ScriptedEmbedding
+from tests.support.scripted_embedding import ScriptedEmbedding
 
 
 def _index_request(post_id: str | None = None) -> ai_service_pb2.IndexRequest:

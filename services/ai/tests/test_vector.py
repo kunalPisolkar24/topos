@@ -25,7 +25,7 @@ from src.vector import (
     _token_id,
     _user_point_id,
 )
-from tests.scripted_embedding import ScriptedEmbedding
+from tests.support.scripted_embedding import ScriptedEmbedding
 
 POST_A = "6a75a41221a9752ec47bc60a"
 POST_B = "6a75a41221a9752ec47bc60b"

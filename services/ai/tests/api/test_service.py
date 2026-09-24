@@ -8,7 +8,7 @@ from grpc_health.v1 import health_pb2, health_pb2_grpc
 from src.generated import ai_service_pb2
 from src.llm import LLMError
 from src.observability.logging import setup_logging
-from tests.fake_llm import FakeLLM
+from tests.support.fake_llm import FakeLLM
 
 
 async def test_generate_summary(stub, fake_llm: FakeLLM) -> None:

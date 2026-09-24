@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from operator import add
 from typing import Annotated, TypedDict
 
-from src.vector import RetrievedPost
+from src.domain.models import RetrievedPost
 
 
 @dataclass(frozen=True)

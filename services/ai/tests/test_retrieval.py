@@ -3,13 +3,13 @@ import logging
 
 import pytest
 
+from src.domain.models import RetrievedPost, SearchResult
 from src.graphs.retrieval import (
     DenseSource,
     HybridSource,
     fan_out,
     fuse_context,
 )
-from src.vector import RetrievedPost, SearchResult
 
 
 def _post(post_id: str, body: str = "b") -> RetrievedPost:

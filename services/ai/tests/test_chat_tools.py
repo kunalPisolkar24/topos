@@ -1,10 +1,10 @@
 import json
 
+from src.domain.models import RetrievedPost, SearchResult
 from src.graphs.chat_graph import build_chat_graph
 from src.graphs.nodes import make_tool_loop
 from src.graphs.tools import make_tool_registry
 from src.llm import CompletionReply, FakeLLMClient, ToolRequest
-from src.vector import RetrievedPost, SearchResult
 
 
 def _post(post_id: str) -> RetrievedPost:

@@ -8,6 +8,7 @@ from langgraph.config import get_stream_writer
 from langsmith import traceable
 
 from src.config import settings
+from src.domain.models import RetrievedPost
 from src.domain.prompts import (
     CHAT_SYSTEM_PROMPT,
     HISTORY_SUMMARY_PROMPT,
@@ -47,7 +48,7 @@ from src.graphs.tools import (
 )
 from src.llm import LLMError, LLMProvider
 from src.observability import metrics
-from src.vector import RetrievedPost, SearchStore
+from src.vector import SearchStore
 
 logger = logging.getLogger(__name__)
 

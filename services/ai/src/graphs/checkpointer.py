@@ -17,8 +17,8 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from src.config import settings
+from src.domain.models import RetrievedPost
 from src.graphs.state import ChatMessage, RelevanceVerdict, ToolCall
-from src.vector import RetrievedPost
 
 logger = logging.getLogger(__name__)
 

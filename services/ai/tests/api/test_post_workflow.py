@@ -23,7 +23,7 @@ from src.generated import ai_service_pb2 as pb
 from src.generated import ai_service_pb2_grpc as ai_stubs
 from src.graphs.post_graph import build_post_generation_graph
 from src.vector import SearchIndex
-from tests.fake_llm import FakeLLM
+from tests.support.fake_llm import FakeLLM
 
 DRAFT_JSON = json.dumps(
     {

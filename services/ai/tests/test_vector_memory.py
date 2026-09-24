@@ -14,8 +14,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from src.config import settings
+from src.domain.models import SearchResult
 from src.embeddings import FakeEmbeddingClient
-from src.vector import MemoryIndex, SearchResult
+from src.vector import MemoryIndex
 
 TITLE_POSTS = [
     (

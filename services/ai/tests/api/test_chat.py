@@ -8,8 +8,8 @@ from src.config import settings
 from src.generated import ai_service_pb2
 from src.generated import ai_service_pb2_grpc as ai_stubs
 from src.llm import LLMError
-from tests.fake_llm import FakeLLM
-from tests.scripted_embedding import ScriptedEmbedding
+from tests.support.fake_llm import FakeLLM
+from tests.support.scripted_embedding import ScriptedEmbedding
 
 
 def _index_request(post_id: str, text: str) -> ai_service_pb2.IndexRequest:

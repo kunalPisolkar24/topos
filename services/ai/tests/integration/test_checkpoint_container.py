@@ -58,6 +58,7 @@ async def test_sessions_resume_through_postgres_factory(
     from langgraph.checkpoint.memory import InMemorySaver
 
     from src.config import settings
+    from src.domain.models import SearchResult
     from src.graphs.chat_graph import build_chat_graph, graph_config_for
     from src.graphs.checkpointer import (
         build_checkpointer,
@@ -65,7 +66,6 @@ async def test_sessions_resume_through_postgres_factory(
         start_checkpointer,
     )
     from src.llm import FakeLLMClient
-    from src.vector import SearchResult
 
     class StubEmbeddings:
         async def embed(self, texts: list[str]) -> list[list[float]]:

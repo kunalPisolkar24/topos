@@ -2,6 +2,7 @@ import logging
 
 import pytest
 
+from src.domain.models import RetrievedPost, SearchResult
 from src.domain.prompts import JUDGE_RELEVANCE_PROMPT, REWRITE_QUERY_PROMPT
 from src.graphs.chat_graph import build_chat_graph
 from src.graphs.nodes import (
@@ -11,7 +12,6 @@ from src.graphs.nodes import (
 )
 from src.graphs.state import RelevanceVerdict
 from src.llm import CompletionReply
-from src.vector import RetrievedPost, SearchResult
 
 
 class ScriptedLLM:

@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 from qdrant_client import AsyncQdrantClient, models
 
 from src.config import settings
+from src.domain.models import RetrievedPost, SearchResult
 from src.domain.text import clean_html
 from src.embeddings import EmbeddingError, EmbeddingProvider
 from src.sparse import embed as sparse_embed
@@ -85,19 +86,14 @@ def _sparse_vector(weights: dict[str, float]) -> models.SparseVector:
     )
 
 
-@dataclass
-class SearchResult:
-    post_ids: list[str]
-    total: int
-
-
-@dataclass
-class RetrievedPost:
-    """A post retrieved as grounding context for the chat assistant."""
-
-    post_id: str
-    title: str
-    body: str
+def _retrieved_post(post_id: str, payload: dict | None) -> RetrievedPost:
+    """Build grounding context from a post id and its stored payload."""
+    payload = payload or {}
+    return RetrievedPost(
+        post_id=post_id,
+        title=payload.get("title", ""),
+        body=payload.get("body", ""),
+    )
 
 
 def _embedding_text(title: str, body: str, summary: str) -> str:
@@ -323,14 +319,7 @@ class SearchIndex:
 
         posts: list[RetrievedPost] = []
         for point in response.points:
-            payload = point.payload or {}
-            posts.append(
-                RetrievedPost(
-                    post_id=_post_id_from_point(point.id),
-                    title=payload.get("title", ""),
-                    body=payload.get("body", ""),
-                )
-            )
+            posts.append(_retrieved_post(_post_id_from_point(point.id), point.payload))
         return posts
 
     async def retrieve_by_text(self, text: str, top_k: int) -> list[RetrievedPost]:
@@ -354,14 +343,7 @@ class SearchIndex:
 
         posts: list[RetrievedPost] = []
         for point in response.points:
-            payload = point.payload or {}
-            posts.append(
-                RetrievedPost(
-                    post_id=_post_id_from_point(point.id),
-                    title=payload.get("title", ""),
-                    body=payload.get("body", ""),
-                )
-            )
+            posts.append(_retrieved_post(_post_id_from_point(point.id), point.payload))
         return posts
 
     async def get_posts(self, post_ids: list[str]) -> list[RetrievedPost]:
@@ -381,11 +363,7 @@ class SearchIndex:
             _post_id_from_point(record.id): record.payload or {} for record in records
         }
         return [
-            RetrievedPost(
-                post_id=post_id,
-                title=payload_by_id[post_id].get("title", ""),
-                body=payload_by_id[post_id].get("body", ""),
-            )
+            _retrieved_post(post_id, payload_by_id[post_id])
             for post_id in post_ids
             if post_id in payload_by_id
         ]
@@ -725,6 +703,11 @@ class _StoredPost:
     created_at: str
 
 
+def _stored_to_retrieved(post: _StoredPost) -> RetrievedPost:
+    """Grounding context from an in-memory stored post."""
+    return RetrievedPost(post_id=post.post_id, title=post.title, body=post.body)
+
+
 def _parse_created_at(created_at: str) -> datetime | None:
     """Parse a stored RFC3339 created_at, or None when it is unusable."""
     if not created_at:
@@ -860,7 +843,7 @@ class MemoryIndex:
         ]
         scored.sort(key=lambda item: item[1], reverse=True)
         return [
-            RetrievedPost(post_id=post.post_id, title=post.title, body=post.body)
+            _stored_to_retrieved(post)
             for post, score in scored[:top_k]
             if score >= settings.SEARCH_DENSE_SCORE_THRESHOLD
         ]
@@ -879,9 +862,7 @@ class MemoryIndex:
         for post_id in post_ids:
             stored = self._posts.get(post_id)
             if stored is not None:
-                posts.append(
-                    RetrievedPost(post_id=post_id, title=stored.title, body=stored.body)
-                )
+                posts.append(_stored_to_retrieved(stored))
         return posts
 
     async def user_tag_weights(self, user_id: str) -> dict[str, float]:

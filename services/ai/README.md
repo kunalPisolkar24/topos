@@ -24,6 +24,13 @@ Topos platform over gRPC.
 src/
 ├── main.py              # entrypoint: serve + graceful shutdown
 ├── config.py            # pydantic settings (env-driven)
+├── api/                 # gRPC server construction + thin service root
+├── application/         # use-cases per bounded context (generation, search,
+│                        #   profiles, chat, post workflows) + RPC plumbing
+├── domain/              # models, prompts, sanitization, text cleaning
+├── vector.py            # Qdrant index: upsert, delete, hybrid search, related
+├── embeddings.py        # embedding clients (ollama + fake + inference noop)
+├── graphs/              # langgraph wiring (nodes, retrieval, tools, graphs)
 ├── llm.py               # LLM provider client (real + fake)
 ├── embeddings.py        # embedding clients (ollama + fake)
 ├── vector.py            # Qdrant index: upsert, delete, hybrid search, related

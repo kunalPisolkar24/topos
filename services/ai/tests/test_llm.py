@@ -6,7 +6,7 @@ import pytest
 from src.domain.models import GeneratedPost
 from src.domain.prompts import POST_PROMPT, SUMMARY_PROMPT, TAGS_PROMPT
 from src.llm import FakeLLMClient, LLMError
-from tests.fakes import (
+from tests.support.fakes import (
     FakeHTTPClient,
     FakeResponse,
     make_client,

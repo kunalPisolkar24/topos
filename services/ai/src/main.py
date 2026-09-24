@@ -11,6 +11,7 @@ from src.api.server import create_server
 from src.api.service import AIService
 from src.config import settings
 from src.embeddings import (
+    EmbeddingProvider,
     FakeEmbeddingClient,
     NoopEmbeddingClient,
     OllamaEmbeddingClient,
@@ -86,6 +87,32 @@ async def _ensure_checkpointer_ready(saver: BaseCheckpointSaver) -> None:
             await asyncio.sleep(5)
 
 
+def build_embeddings() -> EmbeddingProvider:
+    """Provider for the configured mode.
+
+    Inference mode returns a Noop placeholder: Qdrant embeds server-side,
+    so the provider must never be called (it fails loudly if it is).
+    """
+    if settings.EMBEDDING_MODE == "fake":
+        return FakeEmbeddingClient()
+    if settings.EMBEDDING_MODE == "inference":
+        return NoopEmbeddingClient()
+    return OllamaEmbeddingClient()
+
+
+def build_search(embeddings: EmbeddingProvider) -> SearchStore:
+    """Store for the configured mode.
+
+    Inference mode needs the qdrant store: the in-memory twin has no
+    server to embed for it.
+    """
+    if settings.EMBEDDING_MODE == "inference" and settings.VECTOR_MODE == "fake":
+        raise RuntimeError("EMBEDDING_MODE=inference requires VECTOR_MODE=qdrant")
+    if settings.VECTOR_MODE == "fake":
+        return MemoryIndex(embeddings)
+    return SearchIndex(embeddings)
+
+
 async def serve() -> None:
     setup_logging()
     setup_tracing()
@@ -97,22 +124,8 @@ async def serve() -> None:
 
     llm = FakeLLMClient() if settings.LLM_MODE == "fake" else LLMClient()
     logger.info("llm provider: mode %s model %s", settings.LLM_MODE, settings.LLM_MODEL)
-    embeddings = (
-        FakeEmbeddingClient()
-        if settings.EMBEDDING_MODE == "fake"
-        else (
-            NoopEmbeddingClient()
-            if settings.EMBEDDING_MODE == "inference"
-            else OllamaEmbeddingClient()
-        )
-    )
-    if settings.EMBEDDING_MODE == "inference" and settings.VECTOR_MODE == "fake":
-        raise RuntimeError("EMBEDDING_MODE=inference requires VECTOR_MODE=qdrant")
-    search: SearchStore = (
-        MemoryIndex(embeddings)
-        if settings.VECTOR_MODE == "fake"
-        else SearchIndex(embeddings)
-    )
+    embeddings = build_embeddings()
+    search = build_search(embeddings)
 
     feed_agent = None
     if settings.AGENT_MODE != "deterministic":

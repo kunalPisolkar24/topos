@@ -16,7 +16,7 @@ from src.graphs.feed_graph import (
     profile_summary,
 )
 from src.llm import LLMError
-from tests.fake_llm import FakeLLM
+from tests.support.fake_llm import FakeLLM
 
 
 def _decisions(outcome: str) -> float:

@@ -9,7 +9,7 @@ from src.embeddings import FakeEmbeddingClient
 from src.generated import ai_service_pb2_grpc as ai_stubs
 from src.graphs.chat_graph import ChatGraphs, build_chat_graph
 from src.vector import SearchIndex
-from tests.fake_llm import FakeLLM
+from tests.support.fake_llm import FakeLLM
 
 
 @pytest.fixture

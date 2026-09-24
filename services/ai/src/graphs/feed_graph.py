@@ -16,10 +16,11 @@ from langgraph.graph import END, START, StateGraph
 from langsmith import traceable
 
 from src.config import settings
+from src.domain.models import SearchResult
 from src.domain.prompts import FEED_AGENT_PROMPT, feed_agent_user_prompt
 from src.llm import LLMError, LLMProvider
 from src.observability import metrics
-from src.vector import SearchResult, SearchStore
+from src.vector import SearchStore
 
 BALANCED = "balanced"
 FRESH = "fresh"
