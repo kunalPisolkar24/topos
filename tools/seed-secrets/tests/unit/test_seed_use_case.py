@@ -98,3 +98,28 @@ def test_execute_alias() -> None:
     cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=True)
     results, _ = seeder.execute(cfg, env)
     assert results
+
+
+def test_build_payloads_ai_aliases() -> None:
+    env = {
+        "AI_LIGHTNING_MODEL": "lightning-ai/gpt-oss-20b",
+        "AI_LLM_MODE": "fake",
+        "LIGHTNING_AI_API_KEY": "test-llm-key",
+        "AI_QDRANT_URL": "http://qdrant:6333",
+        "AI_CHECKPOINT_DB_URL": "postgresql://ai:pass@user-postgres:5432/ai_checkpoints",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config", "topos/ai/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["/topos/ai/config"]["LLM_MODEL"] == "lightning-ai/gpt-oss-20b"
+    assert by_name["/topos/ai/config"]["LLM_MODE"] == "fake"
+    assert by_name["topos/ai/secrets"]["LLM_API_KEY"] == "test-llm-key"
+    assert by_name["topos/ai/secrets"]["QDRANT_URL"] == "http://qdrant:6333"
+    assert "ai_checkpoints" in by_name["topos/ai/secrets"]["CHECKPOINT_DB_URL"]
+
+
+def test_build_payloads_ai_canonical_wins() -> None:
+    env = {"LLM_MODEL": "canonical-model", "AI_LIGHTNING_MODEL": "alias-model"}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config"}))
+    assert payloads[0].data["LLM_MODEL"] == "canonical-model"

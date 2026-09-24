@@ -6,7 +6,7 @@ WORKDIR /gen
 
 COPY proto/ai/ai_service.proto ./proto/ai/
 
-RUN pip install --no-cache-dir grpcio-tools
+RUN pip install --no-cache-dir grpcio-tools==1.83.0
 
 RUN mkdir -p src/generated && touch src/generated/__init__.py && \
     python -m grpc_tools.protoc -I proto/ai --python_out=src/generated --pyi_out=src/generated --grpc_python_out=src/generated ai_service.proto && \

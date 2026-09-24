@@ -1,6 +1,13 @@
 x-ai-service-env: &ai-service-env
   PORT: ${AI_SERVICE_INT_PORT:-50051}
   METRICS_PORT: ${AI_METRICS_INT_PORT:-12666}
+  ENV_TYPE: ${ENV_TYPE:-dev}
+  AWS_REGION: ${AWS_REGION:-ap-south-1}
+  AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+  AI_SECRETS_NAME: ${AI_SECRETS_NAME:-topos/ai/secrets}
+  AI_CONFIG_PARAM: ${AI_CONFIG_PARAM:-/topos/ai/config}
   LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
   LLM_API_URL: ${AI_LLM_API_URL:-https://lightning.ai/api/v1/chat/completions}
   LLM_API_KEY: ${LIGHTNING_AI_API_KEY:-}
@@ -43,6 +50,8 @@ services:
       - "${AI_SERVICE_EXT_PORT:-50051}:${AI_SERVICE_INT_PORT:-50051}"
       - "${AI_METRICS_EXT_PORT:-12666}:${AI_METRICS_INT_PORT:-12666}"
     environment: *ai-service-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       qdrant:
         condition: service_healthy

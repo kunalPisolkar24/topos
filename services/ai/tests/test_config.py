@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 import pytest
@@ -13,6 +14,11 @@ def isolated_settings(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
 
 
 DEFAULTS = {
+    "ENV_TYPE": "dev",
+    "AWS_REGION": "ap-south-1",
+    "AWS_ENDPOINT_URL": "",
+    "AI_SECRETS_NAME": "topos/ai/secrets",
+    "AI_CONFIG_PARAM": "/topos/ai/config",
     "PORT": "50051",
     "GRACE_SECONDS": 5,
     "METRICS_PORT": 12666,
@@ -66,6 +72,11 @@ def test_defaults(isolated_settings: Settings, field: str, expected) -> None:
 
 
 OVERRIDES = {
+    "ENV_TYPE": "dev",
+    "AWS_REGION": "eu-west-1",
+    "AWS_ENDPOINT_URL": "http://localhost:4566",
+    "AI_SECRETS_NAME": "topos/ai/test-secrets",
+    "AI_CONFIG_PARAM": "/topos/ai/test-config",
     "PORT": "50055",
     "GRACE_SECONDS": 9,
     "METRICS_PORT": 9091,
@@ -124,3 +135,101 @@ def test_invalid_grace_seconds_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_ai_aliases_resolve_to_canonical(monkeypatch: pytest.MonkeyPatch) -> None:
+    for canonical in ("LLM_API_KEY", "LLM_MODEL", "LLM_MODE", "QDRANT_URL"):
+        monkeypatch.delenv(canonical, raising=False)
+    monkeypatch.setenv("LIGHTNING_AI_API_KEY", "alias-key")
+    monkeypatch.setenv("AI_LIGHTNING_MODEL", "alias-model")
+    monkeypatch.setenv("AI_LLM_MODE", "fake")
+    monkeypatch.setenv("AI_QDRANT_URL", "http://alias-qdrant:6333")
+
+    s = Settings()
+    assert s.LLM_API_KEY == "alias-key"
+    assert s.LLM_MODEL == "alias-model"
+    assert s.LLM_MODE == "fake"
+    assert s.QDRANT_URL == "http://alias-qdrant:6333"
+    for canonical in ("LLM_API_KEY", "LLM_MODEL", "LLM_MODE", "QDRANT_URL"):
+        os.environ.pop(canonical, None)
+
+
+def test_canonical_env_wins_over_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_MODEL", "canonical-model")
+    monkeypatch.setenv("AI_LIGHTNING_MODEL", "alias-model")
+
+    assert Settings().LLM_MODEL == "canonical-model"
+
+
+def _install_fake_boto3(monkeypatch: pytest.MonkeyPatch, ssm_value=None, sm_value=None):
+    import sys
+    import types
+
+    from botocore.exceptions import ClientError
+
+    seen: dict = {}
+
+    class FakeSSM:
+        def get_parameter(self, Name):
+            seen["ssm_name"] = Name
+            if ssm_value is None:
+                raise ClientError(
+                    {"Error": {"Code": "ParameterNotFound"}}, "GetParameter"
+                )
+            return {"Parameter": {"Value": ssm_value}}
+
+    class FakeSM:
+        def get_secret_value(self, SecretId):
+            seen["sm_name"] = SecretId
+            if sm_value is None:
+                raise ClientError(
+                    {"Error": {"Code": "ResourceNotFoundException"}}, "GetSecretValue"
+                )
+            return {"SecretString": sm_value}
+
+    fake = types.ModuleType("boto3")
+    fake.client = lambda service, **kwargs: FakeSSM() if service == "ssm" else FakeSM()  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "boto3", fake)
+    return seen
+
+
+def test_prod_hydrate_fills_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    import src.config as config_mod
+
+    monkeypatch.setenv("ENV_TYPE", "prod")
+    for k in ("LLM_API_KEY", "LLM_MODEL", "QDRANT_URL", "LOG_LEVEL"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LOG_LEVEL", "WARNING")  # already set: must win
+    seen = _install_fake_boto3(
+        monkeypatch,
+        ssm_value=json.dumps({"LOG_LEVEL": "DEBUG", "LLM_MODEL": "hydrated-model"}),
+        sm_value=json.dumps(
+            {"LLM_API_KEY": "hydrated-key", "QDRANT_URL": "http://hydrated:6333"}
+        ),
+    )
+
+    config_mod._hydrate_from_aws()
+
+    assert seen["ssm_name"] == "/topos/ai/config"
+    assert seen["sm_name"] == "topos/ai/secrets"
+    assert Settings().LLM_MODEL == "hydrated-model"
+    assert Settings().LLM_API_KEY == "hydrated-key"
+    assert Settings().QDRANT_URL == "http://hydrated:6333"
+    assert Settings().LOG_LEVEL == "WARNING"
+    for k in ("LLM_API_KEY", "LLM_MODEL", "QDRANT_URL"):
+        os.environ.pop(k, None)
+
+
+def test_prod_hydrate_missing_remote_is_tolerated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.config as config_mod
+
+    monkeypatch.setenv("ENV_TYPE", "prod")
+    _install_fake_boto3(monkeypatch, ssm_value=None, sm_value=None)
+
+    config_mod._hydrate_from_aws()  # must not raise
+
+    assert Settings().LLM_API_KEY == ""

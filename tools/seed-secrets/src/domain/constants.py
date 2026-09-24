@@ -29,7 +29,11 @@ USER_SM_SECRET = "topos/user/secrets"
 CONTENT_SSM_PARAM = "/topos/content/config"
 CONTENT_SM_SECRET = "topos/content/secrets"
 
-APP_SECRETS = frozenset({FRONTEND_SSM_PARAM, USER_SSM_PARAM, USER_SM_SECRET, CONTENT_SSM_PARAM, CONTENT_SM_SECRET})
+# AI — SSM (config) + SM (secrets)
+AI_SSM_PARAM = "/topos/ai/config"
+AI_SM_SECRET = "topos/ai/secrets"
+
+APP_SECRETS = frozenset({FRONTEND_SSM_PARAM, USER_SSM_PARAM, USER_SM_SECRET, CONTENT_SSM_PARAM, CONTENT_SM_SECRET, AI_SSM_PARAM, AI_SM_SECRET})
 
 # Mapping: SSM/SM name -> env keys that belong to it
 SECRET_KEY_MAP: dict[str, list[str]] = {
@@ -90,6 +94,80 @@ SECRET_KEY_MAP: dict[str, list[str]] = {
         "JWT_SECRET",
         "INTERNAL_TOKEN",
         "AI_SERVICE_URL",
+    ],
+    AI_SSM_PARAM: [
+        "PORT",
+        "LOG_LEVEL",
+        "OTEL_SERVICE_NAME",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "LLM_MODE",
+        "LLM_MODEL",
+        "LLM_TIMEOUT_SECONDS",
+        "VECTOR_MODE",
+        "EMBEDDING_MODE",
+        "EMBEDDING_MODEL",
+        "EMBEDDING_BATCH_SIZE",
+        "EMBEDDING_MAX_CHARS",
+        "EMBEDDING_TIMEOUT_SECONDS",
+        "QDRANT_COLLECTION",
+        "QDRANT_USERS_COLLECTION",
+        "QDRANT_VECTOR_SIZE",
+        "QDRANT_TIMEOUT_SECONDS",
+        "SEARCH_DENSE_SCORE_THRESHOLD",
+        "SEARCH_MAX_RESULT_WINDOW",
+        "SEARCH_MAX_QUERY_CHARS",
+        "SEARCH_MAX_LIMIT",
+        "RELATED_DEFAULT_LIMIT",
+        "RECOMMEND_RECENCY_DAYS",
+        "SURPRISE_DENSE_SCORE_THRESHOLD",
+        "SURPRISE_THRESHOLD_STEP",
+        "SURPRISE_THRESHOLD_FLOOR",
+        "SURPRISE_TAG_TOP_K",
+        "FEED_FRESH_RECENCY_DAYS",
+        "FEED_EXPLORER_SURPRISE_RATIO",
+        "AGENT_MODE",
+        "AGENT_DECISION_TTL_SECONDS",
+        "CHAT_TOP_K_DEFAULT",
+        "CHAT_MAX_TOP_K",
+        "CHAT_MAX_HISTORY_TURNS",
+        "CHAT_MAX_CONTEXT_CHARS",
+        "CHAT_MAX_RETRIEVAL_ROUNDS",
+        "CHAT_MAX_TOOL_CALLS",
+        "CHAT_DENSE_SOURCE_WEIGHT",
+        "CHAT_HYBRID_SOURCE_WEIGHT",
+        "CHAT_RETRIEVAL_CONCURRENCY",
+        "PROFILE_VIEW_WEIGHT",
+        "PROFILE_LIKE_WEIGHT",
+        "PROFILE_SAVE_WEIGHT",
+        "PROFILE_SURPRISE_FEEDBACK_MULTIPLIER",
+        "PROFILE_SEEN_POSTS_CAP",
+        "PROFILE_MAX_TAGS",
+        "PROFILE_TAG_WEIGHT_CAP",
+        "PROFILE_MAX_ID_CHARS",
+        "MAX_POST_CHARS",
+        "MAX_INPUT_CHARS",
+        "MAX_BODY_CHARS",
+        "MAX_TITLE_CHARS",
+        "SPARSE_MIN_TOKEN_LENGTH",
+        "SPARSE_PREFIX_MIN_LENGTH",
+        "SPARSE_MAX_TOKENS",
+        "GRACE_SECONDS",
+        "METRICS_PORT",
+        "LANGCHAIN_TRACING",
+        "LANGCHAIN_PROJECT",
+        "CHECKPOINT_STARTUP_RETRIES",
+        "QDRANT_STARTUP_RETRIES",
+    ],
+    AI_SM_SECRET: [
+        "LLM_API_URL",
+        "LLM_API_KEY",
+        "LANGCHAIN_API_KEY",
+        "QDRANT_URL",
+        "QDRANT_API_KEY",
+        "EMBEDDING_URL",
+        "CHECKPOINT_DB_URL",
+        "CONTENT_SERVICE_URL",
+        "CONTENT_INTERNAL_TOKEN",
     ],
 }
 

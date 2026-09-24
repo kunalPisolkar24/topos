@@ -41,12 +41,37 @@ class SeedUseCase:
         "PORT": ["USER_SERVICE_INT_PORT", "USER_SERVICE_EXT_PORT"],
     }
 
+    # AI_ alias mapping for local .env -> canonical SM/SSM keys
+    _AI_ALIASES: dict[str, list[str]] = {
+        "PORT": ["AI_SERVICE_INT_PORT"],
+        "METRICS_PORT": ["AI_METRICS_INT_PORT"],
+        "LOG_LEVEL": ["AI_LOG_LEVEL"],
+        "LLM_API_URL": ["AI_LLM_API_URL"],
+        "LLM_API_KEY": ["LIGHTNING_AI_API_KEY"],
+        "LLM_MODEL": ["AI_LIGHTNING_MODEL"],
+        "LLM_MODE": ["AI_LLM_MODE"],
+        "LLM_TIMEOUT_SECONDS": ["AI_TIMEOUT_SECONDS"],
+        "CHECKPOINT_DB_URL": ["AI_CHECKPOINT_DB_URL"],
+        "LANGCHAIN_TRACING": ["AI_LANGCHAIN_TRACING"],
+        "LANGCHAIN_API_KEY": ["AI_LANGCHAIN_API_KEY"],
+        "LANGCHAIN_PROJECT": ["AI_LANGCHAIN_PROJECT"],
+        "QDRANT_URL": ["AI_QDRANT_URL"],
+        "QDRANT_API_KEY": ["AI_QDRANT_API_KEY"],
+        "QDRANT_VECTOR_SIZE": ["AI_QDRANT_VECTOR_SIZE"],
+        "SEARCH_DENSE_SCORE_THRESHOLD": ["AI_SEARCH_DENSE_SCORE_THRESHOLD"],
+        "EMBEDDING_MODE": ["AI_EMBEDDING_MODE"],
+        "EMBEDDING_URL": ["AI_EMBEDDING_URL"],
+        "EMBEDDING_MODEL": ["AI_EMBEDDING_MODEL"],
+        "OTEL_EXPORTER_OTLP_ENDPOINT": ["AI_OTLP_ENDPOINT"],
+        "CONTENT_SERVICE_URL": ["AI_CONTENT_SERVICE_URL"],
+    }
+
     def build_payloads(self, env: dict[str, str], only: frozenset[str] | None = None) -> list[SecretPayload]:
         """Build per-secret payloads from parsed env dict.
 
         - Only keys in allowlist are considered.
         - Empty values are skipped.
-        - USER_ prefixed aliases are resolved to canonical keys.
+        - USER_/AI_ prefixed aliases are resolved to canonical keys.
         """
         present: dict[str, str] = {k: v for k, v in env.items() if v != ""}
 
@@ -61,7 +86,7 @@ class SeedUseCase:
                     data[k] = v
                     continue
                 # Check aliases for this canonical key
-                for alias in self._USER_ALIASES.get(k, []):
+                for alias in self._USER_ALIASES.get(k, []) + self._AI_ALIASES.get(k, []):
                     av = present.get(alias, "")
                     if av != "" and av is not None:
                         data[k] = av

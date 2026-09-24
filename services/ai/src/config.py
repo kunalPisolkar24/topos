@@ -1,9 +1,126 @@
+import json
+import logging
+import os
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+logger = logging.getLogger(__name__)
+
+# AI_-prefixed compose vars resolve to canonical settings keys when the
+# canonical var is unset (mirrors the content service aliases and the
+# user service USER_ aliases).
+_AI_ALIASES = {
+    "AI_SERVICE_INT_PORT": "PORT",
+    "AI_METRICS_INT_PORT": "METRICS_PORT",
+    "AI_LOG_LEVEL": "LOG_LEVEL",
+    "AI_LLM_API_URL": "LLM_API_URL",
+    "LIGHTNING_AI_API_KEY": "LLM_API_KEY",
+    "AI_LIGHTNING_MODEL": "LLM_MODEL",
+    "AI_LLM_MODE": "LLM_MODE",
+    "AI_TIMEOUT_SECONDS": "LLM_TIMEOUT_SECONDS",
+    "AI_CONTENT_SERVICE_URL": "CONTENT_SERVICE_URL",
+    "AI_LANGCHAIN_TRACING": "LANGCHAIN_TRACING",
+    "AI_LANGCHAIN_API_KEY": "LANGCHAIN_API_KEY",
+    "AI_LANGCHAIN_PROJECT": "LANGCHAIN_PROJECT",
+    "AI_CHECKPOINT_DB_URL": "CHECKPOINT_DB_URL",
+    "AI_QDRANT_URL": "QDRANT_URL",
+    "AI_QDRANT_API_KEY": "QDRANT_API_KEY",
+    "AI_QDRANT_VECTOR_SIZE": "QDRANT_VECTOR_SIZE",
+    "AI_SEARCH_DENSE_SCORE_THRESHOLD": "SEARCH_DENSE_SCORE_THRESHOLD",
+    "AI_EMBEDDING_MODE": "EMBEDDING_MODE",
+    "AI_EMBEDDING_URL": "EMBEDDING_URL",
+    "AI_EMBEDDING_MODEL": "EMBEDDING_MODEL",
+    "AI_OTLP_ENDPOINT": "OTEL_EXPORTER_OTLP_ENDPOINT",
+}
+
+
+def _normalize_ai_aliases() -> None:
+    for aliased, canonical in _AI_ALIASES.items():
+        if (
+            os.environ.get(aliased, "").strip()
+            and not os.environ.get(canonical, "").strip()
+        ):
+            os.environ[canonical] = os.environ[aliased].strip()
+
+
+def _fill_missing(values: dict) -> None:
+    for k, v in values.items():
+        if v is not None and str(v).strip() and not os.environ.get(k, "").strip():
+            os.environ[k] = str(v)
+
+
+def _hydrate_from_aws() -> None:
+    """Fill unset settings from SSM/SM when ENV_TYPE=prod. Never raises."""
+    try:
+        import boto3
+        from botocore.config import Config as BotoConfig
+        from botocore.exceptions import ClientError
+    except ImportError:
+        logger.warning("ai config: ENV_TYPE=prod but boto3 is not installed")
+        return
+
+    region = os.environ.get("AWS_REGION", "").strip() or "ap-south-1"
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "").strip()
+    secrets_name = os.environ.get("AI_SECRETS_NAME", "").strip() or "topos/ai/secrets"
+    config_param = os.environ.get("AI_CONFIG_PARAM", "").strip() or "/topos/ai/config"
+
+    common: dict = {
+        "region_name": region,
+        "config": BotoConfig(
+            connect_timeout=5, read_timeout=5, retries={"max_attempts": 1}
+        ),
+    }
+    if endpoint:
+        # Floci uses dummy creds; real AWS uses task role / env creds.
+        common["endpoint_url"] = endpoint
+        common["aws_access_key_id"] = os.environ.get("AWS_ACCESS_KEY_ID") or "test"
+        common["aws_secret_access_key"] = (
+            os.environ.get("AWS_SECRET_ACCESS_KEY") or "test"
+        )
+    try:
+        ssm = boto3.client("ssm", **common)
+        sm = boto3.client("secretsmanager", **common)
+    except Exception as e:  # noqa: BLE001 - startup must survive any AWS failure
+        logger.warning("ai config: AWS client init failed: %s", e)
+        return
+
+    try:
+        out = ssm.get_parameter(Name=config_param)
+        parsed = json.loads(out["Parameter"]["Value"])
+        if isinstance(parsed, dict):
+            _fill_missing(parsed)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code == "ParameterNotFound":
+            logger.debug("ai config: SSM param not found: %s", config_param)
+        else:
+            logger.warning("ai config: SSM fetch failed: %s", e)
+    except Exception as e:  # noqa: BLE001 - startup must survive any AWS failure
+        logger.warning("ai config: SSM fetch failed: %s", e)
+
+    try:
+        out = sm.get_secret_value(SecretId=secrets_name)
+        if out.get("SecretString"):
+            parsed = json.loads(out["SecretString"])
+            if isinstance(parsed, dict):
+                _fill_missing(parsed)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code == "ResourceNotFoundException":
+            logger.debug("ai config: SM secret not found: %s", secrets_name)
+        else:
+            logger.warning("ai config: SM fetch failed: %s", e)
+    except Exception as e:  # noqa: BLE001 - startup must survive any AWS failure
+        logger.warning("ai config: SM fetch failed: %s", e)
+
 
 class Settings(BaseSettings):
+    ENV_TYPE: Literal["dev", "prod"] = "dev"
+    AWS_REGION: str = "ap-south-1"
+    AWS_ENDPOINT_URL: str = ""
+    AI_SECRETS_NAME: str = "topos/ai/secrets"
+    AI_CONFIG_PARAM: str = "/topos/ai/config"
     PORT: str = "50051"
     GRACE_SECONDS: int = 5
     METRICS_PORT: int = 12666
@@ -133,5 +250,14 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+    def __init__(self, **kwargs):
+        _normalize_ai_aliases()
+        super().__init__(**kwargs)
+
+
+_normalize_ai_aliases()
+if os.environ.get("ENV_TYPE", "").strip() == "prod":
+    _hydrate_from_aws()
+    _normalize_ai_aliases()
 
 settings = Settings()
