@@ -135,13 +135,15 @@ const envSchema = z.object({
   USER_SECRETS_NAME: z.string().default('topos/user/secrets'),
   USER_CONFIG_PARAM: z.string().default('/topos/user/config'),
 }).superRefine((val, ctx) => {
-  // RDS Proxy guardrails (prod only; dev/docker use plaintext local Postgres).
-  // The proxy enforces require_tls, so the pooled and migrate URLs must
-  // request TLS. The migrate URL must stay direct (writer, no pgbouncer):
-  // DDL, advisory locks and long transactions pin or break on a pooler.
+  // RDS Proxy guardrails (prod only, and only against real AWS: a set
+  // AWS_ENDPOINT_URL means an emulator such as Floci, whose docker-host
+  // URLs are plaintext by design). The proxy enforces require_tls, so the
+  // pooled and migrate URLs must request TLS. The migrate URL must stay
+  // direct (writer, no pgbouncer): DDL, advisory locks and long
+  // transactions pin or break on a pooler.
   // Note: @prisma/adapter-pg issues unnamed prepared statements, which do
   // not pin proxy sessions, so no pgbouncer flag is needed on the app URL.
-  if (val.ENV_TYPE === 'prod') {
+  if (val.ENV_TYPE === 'prod' && !val.AWS_ENDPOINT_URL) {
     if (!val.DATABASE_URL.toLowerCase().includes('sslmode=require')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
