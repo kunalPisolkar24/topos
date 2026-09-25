@@ -421,7 +421,7 @@ export type User = {
   bannerUrl?: Maybe<Scalars['String']['output']>;
   bio?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
-  email: Scalars['String']['output'];
+  email?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   name?: Maybe<Scalars['String']['output']>;
   posts: PaginatedPosts;
@@ -503,7 +503,7 @@ export type ForceNetworkQuery = { __typename: 'Query', posts: { __typename?: 'Pa
 
 export type PostCardFieldsFragment = { __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> };
 
-export type PostDetailFieldsFragment = { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> };
+export type PostDetailFieldsFragment = { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> };
 
 export type PaginatedPostFieldsFragment = { __typename?: 'PaginatedPosts', totalPages: number, currentPage: number, totalPosts: number, posts: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> };
 
@@ -529,7 +529,7 @@ export type PostQueryVariables = Exact<{
 }>;
 
 
-export type PostQuery = { __typename?: 'Query', post?: { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> } | null };
+export type PostQuery = { __typename?: 'Query', post?: { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> } | null };
 
 export type TagsQueryVariables = Exact<{
   query?: InputMaybe<Scalars['String']['input']>;
@@ -552,7 +552,7 @@ export type UpdatePostMutationVariables = Exact<{
 }>;
 
 
-export type UpdatePostMutation = { __typename?: 'Mutation', updatePost: { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> } };
+export type UpdatePostMutation = { __typename?: 'Mutation', updatePost: { __typename?: 'Post', id: string, title: string, body: string, slug: string, imageUrl?: string | null, summary?: string | null, summaryStatus?: SummaryStatus | null, createdAt: string, updatedAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }>, related: Array<{ __typename?: 'Post', id: string, title: string, body: string, imageUrl?: string | null, createdAt: string, likedByMe: boolean, savedByMe: boolean, author: { __typename?: 'User', id: string, username: string, name?: string | null, avatarUrl?: string | null }, tags: Array<{ __typename?: 'Tag', id: string, name: string }> }> } };
 
 export type DeletePostMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -677,12 +677,12 @@ export type DeletePostDraftMutationVariables = Exact<{
 
 export type DeletePostDraftMutation = { __typename?: 'Mutation', deletePostDraft: boolean };
 
-export type UserCoreFragment = { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string };
+export type UserCoreFragment = { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string };
 
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } | null };
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } | null };
 
 export type SigninMutationVariables = Exact<{
   email: Scalars['String']['input'];
@@ -690,7 +690,7 @@ export type SigninMutationVariables = Exact<{
 }>;
 
 
-export type SigninMutation = { __typename?: 'Mutation', signin: { __typename?: 'AuthPayload', token: string, user: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } } };
+export type SigninMutation = { __typename?: 'Mutation', signin: { __typename?: 'AuthPayload', token: string, user: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } } };
 
 export type SignupMutationVariables = Exact<{
   email: Scalars['String']['input'];
@@ -699,7 +699,7 @@ export type SignupMutationVariables = Exact<{
 }>;
 
 
-export type SignupMutation = { __typename?: 'Mutation', signup: { __typename?: 'AuthPayload', token: string, user: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } } };
+export type SignupMutation = { __typename?: 'Mutation', signup: { __typename?: 'AuthPayload', token: string, user: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } } };
 
 export type UpdateProfileMutationVariables = Exact<{
   name?: InputMaybe<Scalars['String']['input']>;
@@ -709,7 +709,7 @@ export type UpdateProfileMutationVariables = Exact<{
 }>;
 
 
-export type UpdateProfileMutation = { __typename?: 'Mutation', updateProfile: { __typename?: 'User', id: string, username: string, email: string, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } };
+export type UpdateProfileMutation = { __typename?: 'Mutation', updateProfile: { __typename?: 'User', id: string, username: string, email?: string | null, name?: string | null, bio?: string | null, avatarUrl?: string | null, bannerUrl?: string | null, createdAt: string } };
 
 export const ChatFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ChatFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Chat"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<ChatFieldsFragment, unknown>;
 export const ChatMessageFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ChatMessageFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ChatMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"chatId"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"citedPostIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<ChatMessageFieldsFragment, unknown>;
