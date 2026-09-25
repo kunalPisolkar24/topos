@@ -194,6 +194,19 @@ def _wait_for_retry(retry_state) -> float:
     return min(2**retry_state.attempt_number, 10)
 
 
+def _sampling_params() -> dict:
+    """Sampling params the configured model accepts.
+
+    GPT-5-family models fix temperature/top_p/n and reject ``max_tokens``
+    (the Lightning proxy surfaces both as 500s), so they get
+    ``max_completion_tokens`` and no temperature; older models keep the
+    tuned temperature/max_tokens pair.
+    """
+    if "gpt-5" in settings.LLM_MODEL:
+        return {"max_completion_tokens": 2048}
+    return {"temperature": 0.7, "max_tokens": 2048}
+
+
 class LLMClient:
     """OpenAI-compatible chat completions client for the Lightning AI API."""
 
@@ -207,8 +220,7 @@ class LLMClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": 0.7,
-            "max_tokens": 2048,
+            **_sampling_params(),
             "stream": stream,
         }
         if stream:
@@ -301,8 +313,7 @@ class LLMClient:
             "messages": messages,
             "tools": tools,
             "tool_choice": "auto",
-            "temperature": 0.7,
-            "max_tokens": 2048,
+            **_sampling_params(),
         }
         headers = {
             "Authorization": f"Bearer {settings.LLM_API_KEY}",

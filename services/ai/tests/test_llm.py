@@ -24,6 +24,55 @@ async def test_generate_completion_returns_content(
     assert await client.generate_completion("system", "user") == "hi"
 
 
+async def test_gpt5_model_uses_compatible_sampling_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # GPT-5-family models fix temperature and reject max_tokens (both
+    # surface as 500s on the Lightning proxy); they get
+    # max_completion_tokens and no temperature instead.
+    monkeypatch.setattr("src.config.settings.LLM_MODEL", "openai/gpt-5-nano")
+    fake_http = FakeHTTPClient(
+        responses=[
+            ok_response(),
+            FakeResponse(
+                200,
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": "call_1",
+                                        "function": {
+                                            "name": "get_weather",
+                                            "arguments": '{"city": "Mumbai"}',
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+            ),
+        ]
+    )
+    client = make_client(monkeypatch, fake_http)
+
+    await client.generate_completion("sys", "usr")
+    reply = await client.generate_tool_completion(
+        [{"role": "user", "content": "hi"}], []
+    )
+
+    assert fake_http.posted_payloads[0]["max_completion_tokens"] == 2048
+    assert "temperature" not in fake_http.posted_payloads[0]
+    assert "max_tokens" not in fake_http.posted_payloads[0]
+    tool_payload = fake_http.posted_payloads[1]
+    assert tool_payload["max_completion_tokens"] == 2048
+    assert "temperature" not in tool_payload
+    assert reply.tool_requests[0].name == "get_weather"
+
+
 async def test_generate_completion_sends_chat_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
