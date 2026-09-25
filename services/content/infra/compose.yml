@@ -18,7 +18,7 @@ services:
       - DB_NAME=${CONTENT_DB_NAME:-blog_content}
       - REDIS_ADDR=${CONTENT_REDIS_ADDR:-user-redis:6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - JWT_SECRET=${JWT_SECRET:-local-dev-secret}
+      - JWT_SECRET=${CONTENT_JWT_SECRET:-${USER_JWT_SECRET:-local-dev-secret}}
       - JWT_ISSUER=${JWT_ISSUER:-user-service}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-topos}
       - INTERNAL_TOKEN=${INTERNAL_TOKEN:-local-internal-secret}
