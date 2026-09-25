@@ -15,6 +15,7 @@ const makeContext = (overrides: Partial<GraphQLContext> = {}): GraphQLContext =>
     signin: vi.fn(),
     updateProfile: vi.fn(),
   } as unknown as UserServiceLike,
+  visibleEmails: new Set<string>(),
   ...overrides,
 });
 
@@ -115,10 +116,10 @@ describe('Mutation.signup', () => {
     expect(ctx.userService.signup).toHaveBeenCalledWith(args);
   });
 
-  it('rejects invalid input', () => {
+  it('rejects invalid input', async () => {
     const ctx = makeContext();
 
-    expect(() => resolvers.Mutation.signup(null, { email: 'nope' }, ctx)).toThrow(
+    await expect(resolvers.Mutation.signup(null, { email: 'nope' }, ctx)).rejects.toBeInstanceOf(
       ValidationError,
     );
     expect(ctx.userService.signup).not.toHaveBeenCalled();
@@ -134,6 +135,60 @@ describe('Mutation.signin', () => {
     await resolvers.Mutation.signin(null, args, ctx);
 
     expect(ctx.userService.signin).toHaveBeenCalledWith(args);
+  });
+});
+
+describe('User.email visibility', () => {
+  const user = { id: 'u1', email: 'alice@example.com' };
+
+  it('returns the email for freshly signed-up users in the same request', async () => {
+    const ctx = makeContext();
+    vi.mocked(ctx.userService.signup).mockResolvedValue({
+      token: 't',
+      user: { ...user },
+    } as never);
+
+    const result = (await resolvers.Mutation.signup(
+      null,
+      { email: user.email, username: 'alice', password: 'password-1234' },
+      ctx,
+    )) as { user: typeof user };
+
+    expect(resolvers.User.email(result.user, {}, ctx)).toBe(user.email);
+  });
+
+  it('returns the email for freshly signed-in users in the same request', async () => {
+    const ctx = makeContext();
+    vi.mocked(ctx.userService.signin).mockResolvedValue({
+      token: 't',
+      user: { ...user },
+    } as never);
+
+    const result = (await resolvers.Mutation.signin(
+      null,
+      { email: user.email, password: 'password-1234' },
+      ctx,
+    )) as { user: typeof user };
+
+    expect(resolvers.User.email(result.user, {}, ctx)).toBe(user.email);
+  });
+
+  it('returns the email to the authenticated subject', () => {
+    const ctx = makeContext({ user: { id: 'u1' } });
+
+    expect(resolvers.User.email(user, {}, ctx)).toBe(user.email);
+  });
+
+  it('hides the email from other users', () => {
+    const ctx = makeContext({ user: { id: 'u2' } });
+
+    expect(resolvers.User.email(user, {}, ctx)).toBeNull();
+  });
+
+  it('hides the email from unauthenticated requests', () => {
+    const ctx = makeContext();
+
+    expect(resolvers.User.email(user, {}, ctx)).toBeNull();
   });
 });
 
@@ -188,17 +243,18 @@ describe('User.__resolveReference', () => {
 describe('User.email', () => {
   const user = { id: 'u1', email: 'alice@example.com' };
 
+  // graphql-js invokes field resolvers as (parent, args, context).
   it('returns the email to the owning user', () => {
-    expect(resolvers.User.email(user, makeContext({ user: { id: 'u1' } }))).toBe(
+    expect(resolvers.User.email(user, {}, makeContext({ user: { id: 'u1' } }))).toBe(
       'alice@example.com',
     );
   });
 
   it('returns null to unauthenticated callers', () => {
-    expect(resolvers.User.email(user, makeContext())).toBeNull();
+    expect(resolvers.User.email(user, {}, makeContext())).toBeNull();
   });
 
   it('returns null to other users', () => {
-    expect(resolvers.User.email(user, makeContext({ user: { id: 'u2' } }))).toBeNull();
+    expect(resolvers.User.email(user, {}, makeContext({ user: { id: 'u2' } }))).toBeNull();
   });
 });

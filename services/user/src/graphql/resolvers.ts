@@ -34,10 +34,22 @@ export const resolvers = {
     },
   },
   Mutation: {
-    signup: (_: unknown, args: unknown, ctx: GraphQLContext) =>
-      ctx.userService.signup(validate(signupSchema, args)),
-    signin: (_: unknown, args: unknown, ctx: GraphQLContext) =>
-      ctx.userService.signin(validate(signinSchema, args)),
+    signup: async (_: unknown, args: unknown, ctx: GraphQLContext) => {
+      const result = await ctx.userService.signup(validate(signupSchema, args));
+      // Unauthenticated by construction, but the subject just proved
+      // ownership via credentials: its own email stays visible below.
+      if (result.user) {
+        ctx.visibleEmails.add(result.user.id);
+      }
+      return result;
+    },
+    signin: async (_: unknown, args: unknown, ctx: GraphQLContext) => {
+      const result = await ctx.userService.signin(validate(signinSchema, args));
+      if (result.user) {
+        ctx.visibleEmails.add(result.user.id);
+      }
+      return result;
+    },
     updateProfile: (_: unknown, args: unknown, ctx: GraphQLContext) => {
       if (!ctx.user) {
         throw new UnauthorizedError();
@@ -48,7 +60,14 @@ export const resolvers = {
   User: {
     __resolveReference: (ref: { id: string }, ctx: GraphQLContext) =>
       ctx.userService.findByIdForReference(ref.id),
-    email: (obj: { id: string; email: string | null }, ctx: GraphQLContext) =>
-      ctx.user?.id === obj.id ? obj.email : null,
+    // Emails stay private: visible to the subject (authenticated, or fresh
+    // from signup/signin in this request) and hidden from everyone else.
+    // NOTE: graphql-js calls field resolvers as (parent, args, context),
+    // so context is the THIRD parameter, not the second.
+    email: (
+      obj: { id: string; email: string | null },
+      _args: unknown,
+      ctx: GraphQLContext,
+    ) => (ctx.user?.id === obj.id || ctx.visibleEmails.has(obj.id) ? obj.email : null),
   },
 };

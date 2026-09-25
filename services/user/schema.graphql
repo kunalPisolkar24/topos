@@ -3,7 +3,7 @@ extend schema @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@
 type User @key(fields: "id") {
   id: ID!
   username: String!
-  email: String!
+  email: String
   name: String
   bio: String
   avatarUrl: String
