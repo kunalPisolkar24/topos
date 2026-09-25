@@ -21,6 +21,7 @@ function makeContext(overrides: Partial<GraphQLContext> = {}): GraphQLContext {
       signin: vi.fn(),
       updateProfile: vi.fn(),
     } as unknown as UserServiceLike,
+    visibleEmails: new Set<string>(),
     ...overrides,
   };
 }

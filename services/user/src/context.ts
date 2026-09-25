@@ -5,6 +5,10 @@ import { verifyToken } from './utils/token.js';
 export interface GraphQLContext {
   user: { id: string } | null;
   userService: UserService;
+  // User ids whose email the Email field resolver may return in this
+  // request. Populated by signup/signin (unauthenticated by construction,
+  // but the subject proved ownership via credentials). Fresh per request.
+  visibleEmails: Set<string>;
 }
 
 export async function createContext(
@@ -13,5 +17,9 @@ export async function createContext(
 ): Promise<GraphQLContext> {
   const header = c.req.header('authorization');
   const token = header?.match(/^Bearer\s+(\S+)$/i)?.[1];
-  return { user: token ? await verifyToken(token) : null, userService };
+  return {
+    user: token ? await verifyToken(token) : null,
+    userService,
+    visibleEmails: new Set(),
+  };
 }

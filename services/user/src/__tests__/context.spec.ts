@@ -25,6 +25,8 @@ describe('createContext', () => {
 
     expect(ctx.user).toBeNull();
     expect(ctx.userService).toBe(userService);
+    expect(ctx.visibleEmails).toBeInstanceOf(Set);
+    expect(ctx.visibleEmails.size).toBe(0);
     expect(mocks.verifyToken).not.toHaveBeenCalled();
   });
 
