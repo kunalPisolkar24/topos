@@ -168,6 +168,24 @@ async def test_index_rejects_empty_post_id(stub) -> None:
     assert exc_info.value.code() == grpc.StatusCode.INVALID_ARGUMENT
 
 
+async def test_index_accepts_oversized_body(stub) -> None:
+    post_id = str(uuid4())
+    await stub.IndexPost(
+        ai_service_pb2.IndexRequest(
+            post_id=post_id,
+            title="Zebracorn farming guide",
+            body="<p>zebracorn</p>" + " filler" * 5000,
+        )
+    )
+
+    response = await stub.SearchPosts(
+        ai_service_pb2.SearchRequest(query="zebracorn", offset=0, limit=10)
+    )
+
+    assert response.post_ids == [post_id]
+    assert response.total == 1
+
+
 async def test_delete_rejects_empty_post_id(stub) -> None:
     with pytest.raises(grpc.aio.AioRpcError) as exc_info:
         await stub.DeletePost(ai_service_pb2.DeleteRequest(post_id=""))

@@ -9,7 +9,7 @@ import asyncio
 
 import grpc
 
-from src.application.support import TooLargeError, ValidationError, rpc_metrics
+from src.application.support import ValidationError, rpc_metrics
 from src.config import settings
 from src.generated import ai_service_pb2
 
@@ -23,8 +23,10 @@ class SearchMixin:
     ) -> ai_service_pb2.IndexResponse:
         if not request.post_id:
             raise ValidationError("post_id must be a non-empty string")
-        if len(request.body) > settings.MAX_INPUT_CHARS:
-            raise TooLargeError(settings.MAX_INPUT_CHARS)
+        # Bodies can be far larger than the embedding budget (content
+        # allows ~1 MiB); truncate to the budget instead of rejecting so
+        # long posts still index their head instead of landing in the DLQ.
+        body = request.body[: settings.EMBEDDING_MAX_CHARS]
 
         created_at = ""
         if request.HasField("created_at"):
@@ -33,7 +35,7 @@ class SearchMixin:
         await self._search.upsert(
             post_id=request.post_id,
             title=request.title,
-            body=request.body,
+            body=body,
             summary=request.summary,
             tags=list(request.tags),
             created_at=created_at,
