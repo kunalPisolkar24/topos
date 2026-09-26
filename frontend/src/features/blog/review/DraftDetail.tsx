@@ -8,9 +8,7 @@ import { Card, CardContent } from "@/shared/ui/primitives/card";
 import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { useCurrentUser } from "@/entities/session";
 import type { PostDraft } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-documents";
 import { getDisplayName } from "@/shared/lib/account-identity";
-import { ApproveDraftDialog, buildEditsInput } from "./ApproveDraftDialog";
 import { ApproveConfirmDialog } from "./ApproveConfirmDialog";
 import { RejectNoteDialog } from "./RejectNoteDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -18,7 +16,6 @@ import { RejectionNotePanel } from "./RejectionNotePanel";
 import { ApprovedByCard } from "./ApprovedByCard";
 import { DraftSummary } from "./DraftSummary";
 import { useReviewQueueController } from "./useReviewQueueController";
-import type { ApproveDraftFormValues } from "./model/approve-draft.schema";
 import { useReviewerIdentity } from "./hooks/useReviewerIdentity";
 
 const statusBadge: Record<PostDraft["status"], { label: string; className: string }> = {
@@ -62,20 +59,6 @@ export const DraftDetail: React.FC = () => {
   const handleApproveConfirm = (target: PostDraft) => {
     controller.setDialog({ kind: "closed" });
     void controller.approve(target.id, {}).then(() => navigate("/review"));
-  };
-
-  const handleResubmitConfirm = (target: PostDraft, values: ApproveDraftFormValues) => {
-    const edits = buildEditsInput(target.id, values).input;
-    const input: ContentDraftInput = {
-      title: edits.title ?? target.title,
-      body: edits.body ?? target.body,
-      summary: edits.summary ?? null,
-      tags: edits.tags ?? [],
-      imageUrl: target.imageUrl ?? null,
-      postId: target.postId ?? null,
-    };
-    controller.setDialog({ kind: "closed" });
-    void controller.resubmit(target.id, input);
   };
 
   if (!draftId) {
@@ -265,7 +248,7 @@ export const DraftDetail: React.FC = () => {
                     </Button>
                   )}
                   {canResubmit && (
-                    <Button type="button" size="sm" className="w-full" onClick={() => controller.setDialog({ kind: "resubmit", draft })} disabled={controller.isPending(draft.id)}>
+                    <Button type="button" size="sm" className="w-full" onClick={() => navigate(`/review/${draft.id}/edit`)} disabled={controller.isPending(draft.id)}>
                       <Pencil className="h-4 w-4" />
                       Edit &amp; resubmit
                     </Button>
@@ -331,19 +314,6 @@ export const DraftDetail: React.FC = () => {
           if (!open) controller.setDialog({ kind: "closed" });
         }}
         onConfirm={handleApproveConfirm}
-      />
-
-      <ApproveDraftDialog
-        draft={controller.dialog.kind === "resubmit" ? controller.dialog.draft : null}
-        isSubmitting={false}
-        dialogTitle="Edit & resubmit draft"
-        dialogDescription="Rejected stays rejected until you change something. Saving sends it back to peer review."
-        confirmLabel="Resubmit for review"
-        confirmingLabel="Resubmitting..."
-        onOpenChange={(open) => {
-          if (!open) controller.setDialog({ kind: "closed" });
-        }}
-        onConfirm={handleResubmitConfirm}
       />
 
       <RejectNoteDialog

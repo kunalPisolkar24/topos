@@ -8,6 +8,7 @@ import { BlogTagSection } from "./BlogTagSection";
 import { PublishChecklistItem } from "./PublishChecklistItem";
 import {
   usePostAuthoringController,
+  type PostAuthoringMode,
   type PostForEditing,
 } from "../authoring";
 import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
@@ -25,6 +26,10 @@ interface BlogEditFormProps {
   onComplete: () => void;
   renderEditor?: (props: BlogEditFormEditorProps) => React.ReactNode;
   editor?: React.ReactNode;
+  mode?: PostAuthoringMode;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export const BlogEditForm: React.FC<BlogEditFormProps> = ({
@@ -33,11 +38,18 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
   onComplete,
   renderEditor,
   editor,
+  mode = "edit",
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }) => {
   const { state, setters, handlers, refs } = usePostAuthoringController({
-    mode: "edit",
+    mode,
     post: blog,
     onComplete,
+    resubmitDraftId,
+    resubmitPostId,
+    initialSummary,
   });
   const cardImageInputRef = useRef<HTMLInputElement>(null);
 

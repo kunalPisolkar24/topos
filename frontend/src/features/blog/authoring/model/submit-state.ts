@@ -15,6 +15,7 @@ export const isSubmitInFlight = (
 export const submitLabel = (
   state: PostAuthoringSubmitState,
   isEdit: boolean,
+  isResubmit = false,
 ): string => {
   switch (state.kind) {
     case "uploading":
@@ -22,9 +23,10 @@ export const submitLabel = (
     case "creating":
       return "Submitting...";
     case "updating":
-      return "Submitting...";
+      return isResubmit ? "Resubmitting..." : "Submitting...";
     case "idle":
     case "error":
+      if (isResubmit) return "Resubmit for review";
       return isEdit ? "Submit Revision" : "Submit for Review";
   }
 };

@@ -12,8 +12,7 @@ export type ReviewDialog =
   | { kind: "closed" }
   | { kind: "approve"; draft: PostDraft }
   | { kind: "reject"; draft: PostDraft }
-  | { kind: "withdraw"; draft: PostDraft }
-  | { kind: "resubmit"; draft: PostDraft };
+  | { kind: "withdraw"; draft: PostDraft };
 
 export interface PaginatedDraftSection {
   drafts: PostDraft[];

@@ -1,6 +1,6 @@
 import type React from "react";
 import { ShieldCheck } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCurrentUser } from "@/entities/session";
 import { PagePagination } from "@/shared/ui/PagePagination";
 import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
@@ -8,9 +8,7 @@ import { Button } from "@/shared/ui/primitives/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { useState } from "react";
 import type { PostDraft } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-documents";
 import { DraftCard } from "./DraftCard";
-import { ApproveDraftDialog, buildEditsInput } from "./ApproveDraftDialog";
 import { ApproveConfirmDialog } from "./ApproveConfirmDialog";
 import { RejectNoteDialog } from "./RejectNoteDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -18,7 +16,6 @@ import {
   useReviewQueueController,
   type ReviewQueueController,
 } from "./useReviewQueueController";
-import type { ApproveDraftFormValues } from "./model/approve-draft.schema";
 import { usePreviewReviewedDrafts } from "./hooks/usePreviewReview";
 import { isPreview } from "@/shared/config/preview";
 
@@ -118,6 +115,7 @@ const DraftSection: React.FC<DraftSectionProps> = ({
 const ReviewQueuePage: React.FC = () => {
   const controller = useReviewQueueController();
   const { user } = useCurrentUser();
+  const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [approvedPage, setApprovedPage] = useState(1);
@@ -206,19 +204,6 @@ const ReviewQueuePage: React.FC = () => {
     void controller.approve(draft.id, {});
   };
 
-  const handleResubmitConfirm = (draft: PostDraft, values: ApproveDraftFormValues) => {
-    const edits = buildEditsInput(draft.id, values).input;
-    const input: ContentDraftInput = {
-      title: edits.title ?? draft.title,
-      body: edits.body ?? draft.body,
-      summary: edits.summary ?? null,
-      tags: edits.tags ?? [],
-      postId: draft.postId ?? null,
-    };
-    controller.setDialog({ kind: "closed" });
-    void controller.resubmit(draft.id, input);
-  };
-
   return (
     <>
       <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
@@ -293,7 +278,7 @@ const ReviewQueuePage: React.FC = () => {
                 onApprove={() => {}}
                 onReject={() => {}}
                 onWithdraw={(draft) => controller.setDialog({ kind: "withdraw", draft })}
-                onResubmit={(draft) => controller.setDialog({ kind: "resubmit", draft })}
+                onResubmit={(draft) => navigate(`/review/${draft.id}/edit`)}
               />
             </TabsContent>
             {previewOn && (
@@ -347,21 +332,6 @@ const ReviewQueuePage: React.FC = () => {
           controller.setDialog({ kind: "closed" });
           void controller.reject(draft.id, note);
         }}
-      />
-
-      <ApproveDraftDialog
-        draft={
-          controller.dialog.kind === "resubmit" ? controller.dialog.draft : null
-        }
-        isSubmitting={false}
-        dialogTitle="Edit & resubmit draft"
-        dialogDescription="Rejected stays rejected until you change something. Saving sends it back to peer review."
-        confirmLabel="Resubmit for review"
-        confirmingLabel="Resubmitting..."
-        onOpenChange={(open) => {
-          if (!open) controller.setDialog({ kind: "closed" });
-        }}
-        onConfirm={handleResubmitConfirm}
       />
 
       <ConfirmDialog

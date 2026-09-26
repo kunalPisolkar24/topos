@@ -46,6 +46,9 @@ export interface UsePostAuthoringSubmitArgs {
   summary: string | null;
   uploadCardImage: () => Promise<string | null>;
   onComplete?: () => void;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export interface UsePostAuthoringSubmitResult {
@@ -66,8 +69,12 @@ export const usePostAuthoringSubmit = ({
   summary,
   uploadCardImage,
   onComplete,
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }: UsePostAuthoringSubmitArgs): UsePostAuthoringSubmitResult => {
   const isEdit = mode === "edit";
+  const isResubmit = mode === "resubmit";
   const navigate = useNavigate();
   const { toast } = useToast();
   const client = useApolloClient();
@@ -75,6 +82,7 @@ export const usePostAuthoringSubmit = ({
   const isSubmittingRef = useRef(false);
 
   const [createContentDraft] = draftRepository.useCreateContentDraft();
+  const [resubmitContentDraft] = draftRepository.useResubmitContentDraft();
 
   const handleCreateSubmit = useCallback(
     async (event: React.FormEvent) => {
@@ -250,12 +258,112 @@ export const usePostAuthoringSubmit = ({
     ],
   );
 
+  const handleResubmitSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (isSubmittingRef.current) return;
+      if (!post || !resubmitDraftId) return;
+      isSubmittingRef.current = true;
+      try {
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle || !contentText) {
+          toast({
+            title: "Missing Information",
+            description: "Title and content are required.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        let finalImageUrl = imageUrl;
+        if (imageFile) {
+          dispatch({ type: "beginUpload" });
+          const uploadedUrl = await uploadCardImage();
+          if (!uploadedUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          finalImageUrl = uploadedUrl;
+        }
+
+        const originalTagNames = post.tags.map((tag) => tag.name);
+        const hasChanges =
+          trimmedTitle !== post.title ||
+          content !== post.body ||
+          JSON.stringify(tags) !== JSON.stringify(originalTagNames) ||
+          (finalImageUrl ?? null) !== (post.imageUrl ?? null);
+
+        if (!hasChanges) {
+          toast({
+            title: "No Changes",
+            description: "Edit something before resubmitting for review.",
+          });
+          return;
+        }
+
+        // Rejected stays rejected until the author changes something;
+        // saving sends it back to peer review, never live directly.
+        const draftInput: ContentDraftInput = {
+          title: trimmedTitle,
+          body: content,
+          summary: initialSummary?.trim() || summary?.trim() || null,
+          tags,
+          imageUrl: finalImageUrl,
+          postId: resubmitPostId ?? null,
+        };
+        try {
+          dispatch({ type: "beginUpdate" });
+          await resubmitContentDraft({
+            variables: { id: resubmitDraftId, input: draftInput },
+          });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Back in review",
+            description: "Your edits are pending. They go live after peer approval.",
+          });
+          dispatch({ type: "resolveIdle" });
+          navigate(`/review/${resubmitDraftId}`);
+        } catch (error) {
+          toast({
+            title: "Resubmit Failed",
+            description: getGraphQLErrorMessage(error, "Could not resubmit the draft."),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "resubmit" });
+        } finally {
+          isSubmittingRef.current = false;
+        }
+      } finally {
+        isSubmittingRef.current = false;
+      }
+    },
+    [
+      post,
+      resubmitDraftId,
+      resubmitPostId,
+      initialSummary,
+      title,
+      content,
+      contentText,
+      imageFile,
+      imageUrl,
+      tags,
+      summary,
+      uploadCardImage,
+      toast,
+      resubmitContentDraft,
+      client,
+      navigate,
+    ],
+  );
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
+      if (isResubmit) return handleResubmitSubmit(event);
       if (isEdit) return handleEditSubmit(event);
       return handleCreateSubmit(event);
     },
-    [isEdit, handleCreateSubmit, handleEditSubmit],
+    [isResubmit, isEdit, handleResubmitSubmit, handleEditSubmit, handleCreateSubmit],
   );
 
   return { submit, handleSubmit };

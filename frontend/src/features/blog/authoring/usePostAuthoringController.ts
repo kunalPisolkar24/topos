@@ -14,7 +14,7 @@ import { usePostImageUploader } from "./hooks/usePostImageUploader";
 import { usePostTagInput } from "./hooks/usePostTagInput";
 import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
 
-export type PostAuthoringMode = "create" | "edit";
+export type PostAuthoringMode = "create" | "edit" | "resubmit";
 
 export interface PostForEditing {
   id: string;
@@ -28,6 +28,9 @@ export interface UsePostAuthoringControllerProps {
   mode: PostAuthoringMode;
   post?: PostForEditing;
   onComplete?: () => void;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export interface PostAuthoringState {
@@ -95,8 +98,12 @@ export const usePostAuthoringController = ({
   mode,
   post,
   onComplete,
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }: UsePostAuthoringControllerProps): PostAuthoringController => {
   const isEdit = mode === "edit";
+  const isResubmit = mode === "resubmit";
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -114,7 +121,7 @@ export const usePostAuthoringController = ({
 
   const imageUploader = usePostImageUploader({
     initialImageUrl: post?.imageUrl ?? null,
-    isEdit,
+    isEdit: mode !== "create",
   });
 
   const aiDraft = usePostAIDraft({
@@ -136,10 +143,13 @@ export const usePostAuthoringController = ({
     summary: aiDraft.summary,
     uploadCardImage: () => imageUploader.uploadCardImage(),
     onComplete,
+    resubmitDraftId,
+    resubmitPostId,
+    initialSummary,
   });
 
   const handleCancel = () => {
-    if (isEdit) {
+    if (isEdit || isResubmit) {
       onComplete?.();
       return;
     }
@@ -173,7 +183,7 @@ export const usePostAuthoringController = ({
     ],
   );
 
-  const baseSubmitLabel = deriveSubmitLabel(submitController.submit, isEdit);
+  const baseSubmitLabel = deriveSubmitLabel(submitController.submit, isEdit, isResubmit);
   // Review-first publishing: nothing goes live directly, so the action
   // always reads as a review submission.
   const submitLabel = baseSubmitLabel;

@@ -44,6 +44,12 @@ const DraftDetailPage = lazy(() =>
   })),
 );
 
+const DraftResubmitPage = lazy(() =>
+  import("@/pages/DraftResubmitPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 const ChatPage = lazy(() =>
   import("@/pages/ChatPage").then((module) => ({
     default: module.default,
@@ -102,6 +108,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <UserProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/review/:draftId/edit"
+          element={
+            <ProtectedRoute>
+              <DraftResubmitPage />
             </ProtectedRoute>
           }
         />
