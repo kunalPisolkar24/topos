@@ -1,1 +1,1 @@
-export { getGraphQLErrorMessage } from "./graphql-error";
+export { getGraphQLErrorCodes, getGraphQLErrorMessage } from "./graphql-error";

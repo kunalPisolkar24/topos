@@ -25,6 +25,15 @@ type ChatMessage struct {
 	CreatedAt    string      `json:"createdAt"`
 }
 
+type ContentDraftInput struct {
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Summary  *string  `json:"summary,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	ImageURL *string  `json:"imageUrl,omitempty"`
+	PostID   *string  `json:"postId,omitempty"`
+}
+
 type CreatePostInput struct {
 	Title    string   `json:"title"`
 	Body     string   `json:"body"`
@@ -88,6 +97,7 @@ type Post struct {
 	Summary       *string        `json:"summary,omitempty"`
 	SummaryStatus *SummaryStatus `json:"summaryStatus,omitempty"`
 	Author        *User          `json:"author"`
+	ApprovedByID  *string        `json:"approvedById,omitempty"`
 	Tags          []*Tag         `json:"tags"`
 	CreatedAt     string         `json:"createdAt"`
 	UpdatedAt     string         `json:"updatedAt"`
@@ -99,18 +109,23 @@ type Post struct {
 func (Post) IsEntity() {}
 
 type PostDraft struct {
-	ID         string      `json:"id"`
-	ApprovalID string      `json:"approvalId"`
-	Prompt     string      `json:"prompt"`
-	Title      string      `json:"title"`
-	Body       string      `json:"body"`
-	Summary    string      `json:"summary"`
-	Tags       []string    `json:"tags"`
-	Status     DraftStatus `json:"status"`
-	AuthorID   string      `json:"authorId"`
-	PostID     *string     `json:"postId,omitempty"`
-	CreatedAt  string      `json:"createdAt"`
-	UpdatedAt  string      `json:"updatedAt"`
+	ID            string      `json:"id"`
+	ApprovalID    string      `json:"approvalId"`
+	Prompt        string      `json:"prompt"`
+	Title         string      `json:"title"`
+	Body          string      `json:"body"`
+	Summary       string      `json:"summary"`
+	Tags          []string    `json:"tags"`
+	ImageURL      *string     `json:"imageUrl,omitempty"`
+	Author        *User       `json:"author"`
+	Status        DraftStatus `json:"status"`
+	AuthorID      string      `json:"authorId"`
+	PostID        *string     `json:"postId,omitempty"`
+	ReviewedByID  *string     `json:"reviewedById,omitempty"`
+	ReviewedAt    *string     `json:"reviewedAt,omitempty"`
+	RejectionNote *string     `json:"rejectionNote,omitempty"`
+	CreatedAt     string      `json:"createdAt"`
+	UpdatedAt     string      `json:"updatedAt"`
 }
 
 type PostReason struct {

@@ -82,6 +82,12 @@ export class UserService {
   }
 
   async updateProfile(userId: string, data: UpdateProfileInput): Promise<UserResponse> {
+    if (data.username) {
+      const existing = await this.users.findByUsername(data.username);
+      if (existing && existing.id !== userId) {
+        throw new UserAlreadyExistsError();
+      }
+    }
     const user = await this.users.update(userId, data);
     await this.invalidateUser(userId);
     return toUserResponse(user);

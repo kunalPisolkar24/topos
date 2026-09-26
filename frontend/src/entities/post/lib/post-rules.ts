@@ -22,9 +22,9 @@ export interface PublishReadiness {
   publishLabel: string;
 }
 
-const PUBLISH_LABEL_IDLE = "Publish Post";
+const PUBLISH_LABEL_IDLE = "Submit for Review";
 const PUBLISH_LABEL_UPLOADING = "Uploading...";
-const PUBLISH_LABEL_PUBLISHING = "Publishing...";
+const PUBLISH_LABEL_PUBLISHING = "Submitting...";
 
 export function evaluatePublishReadiness(
   input: PublishReadinessInput,

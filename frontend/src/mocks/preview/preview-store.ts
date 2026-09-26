@@ -291,6 +291,7 @@ export async function previewGetPost(id: string) {
       email: author.email,
       bio: author.bio,
     },
+    approvedById: post.approvedById ?? null,
     tags: post.tagIds.map((tid) => toTagResponse(getTagById(tags, tid))),
     related,
   };
@@ -612,6 +613,29 @@ const toPreviewDraftResponse = (d: MockDraft) => ({
   rejectionNote: d.rejectionNote ?? null,
 });
 
+const toDraftAuthorResponse = (user: MockUser | null | undefined) =>
+  user
+    ? {
+        __typename: "User" as const,
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      }
+    : null;
+
+// withDraftAuthor attaches the federated author the real gateway resolves,
+// so preview renders the same identity surfaces as every other env.
+async function withDraftAuthor<T extends { authorId: string }>(draft: T) {
+  const user = await previewDB.get<MockUser>("users", draft.authorId);
+  return { ...draft, author: toDraftAuthorResponse(user) };
+}
+
+export async function previewGetUserById(id: string) {
+  const user = await previewDB.get<MockUser>("users", id);
+  return user ? toUserResponse(user) : null;
+}
+
 export async function previewListPostDrafts(page = 1, limit = 6, viewerId?: string) {
   const drafts = await previewDB.getAll<MockDraft>("drafts");
   // Community queue mirrors prod: pending only, never the viewer's own.
@@ -622,7 +646,7 @@ export async function previewListPostDrafts(page = 1, limit = 6, viewerId?: stri
   const { items, totalPages, currentPage, total } = paginate(sorted, page, limit);
   return {
     __typename: "PaginatedPostDrafts" as const,
-    drafts: items.map(toPreviewDraftResponse),
+    drafts: await Promise.all(items.map((item) => withDraftAuthor(toPreviewDraftResponse(item)))),
     totalPages,
     currentPage,
     totalDrafts: total,
@@ -636,7 +660,7 @@ export async function previewListMyPostDrafts(authorId: string, page = 1, limit 
   const { items, totalPages, currentPage, total } = paginate(sorted, page, limit);
   return {
     __typename: "PaginatedPostDrafts" as const,
-    drafts: items.map(toPreviewDraftResponse),
+    drafts: await Promise.all(items.map((item) => withDraftAuthor(toPreviewDraftResponse(item)))),
     totalPages,
     currentPage,
     totalDrafts: total,
@@ -661,7 +685,7 @@ export async function previewCreatePostDraft(authorId: string, prompt: string) {
     updatedAt: now,
   };
   await previewDB.put("drafts", draft);
-  return toPreviewDraftResponse(draft);
+  return withDraftAuthor(toPreviewDraftResponse(draft));
 }
 
 export interface PreviewContentDraftInput {
@@ -693,7 +717,7 @@ export async function previewCreateContentDraft(authorId: string, input: Preview
       if (input.imageUrl !== undefined) existing.imageUrl = input.imageUrl;
       existing.updatedAt = now;
       await previewDB.put("drafts", existing);
-      return toPreviewDraftResponse(existing);
+      return withDraftAuthor(toPreviewDraftResponse(existing));
     }
   }
   const draft: MockDraft = {
@@ -712,7 +736,7 @@ export async function previewCreateContentDraft(authorId: string, input: Preview
     updatedAt: now,
   };
   await previewDB.put("drafts", draft);
-  return toPreviewDraftResponse(draft);
+  return withDraftAuthor(toPreviewDraftResponse(draft));
 }
 
 // A rejected draft stays rejected until its author edits it; that edit
@@ -745,7 +769,7 @@ export async function previewResubmitContentDraft(
   draft.rejectionNote = null;
   draft.updatedAt = nowIso();
   await previewDB.put("drafts", draft);
-  return toPreviewDraftResponse(draft);
+  return withDraftAuthor(toPreviewDraftResponse(draft));
 }
 
 export async function previewApprovePostDraft(
@@ -808,14 +832,14 @@ export async function previewApprovePostDraft(
     draft.postId = created.id;
   }
   await previewDB.put("drafts", draft);
-  return toPreviewDraftResponse(draft);
+  return withDraftAuthor(toPreviewDraftResponse(draft));
 }
 
 export async function previewRejectPostDraft(id: string, actorId: string, reason?: string | null) {
   const draft = await previewDB.get<MockDraft>("drafts", id);
   if (!draft) throw new Error(`Mock draft ${id} not found`);
   if (draft.authorId === actorId) throw new Error("forbidden: drafts must be reviewed by another user");
-  if (draft.status === "REJECTED") return toPreviewDraftResponse(draft);
+  if (draft.status === "REJECTED") return withDraftAuthor(toPreviewDraftResponse(draft));
   if (draft.status !== "PENDING") throw new Error("approved drafts cannot be rejected");
   const trimmed = (reason ?? "").trim();
   if (trimmed.length < 10) throw new Error("Rejection note is required — tell the author why (min 10 characters)");
@@ -827,7 +851,7 @@ export async function previewRejectPostDraft(id: string, actorId: string, reason
   draft.rejectionNote = trimmed;
   draft.updatedAt = now;
   await previewDB.put("drafts", draft);
-  return toPreviewDraftResponse(draft);
+  return withDraftAuthor(toPreviewDraftResponse(draft));
 }
 
 export async function previewDeletePostDraft(id: string, actorId: string) {
@@ -853,37 +877,10 @@ export async function previewListReviewedDrafts(
   const { items, totalPages, currentPage, total } = paginate(sorted, page, limit);
   return {
     __typename: "PaginatedPostDrafts" as const,
-    drafts: items.map(toPreviewDraftResponse),
+    drafts: await Promise.all(items.map((item) => withDraftAuthor(toPreviewDraftResponse(item)))),
     totalPages,
     currentPage,
     totalDrafts: total,
-  };
-}
-
-export async function previewGetDraftReview(draftId: string) {
-  const draft = await previewDB.get<MockDraft>("drafts", draftId);
-  if (!draft) return null;
-  return {
-    reviewedById: draft.reviewedById ?? null,
-    reviewedAt: draft.reviewedAt ?? null,
-    rejectionNote: draft.rejectionNote ?? null,
-  };
-}
-
-export async function previewGetPostApproval(postId: string) {
-  const drafts = await previewDB.getAll<MockDraft>("drafts");
-  const match = drafts.find((d) => d.postId === postId && d.status === "APPROVED");
-  if (match) {
-    return {
-      approvedById: match.reviewedById ?? null,
-      reviewedAt: match.reviewedAt ?? null,
-    };
-  }
-  const post = await previewDB.get<MockPost>("posts", postId);
-  if (!post) return null;
-  return {
-    approvedById: post.approvedById ?? null,
-    reviewedAt: null,
   };
 }
 

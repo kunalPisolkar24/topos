@@ -44,7 +44,7 @@ type Documents = {
     "\n  query MyPosts($page: Int, $limit: Int) {\n    me {\n      id\n      posts(page: $page, limit: $limit) {\n        ...PaginatedPostFields\n      }\n    }\n  }\n  \n": typeof types.MyPostsDocument,
     "\n  query SearchPosts($query: String!, $page: Int, $limit: Int) {\n    searchPosts(query: $query, page: $page, limit: $limit) {\n      hits {\n        ...PostCardFields\n      }\n      total\n    }\n  }\n  \n": typeof types.SearchPostsDocument,
     "\n  query RecommendedPosts(\n    $page: Int\n    $limit: Int\n    $mode: RecommendMode\n    $seed: Int\n  ) {\n    recommendedPosts(page: $page, limit: $limit, mode: $mode, seed: $seed) {\n      ...PaginatedPostFields\n      reasons {\n        postId\n        reason\n      }\n    }\n  }\n  \n": typeof types.RecommendedPostsDocument,
-    "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    status\n    authorId\n    postId\n    createdAt\n    updatedAt\n  }\n": typeof types.PostDraftFieldsFragmentDoc,
+    "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    imageUrl\n    status\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    authorId\n    postId\n    reviewedById\n    reviewedAt\n    rejectionNote\n    createdAt\n    updatedAt\n  }\n": typeof types.PostDraftFieldsFragmentDoc,
     "\n  fragment PaginatedPostDraftFields on PaginatedPostDrafts {\n    drafts {\n      ...PostDraftFields\n    }\n    totalPages\n    currentPage\n    totalDrafts\n  }\n  \n": typeof types.PaginatedPostDraftFieldsFragmentDoc,
     "\n  query PostDrafts($page: Int, $limit: Int) {\n    postDrafts(page: $page, limit: $limit) {\n      ...PaginatedPostDraftFields\n    }\n  }\n  \n": typeof types.PostDraftsDocument,
     "\n  query MyPostDrafts($page: Int, $limit: Int) {\n    myPostDrafts(page: $page, limit: $limit) {\n      ...PaginatedPostDraftFields\n    }\n  }\n  \n": typeof types.MyPostDraftsDocument,
@@ -52,11 +52,14 @@ type Documents = {
     "\n  mutation ApprovePostDraft($id: ID!, $input: DraftEditsInput) {\n    approvePostDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": typeof types.ApprovePostDraftDocument,
     "\n  mutation RejectPostDraft($id: ID!, $reason: String) {\n    rejectPostDraft(id: $id, reason: $reason) {\n      ...PostDraftFields\n    }\n  }\n  \n": typeof types.RejectPostDraftDocument,
     "\n  mutation DeletePostDraft($id: ID!) {\n    deletePostDraft(id: $id)\n  }\n": typeof types.DeletePostDraftDocument,
+    "\n  mutation CreateContentDraft($input: ContentDraftInput!) {\n    createContentDraft(input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": typeof types.CreateContentDraftDocument,
+    "\n  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {\n    resubmitContentDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": typeof types.ResubmitContentDraftDocument,
     "fragment UserCore on User {\n  id\n  username\n  email\n  name\n  bio\n  avatarUrl\n  bannerUrl\n  createdAt\n}": typeof types.UserCoreFragmentDoc,
     "query Me {\n  me {\n    ...UserCore\n  }\n}": typeof types.MeDocument,
     "mutation Signin($email: String!, $password: String!) {\n  signin(email: $email, password: $password) {\n    token\n    user {\n      ...UserCore\n    }\n  }\n}": typeof types.SigninDocument,
     "mutation Signup($email: String!, $username: String!, $password: String!) {\n  signup(email: $email, username: $username, password: $password) {\n    token\n    user {\n      ...UserCore\n    }\n  }\n}": typeof types.SignupDocument,
-    "mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": typeof types.UpdateProfileDocument,
+    "mutation UpdateProfile($username: String, $name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    username: $username\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": typeof types.UpdateProfileDocument,
+    "query User($id: ID!) {\n  user(id: $id) {\n    ...UserCore\n  }\n}": typeof types.UserDocument,
 };
 const documents: Documents = {
     "\n  fragment ChatFields on Chat {\n    id\n    title\n    createdAt\n    updatedAt\n  }\n": types.ChatFieldsFragmentDoc,
@@ -89,7 +92,7 @@ const documents: Documents = {
     "\n  query MyPosts($page: Int, $limit: Int) {\n    me {\n      id\n      posts(page: $page, limit: $limit) {\n        ...PaginatedPostFields\n      }\n    }\n  }\n  \n": types.MyPostsDocument,
     "\n  query SearchPosts($query: String!, $page: Int, $limit: Int) {\n    searchPosts(query: $query, page: $page, limit: $limit) {\n      hits {\n        ...PostCardFields\n      }\n      total\n    }\n  }\n  \n": types.SearchPostsDocument,
     "\n  query RecommendedPosts(\n    $page: Int\n    $limit: Int\n    $mode: RecommendMode\n    $seed: Int\n  ) {\n    recommendedPosts(page: $page, limit: $limit, mode: $mode, seed: $seed) {\n      ...PaginatedPostFields\n      reasons {\n        postId\n        reason\n      }\n    }\n  }\n  \n": types.RecommendedPostsDocument,
-    "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    status\n    authorId\n    postId\n    createdAt\n    updatedAt\n  }\n": types.PostDraftFieldsFragmentDoc,
+    "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    imageUrl\n    status\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    authorId\n    postId\n    reviewedById\n    reviewedAt\n    rejectionNote\n    createdAt\n    updatedAt\n  }\n": types.PostDraftFieldsFragmentDoc,
     "\n  fragment PaginatedPostDraftFields on PaginatedPostDrafts {\n    drafts {\n      ...PostDraftFields\n    }\n    totalPages\n    currentPage\n    totalDrafts\n  }\n  \n": types.PaginatedPostDraftFieldsFragmentDoc,
     "\n  query PostDrafts($page: Int, $limit: Int) {\n    postDrafts(page: $page, limit: $limit) {\n      ...PaginatedPostDraftFields\n    }\n  }\n  \n": types.PostDraftsDocument,
     "\n  query MyPostDrafts($page: Int, $limit: Int) {\n    myPostDrafts(page: $page, limit: $limit) {\n      ...PaginatedPostDraftFields\n    }\n  }\n  \n": types.MyPostDraftsDocument,
@@ -97,11 +100,14 @@ const documents: Documents = {
     "\n  mutation ApprovePostDraft($id: ID!, $input: DraftEditsInput) {\n    approvePostDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": types.ApprovePostDraftDocument,
     "\n  mutation RejectPostDraft($id: ID!, $reason: String) {\n    rejectPostDraft(id: $id, reason: $reason) {\n      ...PostDraftFields\n    }\n  }\n  \n": types.RejectPostDraftDocument,
     "\n  mutation DeletePostDraft($id: ID!) {\n    deletePostDraft(id: $id)\n  }\n": types.DeletePostDraftDocument,
+    "\n  mutation CreateContentDraft($input: ContentDraftInput!) {\n    createContentDraft(input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": types.CreateContentDraftDocument,
+    "\n  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {\n    resubmitContentDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n": types.ResubmitContentDraftDocument,
     "fragment UserCore on User {\n  id\n  username\n  email\n  name\n  bio\n  avatarUrl\n  bannerUrl\n  createdAt\n}": types.UserCoreFragmentDoc,
     "query Me {\n  me {\n    ...UserCore\n  }\n}": types.MeDocument,
     "mutation Signin($email: String!, $password: String!) {\n  signin(email: $email, password: $password) {\n    token\n    user {\n      ...UserCore\n    }\n  }\n}": types.SigninDocument,
     "mutation Signup($email: String!, $username: String!, $password: String!) {\n  signup(email: $email, username: $username, password: $password) {\n    token\n    user {\n      ...UserCore\n    }\n  }\n}": types.SignupDocument,
-    "mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": types.UpdateProfileDocument,
+    "mutation UpdateProfile($username: String, $name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    username: $username\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}": types.UpdateProfileDocument,
+    "query User($id: ID!) {\n  user(id: $id) {\n    ...UserCore\n  }\n}": types.UserDocument,
 };
 
 /**
@@ -241,7 +247,7 @@ export function graphql(source: "\n  query RecommendedPosts(\n    $page: Int\n  
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    status\n    authorId\n    postId\n    createdAt\n    updatedAt\n  }\n"): (typeof documents)["\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    status\n    authorId\n    postId\n    createdAt\n    updatedAt\n  }\n"];
+export function graphql(source: "\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    imageUrl\n    status\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    authorId\n    postId\n    reviewedById\n    reviewedAt\n    rejectionNote\n    createdAt\n    updatedAt\n  }\n"): (typeof documents)["\n  fragment PostDraftFields on PostDraft {\n    id\n    approvalId\n    prompt\n    title\n    body\n    summary\n    tags\n    imageUrl\n    status\n    author {\n      id\n      username\n      name\n      avatarUrl\n    }\n    authorId\n    postId\n    reviewedById\n    reviewedAt\n    rejectionNote\n    createdAt\n    updatedAt\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -273,6 +279,14 @@ export function graphql(source: "\n  mutation DeletePostDraft($id: ID!) {\n    d
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  mutation CreateContentDraft($input: ContentDraftInput!) {\n    createContentDraft(input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n"): (typeof documents)["\n  mutation CreateContentDraft($input: ContentDraftInput!) {\n    createContentDraft(input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {\n    resubmitContentDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n"): (typeof documents)["\n  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {\n    resubmitContentDraft(id: $id, input: $input) {\n      ...PostDraftFields\n    }\n  }\n  \n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "fragment UserCore on User {\n  id\n  username\n  email\n  name\n  bio\n  avatarUrl\n  bannerUrl\n  createdAt\n}"): (typeof documents)["fragment UserCore on User {\n  id\n  username\n  email\n  name\n  bio\n  avatarUrl\n  bannerUrl\n  createdAt\n}"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -289,7 +303,11 @@ export function graphql(source: "mutation Signup($email: String!, $username: Str
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}"): (typeof documents)["mutation UpdateProfile($name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}"];
+export function graphql(source: "mutation UpdateProfile($username: String, $name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    username: $username\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}"): (typeof documents)["mutation UpdateProfile($username: String, $name: String, $bio: String, $avatarUrl: String, $bannerUrl: String) {\n  updateProfile(\n    username: $username\n    name: $name\n    bio: $bio\n    avatarUrl: $avatarUrl\n    bannerUrl: $bannerUrl\n  ) {\n    ...UserCore\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query User($id: ID!) {\n  user(id: $id) {\n    ...UserCore\n  }\n}"): (typeof documents)["query User($id: ID!) {\n  user(id: $id) {\n    ...UserCore\n  }\n}"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

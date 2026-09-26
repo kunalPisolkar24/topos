@@ -18,22 +18,32 @@ vi.mock("@/shared/config/preview", async (importOriginal) => {
 
 const graphqlApi = graphql.link("http://localhost:4000/graphql");
 
-const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => ({
-  __typename: "PostDraft",
-  id: "draft-community-1",
-  approvalId: "ap-1",
-  prompt: "write about go",
-  title: "Community draft title",
-  body: "<p>body</p>",
-  summary: "A summary",
-  tags: ["go"],
-  status: "PENDING",
-  authorId: "author-9",
-  postId: null,
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z",
-  ...overrides,
-});
+const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => {
+  const { author, authorId = "author-9", ...rest } = overrides;
+  return {
+    __typename: "PostDraft",
+    id: "draft-community-1",
+    approvalId: "ap-1",
+    prompt: "write about go",
+    title: "Community draft title",
+    body: "<p>body</p>",
+    summary: "A summary",
+    tags: ["go"],
+    status: "PENDING",
+    author: author ?? {
+      __typename: "User",
+      id: authorId,
+      username: "draftauthor",
+      name: "Draft Author",
+      avatarUrl: null,
+    },
+    authorId,
+    postId: null,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    ...rest,
+  };
+};
 
 const buildUser = (id: string): MockUser => ({
   id,
@@ -121,6 +131,7 @@ describe("ReviewQueuePage tabs", () => {
     renderWithProviders(<ReviewQueuePage />, { route: "/review" });
 
     expect(await screen.findByText("Community draft title")).toBeInTheDocument();
+    expect(screen.getByText(/Draft Author/)).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /needs review/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /your drafts/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /approved by you/i })).not.toBeInTheDocument();

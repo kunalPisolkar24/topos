@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type ReactQuill from "react-quill-new";
 import { useNavigate } from "react-router-dom";
-import { isPreview } from "@/shared/config/preview";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { toPlainText } from "@/entities/post/lib";
 import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
@@ -175,14 +174,9 @@ export const usePostAuthoringController = ({
   );
 
   const baseSubmitLabel = deriveSubmitLabel(submitController.submit, isEdit);
-  // Preview-first review gating: nothing publishes directly, so the
-  // action reads as a review submission while in-flight labels stay.
-  const submitLabel =
-    isPreview() && baseSubmitLabel === "Publish Post"
-      ? "Submit for Review"
-      : isPreview() && baseSubmitLabel === "Save Changes"
-        ? "Submit Revision"
-        : baseSubmitLabel;
+  // Review-first publishing: nothing goes live directly, so the action
+  // always reads as a review submission.
+  const submitLabel = baseSubmitLabel;
 
   return {
     state: {

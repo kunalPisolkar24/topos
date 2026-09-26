@@ -124,6 +124,52 @@ func TestMutationResolverDeletePostDraftUnauthorized(t *testing.T) {
 	assert.Equal(t, "unauthorized", err.(*gqlerror.Error).Message)
 }
 
+func TestMutationResolverCreateContentDraft(t *testing.T) {
+	resolver := newTestDraftResolver(t, nil, nil)
+
+	image := "https://cdn/cover.png"
+	draft, err := resolver.Mutation().CreateContentDraft(authenticatedContext("u_1"), model.ContentDraftInput{
+		Title:    "Human title",
+		Body:     "Human body with enough content to pass validation.",
+		Tags:     []string{"human"},
+		ImageURL: &image,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "PENDING", string(draft.Status))
+	require.NotNil(t, draft.ImageURL)
+	assert.Equal(t, image, *draft.ImageURL)
+	require.NotNil(t, draft.Author)
+	assert.Equal(t, "u_1", draft.Author.ID)
+}
+
+func TestMutationResolverCreateContentDraftUnauthorized(t *testing.T) {
+	resolver := newTestDraftResolver(t, nil, nil)
+
+	_, err := resolver.Mutation().CreateContentDraft(context.Background(), model.ContentDraftInput{
+		Title: "Human title",
+		Body:  "Human body with enough content to pass validation.",
+	})
+	require.Error(t, err)
+	assert.Equal(t, "unauthorized", err.(*gqlerror.Error).Message)
+}
+
+func TestMutationResolverResubmitContentDraft(t *testing.T) {
+	image := "https://cdn/cover.png"
+	draftRepo := &testutil.MockPostDraftRepository{FindByIDFn: func(ctx context.Context, id string) (*domain.PostDraft, error) {
+		return &domain.PostDraft{ID: id, ApprovalID: "human-ap-1", AuthorID: "u_1", Title: "Old", Body: "Old body", Status: domain.DraftStatusRejected}, nil
+	}}
+	resolver := newTestDraftResolver(t, draftRepo, nil)
+
+	draft, err := resolver.Mutation().ResubmitContentDraft(authenticatedContext("u_1"), "d1", model.ContentDraftInput{
+		Title:    "Fixed title",
+		Body:     "Fixed body with enough content to pass validation.",
+		ImageURL: &image,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "PENDING", string(draft.Status))
+	assert.Equal(t, "Fixed title", draft.Title)
+}
+
 func TestQueryResolverPostDraftsUnauthorized(t *testing.T) {
 	resolver := newTestDraftResolver(t, nil, nil)
 

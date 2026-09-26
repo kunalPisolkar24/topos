@@ -14,12 +14,15 @@ const (
 )
 
 type Post struct {
-	ID            string     `bson:"_id,omitempty" json:"id,omitempty"`
-	Title         string     `bson:"title" json:"title"`
-	Body          string     `bson:"body" json:"body"`
-	Slug          string     `bson:"slug" json:"slug"`
-	ImageUrl      *string    `bson:"imageUrl" json:"imageUrl,omitempty"`
-	AuthorID      string     `bson:"authorId" json:"authorId"`
+	ID       string  `bson:"_id,omitempty" json:"id,omitempty"`
+	Title    string  `bson:"title" json:"title"`
+	Body     string  `bson:"body" json:"body"`
+	Slug     string  `bson:"slug" json:"slug"`
+	ImageUrl *string `bson:"imageUrl" json:"imageUrl,omitempty"`
+	AuthorID string  `bson:"authorId" json:"authorId"`
+	// ApprovedByID is the peer reviewer who approved the post into
+	// existence. Empty for posts published directly without review.
+	ApprovedByID  string     `bson:"approvedById,omitempty" json:"approvedById,omitempty"`
 	Tags          []string   `bson:"tags" json:"tags"`
 	Summary       string     `bson:"summary" json:"summary"`
 	SummaryStatus PostStatus `bson:"summaryStatus" json:"summaryStatus"`

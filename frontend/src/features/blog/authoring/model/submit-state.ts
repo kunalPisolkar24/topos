@@ -20,11 +20,11 @@ export const submitLabel = (
     case "uploading":
       return "Uploading...";
     case "creating":
-      return "Publishing...";
+      return "Submitting...";
     case "updating":
-      return "Saving...";
+      return "Submitting...";
     case "idle":
     case "error":
-      return isEdit ? "Save Changes" : "Publish Post";
+      return isEdit ? "Submit Revision" : "Submit for Review";
   }
 };

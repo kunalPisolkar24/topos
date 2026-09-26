@@ -45,6 +45,7 @@ const loadedPost = {
     bio: null,
     avatarUrl: null,
   },
+  approvedById: null,
   tags: [],
   related: [],
 };

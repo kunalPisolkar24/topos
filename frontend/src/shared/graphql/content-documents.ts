@@ -18,7 +18,7 @@ export interface ContentPostAuthorPreview {
 }
 
 export interface ContentPostAuthorDetail extends ContentPostAuthorPreview {
-  email: string;
+  email?: string | null;
   bio?: string | null;
 }
 
@@ -41,6 +41,7 @@ export interface ContentPostDetail extends ContentPostCard {
   summaryStatus?: SummaryStatus | null;
   updatedAt: string;
   author: ContentPostAuthorDetail;
+  approvedById?: string | null;
   related: ContentPostCard[];
 }
 
@@ -288,6 +289,7 @@ const POST_DETAIL_FIELDS = gql`
       bio
       avatarUrl
     }
+    approvedById
     tags {
       id
       name
@@ -461,9 +463,14 @@ export interface PostDraft {
   body: string;
   summary: string;
   tags: string[];
+  imageUrl?: string | null;
   status: DraftStatus;
+  author: ContentPostAuthorPreview;
   authorId: string;
   postId?: string | null;
+  reviewedById?: string | null;
+  reviewedAt?: string | null;
+  rejectionNote?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -481,6 +488,15 @@ export interface DraftEditsInput {
   body?: string | null;
   summary?: string | null;
   tags?: string[] | null;
+}
+
+export interface ContentDraftInput {
+  title: string;
+  body: string;
+  summary?: string | null;
+  tags?: string[] | null;
+  imageUrl?: string | null;
+  postId?: string | null;
 }
 
 export interface PostDraftsQueryVariables {
@@ -541,6 +557,25 @@ export interface DeletePostDraftMutation {
   deletePostDraft: boolean;
 }
 
+export interface CreateContentDraftMutationVariables {
+  input: ContentDraftInput;
+}
+
+export interface CreateContentDraftMutation {
+  __typename?: "Mutation";
+  createContentDraft: PostDraft;
+}
+
+export interface ResubmitContentDraftMutationVariables {
+  id: string;
+  input: ContentDraftInput;
+}
+
+export interface ResubmitContentDraftMutation {
+  __typename?: "Mutation";
+  resubmitContentDraft: PostDraft;
+}
+
 const POST_DRAFT_FIELDS = gql`
   fragment PostDraftFields on PostDraft {
     id
@@ -550,9 +585,19 @@ const POST_DRAFT_FIELDS = gql`
     body
     summary
     tags
+    imageUrl
     status
+    author {
+      id
+      username
+      name
+      avatarUrl
+    }
     authorId
     postId
+    reviewedById
+    reviewedAt
+    rejectionNote
     createdAt
     updatedAt
   }
@@ -626,3 +671,21 @@ export const DeletePostDraftDocument = gql`
     deletePostDraft(id: $id)
   }
 ` as DocumentNode<DeletePostDraftMutation, DeletePostDraftMutationVariables>;
+
+export const CreateContentDraftDocument = gql`
+  mutation CreateContentDraft($input: ContentDraftInput!) {
+    createContentDraft(input: $input) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<CreateContentDraftMutation, CreateContentDraftMutationVariables>;
+
+export const ResubmitContentDraftDocument = gql`
+  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {
+    resubmitContentDraft(id: $id, input: $input) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<ResubmitContentDraftMutation, ResubmitContentDraftMutationVariables>;

@@ -1,10 +1,12 @@
 mutation UpdateProfile(
+  $username: String
   $name: String
   $bio: String
   $avatarUrl: String
   $bannerUrl: String
 ) {
   updateProfile(
+    username: $username
     name: $name
     bio: $bio
     avatarUrl: $avatarUrl

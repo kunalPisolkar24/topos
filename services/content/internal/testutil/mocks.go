@@ -484,13 +484,14 @@ func (m *MockSummaryProcessor) SetPostSummary(ctx context.Context, id, summary s
 }
 
 type MockPostDraftRepository struct {
-	CreateFn                  func(ctx context.Context, draft *domain.PostDraft) (*domain.PostDraft, error)
-	FindByIDFn                func(ctx context.Context, id string) (*domain.PostDraft, error)
-	FindPendingExceptAuthorFn func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPostDrafts, error)
-	FindByAuthorFn            func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPostDrafts, error)
-	TransitionStatusFn        func(ctx context.Context, id string, from []domain.DraftStatus, to domain.DraftStatus) (*domain.PostDraft, error)
-	UpdateFn                  func(ctx context.Context, draft *domain.PostDraft) (*domain.PostDraft, error)
-	DeleteFn                  func(ctx context.Context, id string) error
+	CreateFn                     func(ctx context.Context, draft *domain.PostDraft) (*domain.PostDraft, error)
+	FindByIDFn                   func(ctx context.Context, id string) (*domain.PostDraft, error)
+	FindPendingExceptAuthorFn    func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPostDrafts, error)
+	FindByAuthorFn               func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPostDrafts, error)
+	FindPendingByAuthorAndPostFn func(ctx context.Context, authorID, postID string) (*domain.PostDraft, error)
+	TransitionStatusFn           func(ctx context.Context, id string, from []domain.DraftStatus, to domain.DraftStatus) (*domain.PostDraft, error)
+	UpdateFn                     func(ctx context.Context, draft *domain.PostDraft) (*domain.PostDraft, error)
+	DeleteFn                     func(ctx context.Context, id string) error
 
 	TransitionCalls int
 }
@@ -522,6 +523,13 @@ func (m *MockPostDraftRepository) FindByAuthor(ctx context.Context, authorID str
 		return m.FindByAuthorFn(ctx, authorID, page, limit)
 	}
 	return &domain.PaginatedPostDrafts{}, nil
+}
+
+func (m *MockPostDraftRepository) FindPendingByAuthorAndPost(ctx context.Context, authorID, postID string) (*domain.PostDraft, error) {
+	if m.FindPendingByAuthorAndPostFn != nil {
+		return m.FindPendingByAuthorAndPostFn(ctx, authorID, postID)
+	}
+	return nil, domain.ErrNotFound
 }
 
 func (m *MockPostDraftRepository) TransitionStatus(ctx context.Context, id string, from []domain.DraftStatus, to domain.DraftStatus) (*domain.PostDraft, error) {

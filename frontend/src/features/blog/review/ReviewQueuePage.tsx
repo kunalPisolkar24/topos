@@ -8,7 +8,7 @@ import { Button } from "@/shared/ui/primitives/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { useState } from "react";
 import type { PostDraft } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
+import type { ContentDraftInput } from "@/shared/graphql/content-documents";
 import { DraftCard } from "./DraftCard";
 import { ApproveDraftDialog, buildEditsInput } from "./ApproveDraftDialog";
 import { ApproveConfirmDialog } from "./ApproveConfirmDialog";

@@ -6,22 +6,32 @@ import { Textarea } from "@/shared/ui/primitives/textarea";
 import type { PostDraft } from "@/shared/graphql/content-documents";
 import { RejectNoteDialog } from "../RejectNoteDialog";
 
-const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => ({
-  __typename: "PostDraft",
-  id: "draft-1",
-  approvalId: "ap-1",
-  prompt: "write about go",
-  title: "Community draft title",
-  body: "<p>body</p>",
-  summary: "A summary",
-  tags: ["go"],
-  status: "PENDING",
-  authorId: "author-9",
-  postId: null,
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z",
-  ...overrides,
-});
+const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => {
+  const { author, authorId = "author-9", ...rest } = overrides;
+  return {
+    __typename: "PostDraft",
+    id: "draft-1",
+    approvalId: "ap-1",
+    prompt: "write about go",
+    title: "Community draft title",
+    body: "<p>body</p>",
+    summary: "A summary",
+    tags: ["go"],
+    status: "PENDING",
+    author: author ?? {
+      __typename: "User",
+      id: authorId,
+      username: "draftauthor",
+      name: "Draft Author",
+      avatarUrl: null,
+    },
+    authorId,
+    postId: null,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    ...rest,
+  };
+};
 
 const renderDialog = (props?: Partial<React.ComponentProps<typeof RejectNoteDialog>>) =>
   renderWithProviders(

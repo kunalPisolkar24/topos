@@ -16,6 +16,7 @@ type Post @key(fields: "id") {
   summary: String
   summaryStatus: SummaryStatus
   author: User!
+  approvedById: ID
   tags: [Tag!]!
   createdAt: String!
   updatedAt: String!
@@ -107,9 +108,11 @@ enum DraftStatus {
   REJECTED
 }
 
-# PostDraft is an AI-generated post paused for peer review. The author
-# cannot act on their own draft; approval by a different user publishes
-# it through the regular createPost path.
+# PostDraft is a post paused for peer review. AI-generated drafts carry
+# the originating prompt; human-authored drafts (createContentDraft) store
+# the author's own title/body/tags/cover with the prompt echoing the title.
+# The author cannot act on their own draft; approval by a different user
+# publishes it through the regular createPost path.
 type PostDraft {
   id: ID!
   approvalId: ID!
@@ -118,9 +121,14 @@ type PostDraft {
   body: String!
   summary: String!
   tags: [String!]!
+  imageUrl: String
+  author: User!
   status: DraftStatus!
   authorId: ID!
   postId: ID
+  reviewedById: ID
+  reviewedAt: String
+  rejectionNote: String
   createdAt: String!
   updatedAt: String!
 }
@@ -169,9 +177,20 @@ type Mutation {
   likePost(postId: ID!, mode: RecommendMode): Boolean!
   savePost(postId: ID!, mode: RecommendMode): Boolean!
   createPostDraft(prompt: String!): PostDraft!
+  createContentDraft(input: ContentDraftInput!): PostDraft!
+  resubmitContentDraft(id: ID!, input: ContentDraftInput!): PostDraft!
   approvePostDraft(id: ID!, input: DraftEditsInput): PostDraft!
   rejectPostDraft(id: ID!, reason: String): PostDraft!
   deletePostDraft(id: ID!): Boolean!
+}
+
+input ContentDraftInput {
+  title: String!
+  body: String!
+  summary: String
+  tags: [String!]
+  imageUrl: String
+  postId: ID
 }
 
 input CreatePostInput {

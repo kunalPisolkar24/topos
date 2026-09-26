@@ -140,6 +140,24 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('findByUsername', () => {
+    it('looks the user up by username', async () => {
+      const user = makeUser();
+      prisma.user.findFirst.mockResolvedValue(user);
+
+      await expect(repository.findByUsername('alice')).resolves.toEqual(user);
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { username: 'alice', deletedAt: null },
+      });
+    });
+
+    it('returns null when the username is free', async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await expect(repository.findByUsername('newbie')).resolves.toBeNull();
+    });
+  });
+
   describe('findById', () => {
     it('returns the user', async () => {
       prisma.user.findFirst.mockResolvedValue(makeUser());

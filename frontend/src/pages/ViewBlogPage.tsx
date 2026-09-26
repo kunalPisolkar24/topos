@@ -17,17 +17,17 @@ import { BlogEditForm } from "@/features/blog/components/BlogEditForm";
 import { PendingRevisionNotice } from "@/features/blog/review";
 import { ApprovedByCard } from "@/features/blog/review/ApprovedByCard";
 import { useCurrentUser } from "@/entities/session";
-import { isPreview } from "@/shared/config/preview";
-import { usePreviewPostApproval, usePreviewReviewerIdentity } from "@/features/blog/review/hooks/usePreviewReview";
+import { useReviewerIdentity } from "@/features/blog/review/hooks/useReviewerIdentity";
 
 const ViewBlogPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useCurrentUser();
   const { state, setView, setDialog, deletePost, refetch } =
     usePostViewerController(id);
-  const postIdForApproval = state.kind === "ready" ? state.post.id : id ?? null;
-  const { approval } = usePreviewPostApproval(postIdForApproval);
-  const { user: reviewer } = usePreviewReviewerIdentity(approval?.approvedById ?? null);
+  // Approver credit rides on the post itself in every env.
+  const { user: postReviewer } = useReviewerIdentity(
+    state.kind === "ready" ? state.post.approvedById ?? null : null,
+  );
 
   if (state.kind === "loading") return <ViewBlogPageSkeleton />;
 
@@ -64,7 +64,7 @@ const ViewBlogPage: React.FC = () => {
   const isEditView = view === "editing";
   const summaryOpen = dialog === "summary";
   const deleteDialogOpen = dialog === "delete";
-  const hasApproval = isPreview() && Boolean(approval?.approvedById);
+  const hasApproval = Boolean(post.approvedById);
 
   return (
     <div className="min-h-screen bg-surface text-foreground">
@@ -90,9 +90,7 @@ const ViewBlogPage: React.FC = () => {
                     Revise your Topos post.
                   </h1>
                   <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
-                    {isPreview()
-                      ? "Modify the title, cover image, body text, or tags. Submitted revisions stay pending until a peer approves them."
-                      : "Modify the title, cover image, body text, or tags. Saved revisions are updated instantly across all channels."}
+                    Modify the title, cover image, body text, or tags. Submitted revisions stay pending until a peer approves them.
                   </p>
                 </div>
               </header>
@@ -162,10 +160,10 @@ const ViewBlogPage: React.FC = () => {
                   {hasApproval && (
                     <div className="mt-6">
                       <ApprovedByCard
-                        approvedById={approval?.approvedById ?? null}
-                        reviewedAt={approval?.reviewedAt ?? null}
-                        reviewerName={reviewer?.name ?? null}
-                        reviewerAvatarUrl={reviewer?.avatarUrl ?? null}
+                        approvedById={post.approvedById ?? null}
+                        reviewedAt={null}
+                        reviewerName={postReviewer?.name ?? null}
+                        reviewerAvatarUrl={postReviewer?.avatarUrl ?? null}
                         draftId={null}
                       />
                     </div>

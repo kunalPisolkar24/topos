@@ -60,6 +60,21 @@ func (r *MongoPostDraftRepository) FindByAuthor(
 	return r.findWithPagination(ctx, bson.M{"authorId": authorID}, page, limit)
 }
 
+func (r *MongoPostDraftRepository) FindPendingByAuthorAndPost(
+	ctx context.Context, authorID, postID string,
+) (*domain.PostDraft, error) {
+	var draft domain.PostDraft
+	err := r.collection.FindOne(ctx, bson.M{
+		"authorId": authorID,
+		"postId":   postID,
+		"status":   domain.DraftStatusPending,
+	}).Decode(&draft)
+	if err != nil {
+		return nil, wrapNotFound(err)
+	}
+	return &draft, nil
+}
+
 // TransitionStatus claims a status move with FindOneAndUpdate so two
 // concurrent reviewers cannot both win: only the first document still
 // matching one of the from statuses transitions; everyone else gets
@@ -105,13 +120,17 @@ func (r *MongoPostDraftRepository) Update(ctx context.Context, draft *domain.Pos
 
 	draft.UpdatedAt = time.Now()
 	update := bson.M{"$set": bson.M{
-		"title":     draft.Title,
-		"body":      draft.Body,
-		"summary":   draft.Summary,
-		"tags":      draft.Tags,
-		"status":    draft.Status,
-		"postId":    draft.PostID,
-		"updatedAt": draft.UpdatedAt,
+		"title":         draft.Title,
+		"body":          draft.Body,
+		"summary":       draft.Summary,
+		"tags":          draft.Tags,
+		"imageUrl":      draft.ImageURL,
+		"status":        draft.Status,
+		"postId":        draft.PostID,
+		"reviewedById":  draft.ReviewedByID,
+		"reviewedAt":    draft.ReviewedAt,
+		"rejectionNote": draft.RejectionNote,
+		"updatedAt":     draft.UpdatedAt,
 	}}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 

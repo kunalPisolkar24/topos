@@ -1,6 +1,6 @@
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { describe, expect, it } from "vitest";
-import { getGraphQLErrorMessage } from "../graphql-error";
+import { getGraphQLErrorCodes, getGraphQLErrorMessage } from "../graphql-error";
 
 describe("getGraphQLErrorMessage", () => {
   it("returns a combined message from a GraphQL error", () => {
@@ -38,5 +38,24 @@ describe("getGraphQLErrorMessage", () => {
     expect(getGraphQLErrorMessage(undefined, "default")).toBe("default");
     expect(getGraphQLErrorMessage({}, "default")).toBe("default");
     expect(getGraphQLErrorMessage({ message: "" }, "default")).toBe("default");
+  });
+});
+
+describe("getGraphQLErrorCodes", () => {
+  it("returns codes from a combined GraphQL error", () => {
+    const combined = new CombinedGraphQLErrors({
+      errors: [
+        { message: "taken", extensions: { code: "USER_ALREADY_EXISTS" } },
+        { message: "other" },
+      ],
+      data: undefined,
+    });
+
+    expect(getGraphQLErrorCodes(combined)).toEqual(["USER_ALREADY_EXISTS"]);
+  });
+
+  it("returns empty array when no codes are present", () => {
+    expect(getGraphQLErrorCodes(new Error("boom"))).toEqual([]);
+    expect(getGraphQLErrorCodes(undefined)).toEqual([]);
   });
 });

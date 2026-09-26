@@ -29,6 +29,7 @@ export const typeDefs = parse(`
     signup(email: String!, username: String!, password: String!): AuthPayload!
     signin(email: String!, password: String!): AuthPayload!
     updateProfile(
+      username: String
       name: String
       bio: String
       avatarUrl: String

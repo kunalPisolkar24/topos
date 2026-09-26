@@ -49,7 +49,7 @@ func NewPostService(postRepo domain.PostRepository, tagRepo domain.TagRepository
 	}
 }
 
-func (s *PostService) CreatePost(ctx context.Context, title, body, authorID string, tags []string, imageUrl *string, summary *string) (*domain.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, title, body, authorID string, tags []string, imageUrl *string, summary *string, approvedByID string) (*domain.Post, error) {
 	title, err := normalizeTitle(title)
 	if err != nil {
 		return nil, err
@@ -83,6 +83,7 @@ func (s *PostService) CreatePost(ctx context.Context, title, body, authorID stri
 			Body:          body,
 			Slug:          slug.Generate(title, now),
 			AuthorID:      authorID,
+			ApprovedByID:  approvedByID,
 			Tags:          tags,
 			ImageUrl:      imageUrl,
 			Summary:       summaryValue,
@@ -136,7 +137,7 @@ func (s *PostService) ensureSlugAvailable(ctx context.Context, slugValue string)
 	return nil
 }
 
-func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title, body *string, tags []string, imageUrl *string) (*domain.Post, error) {
+func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title, body *string, tags []string, imageUrl *string, approvedByID string) (*domain.Post, error) {
 	existing, err := s.postRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -146,6 +147,12 @@ func (s *PostService) UpdatePost(ctx context.Context, id, actorID string, title,
 	}
 
 	post := &domain.Post{UpdatedAt: s.clock()}
+
+	// approvedByID is only set on the peer-review publish path; direct
+	// author edits leave the existing attribution untouched.
+	if approvedByID != "" {
+		post.ApprovedByID = approvedByID
+	}
 
 	if title != nil {
 		trimmed, err := normalizeTitle(*title)

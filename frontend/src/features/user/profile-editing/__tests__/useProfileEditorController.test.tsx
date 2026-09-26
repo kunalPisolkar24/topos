@@ -148,7 +148,7 @@ describe("useProfileEditorController", () => {
 
   it("calls updateProfile mutation on save", async () => {
     updateProfileMock.mockResolvedValueOnce({
-      data: { updateProfile: true },
+      data: { updateProfile: mockUser },
     });
     const { result } = renderProfileEditor();
     act(() => {
@@ -167,7 +167,7 @@ describe("useProfileEditorController", () => {
 
   it("shows success toast on successful save", async () => {
     updateProfileMock.mockResolvedValueOnce({
-      data: { updateProfile: true },
+      data: { updateProfile: mockUser },
     });
     const { result } = renderProfileEditor();
     act(() => {
@@ -188,7 +188,7 @@ describe("useProfileEditorController", () => {
 
   it("revalidates post lists after a successful save", async () => {
     updateProfileMock.mockResolvedValueOnce({
-      data: { updateProfile: true },
+      data: { updateProfile: mockUser },
     });
     const refreshSpy = vi.spyOn(postRepository, "refreshLists");
     const { result } = renderProfileEditor();
@@ -274,5 +274,83 @@ describe("useProfileEditorController", () => {
       );
     });
     expect(result.current.state.bannerFile).toBe(file);
+  });
+
+  it("initializes username from currentUser", () => {
+    const { result } = renderProfileEditor();
+    expect(result.current.state.formData.username).toBe("testuser");
+  });
+
+  it("normalizes username input to lowercase", () => {
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "NewUser_99 " },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    expect(result.current.state.formData.username).toBe("newuser_99");
+  });
+
+  it("sends username in the update payload when changed", async () => {
+    updateProfileMock.mockResolvedValueOnce({
+      data: { updateProfile: { ...mockUser, username: "newuser_99" } },
+    });
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "newuser_99" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(updateProfileMock).toHaveBeenCalledWith({
+      variables: expect.objectContaining({ username: "newuser_99" }),
+    });
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Success" }),
+    );
+  });
+
+  it("shows an inline error for an invalid username without calling the mutation", async () => {
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "ab" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(result.current.state.fieldErrors.username).toMatch(/3-30/i);
+    expect(result.current.state.isEditingProfile).toBe(true);
+  });
+
+  it("shows an inline taken error and stays editing on username collision", async () => {
+    updateProfileMock.mockRejectedValueOnce(new Error("A user with that email or username already exists"));
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "taken_name" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(result.current.state.fieldErrors.username).toBe("Username is already taken.");
+    expect(result.current.state.isEditingProfile).toBe(true);
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Username taken", variant: "destructive" }),
+    );
   });
 });

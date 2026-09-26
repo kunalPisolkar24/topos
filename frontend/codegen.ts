@@ -8,10 +8,6 @@ const config: CodegenConfig = {
   documents: [
     "src/**/*.{graphql,ts,tsx}",
     "!src/shared/graphql/generated/**/*",
-    // Preview-first review contract: unknown to the backend schema until it
-    // adopts createContentDraft/resubmitContentDraft. Delete this exclusion
-    // together with content-draft.documents.ts at that point.
-    "!src/shared/graphql/content-draft.documents.ts",
   ],
   generates: {
     "./src/shared/graphql/generated/": {

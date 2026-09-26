@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/shared/ui/primitives/card";
 import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { useCurrentUser } from "@/entities/session";
 import type { PostDraft } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
+import type { ContentDraftInput } from "@/shared/graphql/content-documents";
+import { getDisplayName } from "@/shared/lib/account-identity";
 import { ApproveDraftDialog, buildEditsInput } from "./ApproveDraftDialog";
 import { ApproveConfirmDialog } from "./ApproveConfirmDialog";
 import { RejectNoteDialog } from "./RejectNoteDialog";
@@ -18,8 +19,7 @@ import { ApprovedByCard } from "./ApprovedByCard";
 import { DraftSummary } from "./DraftSummary";
 import { useReviewQueueController } from "./useReviewQueueController";
 import type { ApproveDraftFormValues } from "./model/approve-draft.schema";
-import { usePreviewDraftReview, usePreviewReviewerIdentity } from "./hooks/usePreviewReview";
-import { isPreview } from "@/shared/config/preview";
+import { useReviewerIdentity } from "./hooks/useReviewerIdentity";
 
 const statusBadge: Record<PostDraft["status"], { label: string; className: string }> = {
   PENDING: {
@@ -44,8 +44,6 @@ export const DraftDetail: React.FC = () => {
   const navigate = useNavigate();
   const controller = useReviewQueueController();
   const { user } = useCurrentUser();
-  const { meta: previewMeta, refresh: refreshPreviewMeta } = usePreviewDraftReview(draftId ?? null);
-  const { user: previewReviewer } = usePreviewReviewerIdentity(previewMeta?.reviewedById ?? null);
 
   const draft: PostDraft | undefined = React.useMemo(() => {
     if (!draftId) return undefined;
@@ -59,6 +57,8 @@ export const DraftDetail: React.FC = () => {
   const isLoading = controller.community.section === "loading" || controller.mine.section === "loading";
   const isError = controller.community.section === "error" || controller.mine.section === "error";
 
+  const { user: reviewer } = useReviewerIdentity(draft?.reviewedById);
+
   const handleApproveConfirm = (target: PostDraft) => {
     controller.setDialog({ kind: "closed" });
     void controller.approve(target.id, {}).then(() => navigate("/review"));
@@ -71,12 +71,11 @@ export const DraftDetail: React.FC = () => {
       body: edits.body ?? target.body,
       summary: edits.summary ?? null,
       tags: edits.tags ?? [],
+      imageUrl: target.imageUrl ?? null,
       postId: target.postId ?? null,
     };
     controller.setDialog({ kind: "closed" });
-    // Resubmit stays on this page — re-read reviewer meta so the
-    // rejection note / approved-by panels update without a refresh.
-    void controller.resubmit(target.id, input).then(() => refreshPreviewMeta());
+    void controller.resubmit(target.id, input);
   };
 
   if (!draftId) {
@@ -139,11 +138,11 @@ export const DraftDetail: React.FC = () => {
   const canWithdraw = isOwnDraft && (draft.status === "PENDING" || draft.status === "REJECTED");
   const canResubmit = isOwnDraft && draft.status === "REJECTED";
   const isApproved = draft.status === "APPROVED";
-  const rejectNote = isPreview() ? previewMeta?.rejectionNote : null;
-  const previewReviewerLabel = previewReviewer
-    ? previewReviewer.name || previewReviewer.username
-    : previewMeta?.reviewedById
-      ? previewMeta.reviewedById.slice(0, 8)
+  const authorLabel = getDisplayName(draft.author, draft.authorId.slice(0, 8));
+  const reviewerLabel = reviewer
+    ? reviewer.name || reviewer.username
+    : draft.reviewedById
+      ? draft.reviewedById.slice(0, 8)
       : undefined;
 
   return (
@@ -169,7 +168,7 @@ export const DraftDetail: React.FC = () => {
             </div>
             <h1 className="mt-6 max-w-3xl break-words text-balance font-sans text-2xl font-semibold leading-[1.05] tracking-[-0.025em] text-foreground sm:text-3xl md:text-4xl lg:text-5xl">{draft.title}</h1>
             <p className="mt-3 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Prompted by author {draft.authorId.slice(0, 8)} · {new Date(draft.createdAt).toLocaleDateString()} · {draft.status.toLowerCase()}
+              Prompted by {authorLabel} · {new Date(draft.createdAt).toLocaleDateString()} · {draft.status.toLowerCase()}
             </p>
             {draft.postId && (
               <Button asChild size="sm" variant="outline" className="mt-4">
@@ -184,6 +183,20 @@ export const DraftDetail: React.FC = () => {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
           <div className="min-w-0 space-y-6">
+            {draft.imageUrl && (
+              <figure className="overflow-hidden bg-surface-low ring-1 ring-outline-variant/20">
+                <img
+                  src={draft.imageUrl}
+                  alt={`Cover for ${draft.title}`}
+                  className="block aspect-[8/5] w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption className="px-4 py-2 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground sm:px-5">
+                  Cover asset
+                </figcaption>
+              </figure>
+            )}
             <Card className="gap-0 rounded-none bg-surface-lowest py-0 ring-1 ring-outline-variant/20">
               <CardContent className="p-0">
                 <div className="flex items-center gap-3 bg-surface-low px-4 py-3 ring-1 ring-outline-variant/20 sm:px-5">
@@ -220,11 +233,11 @@ export const DraftDetail: React.FC = () => {
                 ))}
               </div>
             )}
-            {isPreview() && draft.status === "REJECTED" && rejectNote && (
-              <RejectionNotePanel note={rejectNote} reviewerLabel={previewReviewerLabel} reviewedAt={previewMeta?.reviewedAt ?? null} />
+            {draft.status === "REJECTED" && draft.rejectionNote && (
+              <RejectionNotePanel note={draft.rejectionNote} reviewerLabel={reviewerLabel} reviewedAt={draft.reviewedAt ?? null} />
             )}
-            {isPreview() && isApproved && previewMeta?.reviewedById && (
-              <ApprovedByCard approvedById={previewMeta.reviewedById} reviewedAt={previewMeta.reviewedAt} reviewerName={previewReviewer?.name ?? null} reviewerAvatarUrl={previewReviewer?.avatarUrl ?? null} draftId={draft.id} compact />
+            {isApproved && draft.reviewedById && (
+              <ApprovedByCard approvedById={draft.reviewedById} reviewedAt={draft.reviewedAt ?? null} reviewerName={reviewer?.name ?? null} reviewerAvatarUrl={reviewer?.avatarUrl ?? null} draftId={draft.id} compact />
             )}
           </div>
 
@@ -287,7 +300,7 @@ export const DraftDetail: React.FC = () => {
                     </div>
                     <div className="flex justify-between gap-2">
                       <dt className="text-muted-foreground">Author</dt>
-                      <dd className="truncate font-medium text-foreground">{draft.authorId.slice(0, 8)}</dd>
+                      <dd className="truncate font-medium text-foreground" title={draft.authorId}>{authorLabel}</dd>
                     </div>
                     <div className="flex justify-between gap-2">
                       <dt className="text-muted-foreground">Created</dt>

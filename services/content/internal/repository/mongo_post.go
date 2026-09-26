@@ -82,6 +82,9 @@ func updateFields(post *domain.Post) bson.M {
 	if post.Slug != "" {
 		fields["slug"] = post.Slug
 	}
+	if post.ApprovedByID != "" {
+		fields["approvedById"] = post.ApprovedByID
+	}
 
 	if post.ResetSummary {
 		fields["summary"] = ""

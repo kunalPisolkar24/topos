@@ -50,7 +50,7 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
               <img
                 src={previewSample}
                 alt="Preview sample cover"
-                className="h-40 w-full object-cover sm:h-56"
+                className="block h-40 w-full object-cover sm:h-56"
               />
             </div>
             <div className="rounded-none border border-outline-variant/20 bg-surface-low p-3">
@@ -92,7 +92,7 @@ export const FeaturedImageSection: React.FC<FeaturedImageSectionProps> = ({
                   <img
                     src={preview}
                     alt="Card preview"
-                    className="h-40 w-full object-cover sm:h-56"
+                    className="block h-40 w-full object-cover sm:h-56"
                   />
                 </div>
               ) : (

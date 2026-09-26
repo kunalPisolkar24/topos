@@ -104,12 +104,12 @@ const UserProfile: React.FC = () => {
                   Identity Node
                 </p>
 
-                <div className="group relative mt-6 aspect-square w-32 bg-surface-low ring-1 ring-outline-variant/20 md:w-40">
+                <div className="group relative mt-6 aspect-square w-32 overflow-hidden bg-surface-low ring-1 ring-outline-variant/20 md:w-40">
                   {avatarSrc ? (
                     <img
                       src={avatarSrc}
                       alt={displayName}
-                      className="h-full w-full object-cover"
+                      className="block h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-primary-container font-mono text-5xl font-medium uppercase tracking-[0.08em] text-primary-foreground">
@@ -196,6 +196,7 @@ const UserProfile: React.FC = () => {
                 {profileState.isEditingProfile && (
                   <ProfileEditForm
                     formData={profileState.formData}
+                    fieldErrors={profileState.fieldErrors}
                     isSaving={profileState.isSaving}
                     onFormChange={profileHandlers.handleFormChange}
                     onSave={profileHandlers.handleSaveProfile}

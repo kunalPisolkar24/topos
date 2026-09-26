@@ -13,7 +13,6 @@ import {
 } from "@/features/blog";
 import { PublishChecklistItem } from "@/features/blog/components/PublishChecklistItem";
 import { useCreatePostDraft } from "@/features/blog/review";
-import { isPreview } from "@/shared/config/preview";
 
 const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs } = usePostAuthoringController({
@@ -149,9 +148,7 @@ const CreateNewBlog: React.FC = () => {
                     Publishing Rule
                   </p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {isPreview()
-                      ? "Title, body, and cover image are required. Submitting sends the post to peer review — it goes live after approval."
-                      : "Title, body, and cover image are required. Tags improve discovery but remain optional."}
+                    Title, body, and cover image are required. Submitting sends the post to peer review — it goes live after approval.
                   </p>
                 </div>
 

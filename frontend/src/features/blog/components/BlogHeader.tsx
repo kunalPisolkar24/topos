@@ -40,7 +40,7 @@ export const BlogHeader: React.FC<BlogHeaderProps> = ({
           <img
             src={imageUrl}
             alt={title}
-            className="h-full w-full object-cover opacity-80 saturate-[0.82]"
+            className="block h-full w-full object-cover opacity-80 saturate-[0.82]"
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(var(--surface))_0%,rgb(var(--surface)/0.76)_32%,rgb(var(--surface)/0.22)_72%,rgb(var(--surface)/0.86)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_18%,rgb(var(--primary-container)/0.52),transparent_32%)]" />

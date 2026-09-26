@@ -7,15 +7,22 @@ import { useImageUpload } from "@/entities/upload";
 import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   buildProfileUpdatePayload,
+  isValidProfileUsername,
   sanitizeProfileBioInput,
   sanitizeProfileFormData,
   sanitizeProfileName,
+  sanitizeProfileUsername,
   type EditableProfileFormData,
   type ProfileUpdatePayload,
 } from "@/entities/user";
+import { getGraphQLErrorCodes } from "@/shared/api";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
 
 type AvatarOrBanner = "avatar" | "banner";
+
+export interface ProfileFieldErrors {
+  username?: string;
+}
 
 interface ProfileEditorUpdatePayload extends ProfileUpdatePayload {
   avatarUrl?: string;
@@ -27,6 +34,7 @@ export interface ProfileEditorState {
   avatarPreview: string | null;
   bannerPreview: string | null;
   formData: EditableProfileFormData;
+  fieldErrors: ProfileFieldErrors;
   isSaving: boolean;
   avatarFile: File | null;
   bannerFile: File | null;
@@ -53,6 +61,20 @@ export interface ProfileEditorHandlers {
 export interface UseProfileEditorControllerProps {
   currentUser: UserCoreFragment | null | undefined;
 }
+
+const USERNAME_TAKEN_MESSAGE = "Username is already taken.";
+const USERNAME_INVALID_MESSAGE =
+  "Username must be 3-30 lowercase letters, digits, or underscores.";
+
+export const isUsernameTakenError = (error: unknown): boolean => {
+  if (getGraphQLErrorCodes(error).includes("USER_ALREADY_EXISTS")) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return /already exists/i.test(error.message);
+  }
+  return false;
+};
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -96,9 +118,11 @@ export const useProfileEditorController = ({
     currentUser?.bannerUrl ?? null,
   );
   const [formData, setFormData] = useState<EditableProfileFormData>({
+    username: "",
     name: "",
     bio: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
 
   const [updateProfile, { loading: isSaving }] = userRepository.useUpdateProfile();
   const { upload: uploadImage } = useImageUpload();
@@ -119,6 +143,7 @@ export const useProfileEditorController = ({
   const profileFormDefaults = useMemo<EditableProfileFormData>(
     () =>
       sanitizeProfileFormData({
+        username: currentUser?.username ?? "",
         name: currentUser?.name ?? "",
         bio: currentUser?.bio ?? "",
       }),
@@ -186,14 +211,20 @@ export const useProfileEditorController = ({
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = event.target;
-    if (name !== "name" && name !== "bio") return;
+    if (name !== "username" && name !== "name" && name !== "bio") return;
+
+    if (name === "username") {
+      setFieldErrors((prev) => ({ ...prev, username: undefined }));
+    }
 
     setFormData((prev) => ({
       ...prev,
       [name]:
-        name === "name"
-          ? sanitizeProfileName(value)
-          : sanitizeProfileBioInput(value),
+        name === "username"
+          ? sanitizeProfileUsername(value)
+          : name === "name"
+            ? sanitizeProfileName(value)
+            : sanitizeProfileBioInput(value),
     }));
   };
 
@@ -204,6 +235,13 @@ export const useProfileEditorController = ({
     const updatePayload: ProfileEditorUpdatePayload = {
       ...buildProfileUpdatePayload(sanitizedFormData, profileFormDefaults),
     };
+
+    if (updatePayload.username && !isValidProfileUsername(updatePayload.username)) {
+      setFieldErrors({ username: USERNAME_INVALID_MESSAGE });
+      return;
+    }
+
+    setFieldErrors({});
 
     if (avatarFile) {
       const url = await uploadImage(avatarFile, {
@@ -236,6 +274,7 @@ export const useProfileEditorController = ({
         setIsEditingProfile(false);
         setAvatarFile(null);
         setBannerFile(null);
+        setFieldErrors({});
         // Post lists embed author name/avatar/bio — revalidate them too.
         await postRepository.refreshLists(client);
         toast({
@@ -243,7 +282,16 @@ export const useProfileEditorController = ({
           description: "Profile updated successfully.",
         });
       }
-    } catch {
+    } catch (error) {
+      if (updatePayload.username && isUsernameTakenError(error)) {
+        setFieldErrors({ username: USERNAME_TAKEN_MESSAGE });
+        toast({
+          title: "Username taken",
+          description: USERNAME_TAKEN_MESSAGE,
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "Error",
         description: "Failed to save profile.",
@@ -255,6 +303,7 @@ export const useProfileEditorController = ({
   const handleCancel = () => {
     setIsEditingProfile(false);
     setFormData(profileFormDefaults);
+    setFieldErrors({});
     setAvatarPreview(currentUser?.avatarUrl ?? null);
     setBannerPreview(currentUser?.bannerUrl ?? null);
     setAvatarFile(null);
@@ -282,6 +331,7 @@ export const useProfileEditorController = ({
       avatarPreview,
       bannerPreview,
       formData,
+      fieldErrors,
       isSaving,
       avatarFile,
       bannerFile,

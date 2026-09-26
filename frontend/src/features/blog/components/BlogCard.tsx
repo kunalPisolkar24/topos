@@ -56,17 +56,17 @@ export const BlogCard: React.FC<BlogCardProps> = ({
           className="block focus-visible:outline-none"
           aria-label={`Open blog post: ${title}`}
         >
-          <div className="grid min-w-0 gap-0 md:h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
+          <div className="grid min-w-0 gap-0 overflow-hidden md:min-h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
             <div
               data-slot="blog-card-image-frame"
-              className="relative aspect-[8/5] bg-surface-low md:col-start-2 md:row-start-1 md:h-full md:aspect-auto"
+              className="relative aspect-[8/5] min-h-0 min-w-0 self-stretch overflow-hidden bg-surface-low md:col-start-2 md:row-start-1 md:aspect-auto md:h-auto"
             >
               <img
                 src={blogCardImage.src}
                 srcSet={blogCardImage.srcSet}
                 sizes={blogCardImage.sizes}
                 alt={title}
-                className="h-full w-full object-cover"
+                className="absolute inset-0 block h-full w-full object-cover"
                 width={blogCardImage.width}
                 height={blogCardImage.height}
                 decoding="async"
@@ -88,7 +88,7 @@ export const BlogCard: React.FC<BlogCardProps> = ({
 
             <div
               data-slot="blog-card-content"
-              className="flex min-w-0 flex-col gap-3 px-5 py-5 sm:px-6 sm:py-6 md:col-start-1 md:row-start-1 md:gap-4"
+              className="flex min-h-0 min-w-0 flex-col justify-center gap-3 px-5 py-5 sm:px-6 sm:py-6 md:col-start-1 md:row-start-1 md:gap-4"
             >
               <div className="space-y-3">
                 <div className="space-y-2">

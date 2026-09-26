@@ -34,7 +34,7 @@ export const PostSuggestions: React.FC<PostSuggestionsProps> = ({
           <img
             src={post.imageUrl}
             alt={post.title}
-            className="h-10 w-16 shrink-0 rounded-none object-cover sm:h-12 sm:w-20"
+            className="block h-10 w-16 shrink-0 rounded-none object-cover sm:h-12 sm:w-20"
           />
           <div className="min-w-0">
             <p className="truncate text-[0.97rem] font-medium leading-snug text-foreground sm:text-[1rem]">

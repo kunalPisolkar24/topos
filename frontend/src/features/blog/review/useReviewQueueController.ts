@@ -6,7 +6,7 @@ import { useAppError } from "@/shared/ui/hooks/useAppError";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { useSessionStore } from "@/entities/session";
 import type { DraftEditsInput, PostDraft } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
+import type { ContentDraftInput } from "@/shared/graphql/content-documents";
 
 export type ReviewDialog =
   | { kind: "closed" }

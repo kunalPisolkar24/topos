@@ -84,6 +84,7 @@ func mapDomainPostToModel(dp *domain.Post) *model.Post {
 		CreatedAt:     dp.CreatedAt.String(),
 		UpdatedAt:     dp.UpdatedAt.String(),
 		Author:        &model.User{ID: dp.AuthorID},
+		ApprovedByID:  strOrNil(dp.ApprovedByID),
 	}
 }
 
@@ -250,19 +251,57 @@ func mapDomainPostDraftToModel(dd *domain.PostDraft) *model.PostDraft {
 	}
 
 	return &model.PostDraft{
-		ID:         dd.ID,
-		ApprovalID: dd.ApprovalID,
-		Prompt:     dd.Prompt,
-		Title:      dd.Title,
-		Body:       dd.Body,
-		Summary:    dd.Summary,
-		Tags:       dd.Tags,
-		Status:     model.DraftStatus(dd.Status),
-		AuthorID:   dd.AuthorID,
-		PostID:     postID,
-		CreatedAt:  dd.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:  dd.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:            dd.ID,
+		ApprovalID:    dd.ApprovalID,
+		Prompt:        dd.Prompt,
+		Title:         dd.Title,
+		Body:          dd.Body,
+		Summary:       dd.Summary,
+		Tags:          dd.Tags,
+		ImageURL:      dd.ImageURL,
+		Status:        model.DraftStatus(dd.Status),
+		Author:        &model.User{ID: dd.AuthorID},
+		AuthorID:      dd.AuthorID,
+		PostID:        postID,
+		ReviewedByID:  strOrNil(dd.ReviewedByID),
+		ReviewedAt:    timeOrNil(dd.ReviewedAt),
+		RejectionNote: strOrNil(dd.RejectionNote),
+		CreatedAt:     dd.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:     dd.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+// contentDraftParams maps the human-authored draft input to the service
+// boundary. Kept here (not in schema.resolvers.go) so gqlgen regenerations
+// leave it alone.
+func contentDraftParams(input model.ContentDraftInput) domain.ContentDraftParams {
+	var postID string
+	if input.PostID != nil {
+		postID = *input.PostID
+	}
+	return domain.ContentDraftParams{
+		Title:    input.Title,
+		Body:     input.Body,
+		Summary:  derefStr(input.Summary),
+		Tags:     input.Tags,
+		ImageURL: input.ImageURL,
+		PostID:   postID,
+	}
+}
+
+func strOrNil(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func timeOrNil(value time.Time) *string {
+	if value.IsZero() {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
 }
 
 func mapDomainPaginatedPostDraftsToModel(pd *domain.PaginatedPostDrafts) *model.PaginatedPostDrafts {

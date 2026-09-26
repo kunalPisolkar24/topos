@@ -8,6 +8,7 @@ import {
   sanitizeProfileBio,
   sanitizeProfileBioInput,
   sanitizeProfileName,
+  sanitizeProfileUsername,
 } from "@/entities/user";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { server } from "@/test/server";
@@ -126,5 +127,106 @@ describe("UserProfile", () => {
 
     expect(expectedName.length).toBeLessThanOrEqual(PROFILE_NAME_MAX_LENGTH);
     expect(expectedBio.length).toBeLessThanOrEqual(PROFILE_BIO_MAX_LENGTH);
+  });
+
+  it("sends a normalized username and surfaces collisions inline", async () => {
+    const user = userEvent.setup();
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let receivedVariables: { username?: string } | undefined;
+    let shouldCollide = false;
+
+    sessionStoreActions.markAuthenticated("profile-token");
+
+    server.use(
+      graphqlApi.query("Me", () =>
+        HttpResponse.json({
+          data: {
+            me: {
+              __typename: "User",
+              id: "1",
+              username: "profile-user",
+              email: "profile@example.com",
+              name: "Profile User",
+              bio: "Original bio",
+              avatarUrl: null,
+              bannerUrl: null,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        }),
+      ),
+      graphqlApi.mutation("UpdateProfile", async ({ request }) => {
+        const body = (await request.json()) as unknown as {
+          variables?: { username?: string };
+        };
+        receivedVariables = body.variables;
+        if (shouldCollide) {
+          return HttpResponse.json({
+            errors: [{ message: "A user with that email or username already exists" }],
+          });
+        }
+        return HttpResponse.json({
+          data: {
+            updateProfile: {
+              __typename: "User",
+              id: "1",
+              username: body.variables?.username ?? "profile-user",
+              email: "profile@example.com",
+              name: "Profile User",
+              bio: "Original bio",
+              avatarUrl: null,
+              bannerUrl: null,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        });
+      }),
+      graphqlApi.query("MyPosts", () =>
+        HttpResponse.json({
+          data: {
+            me: {
+              __typename: "User",
+              id: "1",
+              posts: {
+                __typename: "PaginatedPosts",
+                posts: [],
+                totalPages: 1,
+                currentPage: 1,
+                totalPosts: 0,
+              },
+            },
+          },
+        }),
+      ),
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/profile" element={<UserProfile />} />
+      </Routes>,
+      { route: "/profile" },
+    );
+
+    expect(await screen.findByText("Profile User")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /edit profile/i }));
+    const usernameInput = screen.getByLabelText(/^username$/i);
+
+    fireEvent.change(usernameInput, { target: { value: "  NewUser_99 " } });
+    expect(usernameInput).toHaveValue(sanitizeProfileUsername("  NewUser_99 "));
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(receivedVariables).toEqual({ username: "newuser_99" });
+    });
+
+    shouldCollide = true;
+    await user.click(screen.getByRole("button", { name: /edit profile/i }));
+    const usernameInputAfterSave = screen.getByLabelText(/^username$/i);
+    fireEvent.change(usernameInputAfterSave, { target: { value: "taken_name" } });
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/already taken/i);
   });
 });

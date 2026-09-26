@@ -3,11 +3,13 @@ export const PROFILE_NAME_MAX_LENGTH = 50;
 export const PROFILE_BIO_MAX_LENGTH = 280;
 
 export interface EditableProfileFormData {
+  username: string;
   name: string;
   bio: string;
 }
 
 export interface ProfileUpdatePayload {
+  username?: string;
   name?: string;
   bio?: string | null;
 }
@@ -50,6 +52,19 @@ export const getCharacterCount = (value: string) => Array.from(value).length;
 export const sanitizeUsernameInput = (value: string) =>
   clampCharacters(normalizeSingleLineText(value), USERNAME_MAX_LENGTH).trim();
 
+export const sanitizeProfileUsername = (value: string) =>
+  clampCharacters(
+    normalizeSingleLineText(value).toLowerCase(),
+    USERNAME_MAX_LENGTH,
+  ).trim();
+
+const PROFILE_USERNAME_PATTERN = /^[a-z0-9_]+$/;
+
+export const isValidProfileUsername = (value: string): boolean =>
+  value.length >= 3 &&
+  value.length <= USERNAME_MAX_LENGTH &&
+  PROFILE_USERNAME_PATTERN.test(value);
+
 export const sanitizeProfileName = (value: string) =>
   clampCharacters(normalizeSingleLineText(value), PROFILE_NAME_MAX_LENGTH).trim();
 
@@ -62,6 +77,7 @@ export const sanitizeProfileBio = (value: string) =>
 export const sanitizeProfileFormData = (
   value: Partial<EditableProfileFormData>,
 ): EditableProfileFormData => ({
+  username: sanitizeProfileUsername(value.username ?? ""),
   name: sanitizeProfileName(value.name ?? ""),
   bio: sanitizeProfileBio(value.bio ?? ""),
 });
@@ -73,6 +89,13 @@ export const buildProfileUpdatePayload = (
   const sanitizedNextValue = sanitizeProfileFormData(nextValue);
   const sanitizedCurrentValue = sanitizeProfileFormData(currentValue);
   const payload: ProfileUpdatePayload = {};
+
+  if (
+    sanitizedNextValue.username.length > 0 &&
+    sanitizedNextValue.username !== sanitizedCurrentValue.username
+  ) {
+    payload.username = sanitizedNextValue.username;
+  }
 
   if (
     sanitizedNextValue.name.length > 0 &&

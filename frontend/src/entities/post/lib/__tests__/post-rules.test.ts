@@ -14,7 +14,7 @@ describe("evaluatePublishReadiness", () => {
     expect(result.imageReady).toBe(true);
     expect(result.tagsReady).toBe(true);
     expect(result.publishDisabled).toBe(false);
-    expect(result.publishLabel).toBe("Publish Post");
+    expect(result.publishLabel).toBe("Submit for Review");
   });
 
   it("disables publish when uploading card image and shows the right label", () => {
@@ -38,7 +38,7 @@ describe("evaluatePublishReadiness", () => {
       isCreatingPost: true,
     });
     expect(result.publishDisabled).toBe(true);
-    expect(result.publishLabel).toBe("Publishing...");
+    expect(result.publishLabel).toBe("Submitting...");
   });
 
   it("treats empty title and body as not ready", () => {

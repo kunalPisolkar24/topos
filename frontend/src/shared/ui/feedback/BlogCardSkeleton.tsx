@@ -4,9 +4,9 @@ import { Card } from "@/shared/ui/primitives/card";
 export const BlogCardSkeleton: React.FC = () => {
   return (
     <Card className="gap-0 bg-surface-lowest py-0">
-      <div className="grid gap-0 md:h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
-        <Skeleton className="aspect-[8/5] w-full rounded-none bg-surface-low md:col-start-2 md:row-start-1 md:h-full md:aspect-auto" />
-        <div className="flex min-w-0 flex-col gap-3 px-5 py-5 sm:px-6 sm:py-6 md:col-start-1 md:row-start-1 md:gap-4">
+      <div className="grid min-w-0 gap-0 overflow-hidden md:min-h-[280px] md:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]">
+        <Skeleton className="aspect-[8/5] min-h-0 min-w-0 w-full self-stretch overflow-hidden rounded-none bg-surface-low md:col-start-2 md:row-start-1 md:aspect-auto md:h-auto" />
+        <div className="flex min-h-0 min-w-0 flex-col justify-center gap-3 px-5 py-5 sm:px-6 sm:py-6 md:col-start-1 md:row-start-1 md:gap-4">
           <div className="space-y-3">
             <div className="space-y-2">
               <Skeleton className="h-8 w-4/5 rounded-none bg-surface-low sm:h-9" />

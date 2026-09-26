@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildProfileUpdatePayload,
   getCharacterCount,
+  isValidProfileUsername,
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
   sanitizeProfileBio,
   sanitizeProfileBioInput,
   sanitizeProfileFormData,
   sanitizeProfileName,
+  sanitizeProfileUsername,
   sanitizeUsernameInput,
   USERNAME_MAX_LENGTH,
 } from "../profile-sanitizers";
@@ -58,29 +60,55 @@ describe("sanitizeProfileFormData", () => {
     expect(out.bio).toBe("x");
   });
 
+  it("lowercases usernames", () => {
+    expect(sanitizeProfileFormData({ username: "  Ramu33 " }).username).toBe("ramu33");
+  });
+
   it("uses empty string defaults for missing fields", () => {
-    expect(sanitizeProfileFormData({})).toEqual({ name: "", bio: "" });
+    expect(sanitizeProfileFormData({})).toEqual({ username: "", name: "", bio: "" });
+  });
+});
+
+describe("isValidProfileUsername", () => {
+  it("accepts lowercase letters, digits, and underscores", () => {
+    expect(isValidProfileUsername("ramu_33")).toBe(true);
+  });
+
+  it.each(["ab", "has spaces", "UPPER-CASE!", ""])("rejects %j", (value) => {
+    expect(isValidProfileUsername(value)).toBe(false);
+  });
+});
+
+describe("sanitizeProfileUsername", () => {
+  it("trims and lowercases", () => {
+    expect(sanitizeProfileUsername("  Ramu33 ")).toBe("ramu33");
   });
 });
 
 describe("buildProfileUpdatePayload", () => {
   it("returns empty payload when next equals current", () => {
-    const same = { name: "Kunal", bio: "Hello" };
+    const same = { username: "kunal", name: "Kunal", bio: "Hello" };
     expect(buildProfileUpdatePayload(same, same)).toEqual({});
   });
 
   it("includes changed name and bio", () => {
-    const next = { name: "Kunal P", bio: "Author" };
-    const current = { name: "Kunal", bio: "Hello" };
+    const next = { username: "kunal", name: "Kunal P", bio: "Author" };
+    const current = { username: "kunal", name: "Kunal", bio: "Hello" };
     expect(buildProfileUpdatePayload(next, current)).toEqual({
       name: "Kunal P",
       bio: "Author",
     });
   });
 
+  it("includes a changed username", () => {
+    const next = { username: "ramu33", name: "Kunal", bio: "Hello" };
+    const current = { username: "ramu22", name: "Kunal", bio: "Hello" };
+    expect(buildProfileUpdatePayload(next, current)).toEqual({ username: "ramu33" });
+  });
+
   it("omits empty names and converts empty bios to null", () => {
-    const next = { name: "", bio: "" };
-    const current = { name: "Kunal", bio: "Hello" };
+    const next = { username: "kunal", name: "", bio: "" };
+    const current = { username: "kunal", name: "Kunal", bio: "Hello" };
     expect(buildProfileUpdatePayload(next, current)).toEqual({ bio: null });
   });
 });

@@ -41,6 +41,7 @@ import {
   previewGenerateTags,
   previewGetChat,
   previewGetPost,
+  previewGetUserById,
   previewGetUserFromToken,
   previewListChatMessages,
   previewListChats,
@@ -94,6 +95,15 @@ export const handlers = [
     return HttpResponse.json({
       data: { me: isAuthenticated(request) ? me() : null },
     });
+  }),
+
+  gql.query("User", async ({ variables }) => {
+    if (isPreviewEnv) {
+      const id = (variables as { id?: string })?.id;
+      const user = id ? await previewGetUserById(id) : null;
+      return HttpResponse.json({ data: { user } });
+    }
+    return HttpResponse.json({ data: { user: null } });
   }),
 
   gql.mutation("Signin", async ({ variables }) => {

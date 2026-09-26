@@ -59,6 +59,14 @@ func TestPostDraftRepositoryCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, byAuthor.Drafts, 1)
 
+	// Human covers round-trip through create and update.
+	cover := "https://cdn/cover.png"
+	draft.ImageURL = &cover
+	updated, err := repo.Update(ctx, draft)
+	require.NoError(t, err)
+	require.NotNil(t, updated.ImageURL)
+	assert.Equal(t, cover, *updated.ImageURL)
+
 	// Withdrawal removes the document entirely.
 	require.NoError(t, repo.Delete(ctx, draft.ID))
 	_, err = repo.FindByID(ctx, draft.ID)
@@ -128,4 +136,35 @@ func TestPostDraftRepositoryRejectedThenReapproved(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, domain.DraftStatusApproved, approved.Status)
+}
+
+func TestPostDraftRepositoryFindPendingByAuthorAndPost(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	database := startMongo(t, ctx)
+	require.NoError(t, db.EnsureIndexes(ctx, database))
+	repo := NewMongoPostDraftRepository(database)
+
+	revision := newTestDraft()
+	revision.PostID = "post-1"
+	created, err := repo.Create(ctx, revision)
+	require.NoError(t, err)
+
+	found, err := repo.FindPendingByAuthorAndPost(ctx, "author_1", "post-1")
+	require.NoError(t, err)
+	assert.Equal(t, created.ID, found.ID)
+
+	// Other authors and other posts miss; non-pending drafts miss too.
+	_, err = repo.FindPendingByAuthorAndPost(ctx, "someone-else", "post-1")
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
+	_, err = repo.FindPendingByAuthorAndPost(ctx, "author_1", "post-9")
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
+
+	_, err = repo.TransitionStatus(
+		ctx, created.ID, []domain.DraftStatus{domain.DraftStatusPending}, domain.DraftStatusRejected,
+	)
+	require.NoError(t, err)
+	_, err = repo.FindPendingByAuthorAndPost(ctx, "author_1", "post-1")
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
 }

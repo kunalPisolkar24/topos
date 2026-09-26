@@ -39,6 +39,7 @@ const createUserMocks = () => ({
   create: vi.fn(),
   findByEmail: vi.fn(),
   findByEmailOrUsername: vi.fn(),
+  findByUsername: vi.fn(),
   findById: vi.fn(),
   findAll: vi.fn(),
   update: vi.fn(),
@@ -251,6 +252,25 @@ describe('UserService', () => {
 
       expect(cache.invalidateKey).toHaveBeenCalledWith('user:u1');
       expect(cache.invalidateUserLists).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a username taken by another user', async () => {
+      users.findByUsername.mockResolvedValue(makeUser({ id: 'u2', username: 'taken_name' }));
+
+      await expect(service.updateProfile('u1', { username: 'taken_name' })).rejects.toBeInstanceOf(
+        UserAlreadyExistsError,
+      );
+      expect(users.update).not.toHaveBeenCalled();
+    });
+
+    it('allows keeping the current username', async () => {
+      users.findByUsername.mockResolvedValue(makeUser({ id: 'u1', username: 'alice' }));
+      users.update.mockResolvedValue(makeUser({ username: 'alice' }));
+
+      await expect(service.updateProfile('u1', { username: 'alice' })).resolves.toEqual(
+        toUserResponse(makeUser({ username: 'alice' })),
+      );
+      expect(users.update).toHaveBeenCalledWith('u1', { username: 'alice' });
     });
   });
 });

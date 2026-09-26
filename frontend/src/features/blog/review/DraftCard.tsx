@@ -11,8 +11,7 @@ import {
 } from "@/shared/ui/primitives/card";
 import { Check, Eye, Pencil, RotateCcw, Undo2, ShieldAlert } from "lucide-react";
 import type { DraftStatus, PostDraft } from "@/shared/graphql/content-documents";
-import { isPreview } from "@/shared/config/preview";
-import { usePreviewDraftReview } from "./hooks/usePreviewReview";
+import { getDisplayName } from "@/shared/lib/account-identity";
 import { DraftSummary } from "./DraftSummary";
 
 const statusBadge: Record<
@@ -54,9 +53,8 @@ export const DraftCard: React.FC<DraftCardProps> = ({
   onResubmit,
 }) => {
   const statusStyle = statusBadge[draft.status] ?? statusBadge.PENDING;
-  const { meta } = usePreviewDraftReview(isPreview() ? draft.id : null);
-  const previewNote = isPreview() ? meta?.rejectionNote : null;
-  const showNote = isPreview() && draft.status === "REJECTED" && Boolean(previewNote);
+  const authorLabel = getDisplayName(draft.author, draft.authorId.slice(0, 8));
+  const showNote = draft.status === "REJECTED" && Boolean(draft.rejectionNote);
 
   return (
     <Card className="gap-0 rounded-none bg-surface-lowest py-0 ring-1 ring-outline-variant/20">
@@ -73,7 +71,7 @@ export const DraftCard: React.FC<DraftCardProps> = ({
               </Link>
             </CardTitle>
             <p className="mt-2 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Prompted by author {draft.authorId.slice(0, 8)} ·{" "}
+              Prompted by {authorLabel} ·{" "}
               {new Date(draft.createdAt).toLocaleDateString()}
             </p>
           </div>
@@ -102,7 +100,7 @@ export const DraftCard: React.FC<DraftCardProps> = ({
               <ShieldAlert className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
               <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-destructive">Rejection note</p>
             </div>
-            <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap break-words text-xs leading-6 text-foreground/80">{previewNote}</p>
+            <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap break-words text-xs leading-6 text-foreground/80">{draft.rejectionNote}</p>
           </div>
         )}
       </CardContent>

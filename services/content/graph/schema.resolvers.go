@@ -28,7 +28,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 		tags = append(tags, input.Tags...)
 	}
 
-	post, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary)
+	post, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary, "")
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -47,7 +47,7 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 		tags = append(tags, input.Tags...)
 	}
 
-	post, err := r.PostService.UpdatePost(ctx, id, userID, input.Title, input.Body, tags, input.ImageURL)
+	post, err := r.PostService.UpdatePost(ctx, id, userID, input.Title, input.Body, tags, input.ImageURL, "")
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -173,6 +173,37 @@ func (r *mutationResolver) CreatePostDraft(ctx context.Context, prompt string) (
 	}
 
 	draft, err := r.DraftService.CreateDraft(ctx, prompt, userID)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// CreateContentDraft files the caller's human-authored content for peer
+// review: a brand-new post when the input carries no post ID, otherwise a
+// revision proposal for that live post.
+func (r *mutationResolver) CreateContentDraft(ctx context.Context, input model.ContentDraftInput) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.CreateContentDraft(ctx, userID, contentDraftParams(input))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// ResubmitContentDraft sends the caller's rejected draft back to the
+// queue with edits.
+func (r *mutationResolver) ResubmitContentDraft(ctx context.Context, id string, input model.ContentDraftInput) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.ResubmitContentDraft(ctx, id, userID, contentDraftParams(input))
 	if err != nil {
 		return nil, mapDomainError(err)
 	}

@@ -11,7 +11,6 @@ import {
   type PostForEditing,
 } from "../authoring";
 import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
-import { isPreview } from "@/shared/config/preview";
 
 export interface BlogEditFormEditorProps {
   value: string;
@@ -135,9 +134,7 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
               Revision Rule
             </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {isPreview()
-                  ? "All post fields are validated prior to save. Changes stay pending until a peer approves them."
-                  : "All post fields are validated prior to save. Changes are instantly published."}
+                All post fields are validated prior to save. Changes stay pending until a peer approves them.
               </p>
           </div>
 

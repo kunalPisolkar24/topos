@@ -2,13 +2,17 @@ import { gql } from "@apollo/client";
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import {
   ApprovePostDraftDocument,
+  CreateContentDraftDocument,
   CreatePostDraftDocument,
   DeletePostDraftDocument,
   MyPostDraftsDocument,
   PostDraftsDocument,
   RejectPostDraftDocument,
+  ResubmitContentDraftDocument,
   type ApprovePostDraftMutation,
   type ApprovePostDraftMutationVariables,
+  type CreateContentDraftMutation,
+  type CreateContentDraftMutationVariables,
   type CreatePostDraftMutation,
   type CreatePostDraftMutationVariables,
   type DeletePostDraftMutation,
@@ -20,15 +24,9 @@ import {
   type PostDraftsQueryVariables,
   type RejectPostDraftMutation,
   type RejectPostDraftMutationVariables,
-} from "@/shared/graphql/content-documents";
-import {
-  CreateContentDraftDocument,
-  ResubmitContentDraftDocument,
-  type CreateContentDraftMutation,
-  type CreateContentDraftMutationVariables,
   type ResubmitContentDraftMutation,
   type ResubmitContentDraftMutationVariables,
-} from "@/shared/graphql/content-draft.documents";
+} from "@/shared/graphql/content-documents";
 
 const PAGE_LIMIT = 6;
 

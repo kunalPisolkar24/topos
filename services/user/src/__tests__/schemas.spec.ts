@@ -93,4 +93,18 @@ describe('updateProfileSchema', () => {
       false,
     );
   });
+
+  it('accepts a valid username and normalizes it to lowercase', () => {
+    expect(updateProfileSchema.safeParse({ username: ' Alice_99 ' }).success).toBe(true);
+    expect(updateProfileSchema.safeParse({ username: ' Alice_99 ' }).data).toMatchObject({
+      username: 'alice_99',
+    });
+  });
+
+  it.each([{ username: 'ab' }, { username: 'has spaces' }, { username: 'UPPER-CASE!' }])(
+    'rejects username %j',
+    (input) => {
+      expect(updateProfileSchema.safeParse(input).success).toBe(false);
+    },
+  );
 });

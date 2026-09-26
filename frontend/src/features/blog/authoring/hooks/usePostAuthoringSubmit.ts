@@ -1,21 +1,10 @@
 import { useCallback, useReducer, useRef } from "react";
-import { z } from "zod";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import { type UpdatePostInput } from "@/shared/graphql/content-documents";
-import type { ContentDraftInput } from "@/shared/graphql/content-draft.documents";
-import { postRepository } from "@/entities/post/api/postRepository";
+import type { ContentDraftInput } from "@/shared/graphql/content-documents";
 import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
-import { isPreview } from "@/shared/config/preview";
-import {
-  createPostSchema,
-  updatePostSchema,
-  type CreatePostFormValues,
-  type UpdatePostFormValues,
-} from "@/features/blog/authoring/model/post.schema";
-import { reportZodIssues } from "@/features/blog/authoring/lib/post-validation";
 import type { PostForEditing, PostAuthoringMode } from "../usePostAuthoringController";
 import type { PostAuthoringSubmitState } from "../model/submit-state";
 
@@ -85,8 +74,6 @@ export const usePostAuthoringSubmit = ({
   const [submit, dispatch] = useReducer(reducer, { kind: "idle" });
   const isSubmittingRef = useRef(false);
 
-  const [createPost] = postRepository.useCreate();
-  const [updatePost] = postRepository.useUpdate();
   const [createContentDraft] = draftRepository.useCreateContentDraft();
 
   const handleCreateSubmit = useCallback(
@@ -115,7 +102,7 @@ export const usePostAuthoringSubmit = ({
           }
         }
 
-        if (!finalImageUrl && isPreview() && previewCoverUrl) {
+        if (!finalImageUrl && previewCoverUrl) {
           finalImageUrl = previewCoverUrl;
         }
 
@@ -129,74 +116,38 @@ export const usePostAuthoringSubmit = ({
           return;
         }
 
-        if (isPreview()) {
-          // Preview-first review gating: every publish enters the queue as
-          // PENDING. Nothing goes live until a peer approves it.
-          const draftInput: ContentDraftInput = {
-            title: trimmedTitle,
-            body: content,
-            summary: summary?.trim() || null,
-            tags,
-            imageUrl: finalImageUrl,
-            postId: null,
-          };
-          try {
-            dispatch({ type: "beginCreate" });
-            await createContentDraft({ variables: { input: draftInput } });
-            await draftRepository.refreshDraftLists(client);
-            toast({
-              title: "Submitted for review",
-              description: "Your post is pending. It goes live after peer approval.",
-            });
-            dispatch({ type: "resolveIdle" });
-            navigate("/review");
-          } catch (error) {
-            toast({
-              title: "Error",
-              description: getGraphQLErrorMessage(
-                error,
-                "Failed to submit the post for review.",
-              ),
-              variant: "destructive",
-            });
-            dispatch({ type: "fail", message: "create" });
-          } finally {
-            isSubmittingRef.current = false;
-          }
-          return;
-        }
-
-        const candidate: CreatePostFormValues = {
+        // Review-first publishing: every new post enters the queue as
+        // PENDING. Nothing goes live until a peer approves it.
+        const draftInput: ContentDraftInput = {
           title: trimmedTitle,
           body: content,
-          summary: summary?.trim() || undefined,
+          summary: summary?.trim() || null,
           tags,
           imageUrl: finalImageUrl,
+          postId: null,
         };
-
         try {
-          const parsed = createPostSchema.parse(candidate);
           dispatch({ type: "beginCreate" });
-          await createPost({ variables: { input: parsed } });
-          await postRepository.refreshLists(client);
-          toast({ title: "Blog Created", description: "Successfully created." });
+          await createContentDraft({ variables: { input: draftInput } });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Submitted for review",
+            description: "Your post is pending. It goes live after peer approval.",
+          });
           dispatch({ type: "resolveIdle" });
-          navigate("/");
+          navigate("/review");
         } catch (error) {
-          if (error instanceof z.ZodError) {
-            reportZodIssues(toast, error.issues);
-            dispatch({ type: "resolveIdle" });
-            return;
-          }
           toast({
             title: "Error",
             description: getGraphQLErrorMessage(
               error,
-              "Failed to create blog post.",
+              "Failed to submit the post for review.",
             ),
             variant: "destructive",
           });
           dispatch({ type: "fail", message: "create" });
+        } finally {
+          isSubmittingRef.current = false;
         }
       } finally {
         isSubmittingRef.current = false;
@@ -213,7 +164,6 @@ export const usePostAuthoringSubmit = ({
       summary,
       uploadCardImage,
       toast,
-      createPost,
       createContentDraft,
       client,
       navigate,
@@ -239,74 +189,47 @@ export const usePostAuthoringSubmit = ({
         }
 
         const originalTagNames = post.tags.map((tag) => tag.name);
-        const updateData: Partial<UpdatePostFormValues> = {};
-        if (title !== post.title) updateData.title = title;
-        if (content !== post.body) updateData.body = content;
-        if (JSON.stringify(tags) !== JSON.stringify(originalTagNames)) {
-          updateData.tags = tags;
-        }
-        if (finalImageUrl !== post.imageUrl) updateData.imageUrl = finalImageUrl;
+        const hasChanges =
+          title !== post.title ||
+          content !== post.body ||
+          JSON.stringify(tags) !== JSON.stringify(originalTagNames) ||
+          finalImageUrl !== post.imageUrl;
 
-        if (Object.keys(updateData).length === 0) {
+        if (!hasChanges) {
           toast({ title: "No Changes", description: "No changes detected." });
           onComplete?.();
           return;
         }
 
-        if (isPreview()) {
-          // Preview-first review gating: edits become a revision proposal.
-          // The live post is untouched until a peer approves it.
-          const revisionInput: ContentDraftInput = {
-            title,
-            body: content,
-            summary: null,
-            tags,
-            imageUrl: finalImageUrl,
-            postId: post.id,
-          };
-          try {
-            dispatch({ type: "beginUpdate" });
-            await createContentDraft({ variables: { input: revisionInput } });
-            await draftRepository.refreshDraftLists(client);
-            toast({
-              title: "Revision submitted",
-              description: "Your changes are pending. They go live after peer approval.",
-            });
-            dispatch({ type: "resolveIdle" });
-            onComplete?.();
-          } catch (error) {
-            toast({
-              title: "Update Failed",
-              description: getGraphQLErrorMessage(error, "Could not submit the revision."),
-              variant: "destructive",
-            });
-            dispatch({ type: "fail", message: "update" });
-          } finally {
-            isSubmittingRef.current = false;
-          }
-          return;
-        }
-
+        // Review-first publishing: edits become a revision proposal.
+        // The live post is untouched until a peer approves it.
+        const revisionInput: ContentDraftInput = {
+          title,
+          body: content,
+          summary: null,
+          tags,
+          imageUrl: finalImageUrl,
+          postId: post.id,
+        };
         try {
-          const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
           dispatch({ type: "beginUpdate" });
-          await updatePost({ variables: { id: post.id, input: parsedInput } });
-          await postRepository.refreshLists(client, { postId: post.id });
-          toast({ title: "Success", description: "Post updated successfully." });
+          await createContentDraft({ variables: { input: revisionInput } });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Revision submitted",
+            description: "Your changes are pending. They go live after peer approval.",
+          });
           dispatch({ type: "resolveIdle" });
           onComplete?.();
         } catch (error) {
-          if (error instanceof z.ZodError) {
-            reportZodIssues(toast, error.issues);
-            dispatch({ type: "resolveIdle" });
-            return;
-          }
           toast({
             title: "Update Failed",
-            description: getGraphQLErrorMessage(error, "Could not update post."),
+            description: getGraphQLErrorMessage(error, "Could not submit the revision."),
             variant: "destructive",
           });
           dispatch({ type: "fail", message: "update" });
+        } finally {
+          isSubmittingRef.current = false;
         }
       } finally {
         isSubmittingRef.current = false;
@@ -321,7 +244,6 @@ export const usePostAuthoringSubmit = ({
       tags,
       uploadCardImage,
       toast,
-      updatePost,
       createContentDraft,
       client,
       onComplete,

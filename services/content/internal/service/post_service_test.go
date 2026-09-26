@@ -50,20 +50,30 @@ func TestCreatePost(t *testing.T) {
 	publisher := &testutil.MockEventPublisher{}
 	s := newService(t, nil, publisher, nil)
 
-	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "Title", post.Title)
 	assert.Equal(t, domain.PostStatusPending, post.SummaryStatus)
 	assert.Contains(t, post.Slug, "title-")
+	assert.Empty(t, post.ApprovedByID, "direct publishes carry no reviewer attribution")
 	assert.Len(t, publisher.Created, 1)
+}
+
+func TestCreatePostRecordsApprover(t *testing.T) {
+	s := newService(t, nil, nil, nil)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "peer-9")
+
+	require.NoError(t, err)
+	assert.Equal(t, "peer-9", post.ApprovedByID)
 }
 
 func TestCreatePostWithSummary(t *testing.T) {
 	summary := "provided summary"
 	s := newService(t, nil, nil, nil)
 
-	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, &summary)
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, &summary, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.PostStatusCompleted, post.SummaryStatus)
@@ -77,7 +87,7 @@ func TestCreatePostRepoError(t *testing.T) {
 	}}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	assert.ErrorIs(t, err, wantErr)
 }
 
@@ -87,7 +97,7 @@ func TestCreatePostSlugRetriesExhausted(t *testing.T) {
 	}}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "slug retries")
 	assert.Equal(t, maxSlugRetries, repo.CreateCalls)
@@ -104,7 +114,7 @@ func TestCreatePostRegeneratesSlugPerAttempt(t *testing.T) {
 	}}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "slug retries")
 	assert.Len(t, seen, maxSlugRetries, "every retry must try a different slug")
@@ -118,7 +128,7 @@ func TestCreatePostSlugCollisionFailsFast(t *testing.T) {
 	}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.ErrorIs(t, err, domain.ErrValidation)
 	assert.Contains(t, err.Error(), "already taken")
 	assert.Zero(t, repo.CreateCalls, "a known collision must not attempt an insert")
@@ -130,7 +140,7 @@ func TestCreatePostSlugCheckDBErrorPropagates(t *testing.T) {
 	}}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "db down")
 	assert.Zero(t, repo.CreateCalls)
@@ -140,7 +150,7 @@ func TestCreatePostPublishFailureIsIgnored(t *testing.T) {
 	publisher := &testutil.MockEventPublisher{Err: errors.New("kafka down")}
 	s := newService(t, nil, publisher, nil)
 
-	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, post)
 }
@@ -154,7 +164,7 @@ func TestCreatePostNilPublisher(t *testing.T) {
 		nil,
 	)
 
-	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.NoError(t, err)
 }
 
@@ -170,7 +180,7 @@ func TestUpdatePost(t *testing.T) {
 	s := newService(t, repo, publisher, nil)
 
 	title := "New Title"
-	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil)
+	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "New Title", post.Title)
@@ -185,7 +195,7 @@ func TestUpdatePostForbidden(t *testing.T) {
 	}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil, "")
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -197,7 +207,7 @@ func TestUpdatePostNotFound(t *testing.T) {
 	}
 	s := newService(t, repo, nil, nil)
 
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil, "")
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -213,10 +223,38 @@ func TestUpdatePostResetsSummaryOnTitleChange(t *testing.T) {
 	s := newService(t, repo, nil, nil)
 
 	title := "Renamed"
-	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil)
+	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.True(t, post.ResetSummary)
+}
+
+func TestUpdatePostStampsApproverOnlyFromReview(t *testing.T) {
+	var stored *domain.Post
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1"}, nil
+		},
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			stored = post
+			return post, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	title := "Peer-approved rename"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "peer-9")
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Equal(t, "peer-9", stored.ApprovedByID)
+
+	// Direct author edits leave attribution untouched.
+	stored = nil
+	title = "Author tweak"
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Empty(t, stored.ApprovedByID)
 }
 
 func TestCreatePostValidation(t *testing.T) {
@@ -246,7 +284,7 @@ func TestCreatePostValidation(t *testing.T) {
 			repo := &testutil.MockPostRepository{}
 			s := newService(t, repo, nil, nil)
 
-			_, err := s.CreatePost(context.Background(), tt.title, tt.body, "u_1", tt.tags, nil, nil)
+			_, err := s.CreatePost(context.Background(), tt.title, tt.body, "u_1", tt.tags, nil, nil, "")
 
 			require.ErrorIs(t, err, domain.ErrValidation)
 			assert.Contains(t, err.Error(), tt.wantErr)
@@ -258,7 +296,7 @@ func TestCreatePostValidation(t *testing.T) {
 func TestCreatePostTrimsInput(t *testing.T) {
 	s := newService(t, nil, nil, nil)
 
-	post, err := s.CreatePost(context.Background(), "  Title  ", "  Body  ", "u_1", []string{"  go ", "", "rust "}, nil, nil)
+	post, err := s.CreatePost(context.Background(), "  Title  ", "  Body  ", "u_1", []string{"  go ", "", "rust "}, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "Title", post.Title)
@@ -277,7 +315,7 @@ func TestCreatePostTagErrorIsTolerated(t *testing.T) {
 		nil,
 	)
 
-	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", []string{"go"}, nil, nil)
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", []string{"go"}, nil, nil, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, post)
@@ -292,16 +330,16 @@ func TestUpdatePostValidation(t *testing.T) {
 	s := newService(t, repo, nil, nil)
 
 	empty := ""
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &empty, nil, nil, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &empty, nil, nil, nil, "")
 	require.ErrorIs(t, err, domain.ErrValidation)
 	assert.Contains(t, err.Error(), "title is required")
 
-	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", nil, &empty, nil, nil)
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", nil, &empty, nil, nil, "")
 	require.ErrorIs(t, err, domain.ErrValidation)
 	assert.Contains(t, err.Error(), "body is required")
 
 	long := strings.Repeat("a", maxTitleLen+1)
-	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &long, nil, nil, nil)
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &long, nil, nil, nil, "")
 	require.ErrorIs(t, err, domain.ErrValidation)
 }
 
@@ -318,7 +356,7 @@ func TestUpdatePostUnchangedValuesDoNotResetSummary(t *testing.T) {
 	s := newService(t, repo, nil, nil)
 
 	title, body := "Same", "SameBody"
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, &body, nil, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, &body, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.False(t, got.ResetSummary, "unchanged title/body must not reset the summary")
@@ -340,7 +378,7 @@ func TestUpdatePostImageOnlyDoesNotResetSummary(t *testing.T) {
 	s := newService(t, repo, nil, nil)
 
 	imageURL := "https://example.com/image.png"
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, &imageURL)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, &imageURL, "")
 
 	require.NoError(t, err)
 	assert.False(t, got.ResetSummary, "an imageUrl-only edit must not reset the summary")
@@ -362,7 +400,7 @@ func TestUpdatePostChangedValuesResetSummary(t *testing.T) {
 	s := newService(t, repo, nil, nil)
 
 	title := "New"
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
 
 	require.NoError(t, err)
 	assert.True(t, got.ResetSummary, "a real title change must reset the summary")
@@ -390,7 +428,7 @@ func TestUpdatePostTagErrorIsTolerated(t *testing.T) {
 	)
 
 	title := "New"
-	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, []string{"go"}, nil)
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, []string{"go"}, nil, "")
 
 	require.NoError(t, err)
 }
@@ -919,7 +957,7 @@ func TestCreatePostInvalidatesSearchCache(t *testing.T) {
 	_, err := s.SearchPosts(context.Background(), "go", 1, 10)
 	require.NoError(t, err)
 
-	_, err = s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil)
+	_, err = s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
 	require.NoError(t, err)
 
 	_, err = s.SearchPosts(context.Background(), "go", 1, 10)
@@ -947,7 +985,7 @@ func TestUpdatePostInvalidatesSearchCache(t *testing.T) {
 	require.NoError(t, err)
 
 	title := "Renamed"
-	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil)
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
 	require.NoError(t, err)
 
 	_, err = s.SearchPosts(context.Background(), "go", 1, 10)

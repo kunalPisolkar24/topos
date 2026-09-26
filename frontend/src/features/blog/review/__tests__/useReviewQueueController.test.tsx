@@ -15,22 +15,32 @@ import { useReviewQueueController } from "../useReviewQueueController";
 
 const noopUnauthorized = async () => {};
 
-const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => ({
-  __typename: "PostDraft",
-  id: "d1",
-  approvalId: "ap-1",
-  prompt: "write about go",
-  title: "Generated title",
-  body: "<p>body</p>",
-  summary: "A summary",
-  tags: ["go"],
-  status: "PENDING",
-  authorId: "author-9",
-  postId: null,
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z",
-  ...overrides,
-});
+const buildDraft = (overrides: Partial<PostDraft> = {}): PostDraft => {
+  const { author, authorId = "author-9", ...rest } = overrides;
+  return {
+    __typename: "PostDraft",
+    id: "d1",
+    approvalId: "ap-1",
+    prompt: "write about go",
+    title: "Generated title",
+    body: "<p>body</p>",
+    summary: "A summary",
+    tags: ["go"],
+    status: "PENDING",
+    author: author ?? {
+      __typename: "User",
+      id: authorId,
+      username: "draftauthor",
+      name: "Draft Author",
+      avatarUrl: null,
+    },
+    authorId,
+    postId: null,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    ...rest,
+  };
+};
 
 const communityDraft = buildDraft();
 

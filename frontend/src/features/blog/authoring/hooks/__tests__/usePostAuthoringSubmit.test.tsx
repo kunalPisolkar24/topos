@@ -5,9 +5,8 @@ import { ApolloProvider } from "@apollo/client/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
-import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
+import { createApolloClient } from "@/shared/api";
 import { env } from "@/shared/config/env";
-import { PostDocument, PostsDocument } from "@/shared/graphql/content-documents";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
 const noopUnauthorized = async () => {};
@@ -40,51 +39,6 @@ const baseArgs = {
   tags: ["alpha"],
   summary: null as string | null,
   uploadCardImage: () => Promise.resolve<string | null>("https://x/y.png"),
-};
-
-const postListVariables = { page: 1, limit: 6 };
-
-const buildPaginatedPosts = (id: string) => ({
-  __typename: "PaginatedPosts" as const,
-  posts: [
-    {
-      __typename: "Post" as const,
-      id,
-      title: `Post ${id}`,
-      body: "<p>body</p>",
-      imageUrl: "https://x/y.png",
-      createdAt: "2024-01-01T00:00:00Z",
-      likedByMe: false,
-      savedByMe: false,
-      author: {
-        __typename: "User" as const,
-        id: "author-1",
-        username: "alice",
-        name: "Alice",
-        avatarUrl: null,
-      },
-      tags: [
-        {
-          __typename: "Tag" as const,
-          id: "tag-1",
-          name: "alpha",
-        },
-      ],
-    },
-  ],
-  totalPages: 1,
-  currentPage: 1,
-  totalPosts: 1,
-});
-
-const writeStalePostsCache = (client: ApolloClient, id: string) => {
-  client.writeQuery({
-    query: PostsDocument,
-    variables: postListVariables,
-    data: {
-      posts: buildPaginatedPosts(id),
-    },
-  });
 };
 
 describe("usePostAuthoringSubmit", () => {
@@ -139,12 +93,28 @@ describe("usePostAuthoringSubmit", () => {
     expect(result.current.submit).toEqual({ kind: "idle" });
   });
 
-  it("transitions through uploading then creating on successful create", async () => {
+  it("routes new posts to the review queue instead of publishing", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let contentDraftInput: unknown;
+    let createPostCalls = 0;
     server.use(
-      graphqlApi.mutation("CreatePost", () =>
-        HttpResponse.json({ data: { createPost: { __typename: "Post", id: "1" } } }),
-      ),
+      graphqlApi.mutation("CreateContentDraft", async ({ request }) => {
+        const body = (await request.json()) as unknown as {
+          variables?: { input?: unknown };
+        };
+        contentDraftInput = body.variables?.input;
+        return HttpResponse.json({
+          data: {
+            createContentDraft: { __typename: "PostDraft", id: "draft-9" },
+          },
+        });
+      }),
+      graphqlApi.mutation("CreatePost", () => {
+        createPostCalls += 1;
+        return HttpResponse.json({
+          data: { createPost: { __typename: "Post", id: "post-9" } },
+        });
+      }),
     );
 
     const { result } = renderHook(
@@ -165,20 +135,32 @@ describe("usePostAuthoringSubmit", () => {
       } as unknown as React.FormEvent);
     });
 
+    await waitFor(() => {
+      expect(contentDraftInput).toMatchObject({
+        title: "A title",
+        body: "<p>body</p>",
+        tags: ["alpha"],
+        imageUrl: "https://cdn/ok.png",
+        postId: null,
+      });
+    });
+    expect(createPostCalls).toBe(0);
     expect(result.current.submit).toEqual({ kind: "idle" });
   });
 
-  it("creates a post directly when the image url is already known", async () => {
+  it("submits the known image url in the draft input", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     let receivedImageUrl: string | undefined;
     server.use(
-      graphqlApi.mutation("CreatePost", async ({ request }) => {
+      graphqlApi.mutation("CreateContentDraft", async ({ request }) => {
         const body = (await request.json()) as unknown as {
           variables?: { input?: { imageUrl?: string } };
         };
         receivedImageUrl = body.variables?.input?.imageUrl;
         return HttpResponse.json({
-          data: { createPost: { __typename: "Post", id: "2" } },
+          data: {
+            createContentDraft: { __typename: "PostDraft", id: "draft-1" },
+          },
         });
       }),
     );
@@ -205,13 +187,13 @@ describe("usePostAuthoringSubmit", () => {
     });
   });
 
-  it("transitions to error when the create mutation fails", async () => {
+  it("transitions to error when the draft mutation fails", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
-      graphqlApi.mutation("CreatePost", () =>
+      graphqlApi.mutation("CreateContentDraft", () =>
         HttpResponse.json({
-          errors: [{ message: "Server failed", locations: undefined, path: ["createPost"] }],
-          data: { createPost: null },
+          errors: [{ message: "Server failed", locations: undefined, path: ["createContentDraft"] }],
+          data: { createContentDraft: null },
         }),
       ),
     );
@@ -232,47 +214,24 @@ describe("usePostAuthoringSubmit", () => {
     });
   });
 
-  it("returns to idle when validation fails for the create input", async () => {
+  it("routes edits to a revision proposal linked to the live post", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
-    let called = 0;
+    let contentDraftInput: unknown;
+    let updatePostCalls = 0;
     server.use(
-      graphqlApi.mutation("CreatePost", () => {
-        called += 1;
-        return HttpResponse.json({ data: { createPost: null } });
-      }),
-    );
-
-    const { result } = renderHook(
-      () =>
-        usePostAuthoringSubmit({
-          ...baseArgs,
-          mode: "create",
-          tags: ["   "],
-        }),
-      { wrapper },
-    );
-
-    await act(async () => {
-      await result.current.handleSubmit({
-        preventDefault: () => {},
-      } as unknown as React.FormEvent);
-    });
-
-    expect(called).toBe(0);
-    expect(result.current.submit).toEqual({ kind: "idle" });
-  });
-
-  it("transitions through updating on successful edit", async () => {
-    const graphqlApi = graphql.link("http://localhost:4000/graphql");
-    let receivedId: string | undefined;
-    let receivedTitle: string | undefined;
-    server.use(
-      graphqlApi.mutation("UpdatePost", async ({ request }) => {
+      graphqlApi.mutation("CreateContentDraft", async ({ request }) => {
         const body = (await request.json()) as unknown as {
-          variables?: { id?: string; input?: { title?: string } };
+          variables?: { input?: unknown };
         };
-        receivedId = body.variables?.id;
-        receivedTitle = body.variables?.input?.title;
+        contentDraftInput = body.variables?.input;
+        return HttpResponse.json({
+          data: {
+            createContentDraft: { __typename: "PostDraft", id: "draft-10" },
+          },
+        });
+      }),
+      graphqlApi.mutation("UpdatePost", () => {
+        updatePostCalls += 1;
         return HttpResponse.json({
           data: { updatePost: { __typename: "Post", id: "abc" } },
         });
@@ -306,9 +265,13 @@ describe("usePostAuthoringSubmit", () => {
     });
 
     await waitFor(() => {
-      expect(receivedId).toBe("abc");
+      expect(contentDraftInput).toMatchObject({
+        title: "New title",
+        body: "<p>new body</p>",
+        postId: "abc",
+      });
     });
-    expect(receivedTitle).toBe("New title");
+    expect(updatePostCalls).toBe(0);
     expect(onComplete).toHaveBeenCalled();
     expect(result.current.submit).toEqual({ kind: "idle" });
   });
@@ -344,12 +307,14 @@ describe("usePostAuthoringSubmit", () => {
     expect(result.current.submit).toEqual({ kind: "idle" });
   });
 
-  it("refreshes post list queries and invalidates stale feed cache after a successful create", async () => {
+  it("refreshes draft lists after a successful review submission", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
-      graphqlApi.mutation("CreatePost", () =>
+      graphqlApi.mutation("CreateContentDraft", () =>
         HttpResponse.json({
-          data: { createPost: { __typename: "Post", id: "1" } },
+          data: {
+            createContentDraft: { __typename: "PostDraft", id: "draft-1" },
+          },
         }),
       ),
     );
@@ -359,17 +324,7 @@ describe("usePostAuthoringSubmit", () => {
       getToken: () => null,
       onUnauthorized: noopUnauthorized,
     });
-    const refetchSpy = vi.spyOn(localClient, "refetchQueries");
-    writeStalePostsCache(localClient, "stale-create");
-
-    expect(
-      localClient.readQuery({
-        query: PostsDocument,
-        variables: postListVariables,
-      }),
-    ).not.toBeNull();
-
-    const localWrapper = ({ children }: { children: ReactNode }) => (
+    const refetchSpy = vi.spyOn(localClient, "refetchQueries");    const localWrapper = ({ children }: { children: ReactNode }) => (
       <ApolloProvider client={localClient}>
         <MemoryRouter initialEntries={["/"]}>{children}</MemoryRouter>
       </ApolloProvider>
@@ -387,117 +342,7 @@ describe("usePostAuthoringSubmit", () => {
     });
 
     expect(refetchSpy).toHaveBeenCalledWith({
-      include: [...POST_LIST_QUERY_NAMES],
+      include: ["PostDrafts", "MyPostDrafts"],
     });
-    expect(
-      localClient.readQuery({
-        query: PostsDocument,
-        variables: postListVariables,
-      }),
-    ).toBeNull();
-  });
-
-  it("refreshes post list queries and invalidates stale feed cache after a successful update", async () => {
-    const graphqlApi = graphql.link("http://localhost:4000/graphql");
-    server.use(
-      graphqlApi.mutation("UpdatePost", () =>
-        HttpResponse.json({
-          data: { updatePost: { __typename: "Post", id: "abc" } },
-        }),
-      ),
-    );
-
-    const localClient = createApolloClient({
-      uri: env.VITE_GRAPHQL_URL,
-      getToken: () => null,
-      onUnauthorized: noopUnauthorized,
-    });
-    const refetchSpy = vi.spyOn(localClient, "refetchQueries");
-    writeStalePostsCache(localClient, "stale-update");
-    localClient.writeQuery({
-      query: PostDocument,
-      variables: { id: "abc" },
-      data: {
-        post: {
-          __typename: "Post",
-          id: "abc",
-          title: "old title",
-          body: "<p>old body</p>",
-          slug: "old-title",
-          imageUrl: "https://x/y.png",
-          summary: null,
-          summaryStatus: "COMPLETED",
-          createdAt: "2024-01-01T00:00:00Z",
-          updatedAt: "2024-01-01T00:00:00Z",
-          likedByMe: false,
-          savedByMe: false,
-          author: {
-            __typename: "User",
-            id: "author-1",
-            username: "alice",
-            name: "Alice",
-            email: "alice@x.com",
-            bio: null,
-            avatarUrl: null,
-          },
-          tags: [],
-          related: [],
-        },
-      },
-    });
-
-    expect(
-      localClient.readQuery({
-        query: PostsDocument,
-        variables: postListVariables,
-      }),
-    ).not.toBeNull();
-
-    const localWrapper = ({ children }: { children: ReactNode }) => (
-      <ApolloProvider client={localClient}>
-        <MemoryRouter initialEntries={["/"]}>{children}</MemoryRouter>
-      </ApolloProvider>
-    );
-
-    const { result } = renderHook(
-      () =>
-        usePostAuthoringSubmit({
-          ...baseArgs,
-          mode: "edit",
-          title: "New title",
-          content: "<p>new body</p>",
-          post: {
-            id: "abc",
-            title: "old title",
-            body: "<p>old body</p>",
-            imageUrl: "https://x/y.png",
-            tags: [{ id: "t1", name: "alpha" }],
-          },
-        }),
-      { wrapper: localWrapper },
-    );
-
-    await act(async () => {
-      await result.current.handleSubmit({
-        preventDefault: () => {},
-      } as unknown as React.FormEvent);
-    });
-
-    expect(refetchSpy).toHaveBeenCalledWith({
-      include: [...POST_LIST_QUERY_NAMES],
-    });
-    expect(
-      localClient.readQuery({
-        query: PostsDocument,
-        variables: postListVariables,
-      }),
-    ).toBeNull();
-    // The single-post cache entry is evicted so the detail view refetches.
-    expect(
-      localClient.readQuery({
-        query: PostDocument,
-        variables: { id: "abc" },
-      }),
-    ).toBeNull();
   });
 });

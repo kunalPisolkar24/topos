@@ -23,7 +23,7 @@ interface Author {
   id: string;
   name?: string | null;
   username: string;
-  email: string;
+  email?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
 }
@@ -93,12 +93,14 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
         </CardHeader>
 
         <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
-          <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <p className="break-all text-sm leading-6">{author.email}</p>
+          {author.email ? (
+            <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
+              <div className="flex items-start gap-2 text-muted-foreground">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <p className="break-all text-sm leading-6">{author.email}</p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20">
             <div className="flex items-center gap-2">

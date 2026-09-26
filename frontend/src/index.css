@@ -425,6 +425,7 @@ html, body {
 .quill-content-view {
   overflow-wrap: break-word;
   word-break: normal;
+  hyphens: none;
 }
 
 .quill-content-view img,

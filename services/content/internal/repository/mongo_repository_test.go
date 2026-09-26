@@ -76,6 +76,11 @@ func TestPostRepositoryCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Changed", updated.Title)
 
+	// Reviewer attribution persists through create and update.
+	credited, err := repo.Update(ctx, created.ID, &domain.Post{ApprovedByID: "peer-9"})
+	require.NoError(t, err)
+	assert.Equal(t, "peer-9", credited.ApprovedByID)
+
 	all, err := repo.FindAll(ctx, 1, 10)
 	require.NoError(t, err)
 	require.Len(t, all.Posts, 1)

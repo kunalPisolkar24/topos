@@ -684,12 +684,14 @@ export const authenticate = () => {
 };
 
 export const updateProfile = (input: {
+  username?: string | null;
   name?: string | null;
   bio?: string | null;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
 }) => {
   const user = signedInUser ?? users[0];
+  if (input.username !== undefined && input.username !== null) user.username = input.username;
   if (input.name !== undefined && input.name !== null) user.name = input.name;
   if (input.bio !== undefined && input.bio !== null) user.bio = input.bio;
   if (input.avatarUrl !== undefined && input.avatarUrl !== null) user.avatarUrl = input.avatarUrl;
@@ -1000,6 +1002,19 @@ const drafts: MockDraft[] = [
   },
 ];
 
+const toDraftAuthorResponse = (authorId: string) => {
+  const user = users.find((candidate) => candidate.id === authorId);
+  return user
+    ? {
+        __typename: "User" as const,
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      }
+    : null;
+};
+
 const toDraftResponse = (draft: MockDraft) => ({
   __typename: "PostDraft" as const,
   id: draft.id,
@@ -1011,6 +1026,7 @@ const toDraftResponse = (draft: MockDraft) => ({
   tags: draft.tags,
   imageUrl: draft.imageUrl ?? null,
   status: draft.status,
+  author: toDraftAuthorResponse(draft.authorId),
   authorId: draft.authorId,
   postId: draft.postId,
   createdAt: draft.createdAt,

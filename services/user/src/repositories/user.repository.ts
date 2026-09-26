@@ -66,6 +66,12 @@ export class UserRepository {
     );
   }
 
+  async findByUsername(username: string): Promise<User | null> {
+    return this.retried('findByUsername', () =>
+      this.prisma.user.findFirst({ where: { username, deletedAt: null } }),
+    );
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.retried('findById', () =>
       this.prisma.user.findFirst({ where: { id, deletedAt: null } }),

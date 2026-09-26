@@ -38,6 +38,12 @@ const httpUrlSchema = z
   );
 
 export const updateProfileSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.string().min(3).max(30).regex(/^[a-z0-9_]+$/, 'username may only contain lowercase letters, digits, and underscores'))
+    .optional(),
   name: z.string().min(1).max(50).nullable().optional(),
   bio: z.string().max(280).nullable().optional(),
   avatarUrl: httpUrlSchema.nullable().optional(),
