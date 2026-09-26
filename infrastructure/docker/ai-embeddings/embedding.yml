@@ -23,6 +23,8 @@ services:
 
   # One-shot init: downloads the embedding model into the shared volume
   # so the embedding service starts with the model already available.
+  # OLLAMA_HOST must point at the server container: the CLI defaults to
+  # 127.0.0.1, which is empty inside this one-shot container.
   embedding-model-init:
     image: ollama/ollama:latest
     restart: "no"
@@ -31,6 +33,8 @@ services:
         condition: service_healthy
     entrypoint: ["sh", "-c"]
     command: "ollama pull ${EMBEDDING_MODEL:-snowflake-arctic-embed2:568m}"
+    environment:
+      - OLLAMA_HOST=embedding-service:11434
     volumes:
       - embedding_data:/root/.ollama
     networks:
