@@ -135,6 +135,7 @@ const posts: MockPost[] = [
       "Practical techniques for reducing inference latency: kernel fusion, quantization, and batching strategies that keep GPUs saturated.",
     summaryStatus: "COMPLETED",
     authorId: "user-2",
+    approvedById: "user-2",
     tagIds: ["tag-machine-learning", "tag-architecture"],
     likedByMe: false,
     savedByMe: false,
@@ -607,6 +608,7 @@ export const toPostDetailResponse = (post: MockPost) => {
       email: author.email,
       bio: author.bio,
     },
+    approvedById: post.approvedById ?? null,
     related: related.map(toPostCardResponse),
   };
 };
@@ -672,6 +674,11 @@ export const listTags = (query: string, limit = 6) => {
 };
 
 export const getSignedInUser = () => signedInUser;
+
+export const getUserById = (id: string) => {
+  const user = users.find((u) => u.id === id);
+  return user ? toUserResponse(user) : null;
+};
 
 export const authenticate = () => {
   const user = signedInUser ?? users[0];
@@ -1120,21 +1127,89 @@ export const approvePostDraft = (
 ) => {
   const draft = drafts.find((d) => d.id === id);
   if (!draft) throw new Error(`Mock draft ${id} not found`);
+  const actorId = signedInUser?.id ?? users[0].id;
+  if (draft.authorId === actorId) throw new Error("forbidden: drafts must be reviewed by another user");
+  if (draft.status === "APPROVED") throw new Error("draft already reviewed");
   if (input?.title !== undefined && input?.title !== null) draft.title = input.title;
   if (input?.body !== undefined && input?.body !== null) draft.body = input.body;
   if (input?.summary !== undefined && input?.summary !== null) draft.summary = input.summary;
   if (input?.tags !== undefined && input?.tags !== null) draft.tags = input.tags;
+  const now = nowIso();
   draft.status = "APPROVED";
-  draft.postId = draft.postId ?? `post-${nextPostId++}`;
-  draft.updatedAt = nowIso();
+  draft.reviewedById = actorId;
+  draft.reviewedAt = now;
+  draft.rejectionNote = null;
+  draft.updatedAt = now;
+  if (draft.postId) {
+    const live = posts.find((p) => p.id === draft.postId);
+    if (live) {
+      live.title = draft.title;
+      live.body = draft.body;
+      live.summary = draft.summary;
+      live.slug = slugify(draft.title);
+      live.tagIds = resolveTagIds(draft.tags);
+      if (draft.imageUrl !== undefined) live.imageUrl = draft.imageUrl;
+      live.updatedAt = now;
+      live.approvedById = actorId;
+    } else {
+      const created: MockPost = {
+        id: draft.postId ?? `post-${nextPostId++}`,
+        title: draft.title,
+        body: draft.body,
+        slug: slugify(draft.title),
+        imageUrl: draft.imageUrl ?? null,
+        summary: draft.summary,
+        summaryStatus: draft.summary ? "COMPLETED" : "PENDING",
+        authorId: draft.authorId,
+        tagIds: resolveTagIds(draft.tags),
+        likedByMe: false,
+        savedByMe: false,
+        createdAt: now,
+        updatedAt: now,
+        approvedById: actorId,
+      };
+      posts.push(created);
+      draft.postId = created.id;
+    }
+  } else {
+    const created: MockPost = {
+      id: `post-${nextPostId++}`,
+      title: draft.title,
+      body: draft.body,
+      slug: slugify(draft.title),
+      imageUrl: draft.imageUrl ?? null,
+      summary: draft.summary,
+      summaryStatus: draft.summary ? "COMPLETED" : "PENDING",
+      authorId: draft.authorId,
+      tagIds: resolveTagIds(draft.tags),
+      likedByMe: false,
+      savedByMe: false,
+      createdAt: now,
+      updatedAt: now,
+      approvedById: actorId,
+    };
+    posts.push(created);
+    draft.postId = created.id;
+  }
   return toDraftResponse(draft);
 };
 
-export const rejectPostDraft = (id: string) => {
+export const rejectPostDraft = (id: string, reason?: string | null) => {
   const draft = drafts.find((d) => d.id === id);
   if (!draft) throw new Error(`Mock draft ${id} not found`);
+  const actorId = signedInUser?.id ?? users[0].id;
+  if (draft.authorId === actorId) throw new Error("forbidden: drafts must be reviewed by another user");
+  if (draft.status === "REJECTED") return toDraftResponse(draft);
+  if (draft.status !== "PENDING") throw new Error("approved drafts cannot be rejected");
+  const trimmed = (reason ?? "").trim();
+  if (trimmed.length < 10) throw new Error("Rejection note is required — tell the author why (min 10 characters)");
+  if (trimmed.length > 1000) throw new Error("Rejection note is too long (max 1000 characters)");
+  const now = nowIso();
   draft.status = "REJECTED";
-  draft.updatedAt = nowIso();
+  draft.reviewedById = actorId;
+  draft.reviewedAt = now;
+  draft.rejectionNote = trimmed;
+  draft.updatedAt = now;
   return toDraftResponse(draft);
 };
 

@@ -11,6 +11,7 @@ import {
   generateTags,
   getPost,
   getSignedInUser,
+  getUserById,
   listMyPostDrafts,
   listPostDrafts,
   listPosts,
@@ -103,7 +104,8 @@ export const handlers = [
       const user = id ? await previewGetUserById(id) : null;
       return HttpResponse.json({ data: { user } });
     }
-    return HttpResponse.json({ data: { user: null } });
+    const id = (variables as { id?: string })?.id;
+    return HttpResponse.json({ data: { user: id ? getUserById(id) : null } });
   }),
 
   gql.mutation("Signin", async ({ variables }) => {
@@ -466,9 +468,15 @@ export const handlers = [
         return HttpResponse.json({ errors: [{ message }] });
       }
     }
-    return HttpResponse.json({
-      data: { approvePostDraft: approvePostDraft(variables?.id, variables?.input) },
-    });
+    try {
+      const draft = approvePostDraft(variables?.id, variables?.input);
+      return HttpResponse.json({
+        data: { approvePostDraft: draft },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not approve draft";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
   }),
 
   gql.mutation("RejectPostDraft", async ({ request, variables }) => {
@@ -484,9 +492,15 @@ export const handlers = [
         return HttpResponse.json({ errors: [{ message }] });
       }
     }
-    return HttpResponse.json({
-      data: { rejectPostDraft: rejectPostDraft(variables?.id) },
-    });
+    try {
+      const draft = rejectPostDraft(variables?.id, variables?.reason);
+      return HttpResponse.json({
+        data: { rejectPostDraft: draft },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not reject draft";
+      return HttpResponse.json({ errors: [{ message }] });
+    }
   }),
 
   gql.mutation("DeletePostDraft", async ({ request, variables }) => {
