@@ -70,4 +70,5 @@ services:
 
 networks:
   app-network:
-    name: topos_local_network
+    name: ${APP_NETWORK:-topos_local_network}
+    driver: bridge

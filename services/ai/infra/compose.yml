@@ -38,12 +38,6 @@ include:
   - path: ../../../infrastructure/docker/users-postgres/postgres.yml
 
 services:
-  # Shared instance (see infrastructure/docker/users-postgres): remap the
-  # host port so the ai and user stacks can run side by side.
-  user-postgres:
-    ports:
-      - "${AI_POSTGRES_EXT_PORT:-5433}:5432"
-
   ai-service:
     build:
       context: ..
@@ -87,3 +81,4 @@ services:
 networks:
   app-network:
     name: ${APP_NETWORK:-topos_local_network}
+    driver: bridge

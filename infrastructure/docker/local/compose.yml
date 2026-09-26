@@ -4,10 +4,12 @@
 # Merges the per-service compose files into one project so shared services
 # (user-postgres, user-redis) dedupe instead of duplicating. Each service
 # stays the source of truth for its own definition; this file only wires
-# them together.
+# them together plus resolves the user-postgres host-port overlap between
+# the user stack (5432) and the ai stack (5433) by publishing both.
 #
-#   make -C infrastructure/docker/local up    # boot everything
-#   make -C infrastructure/docker/local down  # stop (keeps volumes)
+# Driven from the repo root:
+#   make local-up     # boot everything
+#   make local-down   # stop (keeps volumes)
 #
 # Env comes from .env.local next to this file (copy from .env.local.example):
 #   cp infrastructure/docker/local/.env.local.example \

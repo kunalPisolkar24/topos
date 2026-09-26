@@ -63,8 +63,8 @@ Run verification in the service directory before pushing (see
 - **CI:** per-service GitHub Actions workflows
   (`.github/workflows/service-*.yaml`) run tests and lint on PRs and pushes
   to `main`/`staging`; they also build and push Docker images.
-- **Local stacks:** root `make local-up` / `make local-down` or per-service
-  `compose.local.yml` files. Prod topology is `make up` / `make down` with
+- **Local stacks:** root `make local-up` / `make local-down` or the
+  per-service compose files. Prod topology is `make up` / `make down` with
   `infrastructure/docker/prod/`. Environment files come from the
   `.env.example` in each service dir (plus
   `infrastructure/docker/prod/.env.example` for the prod stack).

@@ -3,7 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
+      # Both host ports land on the single shared instance: 5432 for the
+      # user stack tooling, 5433 so the ai stack can sit alongside the
+      # user stack without a host-port collision. Publishing both keeps
+      # the user and ai compose definitions identical, which the local
+      # full-stack merge (include:) requires.
       - "${USER_POSTGRES_EXT_PORT:-5432}:5432"
+      - "${AI_POSTGRES_EXT_PORT:-5433}:5432"
     environment:
       - POSTGRES_USER=topos_user
       - POSTGRES_PASSWORD=topos_pass
