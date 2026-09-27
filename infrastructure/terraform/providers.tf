@@ -1,24 +1,17 @@
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "ap-south-1"
-}
-
-variable "aws_endpoint_url" {
-  description = "Floci/LocalStack endpoint. Empty for real AWS."
-  type        = string
-  default     = "http://localhost:4566"
-}
-
+# Floci/LocalStack endpoint is configured via var.aws_endpoint_url (see
+# variables.tf). When empty, the default AWS endpoints are used.
 provider "aws" {
-  region     = var.aws_region
-  access_key = "test"
-  secret_key = "test"
+  region = var.aws_region
 
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
-  s3_use_path_style           = true
+  # Real AWS relies on the standard provider credential chain (environment,
+  # profile, workload identity, etc.). Floci only needs placeholder values.
+  access_key = var.aws_endpoint_url != "" ? "test" : null
+  secret_key = var.aws_endpoint_url != "" ? "test" : null
+
+  skip_credentials_validation = var.aws_endpoint_url != ""
+  skip_metadata_api_check     = var.aws_endpoint_url != ""
+  skip_requesting_account_id  = var.aws_endpoint_url != ""
+  s3_use_path_style           = var.aws_endpoint_url != ""
 
   # Floci endpoints — when aws_endpoint_url is empty, use real AWS.
   endpoints {
@@ -35,25 +28,5 @@ provider "aws" {
     secretsmanager = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     ssm            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
     sts            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
-  }
-}
-
-# Alias for us-east-1 where required (e.g., some global services)
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
-
-  access_key = "test"
-  secret_key = "test"
-
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
-
-  endpoints {
-    iam            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
-    sts            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
-    secretsmanager = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
-    ssm            = var.aws_endpoint_url != "" ? var.aws_endpoint_url : null
   }
 }

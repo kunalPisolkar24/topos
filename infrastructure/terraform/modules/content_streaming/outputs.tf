@@ -17,10 +17,6 @@ output "bootstrap_brokers_tls" {
   sensitive = true
 }
 
-output "zookeeper_connect_string" {
-  value = try(aws_msk_cluster.content.zookeeper_connect_string, "")
-}
-
 output "security_group_id" {
-  value = try(aws_security_group.msk.id, "")
+  value = module.security_group.id
 }

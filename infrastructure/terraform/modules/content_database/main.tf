@@ -32,25 +32,18 @@ resource "aws_docdb_subnet_group" "content" {
 # Security group — DocumentDB ingress from service CIDRs
 # ---------------------------------------------------------------------------
 
-resource "aws_security_group" "docdb" {
-  name        = "${var.name_prefix}-docdb-sg"
-  description = "Content DocumentDB access"
-  vpc_id      = var.vpc_id
+module "security_group" {
+  source = "../security_group"
 
-  ingress {
-    from_port   = var.port
-    to_port     = var.port
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  name                = "${var.name_prefix}-docdb-sg"
+  description         = "Content DocumentDB access"
+  vpc_id              = var.vpc_id
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ingress_rules = [{
+    from_port = var.port
+    to_port   = var.port
+    protocol  = "tcp"
+  }]
   tags = var.tags
 }
 
@@ -69,7 +62,7 @@ resource "aws_docdb_cluster" "content" {
   # Floci's mock uses "default" subnet group; use it to avoid replacement drift
   # after manual import. Real AWS uses the created subnet group.
   db_subnet_group_name   = var.aws_endpoint_url != "" ? "default" : aws_docdb_subnet_group.content.name
-  vpc_security_group_ids = [aws_security_group.docdb.id]
+  vpc_security_group_ids = [module.security_group.id]
 
   backup_retention_period = var.backup_retention_period
   deletion_protection     = var.deletion_protection

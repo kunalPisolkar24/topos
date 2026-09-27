@@ -1,4 +1,4 @@
-# Terraform — User service (RDS Postgres + RDS Proxy + ElastiCache Redis)
+# Terraform — Topos managed infrastructure
 
 Floci is the primary target; real AWS is a drop-in via endpoint + backend swap. No real-AWS credentials are committed.
 
@@ -7,11 +7,17 @@ terraform/
 ├── versions.tf          # tf + provider pins, local backend (Floci)
 ├── providers.tf         # aws_region + aws_endpoint_url (Floci vs real)
 ├── variables.tf         # inputs (VPC, instance classes, etc.)
-├── main.tf              # root: user_database + user_cache + SSM/SM
+├── main.tf              # composition root: user/content infrastructure modules
+├── config.tf            # SSM non-secret service configuration
+├── secrets.tf           # Secrets Manager service connection configuration
 ├── outputs.tf           # endpoints + secret ARNs
 ├── modules/
-│   ├── user_database/   # RDS Postgres (2 DBs: users + ai_checkpoints), proxy, master + ai secrets
-│   └── user_cache/      # ElastiCache Redis, subnet/SG/param group, auth token
+│   ├── user_database/    # RDS Postgres (2 DBs: users + ai_checkpoints), proxy, master + AI secrets
+│   ├── user_cache/       # ElastiCache Redis, subnet/SG/param group, auth token
+│   ├── content_database/ # DocumentDB cluster and master secret
+│   ├── content_streaming/ # MSK cluster and security group
+│   └── security_group/   # reusable least-privilege ingress/egress definition
+├── tests/               # mocked Terraform and live Floci contract tests
 ├── envs/
 │   └── floci.tfvars     # single-AZ micro (proxy resources created, app uses docker hosts on Floci)
 ├── backend.hcl.example  # S3 backend for real AWS (provision bucket out-of-band)
@@ -107,3 +113,18 @@ curl http://localhost:4001/healthz
 curl http://localhost:4001/readyz
 curl http://localhost:4001/metrics | grep dependency_up
 ```
+
+## Test
+
+```bash
+# Fast, mocked provider tests. Does not need Docker or Floci.
+make infra-test-unit
+
+# Starts Floci if necessary, applies the stack, validates AWS-compatible
+# resource/configuration contracts, then requires an idempotent plan.
+make infra-test-floci
+```
+
+`infra-test-floci` is intentionally restricted to `ENV=floci`; it never
+targets real AWS. The CI workflow runs both test layers and destroys its
+ephemeral Floci resources afterward.

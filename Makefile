@@ -1,4 +1,4 @@
-.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure obs-plan obs-apply prune
+.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure infra-test-unit infra-test-floci obs-plan obs-apply obs-test-unit obs-test-live obs-test-collector prune
 
 OBS_DIR := infrastructure/observability
 
@@ -49,10 +49,15 @@ help:
 	@echo "  make infra-up     - Apply infra (Floci: starts emulator + network first)"
 	@echo "  make infra-output - Show infra endpoints (fill prod .env from this)"
 	@echo "  make infra-destroy - Destroy infra (prod needs CONFIRM_DESTROY=1)"
+	@echo "  make infra-test-unit - Run mocked Terraform contract tests"
+	@echo "  make infra-test-floci - Apply and verify live Floci resource contracts"
 	@echo ""
 	@echo "  Observability (New Relic dashboards, NEW_RELIC_API_KEY env):"
 	@echo "  make obs-plan     - Plan dashboards/alerts (NEW_RELIC_ACCOUNT_ID/REGION)"
 	@echo "  make obs-apply    - Apply dashboards/alerts"
+	@echo "  make obs-test-unit - Run mocked New Relic Terraform contract tests"
+	@echo "  make obs-test-live - Read-only New Relic API/dashboard verification"
+	@echo "  make obs-test-collector - Validate prod compose and OTEL collector config"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "  make prune    - Prune completely out all unused docker resources"
@@ -118,6 +123,10 @@ infra-floci-ensure:
 		if [ -n "$$(docker ps -aq -f name=^floci$$)" ]; then docker start floci; \
 		else docker run -d --name floci -p 4566:4566 -v /var/run/docker.sock:/var/run/docker.sock -u root floci/floci:latest; fi \
 	fi
+	@for attempt in $$(seq 1 60); do \
+		[ "$$(docker inspect -f '{{.State.Health.Status}}' floci 2>/dev/null)" = "healthy" ] && break; \
+		[ $$attempt -eq 60 ] && { echo "Floci did not become healthy"; exit 1; }; sleep 2; \
+	done
 	@docker inspect floci -f '{{range $$k, $$v := .NetworkSettings.Networks}}{{$$k}} {{end}}' 2>/dev/null | grep -qw floci-apps || docker network connect floci-apps floci
 
 infra-plan: check-tfvars
@@ -136,14 +145,43 @@ infra-destroy: check-tfvars
 	@if [ "$(ENV)" = "prod" ] && [ "$(CONFIRM_DESTROY)" != "1" ]; then echo "refusing to destroy prod without CONFIRM_DESTROY=1"; exit 1; fi
 	terraform -chdir=$(TF_DIR) destroy -input=false -auto-approve -var-file=envs/$(ENV).tfvars
 
+infra-test-unit:
+	terraform -chdir=$(TF_DIR) init -backend=false -input=false
+	terraform -chdir=$(TF_DIR) validate
+	terraform -chdir=$(TF_DIR) test -filter=tests/contracts.tftest.hcl
+
+infra-test-floci: check-tfvars
+	@if [ "$(ENV)" != "floci" ]; then echo "infra-test-floci only supports ENV=floci"; exit 1; fi
+	$(MAKE) --no-print-directory infra-floci-ensure
+	terraform -chdir=$(TF_DIR) init -input=false
+	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/floci.tfvars
+	AWS_ENDPOINT_URL=http://localhost:4566 AWS_REGION=ap-south-1 bash $(TF_DIR)/tests/verify-floci.sh
+	terraform -chdir=$(TF_DIR) plan -input=false -detailed-exitcode -var-file=envs/floci.tfvars
+
 # --- New Relic observability (dashboards + alerts, NEW_RELIC_API_KEY env) ----
 obs-plan:
-	terraform -chdir=$(OBS_DIR) init -input=false
-	terraform -chdir=$(OBS_DIR) plan -input=false -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
+	@test -n "$${NEW_RELIC_API_KEY:-}" || { echo "NEW_RELIC_API_KEY is required"; exit 1; }
+	TF_VAR_newrelic_api_key=$$NEW_RELIC_API_KEY terraform -chdir=$(OBS_DIR) init -input=false
+	TF_VAR_newrelic_api_key=$$NEW_RELIC_API_KEY terraform -chdir=$(OBS_DIR) plan -input=false -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
 
 obs-apply:
-	terraform -chdir=$(OBS_DIR) init -input=false
-	terraform -chdir=$(OBS_DIR) apply -input=false -auto-approve -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
+	@test -n "$${NEW_RELIC_API_KEY:-}" || { echo "NEW_RELIC_API_KEY is required"; exit 1; }
+	TF_VAR_newrelic_api_key=$$NEW_RELIC_API_KEY terraform -chdir=$(OBS_DIR) init -input=false
+	TF_VAR_newrelic_api_key=$$NEW_RELIC_API_KEY terraform -chdir=$(OBS_DIR) apply -input=false -auto-approve -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
+
+obs-test-unit:
+	terraform -chdir=$(OBS_DIR) init -backend=false -input=false
+	terraform -chdir=$(OBS_DIR) validate
+	terraform -chdir=$(OBS_DIR) test -filter=tests/contracts.tftest.hcl
+
+obs-test-live:
+	@test -n "$${NEW_RELIC_API_KEY:-}" || { echo "NEW_RELIC_API_KEY is required"; exit 1; }
+	@test -n "$${NEW_RELIC_ACCOUNT_ID:-}" || { echo "NEW_RELIC_ACCOUNT_ID is required"; exit 1; }
+	NEW_RELIC_REGION=$${NEW_RELIC_REGION:-US} OBS_ENVIRONMENT=$${OBS_ENVIRONMENT:-prod} python3 $(OBS_DIR)/tests/verify-newrelic.py
+
+obs-test-collector:
+	docker compose --env-file $(PROD_ENV_EXAMPLE) -f $(PROD_DIR)/compose.yml config -q
+	docker run --rm -e NEW_RELIC_LICENSE_KEY=test -e NEW_RELIC_OTLP_HTTP_ENDPOINT=https://otlp.nr-data.net -v "$(CURDIR)/$(PROD_DIR)/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro" otel/opentelemetry-collector-contrib:0.122.1 validate --config=/etc/otelcol/config.yaml
 
 prune:
 	docker system prune -a --volumes -f

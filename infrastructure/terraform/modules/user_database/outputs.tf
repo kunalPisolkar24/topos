@@ -7,11 +7,13 @@ output "writer_endpoint" {
 }
 
 output "reader_endpoint" {
+  # Single instance, no read replica: same host as the writer. Kept as a
+  # separate output so callers don't need to change when a replica is added.
   value = try(aws_db_instance.user.address, "")
 }
 
 output "proxy_endpoint" {
-  value = try(aws_db_proxy.user[0].endpoint, "")
+  value = try(aws_db_proxy.user.endpoint, "")
 }
 
 output "master_secret_arn" {
@@ -41,5 +43,5 @@ output "ai_secret_arn" {
 }
 
 output "security_group_id" {
-  value = aws_security_group.db.id
+  value = module.security_group.id
 }

@@ -22,5 +22,5 @@ output "auth_token" {
 }
 
 output "security_group_id" {
-  value = aws_security_group.cache.id
+  value = module.security_group.id
 }

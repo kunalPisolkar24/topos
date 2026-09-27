@@ -28,7 +28,7 @@ output "master_password" {
 }
 
 output "security_group_id" {
-  value = aws_security_group.docdb.id
+  value = module.security_group.id
 }
 
 output "subnet_group_name" {

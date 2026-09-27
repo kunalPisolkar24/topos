@@ -62,25 +62,18 @@ resource "aws_db_subnet_group" "user" {
 # Security group — Postgres ingress from service CIDRs
 # ---------------------------------------------------------------------------
 
-resource "aws_security_group" "db" {
-  name        = "${var.name_prefix}-db-sg"
-  description = "User DB access"
-  vpc_id      = var.vpc_id
+module "security_group" {
+  source = "../security_group"
 
-  ingress {
-    from_port   = var.port
-    to_port     = var.port
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  name                = "${var.name_prefix}-db-sg"
+  description         = "User DB access"
+  vpc_id              = var.vpc_id
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ingress_rules = [{
+    from_port = var.is_floci ? 7001 : var.port
+    to_port   = var.is_floci ? 7001 : var.port
+    protocol  = "tcp"
+  }]
   tags = var.tags
 }
 
@@ -92,9 +85,15 @@ resource "aws_db_parameter_group" "postgres16" {
   name   = "${var.name_prefix}-pg16"
   family = "postgres16"
 
-  parameter {
-    name  = "log_min_duration_statement"
-    value = "1000"
+  # Floci accepts the group but does not persist individual parameters.
+  # Keep the real-AWS diagnostic setting without creating an emulator diff.
+  dynamic "parameter" {
+    for_each = var.is_floci ? [] : [true]
+
+    content {
+      name  = "log_min_duration_statement"
+      value = "1000"
+    }
   }
 
   tags = var.tags
@@ -110,16 +109,18 @@ resource "aws_db_instance" "user" {
   engine_version = var.engine_version
   instance_class = var.instance_class
 
-  allocated_storage      = var.allocated_storage
-  storage_type           = "gp3"
+  allocated_storage = var.allocated_storage
+  # Floci exposes its Docker-backed RDS storage as gp2 and its data-plane
+  # proxy on 7001. Real AWS continues to use gp3 and the configured port.
+  storage_type           = var.is_floci ? "gp2" : "gp3"
   storage_encrypted      = true
   db_name                = var.db_name
   username               = var.username
   password               = random_password.master.result
-  port                   = var.port
+  port                   = var.is_floci ? 7001 : var.port
   parameter_group_name   = aws_db_parameter_group.postgres16.name
   db_subnet_group_name   = aws_db_subnet_group.user.name
-  vpc_security_group_ids = [aws_security_group.db.id]
+  vpc_security_group_ids = [module.security_group.id]
 
   multi_az                  = var.multi_az
   deletion_protection       = var.deletion_protection
@@ -143,11 +144,7 @@ resource "aws_db_instance" "user" {
 # writer when proxy_endpoint is empty (main.tf user/ai secrets logic).
 # ---------------------------------------------------------------------------
 
-data "aws_caller_identity" "current" {}
-
 resource "aws_iam_role" "proxy" {
-  count = 1
-
   name = "${var.name_prefix}-proxy-role"
 
   assume_role_policy = jsonencode({
@@ -163,10 +160,8 @@ resource "aws_iam_role" "proxy" {
 }
 
 resource "aws_iam_role_policy" "proxy_secrets" {
-  count = 1
-
   name = "${var.name_prefix}-proxy-secrets"
-  role = aws_iam_role.proxy[0].id
+  role = aws_iam_role.proxy.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -182,13 +177,11 @@ resource "aws_iam_role_policy" "proxy_secrets" {
 }
 
 resource "aws_db_proxy" "user" {
-  count = 1
-
   name                   = "${var.name_prefix}-proxy"
   engine_family          = "POSTGRESQL"
-  role_arn               = aws_iam_role.proxy[0].arn
+  role_arn               = aws_iam_role.proxy.arn
   vpc_subnet_ids         = var.private_subnet_ids
-  vpc_security_group_ids = [aws_security_group.db.id]
+  vpc_security_group_ids = [module.security_group.id]
   require_tls            = var.proxy_require_tls
   idle_client_timeout    = var.proxy_idle_client_timeout
 
@@ -211,9 +204,7 @@ resource "aws_db_proxy" "user" {
 }
 
 resource "aws_db_proxy_default_target_group" "user" {
-  count = 1
-
-  db_proxy_name = aws_db_proxy.user[0].name
+  db_proxy_name = aws_db_proxy.user.name
 
   connection_pool_config {
     max_connections_percent      = var.proxy_max_connections_percent
@@ -223,9 +214,7 @@ resource "aws_db_proxy_default_target_group" "user" {
 }
 
 resource "aws_db_proxy_target" "user" {
-  count = 1
-
-  db_proxy_name          = aws_db_proxy.user[0].name
-  target_group_name      = aws_db_proxy_default_target_group.user[0].name
+  db_proxy_name          = aws_db_proxy.user.name
+  target_group_name      = aws_db_proxy_default_target_group.user.name
   db_instance_identifier = aws_db_instance.user.identifier
 }

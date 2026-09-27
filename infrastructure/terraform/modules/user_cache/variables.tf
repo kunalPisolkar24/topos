@@ -1,5 +1,9 @@
 variable "project" { type = string }
 variable "environment" { type = string }
+variable "is_floci" {
+  description = "Whether the stack targets Floci's AWS-compatible emulator."
+  type        = bool
+}
 variable "name_prefix" { type = string }
 
 variable "vpc_id" { type = string }
@@ -12,8 +16,5 @@ variable "num_cache_clusters" { type = number }
 variable "automatic_failover_enabled" { type = bool }
 variable "multi_az_enabled" { type = bool }
 variable "snapshot_retention_limit" { type = number }
-
-variable "aws_endpoint_url" { type = string }
-variable "aws_region" { type = string }
 
 variable "tags" { type = map(string) }

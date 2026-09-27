@@ -6,7 +6,7 @@ resource "newrelic_one_dashboard_json" "topos" {
   json = jsonencode({
     name        = "Topos ${var.environment} observability"
     description = "OTEL spans via prod otel-collector -> New Relic."
-    permissions = "PUBLIC_READ_WRITE"
+    permissions = var.dashboard_permissions
     pages = [
       {
         name        = "Overview"
@@ -20,7 +20,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT count(*) FROM Span FACET service.name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT count(*) FROM ${local.span_source} FACET service.name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
               yAxisLeft = { zero = true }
@@ -35,7 +35,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT percentile(duration, 95) FROM Span FACET service.name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT percentile(duration, 95) FROM ${local.span_source} FACET service.name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
               yAxisLeft = { zero = true }
@@ -50,7 +50,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT percentage(count(*), WHERE error IS true) AS `error %` FROM Span FACET service.name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT percentage(count(*), WHERE error IS true) AS `error %` FROM ${local.span_source} FACET service.name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
               yAxisLeft = { zero = true }
@@ -64,7 +64,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT count(*), average(duration), percentile(duration, 95) FROM Span FACET name LIMIT 20 SINCE 1 hour ago"
+                  query     = "SELECT count(*), average(duration), percentile(duration, 95) FROM ${local.span_source} FACET name LIMIT 20 ${local.lookback}"
                 }
               ]
             }
@@ -77,7 +77,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT count(*) AS requests FROM Span WHERE service.name IN ('gateway', 'apollo-router') SINCE 1 hour ago"
+                  query     = "SELECT count(*) AS requests FROM ${local.span_source} AND service.name IN ('gateway', 'apollo-router') ${local.lookback}"
                 }
               ]
             }
@@ -90,7 +90,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT count(*) FROM Span WHERE service.name IN ('content-service', 'content-worker', 'content-search-worker', 'content-personalizer') FACET service.name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT count(*) FROM ${local.span_source} AND service.name IN ('content-service', 'content-worker', 'content-search-worker', 'content-personalizer') FACET service.name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
             }
@@ -103,7 +103,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT average(duration), percentile(duration, 95) FROM Span WHERE service.name = 'ai-service' FACET name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT average(duration), percentile(duration, 95) FROM ${local.span_source} AND service.name = 'ai-service' FACET name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
             }
@@ -116,7 +116,7 @@ resource "newrelic_one_dashboard_json" "topos" {
               nrqlQueries = [
                 {
                   accountId = var.newrelic_account_id
-                  query     = "SELECT count(*), average(duration) FROM Span WHERE service.name = 'user-service' FACET name TIMESERIES AUTO SINCE 1 hour ago"
+                  query     = "SELECT count(*), average(duration) FROM ${local.span_source} AND service.name = 'user-service' FACET name TIMESERIES AUTO ${local.lookback}"
                 }
               ]
             }
@@ -126,50 +126,4 @@ resource "newrelic_one_dashboard_json" "topos" {
       },
     ]
   })
-}
-
-resource "newrelic_alert_policy" "topos" {
-  name = "Topos ${var.environment} golden signals"
-}
-
-resource "newrelic_nrql_alert_condition" "error_rate" {
-  account_id = var.newrelic_account_id
-  policy_id  = newrelic_alert_policy.topos.id
-  type       = "static"
-  name       = "Topos high span error rate"
-  enabled    = true
-
-  nrql {
-    query = "SELECT percentage(count(*), WHERE error IS true) FROM Span"
-  }
-
-  critical {
-    operator              = "above"
-    threshold             = 5
-    threshold_duration    = 300
-    threshold_occurrences = "AT_LEAST_ONCE"
-  }
-
-  violation_time_limit_seconds = 86400
-}
-
-resource "newrelic_nrql_alert_condition" "p95_latency" {
-  account_id = var.newrelic_account_id
-  policy_id  = newrelic_alert_policy.topos.id
-  type       = "static"
-  name       = "Topos high p95 span latency"
-  enabled    = true
-
-  nrql {
-    query = "SELECT percentile(duration, 95) FROM Span"
-  }
-
-  critical {
-    operator              = "above"
-    threshold             = 2
-    threshold_duration    = 300
-    threshold_occurrences = "AT_LEAST_ONCE"
-  }
-
-  violation_time_limit_seconds = 86400
 }

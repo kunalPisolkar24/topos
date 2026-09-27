@@ -2,32 +2,25 @@
 # Content Streaming — MSK (single broker, Floci-compatible)
 # =============================================================================
 
-resource "aws_security_group" "msk" {
-  name        = "${var.name_prefix}-msk-sg"
-  description = "Content MSK access"
-  vpc_id      = var.vpc_id
+module "security_group" {
+  source = "../security_group"
 
-  ingress {
-    from_port   = 9092
-    to_port     = 9092
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  ingress {
-    from_port   = 9098
-    to_port     = 9098
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  name                = "${var.name_prefix}-msk-sg"
+  description         = "Content MSK access"
+  vpc_id              = var.vpc_id
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ingress_rules = [
+    {
+      from_port = 9092
+      to_port   = 9092
+      protocol  = "tcp"
+    },
+    {
+      from_port = 9098
+      to_port   = 9098
+      protocol  = "tcp"
+    },
+  ]
   tags = var.tags
 }
 
@@ -39,7 +32,7 @@ resource "aws_msk_cluster" "content" {
   broker_node_group_info {
     instance_type   = var.instance_type
     client_subnets  = slice(var.private_subnet_ids, 0, min(var.number_of_broker_nodes, length(var.private_subnet_ids)))
-    security_groups = [aws_security_group.msk.id]
+    security_groups = [module.security_group.id]
 
     storage_info {
       ebs_storage_info {

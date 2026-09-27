@@ -1,0 +1,94 @@
+name: Infrastructure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, staging]
+    paths:
+      - "infrastructure/**"
+      - "Makefile"
+      - ".github/workflows/infrastructure.yaml"
+  pull_request:
+    branches: [main, staging]
+    paths:
+      - "infrastructure/**"
+      - "Makefile"
+      - ".github/workflows/infrastructure.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Terraform contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infrastructure/terraform infrastructure/observability
+
+      - name: Test AWS infrastructure contracts
+        run: make infra-test-unit
+
+      - name: Test New Relic configuration contracts
+        run: make obs-test-unit
+
+      - name: Validate production compose and OTEL collector configuration
+        run: make obs-test-collector
+
+  floci:
+    name: Floci integration
+    needs: contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Apply and verify Floci infrastructure
+        run: make infra-test-floci
+
+      - name: Destroy Floci infrastructure
+        if: always()
+        run: |
+          if [ -d infrastructure/terraform/.terraform ]; then
+            terraform -chdir=infrastructure/terraform destroy -input=false -auto-approve -var-file=envs/floci.tfvars || true
+          fi
+
+  newrelic-live:
+    name: New Relic smoke test
+    needs: contracts
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: observability
+    env:
+      NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+      NEW_RELIC_ACCOUNT_ID: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+      NEW_RELIC_REGION: ${{ vars.NEW_RELIC_REGION || 'US' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify New Relic API and deployed dashboard
+        run: make obs-test-live

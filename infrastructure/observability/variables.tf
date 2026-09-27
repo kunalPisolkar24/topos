@@ -4,7 +4,7 @@ variable "newrelic_account_id" {
 }
 
 variable "newrelic_api_key" {
-  description = "User API key (NRAK-...). Never commit; pass via NEW_RELIC_API_KEY env."
+  description = "User API key. The Make targets map NEW_RELIC_API_KEY to this sensitive input."
   type        = string
   sensitive   = true
 }
@@ -24,4 +24,62 @@ variable "environment" {
   description = "Deployment environment label stamped on dashboards"
   type        = string
   default     = "prod"
+}
+
+variable "dashboard_permissions" {
+  description = "New Relic dashboard visibility. Use a public setting only when needed."
+  type        = string
+  default     = "PRIVATE"
+
+  validation {
+    condition     = contains(["PRIVATE", "PUBLIC_READ_ONLY", "PUBLIC_READ_WRITE"], var.dashboard_permissions)
+    error_message = "dashboard_permissions must be PRIVATE, PUBLIC_READ_ONLY, or PUBLIC_READ_WRITE."
+  }
+}
+
+variable "dashboard_lookback" {
+  description = "NRQL lookback used by dashboard widgets."
+  type        = string
+  default     = "1 hour ago"
+}
+
+variable "alert_threshold_duration_seconds" {
+  description = "How long a threshold must be breached before an alert opens."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.alert_threshold_duration_seconds >= 60
+    error_message = "alert_threshold_duration_seconds must be at least 60 seconds."
+  }
+}
+
+variable "alert_violation_time_limit_seconds" {
+  description = "Maximum duration for an open alert violation."
+  type        = number
+  default     = 86400
+}
+
+variable "error_rate_warning_threshold" {
+  description = "Warning span-error percentage."
+  type        = number
+  default     = 2
+}
+
+variable "error_rate_critical_threshold" {
+  description = "Critical span-error percentage."
+  type        = number
+  default     = 5
+}
+
+variable "p95_latency_warning_threshold_seconds" {
+  description = "Warning p95 span duration in seconds."
+  type        = number
+  default     = 1
+}
+
+variable "p95_latency_critical_threshold_seconds" {
+  description = "Critical p95 span duration in seconds."
+  type        = number
+  default     = 2
 }

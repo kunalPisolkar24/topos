@@ -3,26 +3,36 @@
 # User: RDS Postgres + Proxy + ElastiCache Redis
 # Content: DocumentDB + MSK (single instance/broker on Floci)
 # Floci is the primary target; real AWS is a drop-in via endpoint/backend swap.
+#
+# Layout: main.tf (module wiring) + config.tf (SSM params) + secrets.tf
+# (Secrets Manager). Service config lives in config.tf; secrets in secrets.tf.
 # =============================================================================
 
 locals {
-  common_tags = merge({
-    Project     = var.project
+  base_tags = {
+    Project   = var.project
+    ManagedBy = "terraform"
+  }
+
+  common_tags = merge(var.tags, local.base_tags, {
     Environment = var.environment
     Service     = "user"
-    ManagedBy   = "terraform"
-  }, var.tags)
+  })
 
-  is_floci = var.aws_endpoint_url != ""
+  # Placeholder secret for Floci-only URLs. Real AWS uses random_password
+  # values (see secrets.tf). Single source so user and content stacks stay
+  # in sync.
+  floci_jwt_secret     = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
+  floci_internal_token = "floci-internal-secret-0123456789abcdef0123456789abcdef-floci"
 
   content_name_prefix = "${var.project}-content-${var.environment}"
-  content_tags        = merge(local.common_tags, { Service = "content" })
-}
+  content_tags        = merge(var.tags, local.base_tags, { Environment = var.environment, Service = "content" })
 
-# ---------------------------------------------------------------------------
-# Data: default VPC/subnets (Floci) — only used when vpc_id is default.
-# For real AWS, pass explicit subnet IDs via tfvars.
-# ---------------------------------------------------------------------------
+  # Pooled app host: proxy endpoint when present, direct writer otherwise.
+  # Single source for the DATABASE_URL / CHECKPOINT_DB_URL templates in
+  # secrets.tf (previously the same try/coalesce repeated per secret).
+  user_db_host = try(coalesce(module.user_database.proxy_endpoint, ""), "") != "" ? module.user_database.proxy_endpoint : module.user_database.writer_endpoint
+}
 
 # ---------------------------------------------------------------------------
 # User Database — RDS Postgres + Proxy
@@ -31,8 +41,8 @@ locals {
 module "user_database" {
   source = "./modules/user_database"
 
-  project     = var.project
   environment = var.environment
+  is_floci    = var.aws_endpoint_url != ""
   name_prefix = var.name_prefix
 
   vpc_id              = var.vpc_id
@@ -49,9 +59,6 @@ module "user_database" {
   username                = var.postgres_username
   port                    = var.postgres_port
 
-  aws_endpoint_url = var.aws_endpoint_url
-  aws_region       = var.aws_region
-
   tags = local.common_tags
 }
 
@@ -64,6 +71,7 @@ module "user_cache" {
 
   project     = var.project
   environment = var.environment
+  is_floci    = var.aws_endpoint_url != ""
   name_prefix = var.name_prefix
 
   vpc_id              = var.vpc_id
@@ -77,9 +85,6 @@ module "user_cache" {
   multi_az_enabled           = var.redis_multi_az_enabled
   snapshot_retention_limit   = var.redis_snapshot_retention_limit
 
-  aws_endpoint_url = var.aws_endpoint_url
-  aws_region       = var.aws_region
-
   tags = local.common_tags
 }
 
@@ -90,8 +95,6 @@ module "user_cache" {
 module "content_database" {
   source = "./modules/content_database"
 
-  project     = var.project
-  environment = var.environment
   name_prefix = local.content_name_prefix
 
   vpc_id              = var.vpc_id
@@ -107,7 +110,6 @@ module "content_database" {
   skip_final_snapshot     = var.docdb_skip_final_snapshot
 
   aws_endpoint_url = var.aws_endpoint_url
-  aws_region       = var.aws_region
 
   tags = local.content_tags
 }
@@ -119,8 +121,6 @@ module "content_database" {
 module "content_streaming" {
   source = "./modules/content_streaming"
 
-  project     = var.project
-  environment = var.environment
   name_prefix = local.content_name_prefix
 
   vpc_id              = var.vpc_id
@@ -133,234 +133,6 @@ module "content_streaming" {
   ebs_volume_size        = var.msk_ebs_volume_size
 
   aws_endpoint_url = var.aws_endpoint_url
-  aws_region       = var.aws_region
 
   tags = local.content_tags
-}
-
-# ---------------------------------------------------------------------------
-# SSM Parameter Store — user config (non-secret)
-# ---------------------------------------------------------------------------
-
-resource "aws_ssm_parameter" "user_config" {
-  name = "/topos/user/config"
-  type = "String"
-  value = jsonencode({
-    PORT                          = "4001"
-    LOG_LEVEL                     = "info"
-    OTEL_SERVICE_NAME             = "user-service"
-    JWT_ISSUER                    = "user-service"
-    JWT_AUDIENCE                  = "topos"
-    JWT_EXPIRES_IN                = "7d"
-    REDIS_CACHE_TTL_MS            = "3600000"
-    REDIS_MISSING_CACHE_TTL_MS    = "60000"
-    PG_POOL_MAX                   = "10"
-    PG_POOL_IDLE_TIMEOUT_MS       = "30000"
-    PG_POOL_CONNECTION_TIMEOUT_MS = "5000"
-  })
-  description = "User service non-secret config"
-  tags        = local.common_tags
-
-  # Floci's SSM is in-memory; no KMS.
-}
-
-# ---------------------------------------------------------------------------
-# Secrets Manager — user secrets (placeholder, populated by seed-secrets or app)
-# Real values come from `tools/seed-secrets` after `terraform apply`.
-# On Floci this is a mock; on real AWS it holds DATABASE_URL, REDIS_URL, JWT_SECRET.
-# ---------------------------------------------------------------------------
-
-resource "aws_secretsmanager_secret" "user_secrets" {
-  name        = "topos/user/secrets"
-  description = "User service secrets: DATABASE_URL, DATABASE_URL_MIGRATE, AI_CHECKPOINTER_PASSWORD, REDIS_URL, JWT_SECRET"
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret_version" "user_secrets" {
-  secret_id = aws_secretsmanager_secret.user_secrets.id
-  secret_string = jsonencode(
-    var.environment == "floci" ? {
-      # Floci data plane (real, Docker-backed): RDS Postgres is served on
-      # the Floci container's proxy port 7001 and ElastiCache/Valkey on
-      # 6379 (plaintext + AUTH token at the proxy). The `floci` hostname
-      # resolves from app containers on the bridge network (see
-      # services/user/infra/compose.prod.yml), so no docker postgres/redis
-      # is needed. Real AWS uses the proxy / ElastiCache endpoints below.
-      DATABASE_URL         = "postgresql://${var.postgres_username}:${module.user_database.master_password}@floci:7001/${var.postgres_db_name}"
-      DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@floci:7001/${var.postgres_db_name}"
-      # Consumed by the user-migrator runner to bootstrap the AI
-      # checkpointer role/database (see services/user/scripts/).
-      AI_CHECKPOINTER_PASSWORD = module.user_database.ai_password
-      REDIS_URL                = "redis://:${module.user_cache.auth_token}@floci:6379"
-      JWT_SECRET               = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
-      } : {
-      # Pooled app URL goes through the proxy (require_tls) with verified
-      # TLS; the migrate URL stays on the direct writer for DDL. The pg
-      # driver parses ?sslmode=require into verified TLS via the system CA
-      # bundle, and @prisma/adapter-pg uses unnamed statements, so no
-      # pgbouncer flag is needed (and it must never appear on the migrate URL).
-      DATABASE_URL = (
-        try(coalesce(module.user_database.proxy_endpoint, ""), "") != ""
-        ? "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.proxy_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
-        : "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
-      )
-      DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${var.postgres_db_name}?sslmode=require"
-      # Lets the user-migrator bootstrap the AI role/database on every
-      # deploy (services/user/scripts/bootstrap-ai-db.mjs).
-      AI_CHECKPOINTER_PASSWORD = module.user_database.ai_password
-      REDIS_URL                = module.user_cache.redis_url
-      JWT_SECRET               = random_password.jwt.result
-    }
-  )
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
-
-# ---------------------------------------------------------------------------
-# SSM Parameter Store — ai config (non-secret)
-# ---------------------------------------------------------------------------
-
-resource "aws_ssm_parameter" "ai_config" {
-  name = "/topos/ai/config"
-  type = "String"
-  value = jsonencode({
-    CHECKPOINT_POOL_MIN_SIZE   = "1"
-    CHECKPOINT_POOL_MAX_SIZE   = "10"
-    CHECKPOINT_STARTUP_RETRIES = "12"
-  })
-  description = "AI service non-secret config"
-  tags        = local.common_tags
-
-  # Floci's SSM is in-memory; no KMS.
-}
-
-# ---------------------------------------------------------------------------
-# Secrets Manager — ai secrets (placeholder, populated by seed-secrets or app)
-# CHECKPOINT_DB_URL is the pooled runtime URL (proxy); CHECKPOINT_DB_URL_MIGRATE
-# is the direct writer URL for saver.setup() DDL. Shared instance, separate
-# ai_checkpoints database + least-privilege ai_checkpointer role (created once
-# via modules/user_database/init-ai-db.sql).
-# ---------------------------------------------------------------------------
-
-resource "aws_secretsmanager_secret" "ai_secrets" {
-  name        = "topos/ai/secrets"
-  description = "AI service secrets: CHECKPOINT_DB_URL, CHECKPOINT_DB_URL_MIGRATE"
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret_version" "ai_secrets" {
-  secret_id = aws_secretsmanager_secret.ai_secrets.id
-  secret_string = jsonencode(
-    var.environment == "floci" ? {
-      # Floci data plane (real, Docker-backed): the shared RDS instance
-      # serves ai_checkpoints on the Floci proxy port 7001 (plaintext).
-      # Checkpoint traffic never needs a pooler; direct writer URL for both.
-      CHECKPOINT_DB_URL         = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@floci:7001/${module.user_database.ai_db_name}"
-      CHECKPOINT_DB_URL_MIGRATE = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@floci:7001/${module.user_database.ai_db_name}"
-      } : {
-      CHECKPOINT_DB_URL = (
-        try(coalesce(module.user_database.proxy_endpoint, ""), "") != ""
-        ? "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.proxy_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
-        : "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
-      )
-      CHECKPOINT_DB_URL_MIGRATE = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@${module.user_database.writer_endpoint}:${var.postgres_port}/${module.user_database.ai_db_name}?sslmode=require"
-    }
-  )
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
-
-# ---------------------------------------------------------------------------
-# SSM Parameter Store — content config (non-secret)
-# ---------------------------------------------------------------------------
-
-resource "aws_ssm_parameter" "content_config" {
-  name = "/topos/content/config"
-  type = "String"
-  value = jsonencode({
-    PORT                                 = "4002"
-    DB_NAME                              = "blog_content"
-    LOG_LEVEL                            = "info"
-    LOG_FORMAT                           = "json"
-    OTEL_SERVICE_NAME                    = "content-service"
-    OTEL_EXPORTER_OTLP_ENDPOINT          = ""
-    JWT_ISSUER                           = "user-service"
-    JWT_AUDIENCE                         = "topos"
-    KAFKA_TOPIC                          = "posts"
-    KAFKA_USER_INTERACTED_TOPIC          = "user-interacted"
-    KAFKA_DLQ_TOPIC                      = "posts-dlq"
-    KAFKA_CONSUMER_GROUP_ID              = "content-summary-worker-group"
-    KAFKA_SEARCH_CONSUMER_GROUP_ID       = "content-search-worker-group"
-    KAFKA_PERSONALIZER_CONSUMER_GROUP_ID = "content-personalizer-worker-group"
-    WORKER_CONCURRENCY                   = "3"
-  })
-  description = "Content service non-secret config"
-  tags        = local.content_tags
-}
-
-# ---------------------------------------------------------------------------
-# Secrets Manager — content secrets
-# ---------------------------------------------------------------------------
-
-resource "aws_secretsmanager_secret" "content_secrets" {
-  name        = "topos/content/secrets"
-  description = "Content service secrets: MONGO_URI, KAFKA_BROKERS, REDIS_ADDR, JWT_SECRET, INTERNAL_TOKEN"
-
-  tags = local.content_tags
-}
-
-resource "aws_secretsmanager_secret_version" "content_secrets" {
-  secret_id = aws_secretsmanager_secret.content_secrets.id
-  secret_string = jsonencode(
-    var.environment == "floci" ? {
-      # Floci data plane (real, Docker-backed): DocumentDB (Mongo 7) and
-      # MSK (Redpanda, Kafka protocol) run as Floci sidecars. DocDB is
-      # reached by its stable sidecar name; MSK advertises its container
-      # hostname, so KAFKA_BROKERS pins the current sidecar name (changes
-      # only if the cluster is recreated — then re-apply refreshes this).
-      # Redis goes via the Floci proxy (plaintext + AUTH token). App
-      # containers must share the `floci-apps` network with these sidecars
-      # (see services/content/infra/compose.prod.yml). No docker
-      # mongo/kafka/redis needed. Real AWS uses the cluster endpoints below.
-      MONGO_URI      = "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@floci-docdb-topos-content-floci-docdb:27017/blog_content?authSource=admin"
-      KAFKA_BROKERS  = "floci-msk-ecac64:9092"
-      REDIS_ADDR     = "floci:6379"
-      REDIS_PASSWORD = module.user_cache.auth_token
-      JWT_SECRET     = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
-      INTERNAL_TOKEN = "floci-internal-secret-0123456789abcdef0123456789abcdef-floci"
-      AI_SERVICE_URL = "ai-service:50051"
-      } : {
-      MONGO_URI = (
-        try(coalesce(module.content_database.cluster_endpoint, ""), "") != ""
-        ? "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@${module.content_database.cluster_endpoint}:${var.docdb_port}/blog_content?tls=true&tlsCAFile=/app/certs/rds-combined-ca-bundle.pem&retryWrites=false"
-        : "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@${module.content_database.cluster_endpoint}:${var.docdb_port}/blog_content"
-      )
-      KAFKA_BROKERS  = try(coalesce(module.content_streaming.bootstrap_brokers, ""), "kafka-1:9092")
-      REDIS_ADDR     = "user-redis:6379"
-      REDIS_PASSWORD = ""
-      JWT_SECRET     = random_password.jwt.result
-      INTERNAL_TOKEN = random_password.internal_token.result
-      AI_SERVICE_URL = "ai-service:50051"
-    }
-  )
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
-
-resource "random_password" "jwt" {
-  length  = 64
-  special = false
-}
-
-resource "random_password" "internal_token" {
-  length  = 64
-  special = false
 }

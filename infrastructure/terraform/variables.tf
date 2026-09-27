@@ -4,6 +4,18 @@ variable "project" {
   default     = "topos"
 }
 
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-south-1"
+}
+
+variable "aws_endpoint_url" {
+  description = "Floci/LocalStack endpoint. Empty for real AWS."
+  type        = string
+  default     = "http://localhost:4566"
+}
+
 variable "environment" {
   description = "Environment (floci, dev, prod)"
   type        = string

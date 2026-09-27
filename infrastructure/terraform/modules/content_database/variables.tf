@@ -1,5 +1,3 @@
-variable "project" { type = string }
-variable "environment" { type = string }
 variable "name_prefix" { type = string }
 
 variable "vpc_id" { type = string }
@@ -16,6 +14,5 @@ variable "deletion_protection" { type = bool }
 variable "skip_final_snapshot" { type = bool }
 
 variable "aws_endpoint_url" { type = string }
-variable "aws_region" { type = string }
 
 variable "tags" { type = map(string) }

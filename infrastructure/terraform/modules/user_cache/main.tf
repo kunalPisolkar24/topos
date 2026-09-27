@@ -32,25 +32,18 @@ resource "aws_elasticache_subnet_group" "user" {
 # Security group
 # ---------------------------------------------------------------------------
 
-resource "aws_security_group" "cache" {
-  name        = "${var.name_prefix}-cache-sg"
-  description = "User cache access"
-  vpc_id      = var.vpc_id
+module "security_group" {
+  source = "../security_group"
 
-  ingress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  name                = "${var.name_prefix}-cache-sg"
+  description         = "User cache access"
+  vpc_id              = var.vpc_id
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ingress_rules = [{
+    from_port = 6379
+    to_port   = 6379
+    protocol  = "tcp"
+  }]
   tags = var.tags
 }
 
@@ -86,8 +79,11 @@ resource "aws_elasticache_replication_group" "user" {
   num_cache_clusters   = var.num_cache_clusters
   parameter_group_name = aws_elasticache_parameter_group.redis7.name
   subnet_group_name    = aws_elasticache_subnet_group.user.name
-  security_group_ids   = [aws_security_group.cache.id]
-  port                 = 6379
+  # Floci proxies its Docker-backed Valkey endpoint and does not retain
+  # ElastiCache security-group attachments. Real AWS uses the least-privilege
+  # cache group as normal.
+  security_group_ids = var.is_floci ? [] : [module.security_group.id]
+  port               = 6379
 
   automatic_failover_enabled = var.automatic_failover_enabled && var.num_cache_clusters > 1
   multi_az_enabled           = var.multi_az_enabled && var.num_cache_clusters > 1
