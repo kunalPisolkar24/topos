@@ -85,6 +85,22 @@ Runs the service as `ai-service` (resolvable by other services on the
 `LIGHTNING_AI_*` variables in the infra env files map to the service's
 own env names.
 
+## Prod (Floci / AWS)
+
+```sh
+make up-prod    # Floci: needs the `floci` container + sidecars on `floci-apps`
+make down-prod
+```
+
+`infra/compose.prod.yml` is standalone (no docker postgres/qdrant/ollama):
+`LLM_MODE`, `VECTOR_MODE` and `EMBEDDING_MODE` are all `fake`, so no
+external AI infra is needed, and the checkpoint store is Floci RDS
+(`ai_checkpoints` via SM `topos/ai/secrets`). Verified end to end:
+`GenerateSummary`/`GenerateTags`/`ChatAnswer` RPCs pass, chat checkpoints
+persist per `thread_id` in Floci Postgres (18 rows across two turns),
+survive a service restart, and resume into a fresh container. Vectors in
+fake mode are an in-memory index — only checkpoints touch RDS.
+
 ## Testing
 
 ```bash
