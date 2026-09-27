@@ -177,3 +177,52 @@ def test_floci_guard_force_override() -> None:
     results, _ = seeder.seed(cfg, env)
     assert results
     assert store.calls == ["topos/user/secrets"]
+
+
+def test_build_payloads_content_aliases() -> None:
+    env = {
+        "CONTENT_MONGO_URI": "mongodb://content-mongo:27017",
+        "CONTENT_DB_NAME": "blog_content",
+        "CONTENT_REDIS_ADDR": "user-redis:6379",
+        "CONTENT_JWT_SECRET": "content-jwt-secret",
+        "CONTENT_INTERNAL_TOKEN": "content-internal",
+        "CONTENT_AI_SERVICE_URL": "ai-service:50051",
+        "CONTENT_KAFKA_BROKERS": "kafka-1:9092",
+        "CONTENT_KAFKA_TOPIC": "posts",
+        "CONTENT_SERVICE_INT_PORT": "4002",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/content/config", "topos/content/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["topos/content/secrets"]["MONGO_URI"] == "mongodb://content-mongo:27017"
+    assert by_name["topos/content/secrets"]["REDIS_ADDR"] == "user-redis:6379"
+    assert by_name["topos/content/secrets"]["JWT_SECRET"] == "content-jwt-secret"
+    assert by_name["topos/content/secrets"]["INTERNAL_TOKEN"] == "content-internal"
+    assert by_name["topos/content/secrets"]["AI_SERVICE_URL"] == "ai-service:50051"
+    assert by_name["topos/content/secrets"]["KAFKA_BROKERS"] == "kafka-1:9092"
+    assert by_name["/topos/content/config"]["DB_NAME"] == "blog_content"
+    assert by_name["/topos/content/config"]["KAFKA_TOPIC"] == "posts"
+    assert by_name["/topos/content/config"]["PORT"] == "4002"
+
+
+def test_build_payloads_content_canonical_wins() -> None:
+    env = {"MONGO_URI": "mongodb://canonical:27017", "CONTENT_MONGO_URI": "mongodb://alias:27017"}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"topos/content/secrets"}))
+    assert payloads[0].data["MONGO_URI"] == "mongodb://canonical:27017"
+
+
+def test_build_payloads_port_aliases_stay_separate() -> None:
+    env = {
+        "USER_SERVICE_EXT_PORT": "4001",
+        "CONTENT_SERVICE_INT_PORT": "4002",
+        "AI_SERVICE_INT_PORT": "50051",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(
+        env, only=frozenset({"/topos/user/config", "/topos/content/config", "/topos/ai/config"})
+    )
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["/topos/user/config"]["PORT"] == "4001"
+    assert by_name["/topos/content/config"]["PORT"] == "4002"
+    assert by_name["/topos/ai/config"]["PORT"] == "50051"

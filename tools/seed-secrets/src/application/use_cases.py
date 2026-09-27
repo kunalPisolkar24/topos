@@ -119,6 +119,36 @@ class SeedUseCase:
         "CONTENT_SERVICE_URL": ["AI_CONTENT_SERVICE_URL"],
     }
 
+    # CONTENT_ alias mapping for local .env -> canonical SM/SSM keys
+    # (mirrors content service internal/config contentAliases; PORT comes
+    # from the service's own compose ports, not an alias there, so both
+    # INT/EXT variants are accepted here)
+    _CONTENT_ALIASES: dict[str, list[str]] = {
+        "MONGO_URI": ["CONTENT_MONGO_URI"],
+        "DB_NAME": ["CONTENT_DB_NAME"],
+        "REDIS_ADDR": ["CONTENT_REDIS_ADDR"],
+        "REDIS_PASSWORD": ["CONTENT_REDIS_PASSWORD"],
+        "JWT_SECRET": ["CONTENT_JWT_SECRET"],
+        "INTERNAL_TOKEN": ["CONTENT_INTERNAL_TOKEN"],
+        "AI_SERVICE_URL": ["CONTENT_AI_SERVICE_URL"],
+        "KAFKA_BROKERS": ["CONTENT_KAFKA_BROKERS"],
+        "KAFKA_TOPIC": ["CONTENT_KAFKA_TOPIC"],
+        "PORT": ["CONTENT_SERVICE_INT_PORT", "CONTENT_SERVICE_EXT_PORT"],
+    }
+
+    # Alias maps are scoped per secret family: PORT (and other shared
+    # canonical keys) must resolve from that service's own prefixed vars,
+    # never from another service's (e.g. content PORT from CONTENT_*,
+    # not USER_SERVICE_EXT_PORT).
+    _ALIASES_BY_SECRET: dict[str, dict[str, list[str]]] = {
+        "/topos/user/config": _USER_ALIASES,
+        "topos/user/secrets": _USER_ALIASES,
+        "/topos/ai/config": _AI_ALIASES,
+        "topos/ai/secrets": _AI_ALIASES,
+        "/topos/content/config": _CONTENT_ALIASES,
+        "topos/content/secrets": _CONTENT_ALIASES,
+    }
+
     def build_payloads(self, env: dict[str, str], only: frozenset[str] | None = None) -> list[SecretPayload]:
         """Build per-secret payloads from parsed env dict.
 
@@ -133,13 +163,14 @@ class SeedUseCase:
             if only and secret_name not in only:
                 continue
             data: dict[str, str] = {}
+            aliases_for_secret = self._ALIASES_BY_SECRET.get(secret_name, {})
             for k in keys:
                 v = present.get(k, "")
                 if v != "" and v is not None:
                     data[k] = v
                     continue
-                # Check aliases for this canonical key
-                for alias in self._USER_ALIASES.get(k, []) + self._AI_ALIASES.get(k, []):
+                # Check this secret family's aliases for the canonical key
+                for alias in aliases_for_secret.get(k, []):
                     av = present.get(alias, "")
                     if av != "" and av is not None:
                         data[k] = av
