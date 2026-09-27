@@ -1,0 +1,59 @@
+# Topos prod stack: app containers only, no docker postgres/redis/mongo/kafka/qdrant.
+# Data plane comes from Floci (RDS :7001, Valkey :6379, DocDB/MSK sidecars) and
+# Qdrant Cloud; control plane from SM/SSM via ENV_TYPE=prod. Env file: .env (copy from .env.example).
+# Driven from the repo root: SEED_SECRETS=1 make prod-up (seed SM/SSM first), make prod-up (default, no seed).
+
+name: topos-prod
+
+include:
+  - path: ../../../services/user/infra/compose.prod.yml
+  - path: ../../../services/content/infra/compose.prod.yml
+  - path: ../../../services/ai/infra/compose.prod.yml
+
+services:
+  gateway:
+    build:
+      context: ../../../
+      dockerfile: gateway/Dockerfile
+    container_name: ${GATEWAY_CONTAINER:-prod-gateway}
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_EXT_PORT:-4000}:${GATEWAY_INT_PORT:-4000}"
+    environment:
+      - FRONTEND_PUBLIC_ORIGIN=${FRONTEND_PUBLIC_ORIGIN:-${VITE_BACKEND_URL:-}}
+    depends_on:
+      - user-service
+      - content-service
+    networks:
+      - floci-bridge
+
+  frontend:
+    build:
+      context: ../../../
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_ENV_TYPE: ${VITE_ENV_TYPE:-prod}
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4000/graphql}
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:4000}
+        VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}
+        VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET:-}
+        VITE_ENABLE_MOCKS: ${VITE_ENABLE_MOCKS:-false}
+    container_name: ${FRONTEND_CONTAINER:-prod-frontend}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_EXT_PORT:-3000}:${FRONTEND_INT_PORT:-3000}"
+    environment:
+      PORT: ${FRONTEND_INT_PORT:-3000}
+      VITE_ENV_TYPE: ${VITE_ENV_TYPE:-prod}
+      VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4000/graphql}
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:4000}
+      VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}
+      VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET:-}
+      VITE_ENABLE_MOCKS: ${VITE_ENABLE_MOCKS:-false}
+    networks:
+      - floci-bridge
+
+networks:
+  floci-bridge:
+    name: floci-apps
+    external: true

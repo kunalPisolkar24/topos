@@ -1,22 +1,13 @@
-# =============================================================================
-# Topos ai-service — Prod stack (standalone, no docker postgres/qdrant/ollama)
-# =============================================================================
+# Topos ai-service — Prod stack (no docker postgres/qdrant/ollama).
 # Used alone (never merged with compose.yml):
 #   docker compose -f infra/compose.prod.yml --project-name topos-ai-prod \
 #     up -d --build --wait ai-service
 # (`make up-prod` does this.)
 #
-# Contract:
-# - Control plane (SSM /topos/ai/config + SM topos/ai/secrets) AND the
-#   checkpoint data plane (ai_checkpoints on Floci RDS :7001) come from the
-#   real Floci emulator. The `floci` hostname resolves on floci-apps.
-# - Fake modes (LLM/VECTOR/EMBEDDING) mean no Qdrant, Ollama, or LLM API
-#   key is needed; summaries/tags are deterministic canned responses.
-# - SM-owned secrets are emptied below so ENV_TYPE=prod hydrates them from
-#   Floci SM instead of shadowing them with dev defaults.
-# - Service name stays `ai-service`: content workers dial
-#   ai-service:50051 on floci-apps by default.
-# =============================================================================
+# Contract: control plane (SSM /topos/ai/config + SM topos/ai/secrets) and the
+# checkpoint data plane (ai_checkpoints on Floci RDS :7001) come from Floci;
+# vectors come from Qdrant Cloud in inference mode (defaults below). SM-owned
+# secrets stay empty here so ENV_TYPE=prod hydrates them from SM.
 
 name: topos-ai-prod
 
@@ -36,17 +27,27 @@ services:
       # SM-owned: hydrate from topos/ai/secrets (or external injection).
       - CHECKPOINT_DB_URL=${AI_CHECKPOINT_DB_URL:-}
       - CHECKPOINT_DB_URL_MIGRATE=${AI_CHECKPOINT_DB_URL_MIGRATE:-}
+      - LLM_MODE=${AI_LLM_MODE:-real}
       - LLM_API_KEY=${LIGHTNING_AI_API_KEY:-}
+      - LLM_MODEL=${AI_LIGHTNING_MODEL:-openai/gpt-5-nano}
+      - LLM_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-30}
       - QDRANT_URL=${AI_QDRANT_URL:-}
       - QDRANT_API_KEY=${AI_QDRANT_API_KEY:-}
+      - QDRANT_VECTOR_SIZE=${AI_QDRANT_VECTOR_SIZE:-384}
+      - SEARCH_DENSE_SCORE_THRESHOLD=${AI_SEARCH_DENSE_SCORE_THRESHOLD:-0.3}
+      - VECTOR_MODE=${AI_VECTOR_MODE:-qdrant}
+      - EMBEDDING_MODE=${AI_EMBEDDING_MODE:-inference}
+      - EMBEDDING_MODEL=${AI_EMBEDDING_MODEL:-sentence-transformers/all-minilm-l6-v2}
       - EMBEDDING_URL=${AI_EMBEDDING_URL:-}
+      - CONTENT_SERVICE_URL=${AI_CONTENT_SERVICE_URL:-http://content-service:4002}
       - CONTENT_INTERNAL_TOKEN=${CONTENT_INTERNAL_TOKEN:-}
-      # Deterministic fake modes: no external AI infra needed.
-      - LLM_MODE=fake
-      - VECTOR_MODE=fake
-      - EMBEDDING_MODE=fake
+      - LANGCHAIN_TRACING=${AI_LANGCHAIN_TRACING:-false}
+      - LANGCHAIN_API_KEY=${AI_LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${AI_LANGCHAIN_PROJECT:-topos-ai}
+      - CHECKPOINT_POOL_MIN_SIZE=${AI_CHECKPOINT_POOL_MIN_SIZE:-1}
+      - CHECKPOINT_POOL_MAX_SIZE=${AI_CHECKPOINT_POOL_MAX_SIZE:-10}
       - LOG_LEVEL=${AI_LOG_LEVEL:-INFO}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${AI_OTLP_ENDPOINT:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-${AI_OTLP_ENDPOINT:-}}
       # Floci reachable by container name on the floci-apps network.
       - AWS_REGION=${AWS_REGION:-ap-south-1}
       - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}

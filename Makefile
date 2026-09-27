@@ -1,9 +1,28 @@
-.PHONY: help local-up local-down local-logs local-ps local-clean prune
+.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure prune
 
 LOCAL_DIR := infrastructure/docker/local
 LOCAL_ENV := $(LOCAL_DIR)/.env.local
 LOCAL_ENV_EXAMPLE := $(LOCAL_DIR)/.env.local.example
 COMPOSE_LOCAL := docker compose --env-file $(LOCAL_ENV) -f $(LOCAL_DIR)/compose.yml
+
+PROD_DIR := infrastructure/docker/prod
+PROD_ENV := $(PROD_DIR)/.env
+PROD_ENV_EXAMPLE := $(PROD_DIR)/.env.example
+COMPOSE_PROD := docker compose --env-file $(PROD_ENV) -f $(PROD_DIR)/compose.yml
+
+# Set SEED_SECRETS=1 to upsert .env into Floci/AWS SM+SSM before boot. Default
+# skips seeding so terraform-managed real secrets are never clobbered.
+SEED_SECRETS ?= 0
+SEED_TOOL_DIR := tools/seed-secrets
+
+# Set WITH_INFRA=1 on prod-up to terraform-apply managed infra first (cold boot).
+# Default skips it so restarts stay fast. ENV selects the tfvars file.
+WITH_INFRA ?= 0
+ENV ?= floci
+TF_DIR := infrastructure/terraform
+TF_VARS := $(TF_DIR)/envs/$(ENV).tfvars
+# Destroys are never automatic: prod additionally requires CONFIRM_DESTROY=1.
+CONFIRM_DESTROY ?= 0
 
 help:
 	@echo "Available commands:"
@@ -15,6 +34,20 @@ help:
 	@echo "  make local-down   - Stop (keeps volumes)"
 	@echo "  make local-clean  - Stop and delete volumes"
 	@echo ""
+	@echo "  Prod stack (Floci/AWS managed infra, no docker DBs):"
+	@echo "  make prod-up      - Start prod containers (WITH_INFRA=1 to apply infra first,"
+	@echo "                      SEED_SECRETS=1 to seed SM/SSM first)"
+	@echo "  make prod-logs    - Tail prod logs"
+	@echo "  make prod-ps      - List prod containers"
+	@echo "  make prod-down    - Stop prod (keeps volumes)"
+	@echo "  make prod-clean   - Stop prod and delete volumes"
+	@echo ""
+	@echo "  Managed infra (terraform RDS/DocDB/MSK/ElastiCache, ENV=floci|prod):"
+	@echo "  make infra-plan   - Plan infra changes"
+	@echo "  make infra-up     - Apply infra (Floci: starts emulator + network first)"
+	@echo "  make infra-output - Show infra endpoints (fill prod .env from this)"
+	@echo "  make infra-destroy - Destroy infra (prod needs CONFIRM_DESTROY=1)"
+	@echo ""
 	@echo "  Utilities:"
 	@echo "  make prune    - Prune completely out all unused docker resources"
 	@echo ""
@@ -25,6 +58,10 @@ help:
 $(LOCAL_ENV):
 	@cp $(LOCAL_ENV_EXAMPLE) $(LOCAL_ENV)
 	@echo "Created $(LOCAL_ENV) from example — fill in any required values."
+
+$(PROD_ENV):
+	@cp $(PROD_ENV_EXAMPLE) $(PROD_ENV)
+	@echo "Created $(PROD_ENV) from example — fill in CHANGEME values from 'terraform output'."
 
 local-up: $(LOCAL_ENV)
 	$(COMPOSE_LOCAL) up -d --build --wait
@@ -40,6 +77,58 @@ local-ps: $(LOCAL_ENV)
 
 local-clean: $(LOCAL_ENV)
 	$(COMPOSE_LOCAL) down -v --remove-orphans
+
+prod-up: $(PROD_ENV)
+	@if [ "$(WITH_INFRA)" = "1" ]; then echo "==> [1/3] infra (terraform apply, ENV=$(ENV))"; \
+		$(MAKE) --no-print-directory infra-up ENV=$(ENV) || { echo "FAILED phase 1/3: infra — fix the terraform error above, then re-run"; exit 1; }; fi
+	@if [ "$(SEED_SECRETS)" = "1" ]; then echo "==> [2/3] seed (SM/SSM from $(PROD_ENV))"; \
+		$(MAKE) -C $(SEED_TOOL_DIR) seed-floci ENV_FILE=../../$(PROD_ENV) || { echo "FAILED phase 2/3: seed — check the Floci endpoint / AWS creds"; exit 1; }; fi
+	@echo "==> [3/3] app (compose up)"
+	@$(COMPOSE_PROD) up -d --build --wait || { echo "FAILED phase 3/3: app — run 'make prod-logs' for details"; exit 1; }
+	@echo "prod up: OK"
+
+prod-down: $(PROD_ENV)
+	$(COMPOSE_PROD) down
+
+prod-logs: $(PROD_ENV)
+	$(COMPOSE_PROD) logs -f
+
+prod-ps: $(PROD_ENV)
+	$(COMPOSE_PROD) ps
+
+prod-clean: $(PROD_ENV)
+	$(COMPOSE_PROD) down -v --remove-orphans
+
+# --- Managed infra (terraform) ------------------------------------------------
+# Floci is the default target (envs/floci.tfvars). Real AWS needs
+# infrastructure/terraform/envs/prod.tfvars + backend.hcl (see its README).
+
+check-tfvars:
+	@if [ ! -f "$(TF_VARS)" ]; then echo "missing $(TF_VARS) (ENV=$(ENV); try ENV=floci)"; exit 1; fi
+
+infra-floci-ensure:
+	@docker network inspect floci-apps >/dev/null 2>&1 || docker network create floci-apps
+	@if [ -z "$$(docker ps -q -f name=^floci$$)" ]; then \
+		if [ -n "$$(docker ps -aq -f name=^floci$$)" ]; then docker start floci; \
+		else docker run -d --name floci -p 4566:4566 -v /var/run/docker.sock:/var/run/docker.sock -u root floci/floci:latest; fi \
+	fi
+	@docker inspect floci -f '{{range $$k, $$v := .NetworkSettings.Networks}}{{$$k}} {{end}}' 2>/dev/null | grep -qw floci-apps || docker network connect floci-apps floci
+
+infra-plan: check-tfvars
+	terraform -chdir=$(TF_DIR) init -input=false
+	terraform -chdir=$(TF_DIR) plan -input=false -var-file=envs/$(ENV).tfvars
+
+infra-up: check-tfvars
+	@if [ "$(ENV)" = "floci" ]; then $(MAKE) --no-print-directory infra-floci-ensure; fi
+	terraform -chdir=$(TF_DIR) init -input=false
+	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/$(ENV).tfvars
+
+infra-output:
+	terraform -chdir=$(TF_DIR) output
+
+infra-destroy: check-tfvars
+	@if [ "$(ENV)" = "prod" ] && [ "$(CONFIRM_DESTROY)" != "1" ]; then echo "refusing to destroy prod without CONFIRM_DESTROY=1"; exit 1; fi
+	terraform -chdir=$(TF_DIR) destroy -input=false -auto-approve -var-file=envs/$(ENV).tfvars
 
 prune:
 	docker system prune -a --volumes -f

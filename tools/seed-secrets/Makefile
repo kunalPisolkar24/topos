@@ -2,6 +2,10 @@ DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 POETRY := poetry -C $(DIR)
 RUN := $(POETRY) run python main.py
 
+# Overridable: root prod stack passes ENV_FILE=infrastructure/docker/prod/.env
+ENV_FILE ?= infrastructure/docker/local/.env.local.example
+ENDPOINT_URL ?= http://localhost:4566
+
 .PHONY: help install lint format test test-cov test-all dry-run seed-floci dry-run-floci clean
 
 help:
@@ -35,10 +39,10 @@ test-cov:
 	$(POETRY) run pytest -m "not integration" --cov=src --cov-report=term-missing --cov-fail-under=65
 
 dry-run:
-	$(RUN) --env-file infrastructure/docker/local/.env.local.example --endpoint-url http://localhost:4566 --dry-run
+	$(RUN) --env-file $(ENV_FILE) --endpoint-url $(ENDPOINT_URL) --dry-run
 
 seed-floci:
-	$(RUN) --env-file infrastructure/docker/local/.env.local.example --endpoint-url http://localhost:4566
+	$(RUN) --env-file $(ENV_FILE) --endpoint-url $(ENDPOINT_URL)
 
 dry-run-floci: dry-run
 

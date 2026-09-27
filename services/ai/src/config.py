@@ -131,7 +131,7 @@ class Settings(BaseSettings):
     LLM_MODE: Literal["real", "fake"] = "real"
     LLM_API_URL: str = "https://lightning.ai/api/v1/chat/completions"
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "lightning-ai/gpt-oss-20b"
+    LLM_MODEL: str = "openai/gpt-5-nano"
     LLM_TIMEOUT_SECONDS: int = 60
     # LangGraph checkpoint store (Postgres). Empty keeps graphs on the
     # in-memory checkpointer, so local dev and tests need no database.
