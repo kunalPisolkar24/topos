@@ -13,6 +13,26 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
+// normalizeOtelEndpoint converts the shared OTEL_EXPORTER_OTLP_ENDPOINT
+// (HTTP base like http://otel-collector:4318, or bare host:port) to the
+// host:port form otlptracegrpc needs. The collector serves gRPC on :4317
+// and HTTP on :4318, so an :4318 endpoint is mapped to :4317.
+func normalizeOtelEndpoint(endpoint string) string {
+	e := strings.TrimSpace(endpoint)
+	e = strings.TrimPrefix(e, "http://")
+	e = strings.TrimPrefix(e, "https://")
+	if i := strings.Index(e, "/"); i != -1 {
+		e = e[:i]
+	}
+	if !strings.Contains(e, ":") {
+		return e + ":4317"
+	}
+	if strings.HasSuffix(e, ":4318") {
+		return strings.TrimSuffix(e, ":4318") + ":4317"
+	}
+	return e
+}
+
 // SetupTracing wires the OpenTelemetry SDK and exports spans over OTLP
 // gRPC when an endpoint is configured. With an empty endpoint it leaves
 // the no-op tracer in place so the services run fine without any trace
@@ -23,7 +43,7 @@ func SetupTracing(ctx context.Context, endpoint, serviceName string) (func(conte
 		return func(context.Context) error { return nil }, nil
 	}
 
-	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpoint(endpoint), otlptracegrpc.WithInsecure())
+	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpoint(normalizeOtelEndpoint(endpoint)), otlptracegrpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}

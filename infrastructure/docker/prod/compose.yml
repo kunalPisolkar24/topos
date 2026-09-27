@@ -11,6 +11,24 @@ include:
   - path: ../../../services/ai/infra/compose.prod.yml
 
 services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.122.1
+    container_name: ${OTEL_COLLECTOR_CONTAINER:-prod-otel-collector}
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    environment:
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
+      - NEW_RELIC_OTLP_ENDPOINT=${NEW_RELIC_OTLP_ENDPOINT:-https://otlp.nr-data.net:4317}
+      - NEW_RELIC_OTLP_HTTP_ENDPOINT=${NEW_RELIC_OTLP_HTTP_ENDPOINT:-https://otlp.nr-data.net}
+    expose:
+      - "4317"
+      - "4318"
+      - "13133"
+    networks:
+      - floci-bridge
+
   gateway:
     build:
       context: ../../../
@@ -21,9 +39,12 @@ services:
       - "${GATEWAY_EXT_PORT:-4000}:${GATEWAY_INT_PORT:-4000}"
     environment:
       - FRONTEND_PUBLIC_ORIGIN=${FRONTEND_PUBLIC_ORIGIN:-${VITE_BACKEND_URL:-}}
+      - OTEL_TRACING_ENDPOINT=${OTEL_TRACING_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_SERVICE_NAME=gateway
     depends_on:
       - user-service
       - content-service
+      - otel-collector
     networks:
       - floci-bridge
 

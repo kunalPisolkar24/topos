@@ -1,0 +1,21 @@
+# Terraform — New Relic observability (dashboards + alerts)
+#
+# Isolated from infrastructure/terraform (which targets Floci AWS mocks).
+# This stack talks only to New Relic (US or EU) and manages dashboards
+# over the OTEL data sent by the prod otel-collector.
+#
+# Usage (test account, US):
+#   export NEW_RELIC_API_KEY=NRAK-...
+#   terraform -chdir=infrastructure/observability init
+#   terraform -chdir=infrastructure/observability plan \
+#     -var=newrelic_account_id=8557859 -var=newrelic_region=US
+#   terraform -chdir=infrastructure/observability apply \
+#     -var=newrelic_account_id=8557859 -var=newrelic_region=US
+#
+# Data flow: services -> otel-collector:4317/4318 (prod compose only)
+#   -> https://otlp.nr-data.net:4317 (US) with NEW_RELIC_LICENSE_KEY.
+
+newrelic_account_id = 8557859
+newrelic_region     = "US"
+environment         = "prod"
+# newrelic_api_key comes from NEW_RELIC_API_KEY env (TF_VAR_newrelic_api_key).

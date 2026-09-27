@@ -142,7 +142,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4001),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z
-    .preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+    .preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   OTEL_SERVICE_NAME: z.string().default('user-service'),
   DATABASE_URL: z.string().url(),
   DATABASE_URL_MIGRATE: z.string().url().optional(),

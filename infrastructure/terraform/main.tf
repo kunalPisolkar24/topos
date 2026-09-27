@@ -329,7 +329,7 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
       # (see services/content/infra/compose.prod.yml). No docker
       # mongo/kafka/redis needed. Real AWS uses the cluster endpoints below.
       MONGO_URI      = "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@floci-docdb-topos-content-floci-docdb:27017/blog_content?authSource=admin"
-      KAFKA_BROKERS  = "floci-msk-6eb9bc:9092"
+      KAFKA_BROKERS  = "floci-msk-ecac64:9092"
       REDIS_ADDR     = "floci:6379"
       REDIS_PASSWORD = module.user_cache.auth_token
       JWT_SECRET     = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"

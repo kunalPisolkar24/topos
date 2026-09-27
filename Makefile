@@ -1,4 +1,6 @@
-.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure prune
+.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure obs-plan obs-apply prune
+
+OBS_DIR := infrastructure/observability
 
 LOCAL_DIR := infrastructure/docker/local
 LOCAL_ENV := $(LOCAL_DIR)/.env.local
@@ -47,6 +49,10 @@ help:
 	@echo "  make infra-up     - Apply infra (Floci: starts emulator + network first)"
 	@echo "  make infra-output - Show infra endpoints (fill prod .env from this)"
 	@echo "  make infra-destroy - Destroy infra (prod needs CONFIRM_DESTROY=1)"
+	@echo ""
+	@echo "  Observability (New Relic dashboards, NEW_RELIC_API_KEY env):"
+	@echo "  make obs-plan     - Plan dashboards/alerts (NEW_RELIC_ACCOUNT_ID/REGION)"
+	@echo "  make obs-apply    - Apply dashboards/alerts"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "  make prune    - Prune completely out all unused docker resources"
@@ -129,6 +135,15 @@ infra-output:
 infra-destroy: check-tfvars
 	@if [ "$(ENV)" = "prod" ] && [ "$(CONFIRM_DESTROY)" != "1" ]; then echo "refusing to destroy prod without CONFIRM_DESTROY=1"; exit 1; fi
 	terraform -chdir=$(TF_DIR) destroy -input=false -auto-approve -var-file=envs/$(ENV).tfvars
+
+# --- New Relic observability (dashboards + alerts, NEW_RELIC_API_KEY env) ----
+obs-plan:
+	terraform -chdir=$(OBS_DIR) init -input=false
+	terraform -chdir=$(OBS_DIR) plan -input=false -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
+
+obs-apply:
+	terraform -chdir=$(OBS_DIR) init -input=false
+	terraform -chdir=$(OBS_DIR) apply -input=false -auto-approve -var=newrelic_account_id=$${NEW_RELIC_ACCOUNT_ID:-8557859} -var=newrelic_region=$${NEW_RELIC_REGION:-US}
 
 prune:
 	docker system prune -a --volumes -f

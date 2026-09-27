@@ -1,0 +1,70 @@
+# OTEL Collector — prod only. Receives OTLP from all Topos services and
+# forwards to New Relic. Apps talk insecure locally; only this collector
+# talks TLS to NR with the license key.
+# Single OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 works for
+# every service: user uses it as HTTP base, content/ai normalize to gRPC
+# :4317 internally, gateway uses OTEL_TRACING_ENDPOINT (gRPC).
+# Local compose has no collector; empty endpoint keeps tracing disabled.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: topos
+          scrape_interval: 15s
+          static_configs:
+            - targets:
+                - user-service:4001
+                - content-service:4002
+                - content-worker:4003
+                - content-search-worker:4004
+                - content-personalizer:4005
+                - ai-service:12666
+                - gateway:8088
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+  batch:
+    timeout: 10s
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: prod
+        action: upsert
+
+exporters:
+  otlphttp/newrelic:
+    endpoint: ${env:NEW_RELIC_OTLP_HTTP_ENDPOINT}
+    headers:
+      api-key: ${env:NEW_RELIC_LICENSE_KEY}
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/newrelic]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/newrelic]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/newrelic]
+  telemetry:
+    logs:
+      level: info

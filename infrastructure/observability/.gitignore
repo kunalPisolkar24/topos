@@ -1,0 +1,15 @@
+# Terraform (mirrors infrastructure/terraform/.gitignore)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+!/.terraform.lock.hcl
+# Local values (account IDs, API keys) — never commit; see terraform.tfvars.example
+terraform.tfvars
