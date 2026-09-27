@@ -20,6 +20,19 @@ cp .env.example .env
 docker compose -f infra/compose.yml up -d --build
 ```
 
+## Prod (Floci / AWS)
+
+```sh
+make up-prod    # Floci: needs the `floci` container + sidecars on `floci-apps`
+make down-prod
+```
+
+`infra/compose.prod.yml` is standalone (no docker mongo/kafka/redis):
+control plane (SM/SSM) and data plane (DocDB, MSK, Valkey) all come from
+Floci — DocDB/MSK by sidecar container name, Valkey via the `floci`
+proxy. CRUD needs no AI service (summaries stay pending). Real AWS later:
+same file, `AWS_ENDPOINT_URL` empty + external injection.
+
 - API: `http://localhost:4002` (GraphQL at `/query`, health at `/health`)
 - Worker metrics: `http://localhost:4003/metrics`
 - Search worker metrics: `http://localhost:4004/metrics`

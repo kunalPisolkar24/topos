@@ -48,5 +48,14 @@ resource "aws_msk_cluster" "content" {
     }
   }
 
+  # Floci provisions the broker as TLS_PLAINTEXT; pin it so the provider
+  # default ("TLS") doesn't cause a perpetual diff whose UpdateSecurity
+  # call Floci rejects (405). Real AWS keeps the provider default.
+  encryption_info {
+    encryption_in_transit {
+      client_broker = var.aws_endpoint_url != "" ? "TLS_PLAINTEXT" : "TLS"
+    }
+  }
+
   tags = var.tags
 }

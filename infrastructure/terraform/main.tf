@@ -256,9 +256,11 @@ resource "aws_secretsmanager_secret_version" "ai_secrets" {
   secret_id = aws_secretsmanager_secret.ai_secrets.id
   secret_string = jsonencode(
     var.environment == "floci" ? {
-      # Floci: docker compose service names on app-network, no TLS.
-      CHECKPOINT_DB_URL         = "postgresql://ai_checkpointer:ai_checkpointer_pass@user-postgres:5432/ai_checkpoints"
-      CHECKPOINT_DB_URL_MIGRATE = "postgresql://ai_checkpointer:ai_checkpointer_pass@user-postgres:5432/ai_checkpoints"
+      # Floci data plane (real, Docker-backed): the shared RDS instance
+      # serves ai_checkpoints on the Floci proxy port 7001 (plaintext).
+      # Checkpoint traffic never needs a pooler; direct writer URL for both.
+      CHECKPOINT_DB_URL         = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@floci:7001/${module.user_database.ai_db_name}"
+      CHECKPOINT_DB_URL_MIGRATE = "postgresql://${module.user_database.ai_username}:${module.user_database.ai_password}@floci:7001/${module.user_database.ai_db_name}"
       } : {
       CHECKPOINT_DB_URL = (
         try(coalesce(module.user_database.proxy_endpoint, ""), "") != ""
@@ -317,10 +319,19 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
   secret_id = aws_secretsmanager_secret.content_secrets.id
   secret_string = jsonencode(
     var.environment == "floci" ? {
-      MONGO_URI      = "mongodb://content-mongo:27017"
-      KAFKA_BROKERS  = "kafka-1:9092"
-      REDIS_ADDR     = "user-redis:6379"
-      REDIS_PASSWORD = ""
+      # Floci data plane (real, Docker-backed): DocumentDB (Mongo 7) and
+      # MSK (Redpanda, Kafka protocol) run as Floci sidecars. DocDB is
+      # reached by its stable sidecar name; MSK advertises its container
+      # hostname, so KAFKA_BROKERS pins the current sidecar name (changes
+      # only if the cluster is recreated — then re-apply refreshes this).
+      # Redis goes via the Floci proxy (plaintext + AUTH token). App
+      # containers must share the `floci-apps` network with these sidecars
+      # (see services/content/infra/compose.prod.yml). No docker
+      # mongo/kafka/redis needed. Real AWS uses the cluster endpoints below.
+      MONGO_URI      = "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@floci-docdb-topos-content-floci-docdb:27017/blog_content?authSource=admin"
+      KAFKA_BROKERS  = "floci-msk-6eb9bc:9092"
+      REDIS_ADDR     = "floci:6379"
+      REDIS_PASSWORD = module.user_cache.auth_token
       JWT_SECRET     = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
       INTERNAL_TOKEN = "floci-internal-secret-0123456789abcdef0123456789abcdef-floci"
       AI_SERVICE_URL = "ai-service:50051"

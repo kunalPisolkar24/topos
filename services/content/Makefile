@@ -194,20 +194,24 @@ clean:
 ps:
 	$(COMPOSE) ps
 
-# --- Floci (AWS emulation via Floci on host.docker.internal:4566) ---
-COMPOSE_FLOCI := docker compose -f infra/compose.yml --project-name topos-content-floci
+# --- Prod (ENV_TYPE=prod, SM-driven, no bundled DB) ---
+# Against Floci: control plane (SM/SSM) and data plane (DocDB, MSK,
+# Valkey) all come from the `floci` container + sidecars on the
+# `floci-apps` network. Against real AWS later: same file,
+# AWS_ENDPOINT_URL empty + external injection.
+COMPOSE_PROD := docker compose -f infra/compose.prod.yml --project-name topos-content-prod
 
-up-floci:
-	ENV_TYPE=prod $(COMPOSE_FLOCI) up -d --build --wait
+up-prod:
+	$(COMPOSE_PROD) up -d --build --wait content-service
 
-down-floci:
-	$(COMPOSE_FLOCI) down
+down-prod:
+	$(COMPOSE_PROD) down
 
-logs-floci:
-	$(COMPOSE_FLOCI) logs -f
+logs-prod:
+	$(COMPOSE_PROD) logs -f
 
-clean-floci:
-	$(COMPOSE_FLOCI) down -v --remove-orphans
+clean-prod:
+	$(COMPOSE_PROD) down -v --remove-orphans
 
 # Backwards-compat aliases
 local-up: up

@@ -13,7 +13,7 @@ services:
       - "${CONTENT_SERVICE_EXT_PORT:-4002}:${CONTENT_SERVICE_INT_PORT:-4002}"
     environment:
       - PORT=${CONTENT_SERVICE_INT_PORT:-4002}
-      - ENV_TYPE=${ENV_TYPE:-dev}
+      - ENV_TYPE=dev
       - MONGO_URI=${CONTENT_MONGO_URI:-mongodb://content-mongo:27017}
       - DB_NAME=${CONTENT_DB_NAME:-blog_content}
       - REDIS_ADDR=${CONTENT_REDIS_ADDR:-user-redis:6379}
@@ -29,14 +29,6 @@ services:
       - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - AWS_REGION=${AWS_REGION:-ap-south-1}
-      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
-      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
-      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/healthz || exit 1"]
       interval: 30s
@@ -64,7 +56,7 @@ services:
       - "${CONTENT_WORKER_INT_PORT:-4003}"
     environment:
       - PORT=${CONTENT_WORKER_INT_PORT:-4003}
-      - ENV_TYPE=${ENV_TYPE:-dev}
+      - ENV_TYPE=dev
       - MONGO_URI=${CONTENT_MONGO_URI:-mongodb://content-mongo:27017}
       - DB_NAME=${CONTENT_DB_NAME:-blog_content}
       - REDIS_ADDR=${CONTENT_REDIS_ADDR:-user-redis:6379}
@@ -78,14 +70,6 @@ services:
       - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - AWS_REGION=${AWS_REGION:-ap-south-1}
-      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
-      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
-      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_WORKER_INT_PORT:-4003}/healthz || exit 1"]
       interval: 30s
@@ -113,7 +97,7 @@ services:
       - "${CONTENT_SEARCH_WORKER_INT_PORT:-4004}"
     environment:
       - PORT=${CONTENT_SEARCH_WORKER_INT_PORT:-4004}
-      - ENV_TYPE=${ENV_TYPE:-dev}
+      - ENV_TYPE=dev
       - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
       - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
       - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
@@ -123,14 +107,6 @@ services:
       - WORKER_CONCURRENCY=${SEARCH_WORKER_CONCURRENCY:-3}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - AWS_REGION=${AWS_REGION:-ap-south-1}
-      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
-      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
-      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SEARCH_WORKER_INT_PORT:-4004}/healthz || exit 1"]
       interval: 30s
@@ -154,7 +130,7 @@ services:
       - "${CONTENT_PERSONALIZER_INT_PORT:-4005}"
     environment:
       - PORT=${CONTENT_PERSONALIZER_INT_PORT:-4005}
-      - ENV_TYPE=${ENV_TYPE:-dev}
+      - ENV_TYPE=dev
       - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
       - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka-1:9092}
       - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
@@ -163,14 +139,6 @@ services:
       - WORKER_CONCURRENCY=${PERSONALIZER_WORKER_CONCURRENCY:-3}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - AWS_REGION=${AWS_REGION:-ap-south-1}
-      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://host.docker.internal:4566}
-      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
-      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_PERSONALIZER_INT_PORT:-4005}/healthz || exit 1"]
       interval: 30s

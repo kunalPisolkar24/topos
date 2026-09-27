@@ -1,11 +1,14 @@
 package cache
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,8 +56,8 @@ const (
 // observable instead of invisible. A circuit breaker prevents a dead Redis
 // from adding seconds of timeout to every request.
 type Cache struct {
-	client *redis.Client
-	opts   Options
+	client  *redis.Client
+	opts    Options
 	breaker *cacheBreaker
 
 	// coalesceMu guards inFlight, the single-flight registry that
@@ -93,11 +96,11 @@ func New(ctx context.Context, opts Options) (*Cache, error) {
 	}
 
 	c := &Cache{
-		client:  client,
-		opts:    opts,
-		breaker: newCacheBreaker(),
+		client:   client,
+		opts:     opts,
+		breaker:  newCacheBreaker(),
 		inFlight: make(map[string]*inFlightCall),
-		stopCh:  make(chan struct{}),
+		stopCh:   make(chan struct{}),
 	}
 	c.breaker.recordSuccess()
 	go c.reconnectLoop()
@@ -112,11 +115,11 @@ func New(ctx context.Context, opts Options) (*Cache, error) {
 func NewResilient(ctx context.Context, opts Options) *Cache {
 	client := newClient(opts)
 	c := &Cache{
-		client:  client,
-		opts:    opts,
-		breaker: newCacheBreaker(),
+		client:   client,
+		opts:     opts,
+		breaker:  newCacheBreaker(),
 		inFlight: make(map[string]*inFlightCall),
-		stopCh:  make(chan struct{}),
+		stopCh:   make(chan struct{}),
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -140,7 +143,55 @@ func newClient(opts Options) *redis.Client {
 		MaxRetries:      maxRetries,
 		MinRetryBackoff: minRetryBackoff,
 		MaxRetryBackoff: maxRetryBackoff,
+		// RESP2 handshake (plain AUTH, no HELLO 3): Floci's ElastiCache
+		// proxy answers HELLO with NOAUTH and drops the connection.
+		// Plain ElastiCache/Redis serve RESP2 fine for everything used
+		// here (GET/SET/DEL/SCAN/PING).
+		Protocol: 2,
+		// Pre-authenticate the socket: go-redis always opens with HELLO
+		// (even for Protocol 2), which Floci rejects pre-auth by closing
+		// the connection. An already-authed socket survives HELLO's
+		// rejection, and go-redis then falls back to legacy AUTH.
+		Dialer: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialWithPreAuth(ctx, network, addr, opts.Password)
+		},
 	})
+}
+
+// dialWithPreAuth dials Redis and, when a password is set, issues a raw
+// AUTH before returning the socket so go-redis's mandatory HELLO handshake
+// is answered on an authenticated connection. Plain TCP only: this service
+// uses plaintext Redis (Floci proxy with AUTH token, passwordless AWS).
+func dialWithPreAuth(ctx context.Context, network, addr, password string) (net.Conn, error) {
+	d := &net.Dialer{Timeout: dialTimeout}
+	conn, err := d.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(password) == "" {
+		return conn, nil
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	} else {
+		_ = conn.SetDeadline(time.Now().Add(dialTimeout))
+	}
+	cmd := fmt.Sprintf("*2\r\n$4\r\nAUTH\r\n$%d\r\n%s\r\n", len(password), password)
+	if _, err := conn.Write([]byte(cmd)); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	line, err := bufio.NewReader(conn).ReadString('\n')
+	_ = conn.SetDeadline(time.Time{})
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	if !strings.HasPrefix(line, "+OK") {
+		_ = conn.Close()
+		return nil, fmt.Errorf("redis pre-auth rejected: %s", strings.TrimSpace(line))
+	}
+	return conn, nil
 }
 
 func (c *Cache) Close() error {

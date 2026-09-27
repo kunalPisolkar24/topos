@@ -101,6 +101,23 @@ docker-stop:
 docker-logs:
 	docker logs -f topos-ai
 
+# --- Prod (ENV_TYPE=prod, SM-driven, fake AI modes, no bundled DB) ---
+# Against Floci: control plane (SM/SSM) + checkpoint DB (Floci RDS :7001).
+# LLM/VECTOR/EMBEDDING all fake: no Qdrant/Ollama/API key needed.
+COMPOSE_PROD := docker compose -f infra/compose.prod.yml --project-name topos-ai-prod
+
+up-prod:
+	$(COMPOSE_PROD) up -d --build --wait ai-service
+
+down-prod:
+	$(COMPOSE_PROD) down
+
+logs-prod:
+	$(COMPOSE_PROD) logs -f
+
+clean-prod:
+	$(COMPOSE_PROD) down -v --remove-orphans
+
 # --- Load Test Targets ---
 
 COMPOSE_LT := docker compose -f infra/compose.load.yml --project-name topos-ai-loadtest

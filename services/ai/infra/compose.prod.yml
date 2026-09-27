@@ -1,0 +1,68 @@
+# =============================================================================
+# Topos ai-service — Prod stack (standalone, no docker postgres/qdrant/ollama)
+# =============================================================================
+# Used alone (never merged with compose.yml):
+#   docker compose -f infra/compose.prod.yml --project-name topos-ai-prod \
+#     up -d --build --wait ai-service
+# (`make up-prod` does this.)
+#
+# Contract:
+# - Control plane (SSM /topos/ai/config + SM topos/ai/secrets) AND the
+#   checkpoint data plane (ai_checkpoints on Floci RDS :7001) come from the
+#   real Floci emulator. The `floci` hostname resolves on floci-apps.
+# - Fake modes (LLM/VECTOR/EMBEDDING) mean no Qdrant, Ollama, or LLM API
+#   key is needed; summaries/tags are deterministic canned responses.
+# - SM-owned secrets are emptied below so ENV_TYPE=prod hydrates them from
+#   Floci SM instead of shadowing them with dev defaults.
+# - Service name stays `ai-service`: content workers dial
+#   ai-service:50051 on floci-apps by default.
+# =============================================================================
+
+name: topos-ai-prod
+
+services:
+  ai-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${AI_SERVICE_EXT_PORT:-50051}:${AI_SERVICE_INT_PORT:-50051}"
+      - "${AI_METRICS_EXT_PORT:-12666}:${AI_METRICS_INT_PORT:-12666}"
+    environment:
+      - PORT=${AI_SERVICE_INT_PORT:-50051}
+      - METRICS_PORT=${AI_METRICS_INT_PORT:-12666}
+      - ENV_TYPE=prod
+      # SM-owned: hydrate from topos/ai/secrets (or external injection).
+      - CHECKPOINT_DB_URL=${AI_CHECKPOINT_DB_URL:-}
+      - CHECKPOINT_DB_URL_MIGRATE=${AI_CHECKPOINT_DB_URL_MIGRATE:-}
+      - LLM_API_KEY=${LIGHTNING_AI_API_KEY:-}
+      - QDRANT_URL=${AI_QDRANT_URL:-}
+      - QDRANT_API_KEY=${AI_QDRANT_API_KEY:-}
+      - EMBEDDING_URL=${AI_EMBEDDING_URL:-}
+      - CONTENT_INTERNAL_TOKEN=${CONTENT_INTERNAL_TOKEN:-}
+      # Deterministic fake modes: no external AI infra needed.
+      - LLM_MODE=fake
+      - VECTOR_MODE=fake
+      - EMBEDDING_MODE=fake
+      - LOG_LEVEL=${AI_LOG_LEVEL:-INFO}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${AI_OTLP_ENDPOINT:-}
+      # Floci reachable by container name on the floci-apps network.
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - AI_SECRETS_NAME=${AI_SECRETS_NAME:-topos/ai/secrets}
+      - AI_CONFIG_PARAM=${AI_CONFIG_PARAM:-/topos/ai/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${AI_METRICS_INT_PORT:-12666}/metrics')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - floci-bridge
+
+networks:
+  floci-bridge:
+    name: floci-apps
+    external: true
