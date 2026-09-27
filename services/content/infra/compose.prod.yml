@@ -41,6 +41,9 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - JWT_SECRET=${CONTENT_JWT_SECRET:-}
       - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
+      # Prefixed alias: the app normalizes CONTENT_INTERNAL_TOKEN itself, so
+      # direct .env injection works even when SM hydration is skipped.
+      - CONTENT_INTERNAL_TOKEN=${CONTENT_INTERNAL_TOKEN:-}
       - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
       # SSM-owned config keeps compose fallbacks (same values as Floci SSM).
       - DB_NAME=${CONTENT_DB_NAME:-blog_content}
@@ -105,6 +108,85 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_WORKER_INT_PORT:-4003}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  content-search-worker:
+    # Indexing worker: consumes Floci MSK `posts`, indexes into Qdrant via
+    # AI (Cloud inference). Same SM-driven env as the service.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-search-worker"]
+    expose:
+      - "${CONTENT_SEARCH_WORKER_INT_PORT:-4004}"
+    environment:
+      - PORT=${CONTENT_SEARCH_WORKER_INT_PORT:-4004}
+      - ENV_TYPE=prod
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_SEARCH_CONSUMER_GROUP_ID=${KAFKA_SEARCH_CONSUMER_GROUP_ID:-content-search-worker-group}
+      - WORKER_CONCURRENCY=${SEARCH_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SEARCH_WORKER_INT_PORT:-4004}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  content-personalizer:
+    # Taste-profile worker: consumes Floci MSK `user-interacted`, updates
+    # user interest profiles in Qdrant via AI. Same SM-driven env.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-personalizer"]
+    expose:
+      - "${CONTENT_PERSONALIZER_INT_PORT:-4005}"
+    environment:
+      - PORT=${CONTENT_PERSONALIZER_INT_PORT:-4005}
+      - ENV_TYPE=prod
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_PERSONALIZER_CONSUMER_GROUP_ID=${KAFKA_PERSONALIZER_CONSUMER_GROUP_ID:-content-personalizer-worker-group}
+      - WORKER_CONCURRENCY=${PERSONALIZER_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_PERSONALIZER_INT_PORT:-4005}/healthz || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
