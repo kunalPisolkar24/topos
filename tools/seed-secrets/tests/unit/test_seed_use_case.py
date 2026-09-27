@@ -147,3 +147,33 @@ def test_build_payloads_ai_canonical_wins() -> None:
     seeder = SeedUseCase(FakeStore())
     payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config"}))
     assert payloads[0].data["LLM_MODEL"] == "canonical-model"
+
+
+def test_floci_localhost_db_url_guard() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@localhost:5432/topos_users"}
+    seeder = SeedUseCase(FakeStore())
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=False)
+    try:
+        seeder.seed(cfg, env)
+        raise AssertionError("should have raised GuardError")
+    except GuardError as e:
+        assert "localhost" in str(e)
+
+
+def test_floci_docker_hostname_allowed() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@user-postgres:5432/topos_users"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=True)
+    results, _ = seeder.seed(cfg, env)
+    assert results
+
+
+def test_floci_guard_force_override() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@localhost:5432/topos_users"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=False, force=True)
+    results, _ = seeder.seed(cfg, env)
+    assert results
+    assert store.calls == ["topos/user/secrets"]

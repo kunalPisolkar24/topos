@@ -1,0 +1,97 @@
+# =============================================================================
+# Topos user-service — Floci stack (standalone, no docker postgres/redis)
+# =============================================================================
+# Used alone (never merged with compose.yml):
+#   docker compose -f infra/compose.prod.yml --project-name topos-user-prod \
+#     up -d --build --wait user-service
+# (`make up-prod` does this.)
+#
+# Contract:
+# - Control plane (SSM /topos/user/config + SM topos/user/secrets) AND data
+#   plane (RDS Postgres on :7001, ElastiCache/Valkey on :6379) both come
+#   from the real Floci emulator (floci/floci, Docker-backed). The Floci
+#   container must be running as `floci` attached to the `floci-apps`
+#   network (`docker network connect floci-apps floci`) so the hostname
+#   resolves here.
+# - SM-owned secrets are emptied below so ENV_TYPE=prod hydrates them from
+#   Floci SM instead of shadowing them with dev defaults (the same bug the
+#   old overlay fixed: baked defaults silently beat fill-missing hydration).
+# - External injection still wins: set USER_DATABASE_URL / USER_REDIS_URL /
+#   USER_JWT_SECRET explicitly to override SM.
+# =============================================================================
+
+name: topos-user-prod
+
+services:
+  user-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${USER_SERVICE_EXT_PORT:-4001}:4001"
+    environment:
+      - PORT=4001
+      - NODE_ENV=${NODE_ENV:-production}
+      - ENV_TYPE=prod
+      # SM-owned: hydrate from topos/user/secrets (or external injection).
+      - DATABASE_URL=${USER_DATABASE_URL:-}
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-}
+      - REDIS_URL=${USER_REDIS_URL:-}
+      - JWT_SECRET=${USER_JWT_SECRET:-}
+      # SSM-owned config keeps compose fallbacks (same values as Floci SSM).
+      - PG_POOL_MAX=${USER_PG_POOL_MAX:-10}
+      - PG_POOL_IDLE_TIMEOUT_MS=${USER_PG_POOL_IDLE_TIMEOUT_MS:-30000}
+      - PG_POOL_CONNECTION_TIMEOUT_MS=${USER_PG_POOL_CONNECTION_TIMEOUT_MS:-5000}
+      - JWT_ISSUER=${USER_JWT_ISSUER:-user-service}
+      - JWT_AUDIENCE=${USER_JWT_AUDIENCE:-topos}
+      - JWT_EXPIRES_IN=${USER_JWT_EXPIRES_IN:-7d}
+      - REDIS_CACHE_TTL_MS=${USER_CACHE_TTL_MS:-3600000}
+      - REDIS_MISSING_CACHE_TTL_MS=${USER_MISSING_CACHE_TTL_MS:-60000}
+      - LOG_LEVEL=${USER_LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${USER_OTLP_ENDPOINT:-}
+      - OTEL_SERVICE_NAME=user-service
+      # Floci reachable by container name on the bridge network.
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - USER_SECRETS_NAME=${USER_SECRETS_NAME:-topos/user/secrets}
+      - USER_CONFIG_PARAM=${USER_CONFIG_PARAM:-/topos/user/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      user-migrator:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  user-migrator:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    environment:
+      - ENV_TYPE=prod
+      # Same rule as the service: SM provides the migrate URL unless an
+      # external writer URL is injected.
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-}
+      - AI_CHECKPOINTER_PASSWORD=${USER_AI_CHECKPOINTER_PASSWORD:-}
+      - AI_CHECKPOINTER_USER=${USER_AI_CHECKPOINTER_USER:-ai_checkpointer}
+      - AI_CHECKPOINT_DB=${USER_AI_CHECKPOINT_DB:-ai_checkpoints}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - USER_SECRETS_NAME=${USER_SECRETS_NAME:-topos/user/secrets}
+      - USER_CONFIG_PARAM=${USER_CONFIG_PARAM:-/topos/user/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    networks:
+      - floci-bridge
+
+networks:
+  floci-bridge:
+    name: floci-apps
+    external: true

@@ -4,15 +4,61 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
+from urllib.parse import urlparse
 
 from src.core.exceptions import GuardError
-from src.domain.constants import APP_SECRETS, SECRET_KEY_MAP, TF_MANAGED_SECRETS
+from src.domain.constants import (
+    APP_SECRETS,
+    DATA_PLANE_URL_KEYS,
+    FLOCI_UNREACHABLE_HOSTS,
+    SECRET_KEY_MAP,
+    TF_MANAGED_SECRETS,
+)
 from src.domain.schemas import SecretPayload, SeedConfig
 from src.interfaces.secrets_store import ISecretsStore
 
 
 def _default_key_gen(nbytes: int) -> str:
     return secrets.token_hex(nbytes)
+
+
+def _is_floci_target(config: SeedConfig) -> bool:
+    ep = (config.endpoint_url or "").lower()
+    return "localhost:4566" in ep or "127.0.0.1:4566" in ep or "host.docker.internal:4566" in ep
+
+
+def _url_hosts(value: str) -> list[str]:
+    """Extract candidate hosts from a URL or comma-separated host list."""
+    hosts: list[str] = []
+    for part in value.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "://" in part:
+            try:
+                host = (urlparse(part).hostname or "").lower()
+            except ValueError:
+                host = ""
+            if host:
+                hosts.append(host)
+        else:
+            hosts.append(part.split(":")[0].strip().lower())
+    return hosts
+
+
+def _floci_unreachable_payloads(payloads: list[SecretPayload]) -> list[str]:
+    """Describe data-plane URLs pointing at container-unreachable hosts."""
+    bad: list[str] = []
+    for p in payloads:
+        for key in DATA_PLANE_URL_KEYS:
+            value = p.data.get(key, "")
+            if not value:
+                continue
+            for host in _url_hosts(value):
+                if host in FLOCI_UNREACHABLE_HOSTS:
+                    bad.append(f"{p.name}:{key} host {host!r} is unreachable from containers")
+                    break
+    return bad
 
 
 class SeedUseCase:
@@ -125,6 +171,15 @@ class SeedUseCase:
             )
 
         payloads = self.build_payloads(env, only=config.only)
+
+        if _is_floci_target(config) and not config.force and not config.dry_run:
+            bad = _floci_unreachable_payloads(payloads)
+            if bad:
+                raise GuardError(
+                    "refusing to seed container-unreachable data-plane URLs to Floci "
+                    f"without --force ({'; '.join(bad)}). Use docker hostnames "
+                    "(e.g. user-postgres) instead of localhost."
+                )
 
         generated: list[str] = []
 

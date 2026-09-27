@@ -46,7 +46,13 @@ the user block from `infrastructure/docker/local/.env.local.example` into
 
 ## Running the stack
 
-The service runs as a single Postgres + Redis + service stack (`infra/compose.yml`):
+Three modes, one service image (`infra/compose.yml` for dev, `infra/compose.prod.yml` for prod):
+
+| Mode | Command | `ENV_TYPE` | Secrets/config source | Data plane |
+|---|---|---|---|---|
+| Docker standalone (dev) | `make up` | `dev` | compose dev defaults, zero AWS calls | included `user-postgres` + `user-redis` |
+| Floci | `make up-prod` (needs the `floci` container on `:4566` attached to the `floci-apps` network — see `infra/compose.prod.yml` header) | `prod` | Floci SM `topos/user/secrets` + SSM `/topos/user/config` | Floci RDS (`floci:7001`) + ElastiCache (`floci:6379`), no docker DB |
+| Real AWS | `make up-prod` with `AWS_ENDPOINT_URL=` empty + external `USER_DATABASE_URL` (proxy, `?sslmode=require`) | `prod` | SM/SSM, task-def injection wins via fill-missing | RDS Proxy + ElastiCache |
 
 ```bash
 make up     # builds and starts postgres + redis + migrator + service
@@ -54,6 +60,9 @@ make logs   # tail the logs
 make down   # stop (keeps volumes)
 make clean  # stop and delete volumes
 ```
+
+Run only one stack on default ports at a time (`down` one before `up`ing
+the other).
 
 No env file needed — defaults come from `infra/compose.yml`. The service is on
 `:4001`; Postgres `:5432` (external port `USER_POSTGRES_EXT_PORT`), Redis
@@ -96,8 +105,9 @@ standalone. Env is documented in `.env.example` (standalone) and
   `PG_POOL_CONNECTION_TIMEOUT_MS` (`USER_PG_*` locally, SSM
   `/topos/user/config` in prod). No `SET`-based options are used on purpose:
   `SET` pins RDS Proxy sessions.
-- The `user-migrator` entrypoint (`scripts/migrator-entrypoint.sh`) first runs
-  `scripts/bootstrap-ai-db.mjs`, which ensures the AI `ai_checkpointer` role
+- The `user-migrator` runner (`scripts/migrator-run.mjs`) hydrates SM/SSM
+  when `ENV_TYPE=prod` (same fill-missing contract as the service), then
+  runs `scripts/bootstrap-ai-db.mjs`, which ensures the AI `ai_checkpointer` role
   + `ai_checkpoints` database exist on the shared instance (idempotent, safe
   to run every deploy; warns and continues on failure so user migrations are
   never blocked). Needs `AI_CHECKPOINTER_PASSWORD` (`AI_POSTGRES_PASSWORD`

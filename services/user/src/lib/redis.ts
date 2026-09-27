@@ -16,6 +16,11 @@ function baseOptions(): Record<string, unknown> {
     maxRetriesPerRequest: 2,
     connectTimeout: 2000,
     retryStrategy,
+    // RESP2 handshake (plain AUTH, no HELLO): Floci's ElastiCache proxy
+    // closes connections that open with HELLO 3 (ioredis v6 default).
+    // Plain ElastiCache/Redis serve RESP2 fine; all commands used here
+    // (GET/SET/DEL/SCAN/PING) are protocol-agnostic.
+    protocol: 2,
   };
 }
 

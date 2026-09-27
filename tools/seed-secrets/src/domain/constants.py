@@ -181,6 +181,34 @@ SECRET_KEY_MAP: dict[str, list[str]] = {
     ],
 }
 
+# Hosts that are unreachable from inside containers. Seeding a data-plane
+# URL with one of these hosts to Floci/LocalStack breaks containerized
+# services (they need docker hostnames such as user-postgres, never
+# localhost). Guarded without --force (see SeedUseCase.seed).
+FLOCI_UNREACHABLE_HOSTS: frozenset[str] = frozenset(
+    {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "0.0.0.0",
+    }
+)
+
+# Payload keys holding data-plane connection URLs (host part is checked).
+DATA_PLANE_URL_KEYS: frozenset[str] = frozenset(
+    {
+        "DATABASE_URL",
+        "DATABASE_URL_MIGRATE",
+        "CHECKPOINT_DB_URL",
+        "CHECKPOINT_DB_URL_MIGRATE",
+        "REDIS_URL",
+        "MONGO_URI",
+        "KAFKA_BROKERS",
+        "QDRANT_URL",
+        "EMBEDDING_URL",
+    }
+)
+
 # Allowlist = union of all keys we ever read from .env
 ALLOWLIST: frozenset[str] = frozenset({k for keys in SECRET_KEY_MAP.values() for k in keys})
 

@@ -27,7 +27,7 @@ FROM deps AS migrator
 COPY prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts ./scripts
-CMD ["sh", "./scripts/migrator-entrypoint.sh"]
+CMD ["node", "./scripts/migrator-run.mjs"]
 
 FROM base AS runtime
 ARG GIT_REVISION=unknown

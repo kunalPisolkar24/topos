@@ -15,6 +15,16 @@ dotenv.config();
 const rawEnvType = process.env.ENV_TYPE?.trim() || 'dev';
 const isProd = rawEnvType === 'prod';
 
+// Tracks where each key came from for the startup log below (names only,
+// never values). Pre-existing process env wins over SM/SSM (fill-missing),
+// so external injection (ECS task def, explicit USER_* env) keeps working.
+const envSources: Record<string, 'env' | 'ssm' | 'sm'> = {};
+for (const k of Object.keys(process.env)) {
+  if (process.env[k] !== undefined && process.env[k] !== '') {
+    envSources[k] = 'env';
+  }
+}
+
 if (isProd) {
   // Top-level await: hydrate process.env from AWS before zod validates.
   // This keeps a single code path for Floci and real AWS.
@@ -36,6 +46,8 @@ if (isProd) {
       };
     }
 
+    let ssmKeys = 0;
+    let smKeys = 0;
     try {
       const { SSMClient, GetParameterCommand } = await import('@aws-sdk/client-ssm');
       const { SecretsManagerClient, GetSecretValueCommand } = await import('@aws-sdk/client-secrets-manager');
@@ -51,6 +63,8 @@ if (isProd) {
           for (const [k, v] of Object.entries(parsed)) {
             if (v != null && v !== '' && !process.env[k]) {
               process.env[k] = String(v);
+              envSources[k] = 'ssm';
+              ssmKeys += 1;
             }
           }
         }
@@ -70,6 +84,8 @@ if (isProd) {
           for (const [k, v] of Object.entries(parsed)) {
             if (v != null && v !== '' && !process.env[k]) {
               process.env[k] = String(v);
+              envSources[k] = 'sm';
+              smKeys += 1;
             }
           }
         }
@@ -81,6 +97,22 @@ if (isProd) {
       }
     } catch (e) {
       console.warn(`[env] AWS SDK load failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    const target = endpoint ? `Floci (${endpoint})` : 'real AWS';
+    const hydrated = Object.entries(envSources)
+      .filter(([, src]) => src === 'ssm' || src === 'sm')
+      .map(([k, src]) => `${k}=${src}`)
+      .sort()
+      .join(', ');
+    console.log(`[env] ENV_TYPE=prod hydrated ${ssmKeys} SSM + ${smKeys} SM keys from ${target}${hydrated ? ` (${hydrated})` : ''}`);
+    // SM-owned secrets must come from SM (or external injection) in prod:
+    // the Floci overlay empties compose defaults on purpose, so a missing
+    // key here means SM was unreachable — zod below fails fast either way.
+    for (const k of ['DATABASE_URL', 'JWT_SECRET']) {
+      if (!process.env[k] && !process.env[`USER_${k}`]) {
+        console.warn(`[env] ${k} is unset after ${target} hydration; check ${secretsName}`);
+      }
     }
   })();
 }

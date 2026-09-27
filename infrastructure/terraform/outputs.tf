@@ -9,19 +9,19 @@ output "user_db_subnet_group" {
 }
 
 output "user_db_writer_endpoint" {
-  description = "RDS writer endpoint (for migrator: DATABASE_URL_MIGRATE)"
+  description = "RDS writer endpoint (for migrator: DATABASE_URL_MIGRATE). Mock-only on Floci — the app uses docker user-postgres there (see user_secrets_name)."
   value       = module.user_database.writer_endpoint
   sensitive   = true
 }
 
 output "user_db_reader_endpoint" {
-  description = "RDS reader endpoint"
+  description = "RDS reader endpoint. Mock-only on Floci."
   value       = module.user_database.reader_endpoint
   sensitive   = true
 }
 
 output "user_db_proxy_endpoint" {
-  description = "RDS Proxy endpoint (for app: DATABASE_URL)"
+  description = "RDS Proxy endpoint (for app: DATABASE_URL on real AWS). Mock-only on Floci — the app uses docker user-postgres there."
   value       = module.user_database.proxy_endpoint
   sensitive   = true
 }
@@ -37,7 +37,7 @@ output "user_db_master_secret_arn" {
 }
 
 output "user_redis_endpoint" {
-  description = "ElastiCache primary endpoint"
+  description = "ElastiCache primary endpoint. Mock-only on Floci — the app uses docker user-redis there."
   value       = module.user_cache.primary_endpoint
   sensitive   = true
 }
@@ -48,7 +48,7 @@ output "user_redis_reader_endpoint" {
 }
 
 output "user_redis_url" {
-  description = "Redis URL (rediss:// with token when TLS+auth)"
+  description = "Redis URL (rediss:// with token when TLS+auth). Mock-only on Floci — the app uses docker user-redis there."
   value       = module.user_cache.redis_url
   sensitive   = true
 }

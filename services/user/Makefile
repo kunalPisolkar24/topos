@@ -115,6 +115,10 @@ load-test-tail:
 	$(COMPOSE_LT) logs -f
 
 # --- Standalone Stack (single Postgres + Redis + service) ---
+# Dev defaults live in compose.yml (ENV_TYPE=dev, zero AWS calls).
+# Prod (Floci/AWS) is the separate compose.prod.yml file (ENV_TYPE=prod,
+# SM-owned secrets emptied there so SM/SSM hydration wins). Never run two
+# stacks on default ports at once — `down` one before `up`ing the other.
 
 COMPOSE := docker compose -f infra/compose.yml --project-name topos-user-local
 
@@ -162,19 +166,22 @@ local-down: down
 local-logs: logs
 local-clean: clean
 
-# --- Floci (AWS emulation via Floci on host.docker.internal:4566) ---
-# compose.yml now carries Floci-friendly defaults (ENV_TYPE, AWS_*, extra_hosts),
-# so Floci is just ENV_TYPE=prod on the same compose file.
-COMPOSE_FLOCI := docker compose -f infra/compose.yml --project-name topos-user-floci
+# --- Prod (ENV_TYPE=prod, SM-driven, no bundled DB) ---
+# Against Floci: control plane (SM/SSM) and data plane (RDS :7001,
+# Valkey :6379) both come from the `floci` container (running first:
+# docker run ... --name floci ... + attached to `floci-apps`).
+# Against real AWS later: same file, AWS_ENDPOINT_URL empty + external
+# USER_DATABASE_URL/USER_REDIS_URL injection.
+COMPOSE_PROD := docker compose -f infra/compose.prod.yml --project-name topos-user-prod
 
-up-floci:
-	ENV_TYPE=prod $(COMPOSE_FLOCI) up -d --build --wait user-service
+up-prod:
+	$(COMPOSE_PROD) up -d --build --wait user-service
 
-down-floci:
-	$(COMPOSE_FLOCI) down
+down-prod:
+	$(COMPOSE_PROD) down
 
-logs-floci:
-	$(COMPOSE_FLOCI) logs -f
+logs-prod:
+	$(COMPOSE_PROD) logs -f
 
-clean-floci:
-	$(COMPOSE_FLOCI) down -v --remove-orphans
+clean-prod:
+	$(COMPOSE_PROD) down -v --remove-orphans

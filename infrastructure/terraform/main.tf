@@ -181,15 +181,18 @@ resource "aws_secretsmanager_secret_version" "user_secrets" {
   secret_id = aws_secretsmanager_secret.user_secrets.id
   secret_string = jsonencode(
     var.environment == "floci" ? {
-      # Floci: point at the docker compose services so the container can actually connect.
-      # The mocked RDS/ElastiCache endpoints (172.18.0.2:7001, localhost:6379) are not
-      # reachable from the app network; use the real docker service names on app-network.
-      DATABASE_URL         = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
-      DATABASE_URL_MIGRATE = "postgresql://topos_user:topos_pass@user-postgres:5432/topos_users"
-      # Consumed by the user-migrator entrypoint to bootstrap the AI
+      # Floci data plane (real, Docker-backed): RDS Postgres is served on
+      # the Floci container's proxy port 7001 and ElastiCache/Valkey on
+      # 6379 (plaintext + AUTH token at the proxy). The `floci` hostname
+      # resolves from app containers on the bridge network (see
+      # services/user/infra/compose.prod.yml), so no docker postgres/redis
+      # is needed. Real AWS uses the proxy / ElastiCache endpoints below.
+      DATABASE_URL         = "postgresql://${var.postgres_username}:${module.user_database.master_password}@floci:7001/${var.postgres_db_name}"
+      DATABASE_URL_MIGRATE = "postgresql://${var.postgres_username}:${module.user_database.master_password}@floci:7001/${var.postgres_db_name}"
+      # Consumed by the user-migrator runner to bootstrap the AI
       # checkpointer role/database (see services/user/scripts/).
-      AI_CHECKPOINTER_PASSWORD = "ai_checkpointer_pass"
-      REDIS_URL                = "redis://user-redis:6379"
+      AI_CHECKPOINTER_PASSWORD = module.user_database.ai_password
+      REDIS_URL                = "redis://:${module.user_cache.auth_token}@floci:6379"
       JWT_SECRET               = "floci-jwt-secret-0123456789abcdef0123456789abcdef-floci"
       } : {
       # Pooled app URL goes through the proxy (require_tls) with verified
