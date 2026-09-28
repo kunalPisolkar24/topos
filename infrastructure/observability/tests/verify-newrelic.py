@@ -22,6 +22,7 @@ dashboard_names = [
     f"Topos {environment} - AI Service",
     f"Topos {environment} - User Service",
     f"Topos {environment} - Gateway",
+    f"Topos {environment} - Logs",
 ]
 
 query = """
