@@ -31,6 +31,7 @@ export interface UseChatControllerResult {
   streamingContent: string;
   isAsking: boolean;
   isCreating: boolean;
+  freshChatId: string | null;
   askError: string | null;
   selectChat: (id: string | null) => void;
   createChat: (title?: string) => Promise<string | null>;
@@ -68,6 +69,9 @@ export const useChatController = (streaming?: ChatStreamingOptions): UseChatCont
   const [streamingContent, setStreamingContent] = useState("");
   const [isAsking, setIsAsking] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  // Chats created in this session are known empty: the thread renders the
+  // empty state directly instead of flashing a skeleton while history loads.
+  const [freshChatId, setFreshChatId] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -160,6 +164,7 @@ export const useChatController = (streaming?: ChatStreamingOptions): UseChatCont
     sequenceRef.current += 1;
     setIsAsking(false);
     setStreamingContent("");
+    setFreshChatId(null);
     setActiveChatId(id);
   }, []);
 
@@ -171,6 +176,7 @@ export const useChatController = (streaming?: ChatStreamingOptions): UseChatCont
         const id = data?.createChat.id ?? null;
         if (id) {
           await chatRepository.refreshChatLists(client);
+          setFreshChatId(id);
           setActiveChatId(id);
         }
         return id;
@@ -208,13 +214,18 @@ export const useChatController = (streaming?: ChatStreamingOptions): UseChatCont
         await deleteChatMutation({ variables: { id } });
         toast({ title: "Chat deleted" });
         chatRepository.evictChat(client, id);
+        // Select the next chat synchronously so the thread never flashes
+        // through an empty state before the auto-select effect fires.
+        setFreshChatId(null);
+        setActiveChatId((current) =>
+          current === id ? (chats.find((chat) => chat.id !== id)?.id ?? null) : current,
+        );
         await chatRepository.refreshChatLists(client);
-        setActiveChatId((current) => (current === id ? null : current));
       } catch {
         toast({ title: "Could not delete chat", variant: "destructive" });
       }
     },
-    [client, deleteChatMutation, toast],
+    [chats, client, deleteChatMutation, toast],
   );
 
   const stop = useCallback(() => {
@@ -373,6 +384,7 @@ export const useChatController = (streaming?: ChatStreamingOptions): UseChatCont
     streamingContent,
     isAsking,
     isCreating,
+    freshChatId,
     askError,
     selectChat,
     createChat,
