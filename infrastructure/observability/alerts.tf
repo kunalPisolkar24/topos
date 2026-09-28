@@ -60,3 +60,55 @@ resource "newrelic_nrql_alert_condition" "p95_latency" {
 
   violation_time_limit_seconds = var.alert_violation_time_limit_seconds
 }
+
+# Log alerts ride the same policy. Thresholds count ERROR/FATAL lines per
+# evaluation window; the silence alert is off until logs are confirmed
+# flowing in production (see log_silence_alert_enabled).
+resource "newrelic_nrql_alert_condition" "log_errors" {
+  account_id = var.newrelic_account_id
+  policy_id  = newrelic_alert_policy.topos.id
+  type       = "static"
+  name       = "Topos ${var.environment} high error log volume"
+  enabled    = true
+
+  nrql {
+    query = "SELECT count(*) FROM ${local.log_source} WHERE log_level IN ('ERROR', 'FATAL') FACET service.name"
+  }
+
+  warning {
+    operator              = "above"
+    threshold             = var.log_error_warning_threshold
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  critical {
+    operator              = "above"
+    threshold             = var.log_error_critical_threshold
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  violation_time_limit_seconds = var.alert_violation_time_limit_seconds
+}
+
+resource "newrelic_nrql_alert_condition" "log_silence" {
+  account_id = var.newrelic_account_id
+  policy_id  = newrelic_alert_policy.topos.id
+  type       = "static"
+  name       = "Topos ${var.environment} log pipeline silence"
+  enabled    = var.log_silence_alert_enabled
+
+  nrql {
+    query = "SELECT count(*) FROM ${local.log_source}"
+  }
+
+  critical {
+    operator              = "below"
+    threshold             = 1
+    threshold_duration    = var.log_silence_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  violation_time_limit_seconds = var.alert_violation_time_limit_seconds
+}

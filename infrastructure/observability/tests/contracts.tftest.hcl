@@ -111,4 +111,34 @@ run "production_dashboard_and_alerts" {
     condition     = strcontains(newrelic_nrql_alert_condition.error_rate.nrql[0].query, "deployment.environment = 'prod'")
     error_message = "Alert NRQL must be scoped to its deployment environment."
   }
+
+  assert {
+    condition     = jsondecode(newrelic_one_dashboard_json.logs.json).permissions == "PRIVATE"
+    error_message = "The Logs dashboard must be private by default."
+  }
+
+  assert {
+    condition     = jsondecode(newrelic_one_dashboard_json.logs.json).name == "Topos prod - Logs"
+    error_message = "The Logs dashboard must follow the Topos <env> - <service> naming."
+  }
+
+  assert {
+    condition     = length(jsondecode(newrelic_one_dashboard_json.logs.json).pages[0].widgets) == 5
+    error_message = "The Logs dashboard must retain its five widgets."
+  }
+
+  assert {
+    condition     = newrelic_nrql_alert_condition.log_errors.critical[0].threshold == var.log_error_critical_threshold
+    error_message = "The log-errors alert must use the configurable critical threshold."
+  }
+
+  assert {
+    condition     = strcontains(newrelic_nrql_alert_condition.log_errors.nrql[0].query, "deployment.environment = 'prod'")
+    error_message = "Log alert NRQL must be scoped to its deployment environment."
+  }
+
+  assert {
+    condition     = newrelic_nrql_alert_condition.log_silence.enabled == false
+    error_message = "The log-silence alert must stay disabled until logs are confirmed flowing."
+  }
 }
