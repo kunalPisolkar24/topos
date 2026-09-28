@@ -23,20 +23,41 @@ services:
 
   # One-shot init: downloads the embedding model into the shared volume
   # so the embedding service starts with the model already available.
-  # OLLAMA_HOST must point at the server container: the CLI defaults to
-  # 127.0.0.1, which is empty inside this one-shot container.
+  # Pulls via the Ollama REST API (/api/pull) instead of the `ollama pull`
+  # CLI: recent ollama images run the CLI as a TUI that fails without a TTY
+  # ("could not open a new TTY") inside a one-shot container, which left
+  # /api/embed returning 404 and the search worker DLQing every post.
+  # The server writes to its own embedding_data volume, so this container
+  # needs no volumes — only network access to embedding-service.
   embedding-model-init:
-    image: ollama/ollama:latest
+    image: curlimages/curl:latest
     restart: "no"
     depends_on:
       embedding-service:
         condition: service_healthy
-    entrypoint: ["sh", "-c"]
-    command: "ollama pull ${EMBEDDING_MODEL:-snowflake-arctic-embed2:568m}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        set -eu;
+        MODEL="$$EMBEDDING_MODEL";
+        MODEL="$${MODEL:-$$AI_EMBEDDING_MODEL}";
+        MODEL="$${MODEL:-snowflake-arctic-embed2:568m}";
+        HOST="$${OLLAMA_HOST:-embedding-service:11434}";
+        echo "pulling embedding model $$MODEL from $$HOST...";
+        for i in $$(seq 1 30); do
+        if curl -fsS "http://$$HOST/api/tags" >/dev/null 2>&1; then break; fi;
+        echo "waiting for embedding-service ($$i/30)..."; sleep 2; done;
+        curl -fsS -m 1200 -X POST "http://$$HOST/api/pull"
+        -H "Content-Type: application/json"
+        -d "{\"name\":\"$$MODEL\"}";
+        curl -fsS -X POST "http://$$HOST/api/show"
+        -H "Content-Type: application/json"
+        -d "{\"name\":\"$$MODEL\"}" >/dev/null;
+        echo "embedding model $$MODEL ready"
     environment:
       - OLLAMA_HOST=embedding-service:11434
-    volumes:
-      - embedding_data:/root/.ollama
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-}
+      - AI_EMBEDDING_MODEL=${AI_EMBEDDING_MODEL:-}
     networks:
       - app-network
 
