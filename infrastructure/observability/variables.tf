@@ -83,3 +83,32 @@ variable "p95_latency_critical_threshold_seconds" {
   type        = number
   default     = 2
 }
+
+variable "log_error_warning_threshold" {
+  description = "Warning count of ERROR/FATAL log lines per evaluation window."
+  type        = number
+  default     = 10
+}
+
+variable "log_error_critical_threshold" {
+  description = "Critical count of ERROR/FATAL log lines per evaluation window."
+  type        = number
+  default     = 50
+}
+
+variable "log_silence_alert_enabled" {
+  description = "Enable the log-pipeline silence alert. Keep false until logs are confirmed flowing, then enable and tune."
+  type        = bool
+  default     = false
+}
+
+variable "log_silence_threshold_duration_seconds" {
+  description = "How long with (near-)zero log volume before the silence alert opens."
+  type        = number
+  default     = 600
+
+  validation {
+    condition     = var.log_silence_threshold_duration_seconds >= 120
+    error_message = "log_silence_threshold_duration_seconds must be at least 120 seconds."
+  }
+}
