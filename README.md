@@ -1,110 +1,88 @@
-# Topos: Full-Stack Blogging Platform with AI Summaries
+# Topos
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Topos is a full-stack blogging platform where people can publish posts, use
+AI-assisted writing tools, search the post library, and receive personalised
+recommendations.
 
-Topos is a full-stack blogging platform: users sign up, write and tag posts,
-and get AI-generated summaries, tags, and related-post recommendations — all
-delivered through a GraphQL federation gateway in front of a polyglot
-microservice architecture.
+## Start here
 
-## Architecture
+- **New to Topos?** Read the [documentation home](docs/README.md), then use
+  the [local quick start](docs/getting-started/quickstart.md).
+- **Working on a service?** Use the service guides for
+  [AI](services/ai/docs/README.md), [content](services/content/docs/README.md),
+  [users](services/user/docs/README.md), [frontend](frontend/docs/README.md),
+  or the [gateway](gateway/docs/README.md).
+- **Running the platform?** Start with the
+  [infrastructure guide](infrastructure/docs/README.md).
+- **Seeding configuration?** Read the
+  [Seed Secrets guide](tools/seed-secrets/docs/README.md).
+- **Understanding product roles?** See [use cases](docs/use-cases.md).
 
-```
-frontend (React + Vite)
-   │  GraphQL
-   ▼
-gateway (Apollo Router :4000)
-   │            │
-   ▼            ▼
-user           content ── gRPC (:50051) ──> ai
-subgraph       subgraph                    (LLM summaries,
-(:4001)        (:4002 + workers)            tags, posts,
-TypeScript     Go 1.25                     vector search)
-Apollo Fed.    gqlgen + Kafka
-   │            │            │
-Postgres      MongoDB      Qdrant
-(+ replicas,  (sharded)    (vectors)
-Pgpool-II)
-```
+## Run locally
 
-- **gateway/** — Apollo Router composing the `user` and `content` subgraphs
-  (`:4000/graphql`, health/metrics on `:8088`).
-- **services/ai/** — Python 3.12 gRPC service (poetry): LLM summaries, tags,
-  full posts, and hybrid (dense + sparse) vector search over Qdrant.
-- **services/content/** — Go 1.25 GraphQL subgraph (gqlgen): posts and tags,
-  plus Kafka workers for AI summary generation and Qdrant indexing, with a
-  DLQ replay tool.
-- **services/user/** — TypeScript (Node 22) Apollo Federation subgraph:
-  accounts, profiles, JWTs, Prisma over Postgres (primary + replicas behind
-  Pgpool-II) with a Redis sentinel cache.
-
-## Repository layout
-
-```
-frontend/        React + Vite SPA (shadcn/ui, GraphQL codegen)
-gateway/         Apollo Router configuration
-services/ai/     Python gRPC service (LLM + vector search)
-services/content/ Go GraphQL subgraph + Kafka workers
-services/user/   TypeScript federation subgraph (accounts, profiles)
-infrastructure/  Docker compose (prod/local), logging (filebeat/logstash)
-```
-
-## Getting started
-
-Prerequisites: Docker with Docker Compose, plus the per-service toolchains
-listed in each service's README (Python 3.12, Go 1.25, Node 22).
-
-### Local stack
+You need Docker Desktop or Docker Engine with the Compose plugin. From the
+repository root:
 
 ```bash
-make local-up     # build and start all local containers
-make local-logs   # tail logs
-make local-down   # stop (keeps volumes)
-make local-clean  # stop and delete volumes
+make local-up
 ```
 
-Per-service local stacks are also available via `compose.local.yml` inside
-each service directory (see the service READMEs).
-
-### Production topology
+The command creates `infrastructure/docker/local/.env.local` from its example
+file when needed, builds the local stack, and waits for its Compose health
+checks. Open <http://localhost:3000> when it is ready.
 
 ```bash
-cp infrastructure/docker/prod/.env.example .env   # fill in secrets
-make up                                           # start the full prod stack
-make down                                         # stop
+make local-logs  # follow logs from every local container
+make local-down  # stop containers; keep their data volumes
 ```
 
-### Running a single service
+> [!WARNING]
+> `make local-clean` also deletes local Docker volumes. Use it only when you
+> intentionally want to discard local data.
 
-| Service | Quick start |
-|---|---|
-| `services/ai` | `poetry install && make run` |
-| `services/content` | `go run ./cmd/server` |
-| `services/user` | `npm ci && npm run dev` |
-| `frontend` | `npm ci && npm run dev` (see `frontend/DESIGN.md`) |
-| `gateway` | docker only (`make up` or `compose.yml`) |
+## How the pieces fit together
 
-Environment files come from `.env.example` in each service directory.
+```mermaid
+flowchart LR
+    browser[Browser] --> frontend[Frontend<br/>React + Vite]
+    frontend -->|GraphQL| gateway[Apollo Router<br/>:4000]
+    gateway --> user[User service<br/>:4001]
+    gateway --> content[Content service<br/>:4002]
+    user --> postgres[(PostgreSQL)]
+    user --> redis[(Redis)]
+    content --> mongo[(MongoDB)]
+    content --> kafka[(Kafka)]
+    kafka --> summary[Summary worker]
+    kafka --> search[Search worker]
+    kafka --> personalizer[Personalizer]
+    summary -->|gRPC| ai[AI service<br/>:50051]
+    search -->|gRPC| ai
+    personalizer -->|gRPC| ai
+    ai --> qdrant[(Qdrant)]
+```
 
-## Ports
+The [architecture guide](docs/concepts/architecture.md) explains this diagram,
+the ownership of each data store, and the difference between a request handled
+immediately and background work handled later.
 
-| Service | Port(s) |
-|---|---|
-| Gateway (GraphQL) | 4000 |
-| User subgraph | 4001 |
-| Content subgraph / worker / search worker | 4002 / 4003 / 4004 |
-| AI gRPC / metrics | 50051 / 12666 |
-| Frontend (docker) / vite dev | 3000 / 5173 |
+## Repository map
 
-## Documentation
+| Directory | Purpose |
+| --- | --- |
+| `frontend/` | Browser application written with React and Vite. |
+| `gateway/` | The single GraphQL entry point, powered by Apollo Router. |
+| `services/user/` | Accounts, profiles, and JSON Web Tokens (JWTs). |
+| `services/content/` | Posts, tags, chats, drafts, and background workers. |
+| `services/ai/` | AI generation, retrieval, chat, and recommendations over gRPC. |
+| `infrastructure/` | Local/prod Compose stacks, Terraform, and observability. |
+| `tools/seed-secrets/` | Safely copies approved configuration into AWS services. |
 
-- **AGENTS.md** — guidance for AI agents: architecture, service matrix,
-  commands, code style, and commit conventions.
-- **CONTRIBUTING.md** — branch flow, commit rules, and verification steps.
-- **Per-service READMEs** — `services/ai/README.md`,
-  `services/content/README.md`, `services/user/README.md`,
-  `frontend/DESIGN.md` — detailed setup, API, and layout for each service.
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The
+[agent guidance](AGENTS.md) contains repository rules and the command matrix
+for each service.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE.md](LICENSE.md) file for details.
+Topos is released under the [MIT License](LICENSE.md).
