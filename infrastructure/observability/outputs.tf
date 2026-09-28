@@ -28,6 +28,11 @@ output "dashboard_gateway_permalink" {
   value       = newrelic_one_dashboard_json.gateway.permalink
 }
 
+output "dashboard_logs_permalink" {
+  description = "New Relic URL of the Logs dashboard"
+  value       = newrelic_one_dashboard_json.logs.permalink
+}
+
 output "alert_policy_id" {
   description = "New Relic alert policy ID for golden-signal conditions"
   value       = newrelic_alert_policy.topos.id
