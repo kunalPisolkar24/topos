@@ -38,13 +38,15 @@ receivers:
         parse_from: body
         parse_to: attributes
         on_error: send
-      # Structured app lines (pino/slog/python-json) flatten into attributes;
-      # anything else (router access logs) passes through untouched.
+      # Structured app lines (pino/slog/python-json/router) flatten into
+      # attributes; anything else passes through untouched. Quiet errors:
+      # non-JSON lines (nginx access, floci internals) are expected and
+      # handled downstream, so they must not spam the collector log.
       - type: json_parser
         id: app-json
         parse_from: attributes.log
         parse_to: attributes
-        on_error: send
+        on_error: send_quiet
         if: 'attributes["log"] != nil'
       # Prefer the human message as the record body. Copy (not move):
       # sequential moves would mutate state and let the raw fallback
@@ -128,6 +130,17 @@ processors:
           - set(attributes["log_level"], "ERROR") where Int(severity_number) >= 17 and Int(severity_number) <= 20
           - set(attributes["log_level"], "FATAL") where Int(severity_number) >= 21 and Int(severity_number) <= 24
           - set(attributes["trace.id"], attributes["trace_id"]) where attributes["trace_id"] != nil and attributes["trace.id"] == nil
+  # Drops unattributed noise before export: nginx access lines (frontend)
+  # and Java-style internals (floci sidecars) both arrive without a service
+  # field and would otherwise pollute the gateway facet in NR. Router JSON
+  # and all app JSON carry service/message fields, so neither pattern can
+  # match a real application log line.
+  filter/drop-gateway-noise:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'IsMatch(body, "^\\S+ - - \\[") and resource.attributes["service.name"] == "gateway"'
+        - 'IsMatch(body, "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3}") and resource.attributes["service.name"] == "gateway"'
   resource:
     attributes:
       - key: deployment.environment
@@ -153,7 +166,7 @@ service:
       exporters: [otlphttp/newrelic]
     logs:
       receivers: [otlp, filelog]
-      processors: [memory_limiter, resource, transform/log-attrs, batch]
+      processors: [memory_limiter, resource, transform/log-attrs, filter/drop-gateway-noise, batch]
       exporters: [otlphttp/newrelic]
   telemetry:
     logs:
