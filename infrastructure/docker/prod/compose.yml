@@ -18,6 +18,10 @@ services:
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      # Host docker logs for the filelog receiver. Requires the default
+      # json-file logging driver and /var/lib/docker on the prod host —
+      # verify with: docker info --format '{{.DockerRootDir}} {{.LoggingDriver}}'
+      - /var/lib/docker/containers:/var/log/docker:ro
     environment:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
       - NEW_RELIC_OTLP_ENDPOINT=${NEW_RELIC_OTLP_ENDPOINT:-https://otlp.nr-data.net:4317}

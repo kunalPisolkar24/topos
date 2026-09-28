@@ -17,6 +17,81 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  # Docker stdout shipping (prod only): tails every container's json-file
+  # log via the /var/log/docker host mount (see compose.yml). No per-service
+  # code changes needed and the Apollo Router is covered too. start_at: end
+  # avoids reshipping history on collector restarts. No drop filter on
+  # purpose: user/content already exclude probe paths in-app, so the only
+  # residue is the router's own access lines (negligible); tune later from
+  # real NR ingest data if needed.
+  filelog:
+    include:
+      - /var/log/docker/*/*.log
+    start_at: end
+    poll_interval: 500ms
+    include_file_name: false
+    include_file_path: true
+    operators:
+      # Docker wraps every line: {"log":"<line>\n","stream":"...","time":"..."}.
+      - type: json_parser
+        id: docker-wrapper
+        parse_from: body
+        parse_to: attributes
+        on_error: send
+      # Structured app lines (pino/slog/python-json) flatten into attributes;
+      # anything else (router access logs) passes through untouched.
+      - type: json_parser
+        id: app-json
+        parse_from: attributes.log
+        parse_to: attributes
+        on_error: send
+        if: 'attributes["log"] != nil'
+      # Prefer the human message as the record body. Copy (not move):
+      # sequential moves would mutate state and let the raw fallback
+      # clobber a body set by an earlier branch.
+      - type: copy
+        id: body-msg
+        from: attributes.msg
+        to: body
+        if: 'attributes["msg"] != nil'
+      - type: copy
+        id: body-message
+        from: attributes.message
+        to: body
+        if: 'attributes["msg"] == nil and attributes["message"] != nil'
+      - type: copy
+        id: body-raw
+        from: attributes.log
+        to: body
+        if: 'attributes["msg"] == nil and attributes["message"] == nil and attributes["log"] != nil'
+      - type: remove
+        id: drop-raw-json
+        field: attributes.log
+        if: 'attributes["log"] != nil'
+      # Mixed formats: pino uses numeric levels (30/50), slog/python use text.
+      - type: severity_parser
+        id: app-level
+        parse_from: attributes.level
+        if: 'attributes["level"] != nil'
+        mapping:
+          trace: [trace, TRACE, 10]
+          debug: [debug, DEBUG, 20]
+          info: [info, INFO, 30]
+          warn: [warn, WARN, warning, WARNING, 40]
+          error: [error, ERROR, err, ERR, 50]
+          fatal: [fatal, FATAL, critical, CRITICAL, 60]
+      # Every app service logs a service field; lines without one are the
+      # gateway's, so they get that name for NR filtering.
+      - type: add
+        id: service-gateway-default
+        field: resource["service.name"]
+        value: gateway
+        if: 'attributes["service"] == nil'
+      - type: move
+        id: service-name
+        from: attributes.service
+        to: resource["service.name"]
+        if: 'attributes["service"] != nil'
   prometheus:
     config:
       scrape_configs:
@@ -62,7 +137,7 @@ service:
       processors: [memory_limiter, resource, batch]
       exporters: [otlphttp/newrelic]
     logs:
-      receivers: [otlp]
+      receivers: [otlp, filelog]
       processors: [memory_limiter, resource, batch]
       exporters: [otlphttp/newrelic]
   telemetry:
