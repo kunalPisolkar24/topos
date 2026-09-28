@@ -13,10 +13,10 @@ describe("loading skeletons", () => {
     expect(container.querySelector(".rounded-md")).toBeNull();
   });
 
-  it("renders the chat sidebar skeleton rows", () => {
-    const { container } = render(<ChatSidebarSkeleton rows={3} />);
+  it("renders the chat sidebar state without card chrome", () => {
+    const { container } = render(<ChatSidebarSkeleton />);
     expect(screen.getByRole("status", { name: /loading chats/i })).toBeInTheDocument();
-    expect(container.querySelectorAll(".rounded-none").length).toBeGreaterThan(0);
+    expect(container.querySelector(".ring-1")).toBeNull();
   });
 
   it("renders the draft card skeleton", () => {

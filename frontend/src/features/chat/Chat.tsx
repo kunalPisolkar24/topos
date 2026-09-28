@@ -80,7 +80,11 @@ export const Chat: React.FC = () => {
           <div className="flex min-h-0 flex-1 flex-col">
             <ChatThread
               messages={controller.messages}
-              isLoading={controller.messagesLoading && controller.messages.length === 0}
+              isLoading={
+                controller.messagesLoading &&
+                controller.messages.length === 0 &&
+                controller.freshChatId !== controller.activeChatId
+              }
               hasError={controller.messagesError}
               isAsking={controller.isAsking}
               streamingContent={controller.streamingContent}

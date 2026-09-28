@@ -383,7 +383,8 @@ describe("useChatController", () => {
     await waitFor(() => {
       expect(result.current.chats.find((c) => c.id === "chat-1")).toBeUndefined();
     });
-    expect(result.current.activeChatId).not.toBe("chat-1");
+    // The next chat is selected synchronously: no empty-state flash.
+    expect(result.current.activeChatId).toBe("chat-2");
     const snapshot = getClient().cache.extract(false) as Record<string, unknown>;
     expect(snapshot["Chat:chat-1"]).toBeUndefined();
     expect(
@@ -442,8 +443,7 @@ describe("useChatController", () => {
     expect(result.current.isAsking).toBe(false);
   });
 
-  it("names an untitled chat after the first question", async () => {
-    const { wrapper } = createWrapper();
+  it("names an untitled chat after the first question", async () => {    const { wrapper } = createWrapper();
     const seen = setupChatHandlers();
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     const untitled = { ...chatOne, title: "New Chat" };
@@ -477,5 +477,30 @@ describe("useChatController", () => {
     });
 
     expect(seen.rename).toEqual([{ id: "chat-1", title: "Name this chat please?" }]);
+  });
+
+  it("marks newly created chats as fresh until another is selected", async () => {
+    const { wrapper } = createWrapper();
+    setupChatHandlers();
+
+    const { result } = renderHook(() => useChatController(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.activeChatId).toBe("chat-1");
+    });
+    expect(result.current.freshChatId).toBeNull();
+
+    let createdId: string | null = null;
+    await act(async () => {
+      createdId = await result.current.createChat();
+    });
+
+    expect(createdId).toBe("chat-3");
+    expect(result.current.freshChatId).toBe("chat-3");
+
+    act(() => {
+      result.current.selectChat("chat-1");
+    });
+    expect(result.current.freshChatId).toBeNull();
   });
 });

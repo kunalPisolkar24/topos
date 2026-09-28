@@ -58,6 +58,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     setEditingId(null);
   };
 
+  // Skeletons only on true first load. Background refetches keep the
+  // mounted list and signal with a slim bar — no list flashing.
+  const showSkeleton = isLoading && chats.length === 0;
+  const showRefreshing = isLoading && chats.length > 0;
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-low ring-1 ring-outline-variant/20">
       <div className="flex items-center justify-between gap-2 p-3 sm:p-4">
@@ -76,9 +81,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           {isCreating ? "Creating" : "New"}
         </Button>
       </div>
+      {showRefreshing && (
+        <div className="h-0.5 w-full overflow-hidden bg-surface-lowest" aria-hidden="true">
+          <div className="h-full w-1/3 animate-pulse bg-primary" />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-3 sm:px-4 sm:pb-4">
-        {isLoading && <ChatSidebarSkeleton />}
+        {showSkeleton && <ChatSidebarSkeleton />}
         {hasError && !isLoading && (
           <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
             <p className="text-sm text-muted-foreground">Could not load chats.</p>
