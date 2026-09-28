@@ -18,6 +18,12 @@ services:
     # Root is required to traverse /var/lib/docker (0700) for the filelog
     # receiver; the collector only reads container logs, config stays ro.
     user: "0:0"
+    # Local driver keeps the collector's own text logs out of the filelog
+    # receiver (it only tails json-file): otherwise each parser failure on
+    # its own stack traces logs another line and feedback-loops. docker logs
+    # still works for debugging the collector itself.
+    logging:
+      driver: local
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro

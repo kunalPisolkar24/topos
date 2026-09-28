@@ -4,3 +4,4 @@
 .zed/
 .env.ha-test
 node_modules
+containers/
