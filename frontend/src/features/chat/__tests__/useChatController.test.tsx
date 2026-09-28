@@ -80,7 +80,7 @@ const createWrapper = () => {
 
 const setupChatHandlers = (overrides?: { askDelayMs?: number; failAsk?: boolean }) => {
   const graphqlApi = graphql.link("http://localhost:4000/graphql");
-  const seen: { ask: unknown[]; create: unknown[] } = { ask: [], create: [] };
+  const seen: { ask: unknown[]; create: unknown[]; rename: unknown[] } = { ask: [], create: [], rename: [] };
   // Stateful thread: AskChat persists the pair like the backend, so refetch
   // converges and the local echo must reconcile without duplicates.
   const threadExtras: typeof historyPair = [];
@@ -150,6 +150,15 @@ const setupChatHandlers = (overrides?: { askDelayMs?: number; failAsk?: boolean 
             createdAt: "2025-01-04T00:00:00.000Z",
             updatedAt: "2025-01-04T00:00:00.000Z",
           },
+        },
+      });
+    }),
+    graphqlApi.mutation("RenameChat", async ({ variables }) => {
+      seen.rename.push(variables);
+      const v = variables as { id: string; title: string };
+      return HttpResponse.json({
+        data: {
+          renameChat: { ...chatOne, id: v.id, title: v.title },
         },
       });
     }),
@@ -399,5 +408,74 @@ describe("useChatController", () => {
 
     expect(result.current.askError).toBe("Could not get an answer. Please try again.");
     expect(result.current.messages).toHaveLength(before);
+  });
+
+  it("shows the question optimistically while the answer is pending", async () => {
+    const { wrapper } = createWrapper();
+    setupChatHandlers({ askDelayMs: 200 });
+
+    const { result } = renderHook(
+      () => useChatController({ intervalMs: 1, chunkSize: 100000 }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeChatId).toBe("chat-1");
+    });
+
+    let askPromise: Promise<void> | undefined;
+    act(() => {
+      askPromise = result.current.ask("Is this visible yet?");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isAsking).toBe(true);
+    });
+    // The question renders before the mutation resolves.
+    expect(
+      result.current.messages.some((message) => message.content === "Is this visible yet?"),
+    ).toBe(true);
+
+    await act(async () => {
+      await askPromise;
+    });
+    expect(result.current.isAsking).toBe(false);
+  });
+
+  it("names an untitled chat after the first question", async () => {
+    const { wrapper } = createWrapper();
+    const seen = setupChatHandlers();
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    const untitled = { ...chatOne, title: "New Chat" };
+    server.use(
+      graphqlApi.query("Chats", () =>
+        HttpResponse.json({
+          data: {
+            chats: {
+              __typename: "PaginatedChats",
+              chats: [untitled, chatTwo],
+              totalPages: 1,
+              currentPage: 1,
+              totalChats: 2,
+            },
+          },
+        }),
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useChatController({ intervalMs: 1, chunkSize: 100000 }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeChatId).toBe("chat-1");
+    });
+
+    await act(async () => {
+      await result.current.ask("Name this chat please?");
+    });
+
+    expect(seen.rename).toEqual([{ id: "chat-1", title: "Name this chat please?" }]);
   });
 });

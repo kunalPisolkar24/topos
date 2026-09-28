@@ -5,7 +5,7 @@ import { Check, Eye, Pencil, RotateCcw, Undo2, ArrowLeft, FileText, Sparkles } f
 import { Badge } from "@/shared/ui/primitives/badge";
 import { Button } from "@/shared/ui/primitives/button";
 import { Card, CardContent } from "@/shared/ui/primitives/card";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { DraftDetailSkeleton } from "@/shared/ui/feedback/DraftDetailSkeleton";
 import { useCurrentUser } from "@/entities/session";
 import type { PostDraft } from "@/shared/graphql/content-documents";
 import { getDisplayName } from "@/shared/lib/account-identity";
@@ -77,7 +77,7 @@ export const DraftDetail: React.FC = () => {
   }
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <DraftDetailSkeleton />;
   }
 
   if (isError) {

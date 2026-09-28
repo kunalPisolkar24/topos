@@ -31,8 +31,7 @@ describe("ChatThread", () => {
     expect(onSuggest).toHaveBeenCalledWith("What covers idempotency on Topos?");
   });
 
-  it("labels roles with timestamps in chronological order", () => {
-    const messages: ChatMessageView[] = [
+  it("labels roles with timestamps in chronological order", () => {    const messages: ChatMessageView[] = [
       {
         __typename: "ChatMessage",
         id: "m1",
@@ -62,5 +61,32 @@ describe("ChatThread", () => {
     expect(userBubble?.compareDocumentPosition(answerBubble as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+  });
+
+  it("renders a message skeleton instead of a spinner while loading", () => {
+    renderWithProviders(<ChatThread {...baseProps} messages={[]} isLoading />);
+
+    expect(screen.getByRole("status", { name: /loading messages/i })).toBeInTheDocument();
+    expect(screen.queryByText("Start with a question")).not.toBeInTheDocument();
+  });
+
+  it("dims the optimistic echo while it is pending", () => {
+    const messages: ChatMessageView[] = [
+      {
+        __typename: "ChatMessage",
+        id: "temp-1",
+        chatId: "c1",
+        role: "USER",
+        content: "Sending…",
+        citedPostIds: [],
+        createdAt: "2025-09-16T10:00:00.000Z",
+        pending: true,
+      },
+    ];
+
+    renderWithProviders(<ChatThread {...baseProps} messages={messages} />);
+
+    const bubble = screen.getByText("Sending…").closest("div");
+    expect(bubble?.className).toMatch(/opacity-70/);
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useApolloClient } from "@apollo/client/react";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { RouteShellSkeleton } from "@/shared/ui/feedback/RouteShellSkeleton";
 import { Button } from "@/shared/ui/primitives/button";
 import { bootstrapSession, useSessionStore } from "@/entities/session";
 
@@ -45,7 +45,7 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
   }
 
   if (!hasHydrated || status === "hydrating") {
-    return <LoadingSpinner />;
+    return <RouteShellSkeleton />;
   }
 
   if (status !== "authenticated") {

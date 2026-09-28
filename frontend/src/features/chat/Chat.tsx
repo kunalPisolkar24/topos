@@ -62,6 +62,7 @@ export const Chat: React.FC = () => {
               chats={controller.chats}
               activeChatId={controller.activeChatId}
               isLoading={controller.chatsLoading}
+              isCreating={controller.isCreating}
               hasError={controller.chatsError}
               onSelect={(id) => {
                 controller.selectChat(id);
