@@ -3,7 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCurrentUser } from "@/entities/session";
 import { PagePagination } from "@/shared/ui/PagePagination";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { DraftCardSkeleton } from "@/shared/ui/feedback/DraftCardSkeleton";
 import { Button } from "@/shared/ui/primitives/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { useState } from "react";
@@ -61,7 +61,13 @@ const DraftSection: React.FC<DraftSectionProps> = ({
         <p className="mt-2 max-w-2xl font-sans text-sm leading-7 text-muted-foreground">{description}</p>
       </div>
 
-    {section.section === "loading" && <LoadingSpinner />}
+    {section.section === "loading" && (
+      <div className="grid gap-4" role="status" aria-label="Loading drafts">
+        {[0, 1, 2].map((index) => (
+          <DraftCardSkeleton key={index} />
+        ))}
+      </div>
+    )}
     {section.section === "error" && (
       <div className="bg-surface-low p-6 ring-1 ring-outline-variant/20">
         <p className="text-sm text-muted-foreground">

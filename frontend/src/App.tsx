@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Home from "@/pages/Home";
 import SearchResultsPage from "@/pages/SearchResultsPage";
 import ViewBlogPage from "@/pages/ViewBlogPage";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { RouteShellSkeleton } from "@/shared/ui/feedback/RouteShellSkeleton";
 import { ProtectedRoute } from "@/app/routing/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/routing/PublicOnlyRoute";
 import { hasValidEnv } from "@/shared/config/env";
@@ -75,7 +75,7 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<RouteShellSkeleton />}>
       <Routes>
         <Route
           path="/signup"

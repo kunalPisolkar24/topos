@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, Bot, Sparkles } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
 import { cn } from "@/shared/lib/cn";
 import type { ChatMessageView } from "../useChatController";
 import { ChatCitations } from "./ChatCitations";
+import { ChatThreadSkeleton } from "./ChatThreadSkeleton";
 
 interface ChatThreadProps {
   messages: ChatMessageView[];
@@ -57,11 +57,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   }, [messages, streamingContent, isAsking]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-64 items-center justify-center bg-surface-lowest ring-1 ring-outline-variant/20">
-        <LoadingSpinner />
-      </div>
-    );
+    return <ChatThreadSkeleton />;
   }
 
   if (hasError) {
@@ -145,6 +141,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
                         isUser
                           ? "bg-primary-container text-primary-foreground"
                           : "bg-surface-low text-foreground ring-1 ring-outline-variant/20",
+                        message.pending && "opacity-70",
                       )}
                     >
                       <p className="whitespace-pre-wrap break-words font-sans text-sm leading-7">

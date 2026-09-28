@@ -4,7 +4,7 @@ import * as React from "react";
 import { PencilLine } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { StickyNavbar, BlogEditor } from "@/widgets";
-import { LoadingSpinner } from "@/shared/ui/feedback/LoadingSpinner";
+import { DraftDetailSkeleton } from "@/shared/ui/feedback/DraftDetailSkeleton";
 import { Button } from "@/shared/ui/primitives/button";
 import { useCurrentUser } from "@/entities/session";
 import { BlogEditForm } from "@/features/blog/components/BlogEditForm";
@@ -41,7 +41,7 @@ const DraftResubmitPage: React.FC = () => {
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
         <main className="container mx-auto px-4 pb-20 pt-app-navbar-offset sm:px-5 lg:px-6">
-          <LoadingSpinner />
+          <DraftDetailSkeleton />
         </main>
       </div>
     );

@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
 import { Input } from "@/shared/ui/primitives/input";
-import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { cn } from "@/shared/lib/cn";
 import type { ChatThread } from "@/entities/chat";
+import { ChatSidebarSkeleton } from "./ChatSidebarSkeleton";
 
 interface ChatSidebarProps {
   chats: ChatThread[];
   activeChatId: string | null;
   isLoading: boolean;
+  isCreating: boolean;
   hasError: boolean;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -28,6 +29,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   chats,
   activeChatId,
   isLoading,
+  isCreating,
   hasError,
   onSelect,
   onCreate,
@@ -62,20 +64,21 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
           Chats
         </p>
-        <Button type="button" variant="outline" size="xs" onClick={onCreate} aria-label="Start new chat">
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={onCreate}
+          disabled={isCreating}
+          aria-label="Start new chat"
+        >
           <Plus className="h-3 w-3" />
-          New
+          {isCreating ? "Creating" : "New"}
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-3 sm:px-4 sm:pb-4">
-        {isLoading && (
-          <div className="space-y-1">
-            {[0, 1, 2].map((skeleton) => (
-              <Skeleton key={skeleton} className="h-12 rounded-none bg-surface-lowest" />
-            ))}
-          </div>
-        )}
+        {isLoading && <ChatSidebarSkeleton />}
         {hasError && !isLoading && (
           <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
             <p className="text-sm text-muted-foreground">Could not load chats.</p>
