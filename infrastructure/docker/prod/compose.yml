@@ -15,6 +15,9 @@ services:
     image: otel/opentelemetry-collector-contrib:0.122.1
     container_name: ${OTEL_COLLECTOR_CONTAINER:-prod-otel-collector}
     restart: unless-stopped
+    # Root is required to traverse /var/lib/docker (0700) for the filelog
+    # receiver; the collector only reads container logs, config stays ro.
+    user: "0:0"
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
