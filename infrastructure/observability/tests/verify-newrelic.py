@@ -15,7 +15,14 @@ if not api_key or not account_id:
     raise SystemExit("NEW_RELIC_API_KEY and NEW_RELIC_ACCOUNT_ID are required")
 
 endpoint = "https://api.eu.newrelic.com/graphql" if region == "EU" else "https://api.newrelic.com/graphql"
-dashboard_name = f"Topos {environment} observability"
+dashboard_names = [
+    f"Topos {environment} observability",
+    f"Topos {environment} - Content API",
+    f"Topos {environment} - Workers & Kafka",
+    f"Topos {environment} - AI Service",
+    f"Topos {environment} - User Service",
+    f"Topos {environment} - Gateway",
+]
 
 query = """
 query ($accountId: Int!, $nrql: Nrql!, $entitySearch: String!) {
@@ -35,7 +42,7 @@ payload = json.dumps(
         "variables": {
             "accountId": int(account_id),
             "nrql": "SELECT count(*) FROM Span SINCE 5 minutes ago",
-            "entitySearch": f"name = '{dashboard_name}'",
+            "entitySearch": "name LIKE 'Topos '",
         },
     }
 ).encode()
@@ -53,7 +60,9 @@ if body.get("errors"):
     raise SystemExit(f"New Relic query failed: {body['errors']}")
 
 entities = body["data"]["actor"]["entitySearch"]["results"]["entities"]
-if dashboard_name not in {entity["name"] for entity in entities}:
-    raise SystemExit(f"New Relic dashboard not found: {dashboard_name}")
+found = {entity["name"] for entity in entities}
+missing = [name for name in dashboard_names if name not in found]
+if missing:
+    raise SystemExit(f"New Relic dashboards not found: {missing}")
 
-print("New Relic API and deployed dashboard verified.")
+print(f"New Relic API and {len(dashboard_names)} deployed dashboards verified.")

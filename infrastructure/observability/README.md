@@ -6,9 +6,14 @@ the New Relic dashboard and golden-signal NRQL alerts over OTEL data sent by
 
 ## Structure
 
-- `dashboards.tf` — overview dashboard.
+- `dashboards.tf` — overview dashboard (golden signals, untouched contract).
+- `dashboards_content.tf` — `Topos <env> - Content API` (HTTP/GraphQL, posts, cache, AI degradation).
+- `dashboards_workers.tf` — `Topos <env> - Workers & Kafka` (consumer throughput, lag, retries, DLQ, per-worker spans).
+- `dashboards_ai.tf` — `Topos <env> - AI Service` (gRPC, LLM/embeddings, Qdrant, retrieval, feed agent).
+- `dashboards_user.tf` — `Topos <env> - User Service` (auth funnel, HTTP/GraphQL, Postgres pool, cache).
+- `dashboards_gateway.tf` — `Topos <env> - Gateway` (federation golden signals).
 - `alerts.tf` — alert policy and conditions.
-- `locals.tf` — environment-scoped NRQL fragments.
+- `locals.tf` — environment-scoped NRQL fragments (`span_source`, `metric_source`).
 - `tests/` — mocked Terraform contracts and a read-only New Relic smoke test.
 
 ## Test
