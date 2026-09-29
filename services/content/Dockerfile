@@ -58,5 +58,8 @@ CMD ["./content-service"]
 FROM runtime AS content-worker
 CMD ["./content-worker"]
 
+FROM runtime AS content-search-worker
+CMD ["./content-search-worker"]
+
 FROM runtime AS content-personalizer
 CMD ["./content-personalizer"]
