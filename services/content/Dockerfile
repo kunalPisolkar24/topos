@@ -50,3 +50,13 @@ USER appuser
 EXPOSE 4002
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["./content-service"]
+
+# --- Per-component targets (CI builds and pushes each of these) ---
+FROM runtime AS content-service
+CMD ["./content-service"]
+
+FROM runtime AS content-worker
+CMD ["./content-worker"]
+
+FROM runtime AS content-personalizer
+CMD ["./content-personalizer"]
