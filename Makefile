@@ -154,7 +154,9 @@ infra-test-floci: check-tfvars
 	@if [ "$(ENV)" != "floci" ]; then echo "infra-test-floci only supports ENV=floci"; exit 1; fi
 	$(MAKE) --no-print-directory infra-floci-ensure
 	terraform -chdir=$(TF_DIR) init -input=false
-	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/floci.tfvars
+	@terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/floci.tfvars || \
+	{ echo "first apply hit an emulator flake; retrying once"; \
+	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/floci.tfvars; }
 	AWS_ENDPOINT_URL=http://localhost:4566 AWS_REGION=ap-south-1 bash $(TF_DIR)/tests/verify-floci.sh
 	terraform -chdir=$(TF_DIR) plan -input=false -detailed-exitcode -var-file=envs/floci.tfvars
 
