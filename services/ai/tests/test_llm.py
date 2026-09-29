@@ -76,6 +76,10 @@ async def test_gpt5_model_uses_compatible_sampling_params(
 async def test_generate_completion_sends_chat_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Legacy (non-GPT-5) models keep the tuned temperature/max_tokens pair.
+    monkeypatch.setattr(
+        "src.config.settings.LLM_MODEL", "lightning-ai/gpt-oss-20b"
+    )
     fake_http = FakeHTTPClient()
     client = make_client(monkeypatch, fake_http)
 

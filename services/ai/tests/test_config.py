@@ -25,7 +25,7 @@ DEFAULTS = {
     "LOG_LEVEL": "INFO",
     "LLM_API_URL": "https://lightning.ai/api/v1/chat/completions",
     "LLM_API_KEY": "",
-    "LLM_MODEL": "lightning-ai/gpt-oss-20b",
+    "LLM_MODEL": "openai/gpt-5-nano",
     "LLM_TIMEOUT_SECONDS": 60,
     "CHECKPOINT_DB_URL": "",
     "CHECKPOINT_DB_URL_MIGRATE": "",
