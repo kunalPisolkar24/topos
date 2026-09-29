@@ -1,0 +1,217 @@
+# =============================================================================
+# Topos content-service — Prod stack (standalone, no docker mongo/kafka/redis)
+# =============================================================================
+# Used alone (never merged with compose.yml):
+#   docker compose -f infra/compose.prod.yml --project-name topos-content-prod \
+#     up -d --build --wait content-service
+# (`make up-prod` does this.)
+#
+# Contract:
+# - Control plane (SSM /topos/content/config + SM topos/content/secrets)
+#   AND data plane (DocDB :27017, MSK :9092, Valkey :6379) all come from the
+#   real Floci emulator (floci/floci, Docker-backed). DocDB/MSK are reached
+#   by Floci sidecar container name; Valkey via the `floci` proxy hostname.
+#   Floci plus its sidecars must share the `floci-apps` network with this
+#   stack (`docker network connect floci-apps <sidecar>` for any sidecar
+#   created after the network, e.g. after a cluster recreate).
+# - SM-owned secrets are emptied below so ENV_TYPE=prod hydrates them from
+#   Floci SM instead of shadowing them with dev defaults.
+# - CRUD needs no AI service (summaries stay pending; workers/AI come later).
+#   JWT must match the user service (shared Floci secret in both SMs).
+# - External injection still wins: set CONTENT_* env explicitly to override.
+# =============================================================================
+
+name: topos-content-prod
+
+services:
+  content-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CONTENT_SERVICE_EXT_PORT:-4002}:${CONTENT_SERVICE_INT_PORT:-4002}"
+    environment:
+      - PORT=${CONTENT_SERVICE_INT_PORT:-4002}
+      - ENV_TYPE=prod
+      # SM-owned: hydrate from topos/content/secrets (or external injection).
+      - MONGO_URI=${CONTENT_MONGO_URI:-}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - REDIS_ADDR=${CONTENT_REDIS_ADDR:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${CONTENT_JWT_SECRET:-}
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
+      # Prefixed alias: the app normalizes CONTENT_INTERNAL_TOKEN itself, so
+      # direct .env injection works even when SM hydration is skipped.
+      - CONTENT_INTERNAL_TOKEN=${CONTENT_INTERNAL_TOKEN:-}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      # SSM-owned config keeps compose fallbacks (same values as Floci SSM).
+      - DB_NAME=${CONTENT_DB_NAME:-blog_content}
+      - JWT_ISSUER=${JWT_ISSUER:-user-service}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-topos}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Floci reachable by container name on the floci-apps network.
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SERVICE_INT_PORT:-4002}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  content-worker:
+    # Summary worker: consumes Floci MSK `posts`, calls AI, writes the
+    # summary back to DocDB. Same SM-driven env as the service.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-worker"]
+    expose:
+      - "${CONTENT_WORKER_INT_PORT:-4003}"
+    environment:
+      - PORT=${CONTENT_WORKER_INT_PORT:-4003}
+      - ENV_TYPE=prod
+      - MONGO_URI=${CONTENT_MONGO_URI:-}
+      - DB_NAME=${CONTENT_DB_NAME:-blog_content}
+      - REDIS_ADDR=${CONTENT_REDIS_ADDR:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_CONSUMER_GROUP_ID=${KAFKA_CONSUMER_GROUP_ID:-content-summary-worker-group}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_WORKER_INT_PORT:-4003}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  content-search-worker:
+    # Indexing worker: consumes Floci MSK `posts`, indexes into Qdrant via
+    # AI (Cloud inference). Same SM-driven env as the service.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-search-worker"]
+    expose:
+      - "${CONTENT_SEARCH_WORKER_INT_PORT:-4004}"
+    environment:
+      - PORT=${CONTENT_SEARCH_WORKER_INT_PORT:-4004}
+      - ENV_TYPE=prod
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-posts}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_SEARCH_CONSUMER_GROUP_ID=${KAFKA_SEARCH_CONSUMER_GROUP_ID:-content-search-worker-group}
+      - WORKER_CONCURRENCY=${SEARCH_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_SEARCH_WORKER_INT_PORT:-4004}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  content-personalizer:
+    # Taste-profile worker: consumes Floci MSK `user-interacted`, updates
+    # user interest profiles in Qdrant via AI. Same SM-driven env.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["./content-personalizer"]
+    expose:
+      - "${CONTENT_PERSONALIZER_INT_PORT:-4005}"
+    environment:
+      - PORT=${CONTENT_PERSONALIZER_INT_PORT:-4005}
+      - ENV_TYPE=prod
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-ai-service:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-}
+      - KAFKA_USER_INTERACTED_TOPIC=${KAFKA_USER_INTERACTED_TOPIC:-user-interacted}
+      - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-posts-dlq}
+      - KAFKA_PERSONALIZER_CONSUMER_GROUP_ID=${KAFKA_PERSONALIZER_CONSUMER_GROUP_ID:-content-personalizer-worker-group}
+      - WORKER_CONCURRENCY=${PERSONALIZER_WORKER_CONCURRENCY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - CONTENT_SECRETS_NAME=${CONTENT_SECRETS_NAME:-topos/content/secrets}
+      - CONTENT_CONFIG_PARAM=${CONTENT_CONFIG_PARAM:-/topos/content/config}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CONTENT_PERSONALIZER_INT_PORT:-4005}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - floci-bridge
+
+  init-kafka:
+    # Creates topics on Floci MSK (Redpanda does not auto-create for the
+    # content producer path). Broker default must match SM KAFKA_BROKERS
+    # (terraform content secrets Floci branch); override KAFKA_BROKERS to
+    # change both.
+    image: redpandadata/redpanda:latest
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_TOPIC:-posts} -p 3 -r 1;
+       rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_DLQ_TOPIC:-posts-dlq} -p 1 -r 1;
+       rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_USER_INTERACTED_TOPIC:-user-interacted} -p 3 -r 1"
+    networks:
+      - floci-bridge
+
+networks:
+  floci-bridge:
+    name: floci-apps
+    external: true

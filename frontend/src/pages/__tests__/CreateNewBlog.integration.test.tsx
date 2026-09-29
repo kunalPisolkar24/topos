@@ -139,7 +139,7 @@ describe("CreateNewBlog - integration", () => {
 
     await screen.findByText("Compose a precise Topos post.");
 
-    await user.click(screen.getByRole("button", { name: /publish post/i }));
+    await user.click(screen.getByRole("button", { name: /submit for review/i }));
 
     expect(
       screen.getByText("Compose a precise Topos post."),
@@ -229,7 +229,7 @@ describe("CreateNewBlog - integration", () => {
     expect(screen.getByRole("button", { name: /remove architecture tag/i })).toBeInTheDocument();
   });
 
-  it("creates a new post successfully and redirects to home", async () => {
+  it("submits a new post for review and redirects to the review queue", async () => {
     const user = userEvent.setup();
 
     server.use(
@@ -250,13 +250,10 @@ describe("CreateNewBlog - integration", () => {
           },
         }),
       ),
-      graphqlApi.mutation("CreatePost", () =>
+      graphqlApi.mutation("CreateContentDraft", () =>
         HttpResponse.json({
           data: {
-            createPost: {
-              __typename: "Post",
-              id: "new-post-1",
-            },
+            createContentDraft: { __typename: "PostDraft", id: "draft-1" },
           },
         }),
       ),
@@ -265,7 +262,7 @@ describe("CreateNewBlog - integration", () => {
     renderWithProviders(
       <Routes>
         <Route path="/create-blog" element={<CreateNewBlog />} />
-        <Route path="/" element={<div>Home Page After Create</div>} />
+        <Route path="/review" element={<div>Review Queue Page</div>} />
       </Routes>,
       { route: "/create-blog" },
     );
@@ -288,11 +285,11 @@ describe("CreateNewBlog - integration", () => {
     await user.type(tagInput, "Architecture");
     await user.click(screen.getByRole("button", { name: /^add tag$/i }));
 
-    await user.click(screen.getByRole("button", { name: /publish post/i }));
+    await user.click(screen.getByRole("button", { name: /submit for review/i }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Home Page After Create"),
+        screen.getByText("Review Queue Page"),
       ).toBeInTheDocument();
     });
   });

@@ -1,12 +1,13 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { Command, CommandList } from "@/components/ui/command";
+import { HttpResponse, graphql } from "msw";
+import { Command, CommandList } from "@/shared/ui/primitives/command";
 import { renderWithProviders } from "@/test/render-with-providers";
+import { server } from "@/test/server";
 import { SearchBar } from "../SearchBar";
 import { PostSuggestions } from "../PostSuggestions";
 import { TagSuggestions } from "../TagSuggestions";
-import { useSearchSuggestionsController } from "../../suggestions";
 
 const mockNavigate = vi.fn();
 
@@ -18,17 +19,6 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-  };
-});
-
-vi.mock("../../suggestions", async () => {
-  const actual = await vi.importActual<typeof import("../../suggestions")>(
-    "../../suggestions",
-  );
-
-  return {
-    ...actual,
-    useSearchSuggestionsController: vi.fn(),
   };
 });
 
@@ -61,7 +51,7 @@ const postSuggestions = [
 
 describe("SearchBar", () => {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-  const mockUseSearchSuggestions = vi.mocked(useSearchSuggestionsController);
+  const gql = graphql.link("http://localhost:4000/graphql");
 
   beforeAll(() => {
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
@@ -75,36 +65,47 @@ describe("SearchBar", () => {
 
   beforeEach(() => {
     mockNavigate.mockReset();
-    mockUseSearchSuggestions.mockImplementation(
-      ({ query, mode, isFocused, postLimit }) => {
-        if (!isFocused || query.trim() === "") {
-          return {
-            tags: [],
-            posts: [],
-            totalPosts: 0,
-            isLoading: false,
-            debouncedQuery: query,
-          };
+    server.use(
+      gql.query("Tags", ({ variables }) => {
+        const q = String(variables?.query ?? "").toLowerCase();
+        if (q.includes("train")) {
+          return HttpResponse.json({ data: { tags: tagSuggestions } });
         }
-
-        if (mode === "tags") {
-          return {
-            tags: tagSuggestions,
-            posts: [],
-            totalPosts: 0,
-            isLoading: false,
-            debouncedQuery: query,
-          };
+        return HttpResponse.json({ data: { tags: [] } });
+      }),
+      gql.query("SearchPosts", ({ variables }) => {
+        const q = String(variables?.query ?? "").toLowerCase();
+        if (q.includes("train")) {
+          return HttpResponse.json({
+            data: {
+              searchPosts: {
+                hits: postSuggestions.map((p) => ({
+                  __typename: "Post" as const,
+                  id: p.id,
+                  title: p.title,
+                  body: "<p>body</p>",
+                  imageUrl: p.imageUrl,
+                  createdAt: new Date().toISOString(),
+                  likedByMe: false,
+                  savedByMe: false,
+                  author: {
+                    __typename: "User" as const,
+                    id: "author-1",
+                    username: p.authorName,
+                    name: p.authorName,
+                    avatarUrl: null,
+                  },
+                  tags: [],
+                })),
+                total: postSuggestions.length,
+              },
+            },
+          });
         }
-
-        return {
-          tags: [],
-          posts: postSuggestions.slice(0, postLimit ?? postSuggestions.length),
-          totalPosts: postSuggestions.length,
-          isLoading: false,
-          debouncedQuery: query,
-        };
-      },
+        return HttpResponse.json({
+          data: { searchPosts: { hits: [], total: 0 } },
+        });
+      }),
     );
   });
 
@@ -120,7 +121,7 @@ describe("SearchBar", () => {
     await user.click(input);
     await user.type(input, "train");
 
-    expect(screen.getByText("#TRAIN1")).toBeInTheDocument();
+    expect(await screen.findByText("#TRAIN1")).toBeInTheDocument();
     expect(screen.queryByRole("option", { selected: true })).not.toBeInTheDocument();
   });
 
@@ -135,6 +136,8 @@ describe("SearchBar", () => {
 
     await user.click(input);
     await user.type(input, "train");
+
+    await screen.findByText("#TRAIN1");
 
     const firstTagSuggestion = screen
       .getByText("#TRAIN1")
@@ -164,6 +167,8 @@ describe("SearchBar", () => {
     await user.click(input);
     await user.type(input, "train");
 
+    await screen.findByText("Riding the Rails of the 19th Century");
+
     expect(screen.queryByRole("option", { selected: true })).not.toBeInTheDocument();
 
     await user.keyboard("{ArrowDown}");
@@ -191,6 +196,8 @@ describe("SearchBar", () => {
     await user.click(input);
     await user.type(input, "train");
 
+    await screen.findByText("#TRAIN1");
+
     const firstTagSuggestion = screen
       .getByText("#TRAIN1")
       .closest('[data-slot="command-item"]');
@@ -199,8 +206,12 @@ describe("SearchBar", () => {
     expect(firstTagSuggestion).toHaveAttribute("data-selected", "true");
 
     await user.type(input, "s");
-    expect(screen.queryByRole("option", { selected: true })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("option", { selected: true })).not.toBeInTheDocument();
+    });
 
+    // still has suggestions for "trains"
+    await screen.findByText("#TRAIN1");
     fireEvent.pointerMove(
       screen.getByText("#TRAIN1").closest('[data-slot="command-item"]') as HTMLElement,
     );

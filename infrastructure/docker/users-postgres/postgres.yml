@@ -1,0 +1,41 @@
+services:
+  user-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      # Both host ports land on the single shared instance: 5432 for the
+      # user stack tooling, 5433 so the ai stack can sit alongside the
+      # user stack without a host-port collision. Publishing both keeps
+      # the user and ai compose definitions identical, which the local
+      # full-stack merge (include:) requires.
+      - "${USER_POSTGRES_EXT_PORT:-5432}:5432"
+      - "${AI_POSTGRES_EXT_PORT:-5433}:5432"
+    environment:
+      - POSTGRES_USER=topos_user
+      - POSTGRES_PASSWORD=topos_pass
+      - POSTGRES_DB=topos_users
+      # Second role/database for the ai checkpointer (see init/); defaults
+      # keep docker and init in sync, overrides via AI_POSTGRES_*.
+      - AI_POSTGRES_USER=${AI_POSTGRES_USER:-ai_checkpointer}
+      - AI_POSTGRES_PASSWORD=${AI_POSTGRES_PASSWORD:-ai_checkpointer_pass}
+      - AI_POSTGRES_DB=${AI_POSTGRES_DB:-ai_checkpoints}
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topos_user -d topos_users"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${USER_POSTGRES_MEM:-512M}
+        reservations:
+          memory: 256M
+
+volumes:
+  user_postgres_data:

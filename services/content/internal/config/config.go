@@ -1,131 +1,229 @@
 package config
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port            string
-	MongoURI        string
-	DbName          string
-	JwtSecret       string
-	KafkaBrokers    []string
-	KafkaTopic      string
-	KafkaConsumerGroupID string
-	KafkaConsumerTopics  []string
-	KafkaDLQTopic        string
-	RedisAddrs      []string
-	RedisMasterName string
-	RedisURL        string
-	RedisMode       string
-	AIServiceURL    string
-	AIRequired      bool
-	AIDialTimeout   time.Duration
-	CORSOrigins     []string
+	EnvType              string
+	Port                 string
+	MongoURI             string
+	DbName               string
+	RedisAddr            string
+	RedisPassword        string
+	JwtSecret            string
+	JwtIssuer            string
+	JwtAudience          string
+	InternalToken        string
+	AIServiceURL         string
+	KafkaBrokers         []string
+	KafkaTopic           string
+	KafkaUserInteractedTopic         string
+	KafkaConsumerGroupID             string
+	KafkaSearchConsumerGroupID       string
+	KafkaPersonalizerConsumerGroupID string
+	KafkaDLQTopic                    string
+	WorkerConcurrency                int
+	LogFormat                        string
+	LogLevel                         string
+	OtelEndpoint                     string
+	AwsRegion                        string
+	AwsEndpointURL                   string
+	ContentSecretsName               string
+	ContentConfigParam               string
 }
 
-var envLoadOnce sync.Once
+var loadOnce sync.Once
 
-func LoadConfig() (*Config, error) {
-	loadEnvIfPresent()
-
-	kafkaTopic := getEnvAny([]string{"CONTENT_KAFKA_TOPIC", "KAFKA_TOPIC"}, "posts")
-	kafkaConsumerTopics := splitAndTrim(getEnv("KAFKA_CONSUMER_TOPICS", ""))
-	if len(kafkaConsumerTopics) == 0 {
-		kafkaConsumerTopics = splitAndTrim(kafkaTopic)
-	}
-
-	jwtSecret := strings.TrimSpace(getEnv("JWT_SECRET", ""))
-	if jwtSecret == "" {
-		return nil, errors.New("JWT_SECRET is required")
-	}
-
-	return &Config{
-		Port:            getEnv("PORT", "4002"),
-		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		DbName:          getEnv("DB_NAME", "blog_content"),
-		JwtSecret:       jwtSecret,
-		KafkaBrokers:    splitAndTrim(getEnv("KAFKA_BROKERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")),
-		KafkaTopic:      kafkaTopic,
-		KafkaConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
-		KafkaConsumerTopics:  kafkaConsumerTopics,
-		KafkaDLQTopic:       getEnv("KAFKA_DLQ_TOPIC", kafkaTopic+"-dlq"),
-		RedisAddrs:      splitAndTrim(getEnv("REDIS_ADDRS", "")),
-		RedisMasterName: getEnv("REDIS_MASTER_NAME", ""),
-		RedisURL:        getEnv("REDIS_URL", "redis://localhost:6379"),
-		RedisMode:       detectRedisMode(),
-		AIServiceURL:    getEnvAny([]string{"AI_SERVICE_URL", "AI_SERVICE_ADDR"}, "ai-service:50051"),
-		AIRequired:      getEnvBool("AI_REQUIRED", false),
-		AIDialTimeout:   time.Duration(getEnvInt("AI_DIAL_TIMEOUT_SECONDS", 5)) * time.Second,
-		CORSOrigins:     loadCORSOrigins(),
-	}, nil
+var contentAliases = map[string]string{
+	"CONTENT_MONGO_URI":      "MONGO_URI",
+	"CONTENT_DB_NAME":        "DB_NAME",
+	"CONTENT_REDIS_ADDR":     "REDIS_ADDR",
+	"CONTENT_REDIS_PASSWORD": "REDIS_PASSWORD",
+	"CONTENT_JWT_SECRET":     "JWT_SECRET",
+	"CONTENT_INTERNAL_TOKEN": "INTERNAL_TOKEN",
+	"CONTENT_AI_SERVICE_URL": "AI_SERVICE_URL",
+	"CONTENT_KAFKA_BROKERS":  "KAFKA_BROKERS",
+	"CONTENT_KAFKA_TOPIC":    "KAFKA_TOPIC",
 }
 
-func loadEnvIfPresent() {
-	envLoadOnce.Do(func() {
-		paths := []string{
-			".env",
-			"/app/.env",
-			"../.env",
-			"../../.env",
-			"../../../.env",
+// LoadConfig reads configuration from the environment, falling back to a
+// local .env file when present, then to sane defaults. When ENV_TYPE=prod
+// it hydrates missing vars from SSM (/topos/content/config) and SM
+// (topos/content/secrets) via the AWS SDK (Floci at http://localhost:4566
+// or real AWS), mirroring the user service.
+func LoadConfig() Config {
+	loadEnvFile()
+	normalizeAliases()
+	envType := strings.TrimSpace(os.Getenv("ENV_TYPE"))
+	if envType == "prod" {
+		loadFromAWS()
+		// Re-normalize after AWS hydrate (SSM/SM may still use CONTENT_ prefix on Floci).
+		normalizeAliases()
+	}
+
+	return Config{
+		EnvType:                          getEnv("ENV_TYPE", "dev"),
+		Port:                             getEnv("PORT", "4002"),
+		MongoURI:                         getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		DbName:                           getEnv("DB_NAME", "blog_content"),
+		RedisAddr:                        getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:                    getEnv("REDIS_PASSWORD", ""),
+		JwtSecret:                        getEnv("JWT_SECRET", ""),
+		JwtIssuer:                        getEnv("JWT_ISSUER", "user-service"),
+		JwtAudience:                      getEnv("JWT_AUDIENCE", "topos"),
+		InternalToken:                    getEnv("INTERNAL_TOKEN", ""),
+		AIServiceURL:                     getEnv("AI_SERVICE_URL", "ai-service:50051"),
+		KafkaBrokers:                     splitAndTrim(getEnv("KAFKA_BROKERS", "kafka-1:9092")),
+		KafkaTopic:                       getEnv("KAFKA_TOPIC", "posts"),
+		KafkaUserInteractedTopic:         getEnv("KAFKA_USER_INTERACTED_TOPIC", "user-interacted"),
+		KafkaConsumerGroupID:             getEnv("KAFKA_CONSUMER_GROUP_ID", "content-summary-worker-group"),
+		KafkaSearchConsumerGroupID:       getEnv("KAFKA_SEARCH_CONSUMER_GROUP_ID", "content-search-worker-group"),
+		KafkaPersonalizerConsumerGroupID: getEnv("KAFKA_PERSONALIZER_CONSUMER_GROUP_ID", "content-personalizer-worker-group"),
+		KafkaDLQTopic:                    getEnv("KAFKA_DLQ_TOPIC", "posts-dlq"),
+		WorkerConcurrency:                getEnvInt("WORKER_CONCURRENCY", 3),
+		LogFormat:                        getEnv("LOG_FORMAT", "json"),
+		LogLevel:                         getEnv("LOG_LEVEL", "info"),
+		OtelEndpoint:                     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		AwsRegion:                        getEnv("AWS_REGION", "ap-south-1"),
+		AwsEndpointURL:                   getEnv("AWS_ENDPOINT_URL", ""),
+		ContentSecretsName:               getEnv("CONTENT_SECRETS_NAME", "topos/content/secrets"),
+		ContentConfigParam:               getEnv("CONTENT_CONFIG_PARAM", "/topos/content/config"),
+	}
+}
+
+func normalizeAliases() {
+	for aliased, canonical := range contentAliases {
+		if v := strings.TrimSpace(os.Getenv(aliased)); v != "" && strings.TrimSpace(os.Getenv(canonical)) == "" {
+			_ = os.Setenv(canonical, v)
 		}
+	}
+}
 
-		for _, path := range paths {
-			if _, err := os.Stat(path); err == nil {
-				_ = godotenv.Overload(path)
-				return
+func loadFromAWS() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	region := getEnv("AWS_REGION", "ap-south-1")
+	endpoint := strings.TrimSpace(os.Getenv("AWS_ENDPOINT_URL"))
+	secretsName := getEnv("CONTENT_SECRETS_NAME", "topos/content/secrets")
+	configParam := getEnv("CONTENT_CONFIG_PARAM", "/topos/content/config")
+
+	// Build AWS config with explicit creds for Floci before LoadDefaultConfig reads env.
+	var loadOpts []func(*awsconfig.LoadOptions) error
+	loadOpts = append(loadOpts, awsconfig.WithRegion(region))
+	if endpoint != "" {
+		// Floci uses dummy creds; inject before load so SDK picks them up.
+		accessKey := strings.TrimSpace(os.Getenv("AWS_ACCESS_KEY_ID"))
+		secretKey := strings.TrimSpace(os.Getenv("AWS_SECRET_ACCESS_KEY"))
+		if accessKey == "" {
+			accessKey = "test"
+		}
+		if secretKey == "" {
+			secretKey = "test"
+		}
+		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")))
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
+	if err != nil {
+		slog.Warn("content config: AWS load failed", "error", err)
+		return
+	}
+	if endpoint != "" {
+		cfg.BaseEndpoint = aws.String(endpoint)
+	}
+
+	// SSM — JSON blob
+	func() {
+		client := ssm.NewFromConfig(cfg)
+		if endpoint != "" {
+			// Override endpoint for Floci.
+			client = ssm.NewFromConfig(cfg, func(o *ssm.Options) {
+				o.BaseEndpoint = aws.String(endpoint)
+			})
+		}
+		out, err := client.GetParameter(ctx, &ssm.GetParameterInput{Name: aws.String(configParam)})
+		if err != nil {
+			msg := err.Error()
+			if strings.Contains(msg, "ParameterNotFound") || strings.Contains(strings.ToLower(msg), "not found") {
+				slog.Debug("content config: SSM param not found", "param", configParam)
+			} else {
+				slog.Warn("content config: SSM fetch failed", "param", configParam, "error", err)
+			}
+			return
+		}
+		if out.Parameter != nil && out.Parameter.Value != nil {
+			var parsed map[string]string
+			if err := json.Unmarshal([]byte(*out.Parameter.Value), &parsed); err == nil {
+				for k, v := range parsed {
+					if strings.TrimSpace(v) != "" && os.Getenv(k) == "" {
+						_ = os.Setenv(k, v)
+					}
+				}
 			}
 		}
+	}()
+
+	// SM — JSON blob
+	func() {
+		client := secretsmanager.NewFromConfig(cfg)
+		if endpoint != "" {
+			client = secretsmanager.NewFromConfig(cfg, func(o *secretsmanager.Options) {
+				o.BaseEndpoint = aws.String(endpoint)
+			})
+		}
+		out, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(secretsName)})
+		if err != nil {
+			msg := err.Error()
+			if strings.Contains(msg, "ResourceNotFoundException") || strings.Contains(strings.ToLower(msg), "not found") {
+				slog.Debug("content config: SM secret not found", "secret", secretsName)
+			} else {
+				slog.Warn("content config: SM fetch failed", "secret", secretsName, "error", err)
+			}
+			return
+		}
+		if out.SecretString != nil {
+			var parsed map[string]string
+			if err := json.Unmarshal([]byte(*out.SecretString), &parsed); err == nil {
+				for k, v := range parsed {
+					if strings.TrimSpace(v) != "" && os.Getenv(k) == "" {
+						_ = os.Setenv(k, v)
+					}
+				}
+			}
+		}
+	}()
+}
+
+func loadEnvFile() {
+	loadOnce.Do(func() {
+		_ = godotenv.Load()
 	})
 }
 
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists && strings.TrimSpace(value) != "" {
-		return value
+		return strings.TrimSpace(value)
 	}
 	return fallback
-}
-
-func getEnvAny(keys []string, fallback string) string {
-	for _, key := range keys {
-		if value, exists := os.LookupEnv(key); exists && strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return fallback
-}
-
-func getEnvBool(key string, fallback bool) bool {
-	raw, exists := os.LookupEnv(key)
-	if !exists {
-		return fallback
-	}
-
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return fallback
-	}
 }
 
 func getEnvInt(key string, fallback int) int {
-	raw, exists := os.LookupEnv(key)
-	if !exists {
-		return fallback
-	}
-
-	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
 	if err != nil || value <= 0 {
 		return fallback
 	}
@@ -136,26 +234,9 @@ func splitAndTrim(value string) []string {
 	parts := strings.Split(value, ",")
 	result := make([]string, 0, len(parts))
 	for _, part := range parts {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
 			result = append(result, trimmed)
 		}
 	}
 	return result
-}
-
-func detectRedisMode() string {
-	masterName, exists := os.LookupEnv("REDIS_MASTER_NAME")
-	if exists && strings.TrimSpace(masterName) != "" {
-		return "sentinel"
-	}
-	return "standalone"
-}
-
-func loadCORSOrigins() []string {
-	raw := getEnv("CORS_ALLOWED_ORIGINS", "")
-	if raw == "" {
-		return []string{"*"}
-	}
-	return splitAndTrim(raw)
 }

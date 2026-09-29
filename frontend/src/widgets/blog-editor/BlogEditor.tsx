@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useMemo, useRef, type MutableRefObject } from 
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/primitives/card";
 import { ResponsiveRichTextToolbar } from "./ResponsiveRichTextToolbar";
 
 interface BlogEditorProps {

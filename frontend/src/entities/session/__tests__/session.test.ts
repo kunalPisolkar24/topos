@@ -14,6 +14,7 @@ function createMockClient(overrides?: Partial<ApolloClient>) {
   return {
     query: vi.fn(),
     clearStore: vi.fn().mockResolvedValue(undefined),
+    resetStore: vi.fn().mockResolvedValue(undefined),
     writeQuery: vi.fn(),
     ...overrides,
   } as unknown as ApolloClient;
@@ -57,12 +58,18 @@ describe("session", () => {
   });
 
   describe("authenticateSession", () => {
-    it("marks the session as authenticated and writes user to cache", () => {
+    it("marks the session as authenticated and writes user to cache", async () => {
       const client = createMockClient();
-      authenticateSession(client, "token-123", mockUser as never);
+      await authenticateSession(client, "token-123", mockUser as never);
       expect(client.writeQuery).toHaveBeenCalled();
       const state = sessionStoreActions as unknown as { initializeFromStorage(): string | null };
       expect(state).toBeDefined();
+    });
+
+    it("resets the Apollo store so no previous-user data lingers", async () => {
+      const client = createMockClient();
+      await authenticateSession(client, "token-123", mockUser as never);
+      expect(client.resetStore).toHaveBeenCalled();
     });
   });
 
@@ -99,14 +106,16 @@ describe("session", () => {
 
       await bootstrapSession(client);
 
-      expect(client.query).toHaveBeenCalledWith({
-        query: MeDocument,
-        fetchPolicy: "network-only",
-      });
+      expect(client.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: MeDocument,
+          fetchPolicy: "network-only",
+        }),
+      );
       expect(client.writeQuery).toHaveBeenCalled();
     });
 
-    it("calls logoutSession when query fails", async () => {
+    it("keeps session authenticated when query fails with transient error", async () => {
       localStorage.setItem("jwt", "bad-token");
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const client = createMockClient({
@@ -116,7 +125,7 @@ describe("session", () => {
 
       await bootstrapSession(client);
 
-      expect(client.clearStore).toHaveBeenCalled();
+      expect(client.clearStore).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 

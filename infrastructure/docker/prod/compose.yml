@@ -1,0 +1,93 @@
+# Topos prod stack: app containers only, no docker postgres/redis/mongo/kafka/qdrant.
+# Data plane comes from Floci (RDS :7001, Valkey :6379, DocDB/MSK sidecars) and
+# Qdrant Cloud; control plane from SM/SSM via ENV_TYPE=prod. Env file: .env (copy from .env.example).
+# Driven from the repo root: SEED_SECRETS=1 make prod-up (seed SM/SSM first), make prod-up (default, no seed).
+
+name: topos-prod
+
+include:
+  - path: ../../../services/user/infra/compose.prod.yml
+  - path: ../../../services/content/infra/compose.prod.yml
+  - path: ../../../services/ai/infra/compose.prod.yml
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.122.1
+    container_name: ${OTEL_COLLECTOR_CONTAINER:-prod-otel-collector}
+    restart: unless-stopped
+    # Root is required to traverse /var/lib/docker (0700) for the filelog
+    # receiver; the collector only reads container logs, config stays ro.
+    user: "0:0"
+    # Local driver keeps the collector's own text logs out of the filelog
+    # receiver (it only tails json-file): otherwise each parser failure on
+    # its own stack traces logs another line and feedback-loops. docker logs
+    # still works for debugging the collector itself.
+    logging:
+      driver: local
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      # Host docker logs for the filelog receiver. Requires the default
+      # json-file logging driver and /var/lib/docker on the prod host —
+      # verify with: docker info --format '{{.DockerRootDir}} {{.LoggingDriver}}'
+      - /var/lib/docker/containers:/var/log/docker:ro
+    environment:
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
+      - NEW_RELIC_OTLP_ENDPOINT=${NEW_RELIC_OTLP_ENDPOINT:-https://otlp.nr-data.net:4317}
+      - NEW_RELIC_OTLP_HTTP_ENDPOINT=${NEW_RELIC_OTLP_HTTP_ENDPOINT:-https://otlp.nr-data.net}
+    expose:
+      - "4317"
+      - "4318"
+      - "13133"
+    networks:
+      - floci-bridge
+
+  gateway:
+    build:
+      context: ../../../
+      dockerfile: gateway/Dockerfile
+    container_name: ${GATEWAY_CONTAINER:-prod-gateway}
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_EXT_PORT:-4000}:${GATEWAY_INT_PORT:-4000}"
+    environment:
+      - FRONTEND_PUBLIC_ORIGIN=${FRONTEND_PUBLIC_ORIGIN:-${VITE_BACKEND_URL:-}}
+      - OTEL_TRACING_ENDPOINT=${OTEL_TRACING_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_SERVICE_NAME=gateway
+    depends_on:
+      - user-service
+      - content-service
+      - otel-collector
+    networks:
+      - floci-bridge
+
+  frontend:
+    build:
+      context: ../../../
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_ENV_TYPE: ${VITE_ENV_TYPE:-prod}
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4000/graphql}
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:4000}
+        VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}
+        VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET:-}
+        VITE_ENABLE_MOCKS: ${VITE_ENABLE_MOCKS:-false}
+    container_name: ${FRONTEND_CONTAINER:-prod-frontend}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_EXT_PORT:-3000}:${FRONTEND_INT_PORT:-3000}"
+    environment:
+      PORT: ${FRONTEND_INT_PORT:-3000}
+      VITE_ENV_TYPE: ${VITE_ENV_TYPE:-prod}
+      VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4000/graphql}
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:4000}
+      VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}
+      VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET:-}
+      VITE_ENABLE_MOCKS: ${VITE_ENABLE_MOCKS:-false}
+    networks:
+      - floci-bridge
+
+networks:
+  floci-bridge:
+    name: floci-apps
+    external: true

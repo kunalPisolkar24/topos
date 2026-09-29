@@ -30,3 +30,11 @@ models:
     fields:
       posts:
         resolver: true
+  Post:
+    fields:
+      related:
+        resolver: true
+      likedByMe:
+        resolver: true
+      savedByMe:
+        resolver: true

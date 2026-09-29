@@ -1,16 +1,19 @@
 import type { ApolloCache, ApolloClient } from "@apollo/client";
+import { logger } from "@/shared/lib/logger";
 
 export type PostListQueryName =
   | "Posts"
   | "PostsByTag"
   | "MyPosts"
-  | "SearchPosts";
+  | "SearchPosts"
+  | "RecommendedPosts";
 
 export const POST_LIST_QUERY_NAMES: PostListQueryName[] = [
   "Posts",
   "PostsByTag",
   "MyPosts",
   "SearchPosts",
+  "RecommendedPosts",
 ];
 
 export interface PostListCacheRefreshOptions {
@@ -18,7 +21,12 @@ export interface PostListCacheRefreshOptions {
 }
 
 const ROOT_QUERY_ID = "ROOT_QUERY";
-const ROOT_POST_LIST_FIELDS = ["posts", "postsByTag", "searchPosts"] as const;
+const ROOT_POST_LIST_FIELDS = [
+  "posts",
+  "postsByTag",
+  "searchPosts",
+  "recommendedPosts",
+] as const;
 
 const getCacheEntityIds = (cache: ApolloCache, typename: string) => {
   const snapshot = cache.extract(false);
@@ -68,6 +76,6 @@ export const refreshPostListQueries = async (
   try {
     await client.refetchQueries({ include: POST_LIST_QUERY_NAMES });
   } catch (error) {
-    console.warn("Unable to refetch post list queries.", error);
+    logger.warn("Unable to refetch post list queries.", error);
   }
 };

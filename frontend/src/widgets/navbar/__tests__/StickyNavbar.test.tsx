@@ -47,19 +47,19 @@ describe("StickyNavbar", () => {
 
     renderWithProviders(<StickyNavbar />);
 
-    await screen.findByRole("button", { name: /open mobile account menu/i });
+    await screen.findByRole("button", { name: /open account menu/i });
     expect(screen.queryByText("shamu22")).not.toBeInTheDocument();
     expect(screen.queryByText("shamu22@example.com")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: /open mobile account menu/i }),
+      screen.getByRole("button", { name: /open account menu/i }),
     );
 
     expect(screen.getByText("shamu22")).toBeInTheDocument();
     expect(screen.getByText("shamu22@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /create blog/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /account/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /create blog/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /account/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /log out/i })).toBeInTheDocument();
   });
 
   it("opens the desktop account dropdown and shows the refreshed menu design", async () => {
@@ -95,6 +95,12 @@ describe("StickyNavbar", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByText("shamu22")).toBeInTheDocument();
     expect(screen.getByText("shamu22@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /create blog/i })).toHaveClass(
+      "interactive-hover-primary",
+    );
+    expect(screen.getByRole("menuitem", { name: /review/i })).toHaveClass(
+      "interactive-hover-primary",
+    );
     expect(screen.getByRole("menuitem", { name: /account/i })).toHaveClass(
       "interactive-hover-primary",
     );

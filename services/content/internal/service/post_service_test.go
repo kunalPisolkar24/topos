@@ -3,715 +3,1106 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain/mocks"
-	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/kunalPisolkar24/topos/services/content/internal/cache"
+	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
+	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
+	"github.com/kunalPisolkar24/topos/services/content/internal/testutil"
+	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func init() {
-	logger.Init()
+func newService(t *testing.T, postRepo *testutil.MockPostRepository, publisher *testutil.MockEventPublisher, cacheClient *cache.Cache) *PostService {
+	t.Helper()
+
+	if postRepo == nil {
+		postRepo = &testutil.MockPostRepository{}
+	}
+	if publisher == nil {
+		publisher = &testutil.MockEventPublisher{}
+	}
+	return NewPostService(
+		postRepo,
+		&testutil.MockTagRepository{},
+		&testutil.MockAIService{},
+		publisher,
+		cacheClient,
+	)
 }
 
-func TestPostService_CreatePost(t *testing.T) {
-	type args struct {
-		title    string
-		body     string
-		authorID string
-		tags     []string
-		imageUrl *string
-		summary  *string
-	}
+func newMemCache(t *testing.T) *cache.Cache {
+	t.Helper()
 
-	img := "http://example.com/image.jpg"
-
-	tests := []struct {
-		name          string
-		args          args
-		setupMocks    func(*mocks.PostRepository, *mocks.TagRepository, *mocks.EventProducer)
-		expectedError bool
-		checkResponse func(*testing.T, *domain.Post)
-	}{
-		{
-			name: "Success_FullData",
-			args: args{
-				title:    "Test Title",
-				body:     "Test Body",
-				authorID: "user123",
-				tags:     []string{"go"},
-				imageUrl: &img,
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				tr.On("CreateOrFind", mock.Anything, "go").Return(&domain.Tag{ID: "1", Name: "go"}, nil)
-
-				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == "Test Title" && p.Slug != "" && p.SummaryStatus == domain.PostStatusPending
-				})).Return(&domain.Post{
-					ID:       "post123",
-					Title:    "Test Title",
-					AuthorID: "user123",
-				}, nil)
-
-				ep.On("PublishPostCreated", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.ID == "post123"
-				})).Return(nil)
-			},
-			expectedError: false,
-			checkResponse: func(t *testing.T, p *domain.Post) {
-				assert.NotNil(t, p)
-				assert.Equal(t, "post123", p.ID)
-			},
-		},
-		{
-			name: "Success_WithSummary",
-			args: args{
-				title:    "AI Title",
-				body:     "AI Body",
-				authorID: "user123",
-				summary:  func() *string { s := "AI Summary"; return &s }(),
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("Create", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Summary == "AI Summary" && p.SummaryStatus == domain.PostStatusCompleted
-				})).Return(&domain.Post{
-					ID:       "post456",
-					Title:    "AI Title",
-					AuthorID: "user123",
-				}, nil)
-
-				ep.On("PublishPostCreated", mock.Anything, mock.Anything).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name: "Success_EventPublishFailure_Ignored",
-			args: args{
-				title:    "Test Title",
-				body:     "Body",
-				authorID: "user1",
-				tags:     []string{},
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("Create", mock.Anything, mock.Anything).Return(&domain.Post{ID: "post1"}, nil)
-				ep.On("PublishPostCreated", mock.Anything, mock.Anything).Return(errors.New("kafka error"))
-			},
-			expectedError: false,
-		},
-		{
-			name: "Failure_RepoError",
-			args: args{
-				title:    "Test Title",
-				body:     "Body",
-				authorID: "user1",
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("db error"))
-			},
-			expectedError: true,
-		},
-		{
-			name: "Success_RetriesOnDuplicateSlug",
-			args: args{
-				title:    "Same Title",
-				body:     "Body",
-				authorID: "user1",
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("Create", mock.Anything, mock.Anything).Return(nil, mongo.WriteException{WriteErrors: mongo.WriteErrors{{Code: 11000}}}).Once()
-				pr.On("Create", mock.Anything, mock.Anything).Return(&domain.Post{ID: "post-retry-success"}, nil).Once()
-				ep.On("PublishPostCreated", mock.Anything, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.ID == "post-retry-success"
-				})).Return(nil)
-			},
-			expectedError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			tr := new(mocks.TagRepository)
-			ep := new(mocks.EventProducer)
-			ai := new(mocks.AIService)
-
-			if tt.setupMocks != nil {
-				tt.setupMocks(pr, tr, ep)
-			}
-
-			s := NewPostService(pr, tr, ep, ai)
-			got, err := s.CreatePost(context.Background(), tt.args.title, tt.args.body, tt.args.authorID, tt.args.tags, tt.args.imageUrl, tt.args.summary)
-
-			if tt.expectedError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-
-			if tt.checkResponse != nil {
-				tt.checkResponse(t, got)
-			}
-			pr.AssertExpectations(t)
-			tr.AssertExpectations(t)
-			ep.AssertExpectations(t)
-		})
-	}
+	mr := miniredis.RunT(t)
+	c, err := cache.New(context.Background(), cache.Options{Addr: mr.Addr()})
+	require.NoError(t, err)
+	t.Cleanup(func() { c.Close() })
+	return c
 }
 
-func TestPostService_UpdatePost(t *testing.T) {
-	type args struct {
-		id       string
-		actorID  string
-		title    *string
-		body     *string
-		tags     []string
-		imageUrl *string
+func TestCreatePost(t *testing.T) {
+	publisher := &testutil.MockEventPublisher{}
+	s := newService(t, nil, publisher, nil)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, "Title", post.Title)
+	assert.Equal(t, domain.PostStatusPending, post.SummaryStatus)
+	assert.Contains(t, post.Slug, "title-")
+	assert.Empty(t, post.ApprovedByID, "direct publishes carry no reviewer attribution")
+	assert.Len(t, publisher.Created, 1)
+}
+
+func TestCreatePostRecordsApprover(t *testing.T) {
+	s := newService(t, nil, nil, nil)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "peer-9")
+
+	require.NoError(t, err)
+	assert.Equal(t, "peer-9", post.ApprovedByID)
+}
+
+func TestCreatePostWithSummary(t *testing.T) {
+	summary := "provided summary"
+	s := newService(t, nil, nil, nil)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, &summary, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.PostStatusCompleted, post.SummaryStatus)
+	assert.Equal(t, summary, post.Summary)
+}
+
+func TestCreatePostRepoError(t *testing.T) {
+	wantErr := errors.New("db down")
+	repo := &testutil.MockPostRepository{CreateFn: func(ctx context.Context, post *domain.Post) (*domain.Post, error) {
+		return nil, wantErr
+	}}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func TestCreatePostSlugRetriesExhausted(t *testing.T) {
+	repo := &testutil.MockPostRepository{CreateFn: func(ctx context.Context, post *domain.Post) (*domain.Post, error) {
+		return nil, mongo.CommandError{Code: 11000}
+	}}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "slug retries")
+	assert.Equal(t, maxSlugRetries, repo.CreateCalls)
+}
+
+func TestCreatePostRegeneratesSlugPerAttempt(t *testing.T) {
+	seen := map[string]bool{}
+	repo := &testutil.MockPostRepository{CreateFn: func(ctx context.Context, post *domain.Post) (*domain.Post, error) {
+		if seen[post.Slug] {
+			return nil, errors.New("slug repeated across retries")
+		}
+		seen[post.Slug] = true
+		return nil, mongo.CommandError{Code: 11000}
+	}}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "slug retries")
+	assert.Len(t, seen, maxSlugRetries, "every retry must try a different slug")
+}
+
+func TestCreatePostSlugCollisionFailsFast(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindBySlugFn: func(ctx context.Context, slug string) (*domain.Post, error) {
+			return &domain.Post{ID: "existing", Slug: slug}, nil
+		},
 	}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.ErrorIs(t, err, domain.ErrValidation)
+	assert.Contains(t, err.Error(), "already taken")
+	assert.Zero(t, repo.CreateCalls, "a known collision must not attempt an insert")
+}
+
+func TestCreatePostSlugCheckDBErrorPropagates(t *testing.T) {
+	repo := &testutil.MockPostRepository{FindBySlugFn: func(ctx context.Context, slug string) (*domain.Post, error) {
+		return nil, errors.New("db down")
+	}}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db down")
+	assert.Zero(t, repo.CreateCalls)
+}
+
+func TestCreatePostPublishFailureIsIgnored(t *testing.T) {
+	publisher := &testutil.MockEventPublisher{Err: errors.New("kafka down")}
+	s := newService(t, nil, publisher, nil)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.NoError(t, err)
+	require.NotNil(t, post)
+}
+
+func TestCreatePostNilPublisher(t *testing.T) {
+	s := NewPostService(
+		&testutil.MockPostRepository{},
+		&testutil.MockTagRepository{},
+		&testutil.MockAIService{},
+		nil,
+		nil,
+	)
+
+	_, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.NoError(t, err)
+}
+
+func TestUpdatePost(t *testing.T) {
+	existing := &domain.Post{ID: "p_1", AuthorID: "u_1"}
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) { return existing, nil },
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			return post, nil
+		},
+	}
+	publisher := &testutil.MockEventPublisher{}
+	s := newService(t, repo, publisher, nil)
 
 	title := "New Title"
-	body := "New Body"
-	img := "new.jpg"
-	id := "post123"
-	author := "user1"
+	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, "New Title", post.Title)
+	assert.Len(t, publisher.Updated, 1)
+}
+
+func TestUpdatePostForbidden(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_other"}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil, "")
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestUpdatePostNotFound(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, nil, "")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestUpdatePostResetsSummaryOnTitleChange(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1"}, nil
+		},
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			return post, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	title := "Renamed"
+	post, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.True(t, post.ResetSummary)
+}
+
+func TestUpdatePostStampsApproverOnlyFromReview(t *testing.T) {
+	var stored *domain.Post
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1"}, nil
+		},
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			stored = post
+			return post, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	title := "Peer-approved rename"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "peer-9")
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Equal(t, "peer-9", stored.ApprovedByID)
+
+	// Direct author edits leave attribution untouched.
+	stored = nil
+	title = "Author tweak"
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Empty(t, stored.ApprovedByID)
+}
+
+func TestCreatePostValidation(t *testing.T) {
+	longTitle := strings.Repeat("a", maxTitleLen+1)
+	longBody := strings.Repeat("b", maxBodyLen+1)
+	longTag := strings.Repeat("t", maxTagLen+1)
+	tooManyTags := make([]string, maxTagCount+1)
 
 	tests := []struct {
-		name          string
-		args          args
-		setupMocks    func(*mocks.PostRepository, *mocks.TagRepository, *mocks.EventProducer)
-		expectedError bool
+		name    string
+		title   string
+		body    string
+		tags    []string
+		wantErr string
 	}{
-		{
-			name: "Success_FullUpdate",
-			args: args{
-				id:       id,
-				actorID:  author,
-				title:    &title,
-				body:     &body,
-				imageUrl: &img,
-				tags:     []string{"newtag"},
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				tr.On("CreateOrFind", mock.Anything, "newtag").Return(&domain.Tag{}, nil)
-
-				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title &&
-						p.Body == body &&
-						*p.ImageUrl == img &&
-						len(p.Tags) == 1 &&
-						!p.UpdatedAt.IsZero() &&
-						p.Summary == "" &&
-						p.SummaryStatus == domain.PostStatusPending &&
-						p.ResetSummary
-				})).Return(&domain.Post{ID: id, Title: title}, nil)
-
-				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name: "Success_PartialUpdate_TitleOnly",
-			args: args{
-				id:      id,
-				actorID: author,
-				title:   &title,
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Title == title &&
-						p.Body == "" &&
-						p.ImageUrl == nil &&
-						p.Tags == nil &&
-						p.Summary == "" &&
-						p.SummaryStatus == domain.PostStatusPending &&
-						p.ResetSummary
-				})).Return(&domain.Post{ID: id}, nil)
-
-				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name: "Success_ImageOnly_DoesNotResetSummary",
-			args: args{
-				id:       id,
-				actorID:  author,
-				imageUrl: &img,
-			},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				pr.On("Update", mock.Anything, id, mock.MatchedBy(func(p *domain.Post) bool {
-					return p.Summary == "" && p.SummaryStatus == ""
-				})).Return(&domain.Post{ID: id}, nil)
-
-				ep.On("PublishPostUpdated", mock.Anything, mock.Anything).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name: "Failure_Forbidden",
-			args: args{id: id, actorID: "other-user", body: &body},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-			},
-			expectedError: true,
-		},
-		{
-			name: "Failure_NotFound",
-			args: args{id: id, actorID: author, body: &body},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(nil, domain.ErrNotFound)
-			},
-			expectedError: true,
-		},
-		{
-			name: "Failure_RepoUpdate",
-			args: args{id: id, actorID: author, body: &body},
-			setupMocks: func(pr *mocks.PostRepository, tr *mocks.TagRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				pr.On("Update", mock.Anything, id, mock.Anything).Return(nil, errors.New("update failed"))
-			},
-			expectedError: true,
-		},
+		{name: "empty title", wantErr: "title is required"},
+		{name: "whitespace title", title: "   ", body: "Body", wantErr: "title is required"},
+		{name: "empty body", title: "Title", wantErr: "body is required"},
+		{name: "title too long", title: longTitle, body: "Body", wantErr: "title is too long"},
+		{name: "body too long", title: "Title", body: longBody, wantErr: "body is too long"},
+		{name: "too many tags", title: "Title", body: "Body", tags: tooManyTags, wantErr: "too many tags"},
+		{name: "tag too long", title: "Title", body: "Body", tags: []string{longTag}, wantErr: "tag is too long"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			tr := new(mocks.TagRepository)
-			ep := new(mocks.EventProducer)
-			ai := new(mocks.AIService)
+			repo := &testutil.MockPostRepository{}
+			s := newService(t, repo, nil, nil)
 
-			tt.setupMocks(pr, tr, ep)
+			_, err := s.CreatePost(context.Background(), tt.title, tt.body, "u_1", tt.tags, nil, nil, "")
 
-			s := NewPostService(pr, tr, ep, ai)
-			_, err := s.UpdatePost(context.Background(), tt.args.id, tt.args.actorID, tt.args.title, tt.args.body, tt.args.tags, tt.args.imageUrl)
-
-			if tt.expectedError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-			pr.AssertExpectations(t)
+			require.ErrorIs(t, err, domain.ErrValidation)
+			assert.Contains(t, err.Error(), tt.wantErr)
+			assert.Zero(t, repo.CreateCalls, "invalid input must not reach the repository")
 		})
 	}
 }
 
-func TestPostService_DeletePost(t *testing.T) {
-	id := "post123"
-	author := "user1"
-	tests := []struct {
-		name          string
-		actorID       string
-		setupMocks    func(*mocks.PostRepository, *mocks.EventProducer)
-		expectedError bool
-	}{
-		{
-			name:    "Success",
-			actorID: author,
-			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				pr.On("Delete", mock.Anything, id).Return(nil)
-				ep.On("PublishPostDeleted", mock.Anything, id).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name:    "Failure_Repo",
-			actorID: author,
-			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-				pr.On("Delete", mock.Anything, id).Return(errors.New("fail"))
-			},
-			expectedError: true,
-		},
-		{
-			name:    "Failure_Forbidden",
-			actorID: "other-user",
-			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(&domain.Post{ID: id, AuthorID: author}, nil)
-			},
-			expectedError: true,
-		},
-		{
-			name:    "Failure_NotFound",
-			actorID: author,
-			setupMocks: func(pr *mocks.PostRepository, ep *mocks.EventProducer) {
-				pr.On("FindByID", mock.Anything, id).Return(nil, domain.ErrNotFound)
-			},
-			expectedError: true,
-		},
-	}
+func TestCreatePostTrimsInput(t *testing.T) {
+	s := newService(t, nil, nil, nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ep := new(mocks.EventProducer)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr, ep)
-			s := NewPostService(pr, nil, ep, ai)
-			err := s.DeletePost(context.Background(), id, tt.actorID)
-			if tt.expectedError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	post, err := s.CreatePost(context.Background(), "  Title  ", "  Body  ", "u_1", []string{"  go ", "", "rust "}, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, "Title", post.Title)
+	assert.Equal(t, "Body", post.Body)
+	assert.Equal(t, []string{"go", "rust"}, post.Tags)
 }
 
-func TestPostService_GetPost(t *testing.T) {
-	tests := []struct {
-		name       string
-		id         string
-		setupMocks func(*mocks.PostRepository)
-		wantErr    bool
-	}{
-		{
-			name: "Success",
-			id:   "1",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByID", mock.Anything, "1").Return(&domain.Post{ID: "1"}, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name: "NotFound",
-			id:   "1",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByID", mock.Anything, "1").Return(nil, errors.New("not found"))
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil, ai)
-			_, err := s.GetPost(context.Background(), tt.id)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+func TestCreatePostTagErrorIsTolerated(t *testing.T) {
+	s := NewPostService(
+		&testutil.MockPostRepository{},
+		&testutil.MockTagRepository{CreateOrFindFn: func(ctx context.Context, name string) (*domain.Tag, error) {
+			return nil, errors.New("tag db down")
+		}},
+		&testutil.MockAIService{},
+		nil,
+		nil,
+	)
+
+	post, err := s.CreatePost(context.Background(), "Title", "Body", "u_1", []string{"go"}, nil, nil, "")
+
+	require.NoError(t, err)
+	require.NotNil(t, post)
 }
 
-func TestPostService_GetPosts(t *testing.T) {
-	tests := []struct {
-		name       string
-		setupMocks func(*mocks.PostRepository)
-		wantErr    bool
-	}{
-		{
-			name: "Success",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindAll", mock.Anything, 1, 10).Return(&domain.PaginatedPosts{}, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name: "Error",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindAll", mock.Anything, 1, 10).Return(nil, errors.New("fail"))
-			},
-			wantErr: true,
+func TestUpdatePostValidation(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1", Title: "Old"}, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil, ai)
-			_, err := s.GetPosts(context.Background(), 1, 10)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	s := newService(t, repo, nil, nil)
+
+	empty := ""
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &empty, nil, nil, nil, "")
+	require.ErrorIs(t, err, domain.ErrValidation)
+	assert.Contains(t, err.Error(), "title is required")
+
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", nil, &empty, nil, nil, "")
+	require.ErrorIs(t, err, domain.ErrValidation)
+	assert.Contains(t, err.Error(), "body is required")
+
+	long := strings.Repeat("a", maxTitleLen+1)
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &long, nil, nil, nil, "")
+	require.ErrorIs(t, err, domain.ErrValidation)
 }
 
-func TestPostService_GetPostsByAuthor(t *testing.T) {
-	tests := []struct {
-		name       string
-		authorID   string
-		setupMocks func(*mocks.PostRepository)
-		wantErr    bool
-	}{
-		{
-			name:     "Success",
-			authorID: "user1",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByAuthor", mock.Anything, "user1", 1, 10).Return(&domain.PaginatedPosts{}, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name:     "Error",
-			authorID: "user1",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByAuthor", mock.Anything, "user1", 1, 10).Return(nil, errors.New("fail"))
-			},
-			wantErr: true,
+func TestUpdatePostUnchangedValuesDoNotResetSummary(t *testing.T) {
+	existing := &domain.Post{ID: "p_1", AuthorID: "u_1", Title: "Same", Body: "SameBody"}
+	var got *domain.Post
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) { return existing, nil },
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			got = post
+			return post, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil, ai)
-			_, err := s.GetPostsByAuthor(context.Background(), tt.authorID, 1, 10)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	s := newService(t, repo, nil, nil)
+
+	title, body := "Same", "SameBody"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, &body, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.False(t, got.ResetSummary, "unchanged title/body must not reset the summary")
+	assert.Empty(t, got.Title, "unchanged title must not be rewritten")
+	assert.Empty(t, got.Body, "unchanged body must not be rewritten")
+	assert.Empty(t, got.Slug, "unchanged title must not regenerate the slug")
 }
 
-func TestPostService_GetPostsByTag(t *testing.T) {
-	tests := []struct {
-		name       string
-		tag        string
-		setupMocks func(*mocks.PostRepository)
-		wantErr    bool
-	}{
-		{
-			name: "Success",
-			tag:  "tech",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByTag", mock.Anything, "tech", 1, 10).Return(&domain.PaginatedPosts{}, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name: "Error",
-			tag:  "tech",
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("FindByTag", mock.Anything, "tech", 1, 10).Return(nil, errors.New("fail"))
-			},
-			wantErr: true,
+func TestUpdatePostImageOnlyDoesNotResetSummary(t *testing.T) {
+	existing := &domain.Post{ID: "p_1", AuthorID: "u_1", Title: "Title", Body: "Body"}
+	var got *domain.Post
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) { return existing, nil },
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			got = post
+			return post, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil, ai)
-			_, err := s.GetPostsByTag(context.Background(), tt.tag, 1, 10)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	s := newService(t, repo, nil, nil)
+
+	imageURL := "https://example.com/image.png"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", nil, nil, nil, &imageURL, "")
+
+	require.NoError(t, err)
+	assert.False(t, got.ResetSummary, "an imageUrl-only edit must not reset the summary")
+	assert.Empty(t, got.Title)
+	assert.Empty(t, got.Body)
+	assert.Empty(t, got.Slug)
 }
 
-func TestPostService_SetPostSummary(t *testing.T) {
-	tests := []struct {
-		name          string
-		postID        string
-		summary       string
-		status        domain.PostStatus
-		setupMocks    func(*mocks.PostRepository)
-		expectedError bool
-	}{
-		{
-			name:    "Success",
-			postID:  "post123",
-			summary: "A great summary",
-			status:  domain.PostStatusCompleted,
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("UpdateSummary", mock.Anything, "post123", "A great summary", domain.PostStatusCompleted).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name:    "Success_Pending",
-			postID:  "post456",
-			summary: "",
-			status:  domain.PostStatusPending,
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("UpdateSummary", mock.Anything, "post456", "", domain.PostStatusPending).Return(nil)
-			},
-			expectedError: false,
-		},
-		{
-			name:    "Error",
-			postID:  "post789",
-			summary: "fail summary",
-			status:  domain.PostStatusFailed,
-			setupMocks: func(pr *mocks.PostRepository) {
-				pr.On("UpdateSummary", mock.Anything, "post789", "fail summary", domain.PostStatusFailed).Return(errors.New("repo error"))
-			},
-			expectedError: true,
+func TestUpdatePostChangedValuesResetSummary(t *testing.T) {
+	existing := &domain.Post{ID: "p_1", AuthorID: "u_1", Title: "Old", Body: "OldBody"}
+	var got *domain.Post
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) { return existing, nil },
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			got = post
+			return post, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(pr)
-			s := NewPostService(pr, nil, nil, ai)
-			err := s.SetPostSummary(context.Background(), tt.postID, tt.summary, tt.status)
-			if tt.expectedError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-			pr.AssertExpectations(t)
-		})
-	}
+	s := newService(t, repo, nil, nil)
+
+	title := "New"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+
+	require.NoError(t, err)
+	assert.True(t, got.ResetSummary, "a real title change must reset the summary")
+	assert.Equal(t, "New", got.Title)
+	assert.NotEmpty(t, got.Slug)
 }
 
-func TestPostService_GenerateTags(t *testing.T) {
-	tests := []struct {
-		name          string
-		title         string
-		body          string
-		setupMocks    func(*mocks.AIService)
-		expectedTags  []string
-		expectedError bool
-	}{
-		{
-			name:  "Success",
-			title: "Go Programming",
-			body:  "Go is a statically typed language",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GenerateTags", mock.Anything, "Go Programming", "Go is a statically typed language").Return([]string{"go", "programming"}, nil)
-			},
-			expectedTags:  []string{"go", "programming"},
-			expectedError: false,
+func TestUpdatePostTagErrorIsTolerated(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1", Title: "Old"}, nil
 		},
-		{
-			name:  "Success_Empty",
-			title: "Untitled",
-			body:  "",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GenerateTags", mock.Anything, "Untitled", "").Return([]string{}, nil)
-			},
-			expectedTags:  []string{},
-			expectedError: false,
-		},
-		{
-			name:  "Error",
-			title: "Fail",
-			body:  "case",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GenerateTags", mock.Anything, "Fail", "case").Return(nil, errors.New("ai error"))
-			},
-			expectedTags:  nil,
-			expectedError: true,
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			return post, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(ai)
-			s := NewPostService(pr, nil, nil, ai)
-			tags, err := s.GenerateTags(context.Background(), tt.title, tt.body)
-			if tt.expectedError {
-				assert.Error(t, err)
-				assert.Nil(t, tags)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedTags, tags)
-			}
-			ai.AssertExpectations(t)
-		})
-	}
+	s := NewPostService(
+		repo,
+		&testutil.MockTagRepository{CreateOrFindFn: func(ctx context.Context, name string) (*domain.Tag, error) {
+			return nil, errors.New("tag db down")
+		}},
+		&testutil.MockAIService{},
+		nil,
+		nil,
+	)
+
+	title := "New"
+	_, err := s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, []string{"go"}, nil, "")
+
+	require.NoError(t, err)
 }
 
-func TestPostService_GeneratePostContent(t *testing.T) {
-	tests := []struct {
-		name          string
-		prompt        string
-		setupMocks    func(*mocks.AIService)
-		expectedPost  *domain.GeneratedPost
-		expectedError bool
-	}{
-		{
-			name:   "Success",
-			prompt: "Write about Go",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GeneratePost", mock.Anything, "Write about Go").Return(&domain.GeneratedPost{
-					Title:   "All About Go",
-					Body:    "Go is great...",
-					Summary: "A summary",
-					Tags:    []string{"go"},
-				}, nil)
-			},
-			expectedPost: &domain.GeneratedPost{
-				Title:   "All About Go",
-				Body:    "Go is great...",
-				Summary: "A summary",
-				Tags:    []string{"go"},
-			},
-			expectedError: false,
-		},
-		{
-			name:   "Success_EmptyPrompt",
-			prompt: "",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GeneratePost", mock.Anything, "").Return((*domain.GeneratedPost)(nil), nil)
-			},
-			expectedPost:  nil,
-			expectedError: false,
-		},
-		{
-			name:   "Error",
-			prompt: "fail",
-			setupMocks: func(ai *mocks.AIService) {
-				ai.On("GeneratePost", mock.Anything, "fail").Return(nil, errors.New("ai error"))
-			},
-			expectedPost:  nil,
-			expectedError: true,
+func TestDeletePost(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1"}, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pr := new(mocks.PostRepository)
-			ai := new(mocks.AIService)
-			tt.setupMocks(ai)
-			s := NewPostService(pr, nil, nil, ai)
-			got, err := s.GeneratePostContent(context.Background(), tt.prompt)
-			if tt.expectedError {
-				assert.Error(t, err)
-				assert.Nil(t, got)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedPost, got)
-			}
-			ai.AssertExpectations(t)
-		})
-	}
+	publisher := &testutil.MockEventPublisher{}
+	s := newService(t, repo, publisher, nil)
+
+	err := s.DeletePost(context.Background(), "p_1", "u_1")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_1"}, publisher.Deleted)
 }
 
-func TestPostService_DeletePost_NilEventProducer(t *testing.T) {
-	pr := new(mocks.PostRepository)
-	ai := new(mocks.AIService)
+func TestDeletePostForbidden(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_other"}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
 
-	pr.On("FindByID", mock.Anything, "post1").Return(&domain.Post{ID: "post1", AuthorID: "user1"}, nil)
-	pr.On("Delete", mock.Anything, "post1").Return(nil)
+	err := s.DeletePost(context.Background(), "p_1", "u_1")
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
 
-	s := NewPostService(pr, nil, nil, ai)
-	err := s.DeletePost(context.Background(), "post1", "user1")
+func TestSetPostSummary(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		UpdateSummaryFn: func(ctx context.Context, id, summary string, status domain.PostStatus) error {
+			return errors.New("boom")
+		},
+	}
+	s := newService(t, repo, nil, nil)
 
-	assert.NoError(t, err)
-	pr.AssertExpectations(t)
+	err := s.SetPostSummary(context.Background(), "p_1", "summary", domain.PostStatusCompleted)
+	assert.ErrorContains(t, err, "boom")
+}
+
+func TestGetPosts(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindAllFn: func(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
+			return &domain.PaginatedPosts{Page: page, Posts: []*domain.Post{{ID: "p_1"}}}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	result, err := s.GetPosts(context.Background(), 1, 10)
+	require.NoError(t, err)
+	assert.Len(t, result.Posts, 1)
+}
+
+func TestGetPostsCached(t *testing.T) {
+	calls := 0
+	repo := &testutil.MockPostRepository{
+		FindAllFn: func(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
+			calls++
+			return &domain.PaginatedPosts{Page: page}, nil
+		},
+	}
+	s := newService(t, repo, nil, newMemCache(t))
+
+	_, err := s.GetPosts(context.Background(), 1, 10)
+	require.NoError(t, err)
+	_, err = s.GetPosts(context.Background(), 1, 10)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, calls, "second read should hit the cache")
+}
+
+func TestGetPostsPaginationNormalized(t *testing.T) {
+	var gotPage, gotLimit int
+	repo := &testutil.MockPostRepository{
+		FindAllFn: func(ctx context.Context, page, limit int) (*domain.PaginatedPosts, error) {
+			gotPage, gotLimit = page, limit
+			return &domain.PaginatedPosts{}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	_, err := s.GetPosts(context.Background(), 0, 500)
+	require.NoError(t, err)
+	assert.Equal(t, 1, gotPage)
+	assert.Equal(t, 100, gotLimit)
+}
+
+func TestGetPostRepoErrorNotCached(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	s := newService(t, repo, nil, newMemCache(t))
+
+	_, err := s.GetPost(context.Background(), "missing")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestGetPostFromCache(t *testing.T) {
+	calls := 0
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			calls++
+			return &domain.Post{ID: id, Title: "t"}, nil
+		},
+	}
+	s := newService(t, repo, nil, newMemCache(t))
+
+	for i := 0; i < 2; i++ {
+		post, err := s.GetPost(context.Background(), "p_1")
+		require.NoError(t, err)
+		assert.Equal(t, "t", post.Title)
+	}
+	assert.Equal(t, 1, calls)
+}
+
+func TestGetPostsByAuthor(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByAuthorFn: func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
+			return &domain.PaginatedPosts{Page: page}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	result, err := s.GetPostsByAuthor(context.Background(), "u_1", 2, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Page)
+}
+
+func TestGetPostsByTag(t *testing.T) {
+	repo := &testutil.MockPostRepository{
+		FindByTagFn: func(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
+			return &domain.PaginatedPosts{Page: page}, nil
+		},
+	}
+	s := newService(t, repo, nil, nil)
+
+	result, err := s.GetPostsByTag(context.Background(), "go", 3, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 3, result.Page)
+}
+
+func TestGetPostsByTagCached(t *testing.T) {
+	calls := 0
+	repo := &testutil.MockPostRepository{
+		FindByTagFn: func(ctx context.Context, tag string, page, limit int) (*domain.PaginatedPosts, error) {
+			calls++
+			return &domain.PaginatedPosts{}, nil
+		},
+	}
+	s := newService(t, repo, nil, newMemCache(t))
+
+	for i := 0; i < 2; i++ {
+		_, err := s.GetPostsByTag(context.Background(), "go", 1, 10)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 1, calls)
+}
+
+func TestGenerateTags(t *testing.T) {
+	ai := &testutil.MockAIService{GenerateTagsFn: func(ctx context.Context, title, body string) ([]string, error) {
+		return []string{"go"}, nil
+	}}
+	s := NewPostService(nil, nil, ai, nil, nil)
+
+	tags, err := s.GenerateTags(context.Background(), "t", "b")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go"}, tags)
+}
+
+func TestGeneratePostContent(t *testing.T) {
+	ai := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+		return &domain.GeneratedPost{Title: "t"}, nil
+	}}
+	s := NewPostService(nil, nil, ai, nil, nil)
+
+	post, err := s.GeneratePostContent(context.Background(), "prompt")
+	require.NoError(t, err)
+	assert.Equal(t, "t", post.Title)
+}
+
+func TestPostServiceClock(t *testing.T) {
+	s := NewPostService(&testutil.MockPostRepository{}, nil, nil, nil, nil)
+	now := time.Now()
+	assert.NotZero(t, s.clock().Sub(now))
+}
+
+func newSearchService(t *testing.T, ai *testutil.MockAIService, repo *testutil.MockPostRepository, cacheClient *cache.Cache) *PostService {
+	t.Helper()
+	if ai == nil {
+		ai = &testutil.MockAIService{}
+	}
+	if repo == nil {
+		repo = &testutil.MockPostRepository{}
+	}
+	return NewPostService(repo, nil, ai, nil, cacheClient)
+}
+
+func TestSearchPostsRanksAndDropsMissing(t *testing.T) {
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		assert.Equal(t, "go", query)
+		assert.Equal(t, 0, offset)
+		assert.Equal(t, 10, limit)
+		return &domain.SearchResult{PostIDs: []string{"p_2", "missing", "p_1"}, Total: 3}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		assert.Equal(t, []string{"p_2", "missing", "p_1"}, ids)
+		return []*domain.Post{
+			{ID: "p_1", Title: "First"},
+			{ID: "p_2", Title: "Second"},
+		}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	result, err := s.SearchPosts(context.Background(), "go", 1, 10)
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, result.Total)
+	require.Len(t, result.Hits, 2)
+	assert.Equal(t, "p_2", result.Hits[0].ID, "hits keep the search rank order")
+	assert.Equal(t, "p_1", result.Hits[1].ID)
+}
+
+func TestSearchPostsEmptyResult(t *testing.T) {
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		return &domain.SearchResult{PostIDs: nil, Total: 0}, nil
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	result, err := s.SearchPosts(context.Background(), "nothing", 1, 10)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Total)
+	assert.Empty(t, result.Hits)
+}
+
+func TestSearchPostsAIError(t *testing.T) {
+	wantErr := errors.New("ai down")
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		return nil, wantErr
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	_, err := s.SearchPosts(context.Background(), "go", 1, 10)
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func TestSearchPostsRepoError(t *testing.T) {
+	wantErr := errors.New("db down")
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		return &domain.SearchResult{PostIDs: []string{"p_1"}, Total: 1}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return nil, wantErr
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	_, err := s.SearchPosts(context.Background(), "go", 1, 10)
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func TestRecommendedPostsRanksDropsMissingExcludesOwn(t *testing.T) {
+	before := promtestutil.ToFloat64(metrics.RecommendColdStartTotal)
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		assert.Equal(t, "u_1", userID)
+		assert.Equal(t, 0, offset)
+		assert.Equal(t, 10, limit)
+		assert.Equal(t, domain.RecommendModeSurprise, mode)
+		assert.Equal(t, uint32(42), seed)
+		return &domain.SearchResult{PostIDs: []string{"p_2", "mine", "missing", "p_1"}, Total: 4}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		assert.Equal(t, []string{"p_2", "mine", "missing", "p_1"}, ids)
+		return []*domain.Post{
+			{ID: "p_1", Title: "First", AuthorID: "u_2"},
+			{ID: "p_2", Title: "Second", AuthorID: "u_2"},
+			{ID: "mine", Title: "Mine", AuthorID: "u_1"},
+		}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	result, err := s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeSurprise, 42)
+
+	require.NoError(t, err)
+	require.Len(t, result.Posts, 2)
+	assert.Equal(t, "p_2", result.Posts[0].ID, "posts keep the AI rank order")
+	assert.Equal(t, "p_1", result.Posts[1].ID)
+	assert.Equal(t, 4, int(result.TotalPosts), "total reflects the rankable set")
+	assert.Equal(t, 1, result.TotalPages, "totalPages derives from the AI total")
+	assert.Equal(t, before, promtestutil.ToFloat64(metrics.RecommendColdStartTotal), "a populated feed is not a cold start")
+}
+
+func TestRecommendedPostsKeepsReasonsForServedPosts(t *testing.T) {
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		return &domain.SearchResult{
+			PostIDs: []string{"p_1", "p_2", "mine"},
+			Total:   3,
+			Reasons: map[string]string{
+				"p_1":  "Because you engage with golang posts",
+				"mine": "Because you engage with golang posts",
+				"gone": "Because you engage with golang posts",
+			},
+		}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return []*domain.Post{
+			{ID: "p_1", Title: "First", AuthorID: "u_2"},
+			{ID: "p_2", Title: "Second", AuthorID: "u_2", Tags: []string{"rust"}},
+			{ID: "mine", Title: "Mine", AuthorID: "u_1"},
+		}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	result, err := s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeDefault, 0)
+
+	require.NoError(t, err)
+	require.Len(t, result.Reasons, 1, "only served posts with evidence keep a reason")
+	assert.Equal(t, "p_1", result.Reasons[0].PostID)
+	assert.Equal(t, "Because you engage with golang posts", result.Reasons[0].Reason)
+}
+
+func TestRecommendedPostsColdStartFallsBackToRecency(t *testing.T) {
+	before := promtestutil.ToFloat64(metrics.RecommendColdStartTotal)
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		return &domain.SearchResult{PostIDs: nil, Total: 0}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindAllExceptAuthorFn: func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
+		assert.Equal(t, "u_1", authorID)
+		return &domain.PaginatedPosts{
+			Posts:      []*domain.Post{{ID: "p_1"}, {ID: "p_2"}},
+			TotalPages: 1,
+			TotalPosts: 2,
+			Page:       page,
+		}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	result, err := s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeDefault, 0)
+
+	require.NoError(t, err)
+	require.Len(t, result.Posts, 2)
+	assert.Equal(t, int64(2), result.TotalPosts, "fallback totals come from the repository")
+	assert.Nil(t, result.Reasons, "fallback feeds carry no reasons")
+	assert.Equal(t, before+1, promtestutil.ToFloat64(metrics.RecommendColdStartTotal), "an empty AI result must count as a cold start")
+}
+
+func TestRecommendedPostsAIErrorFallsBackToRecency(t *testing.T) {
+	before := promtestutil.ToFloat64(metrics.RecommendColdStartTotal)
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		return nil, errors.New("ai down")
+	}}
+	repo := &testutil.MockPostRepository{FindAllExceptAuthorFn: func(ctx context.Context, authorID string, page, limit int) (*domain.PaginatedPosts, error) {
+		return &domain.PaginatedPosts{Posts: []*domain.Post{{ID: "p_1"}}, TotalPosts: 1, TotalPages: 1, Page: page}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	result, err := s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeDefault, 0)
+
+	require.NoError(t, err)
+	require.Len(t, result.Posts, 1)
+	assert.Equal(t, "p_1", result.Posts[0].ID)
+	assert.Equal(t, before, promtestutil.ToFloat64(metrics.RecommendColdStartTotal), "an AI failure is degradation, not a cold start")
+}
+
+func TestRecommendedPostsPaginationNormalized(t *testing.T) {
+	var gotOffset, gotLimit int
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		gotOffset, gotLimit = offset, limit
+		return &domain.SearchResult{PostIDs: []string{"p_1"}, Total: 1}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return []*domain.Post{{ID: "p_1", AuthorID: "u_2"}}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	_, err := s.RecommendedPosts(context.Background(), "u_1", 0, 500, domain.RecommendModeDefault, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 0, gotOffset, "page 1 starts at offset 0")
+	assert.Equal(t, 100, gotLimit, "limit clamps to the maximum")
+}
+
+func TestRecommendedPostsCached(t *testing.T) {
+	calls := 0
+	ai := &testutil.MockAIService{RecommendFeedFn: func(ctx context.Context, userID string, offset, limit int, mode domain.RecommendMode, seed uint32) (*domain.SearchResult, error) {
+		calls++
+		return &domain.SearchResult{PostIDs: []string{"p_1"}, Total: 1}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return []*domain.Post{{ID: "p_1", AuthorID: "u_2"}}, nil
+	}}
+	s := newSearchService(t, ai, repo, newMemCache(t))
+
+	_, err := s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeDefault, 0)
+	require.NoError(t, err)
+	_, err = s.RecommendedPosts(context.Background(), "u_1", 1, 10, domain.RecommendModeDefault, 0)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, calls, "second read should hit the cache")
+}
+
+func TestRelatedPostsRanksAndDropsMissing(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsFn: func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		assert.Equal(t, "p_1", postID)
+		assert.Equal(t, 5, limit)
+		return &domain.SearchResult{PostIDs: []string{"p_3", "missing", "p_2"}, Total: 3}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		assert.Equal(t, []string{"p_3", "missing", "p_2"}, ids)
+		return []*domain.Post{
+			{ID: "p_2", Title: "Second"},
+			{ID: "p_3", Title: "Third"},
+		}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	posts, err := s.RelatedPosts(context.Background(), "p_1", 5)
+
+	require.NoError(t, err)
+	require.Len(t, posts, 2)
+	assert.Equal(t, "p_3", posts[0].ID, "related posts keep the AI rank order")
+	assert.Equal(t, "p_2", posts[1].ID)
+}
+
+func TestRelatedPostsEmptyResult(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsFn: func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		return &domain.SearchResult{PostIDs: nil, Total: 0}, nil
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	posts, err := s.RelatedPosts(context.Background(), "p_1", 5)
+
+	require.NoError(t, err)
+	assert.Empty(t, posts)
+}
+
+func TestRelatedPostsNormalizesLimit(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsFn: func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		assert.Equal(t, 5, limit, "zero limit defaults to 5")
+		return &domain.SearchResult{}, nil
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	_, err := s.RelatedPosts(context.Background(), "p_1", 0)
+	require.NoError(t, err)
+
+	ai.RelatedPostsFn = func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		assert.Equal(t, 20, limit, "limit is capped at 20")
+		return &domain.SearchResult{}, nil
+	}
+	_, err = s.RelatedPosts(context.Background(), "p_1", 100)
+	require.NoError(t, err)
+}
+
+func TestRelatedPostsAIError(t *testing.T) {
+	wantErr := errors.New("ai down")
+	ai := &testutil.MockAIService{RelatedPostsFn: func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		return nil, wantErr
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	_, err := s.RelatedPosts(context.Background(), "p_1", 5)
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func TestRelatedPostsRepoError(t *testing.T) {
+	wantErr := errors.New("db down")
+	ai := &testutil.MockAIService{RelatedPostsFn: func(ctx context.Context, postID string, limit int) (*domain.SearchResult, error) {
+		return &domain.SearchResult{PostIDs: []string{"p_2"}, Total: 1}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return nil, wantErr
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	_, err := s.RelatedPosts(context.Background(), "p_1", 5)
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func TestSearchPostsPaginationNormalized(t *testing.T) {
+	var gotOffset, gotLimit int
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		gotOffset, gotLimit = offset, limit
+		return &domain.SearchResult{}, nil
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	_, err := s.SearchPosts(context.Background(), "go", 3, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 20, gotOffset)
+	assert.Equal(t, 10, gotLimit)
+
+	_, err = s.SearchPosts(context.Background(), "go", 0, 500)
+	require.NoError(t, err)
+	assert.Equal(t, 0, gotOffset)
+	assert.Equal(t, 100, gotLimit)
+}
+
+func TestSearchPostsCached(t *testing.T) {
+	calls := 0
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		calls++
+		return &domain.SearchResult{PostIDs: []string{"p_1"}, Total: 1}, nil
+	}}
+	s := newSearchService(t, ai, nil, newMemCache(t))
+
+	for i := 0; i < 2; i++ {
+		result, err := s.SearchPosts(context.Background(), "go", 1, 10)
+		require.NoError(t, err)
+		assert.Len(t, result.Hits, 1)
+	}
+	assert.Equal(t, 1, calls, "second search should hit the cache")
+}
+
+func TestCreatePostInvalidatesSearchCache(t *testing.T) {
+	calls := 0
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		calls++
+		return &domain.SearchResult{}, nil
+	}}
+	s := newSearchService(t, ai, nil, newMemCache(t))
+
+	_, err := s.SearchPosts(context.Background(), "go", 1, 10)
+	require.NoError(t, err)
+
+	_, err = s.CreatePost(context.Background(), "Title", "Body", "u_1", nil, nil, nil, "")
+	require.NoError(t, err)
+
+	_, err = s.SearchPosts(context.Background(), "go", 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 2, calls, "a write must invalidate the search cache")
+}
+
+func TestUpdatePostInvalidatesSearchCache(t *testing.T) {
+	calls := 0
+	ai := &testutil.MockAIService{SearchPostsFn: func(ctx context.Context, query string, offset, limit int) (*domain.SearchResult, error) {
+		calls++
+		return &domain.SearchResult{}, nil
+	}}
+	repo := &testutil.MockPostRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.Post, error) {
+			return &domain.Post{ID: "p_1", AuthorID: "u_1"}, nil
+		},
+		UpdateFn: func(ctx context.Context, id string, post *domain.Post) (*domain.Post, error) {
+			return post, nil
+		},
+	}
+	s := newSearchService(t, ai, repo, newMemCache(t))
+
+	_, err := s.SearchPosts(context.Background(), "go", 1, 10)
+	require.NoError(t, err)
+
+	title := "Renamed"
+	_, err = s.UpdatePost(context.Background(), "p_1", "u_1", &title, nil, nil, nil, "")
+	require.NoError(t, err)
+
+	_, err = s.SearchPosts(context.Background(), "go", 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 2, calls, "a write must invalidate the search cache")
+}
+
+func TestRelatedPostsBatchOneAICallOneHydration(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsBatchFn: func(ctx context.Context, postIDs []string, limit int) (map[string]*domain.SearchResult, error) {
+		assert.Equal(t, []string{"p_1", "p_2"}, postIDs)
+		assert.Equal(t, 5, limit)
+		return map[string]*domain.SearchResult{
+			"p_1": {PostIDs: []string{"p_3", "p_4"}, Total: 10},
+			"p_2": {PostIDs: []string{"p_4"}, Total: 10},
+		}, nil
+	}}
+	hydrations := 0
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		hydrations++
+		posts := make([]*domain.Post, 0, len(ids))
+		for _, id := range ids {
+			posts = append(posts, &domain.Post{ID: id})
+		}
+		return posts, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	results, err := s.RelatedPostsBatch(context.Background(), []string{"p_1", "p_2"}, 5)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_3", "p_4"}, idsOf(results["p_1"]))
+	assert.Equal(t, []string{"p_4"}, idsOf(results["p_2"]))
+	assert.Equal(t, 1, hydrations, "one hydration pass for the whole batch")
+}
+
+func TestRelatedPostsBatchDedupesAndSkipsEmpty(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsBatchFn: func(ctx context.Context, postIDs []string, limit int) (map[string]*domain.SearchResult, error) {
+		assert.Equal(t, []string{"p_1"}, postIDs, "duplicate and empty ids must be collapsed")
+		return map[string]*domain.SearchResult{"p_1": {PostIDs: []string{"p_2"}, Total: 1}}, nil
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	results, err := s.RelatedPostsBatch(context.Background(), []string{"p_1", "p_1", ""}, 5)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_2"}, idsOf(results["p_1"]))
+}
+
+func TestRelatedPostsBatchServesCacheWithoutAICall(t *testing.T) {
+	calls := 0
+	ai := &testutil.MockAIService{RelatedPostsBatchFn: func(ctx context.Context, postIDs []string, limit int) (map[string]*domain.SearchResult, error) {
+		calls++
+		return map[string]*domain.SearchResult{"p_1": {PostIDs: []string{"p_2"}, Total: 1}}, nil
+	}}
+	s := newSearchService(t, ai, nil, newMemCache(t))
+
+	_, err := s.RelatedPostsBatch(context.Background(), []string{"p_1"}, 5)
+	require.NoError(t, err)
+
+	results, err := s.RelatedPostsBatch(context.Background(), []string{"p_1"}, 5)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_2"}, idsOf(results["p_1"]))
+	assert.Equal(t, 1, calls, "a cached id must not touch the AI service")
+}
+
+func TestRelatedPostsBatchDropsUnhydrated(t *testing.T) {
+	ai := &testutil.MockAIService{RelatedPostsBatchFn: func(ctx context.Context, postIDs []string, limit int) (map[string]*domain.SearchResult, error) {
+		return map[string]*domain.SearchResult{"p_1": {PostIDs: []string{"p_2", "ghost"}, Total: 2}}, nil
+	}}
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		return []*domain.Post{{ID: "p_2"}}, nil
+	}}
+	s := newSearchService(t, ai, repo, nil)
+
+	results, err := s.RelatedPostsBatch(context.Background(), []string{"p_1"}, 5)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_2"}, idsOf(results["p_1"]), "ids without a stored post must be dropped")
+}
+
+func TestRelatedPostsBatchAIError(t *testing.T) {
+	wantErr := errors.New("ai down")
+	ai := &testutil.MockAIService{RelatedPostsBatchFn: func(ctx context.Context, postIDs []string, limit int) (map[string]*domain.SearchResult, error) {
+		return nil, wantErr
+	}}
+	s := newSearchService(t, ai, nil, nil)
+
+	_, err := s.RelatedPostsBatch(context.Background(), []string{"p_1"}, 5)
+	assert.ErrorIs(t, err, wantErr)
+}
+
+func idsOf(posts []*domain.Post) []string {
+	ids := make([]string, 0, len(posts))
+	for _, post := range posts {
+		ids = append(ids, post.ID)
+	}
+	return ids
+}
+
+func TestGetPostsByIDs(t *testing.T) {
+	repo := &testutil.MockPostRepository{FindByIDsFn: func(ctx context.Context, ids []string) ([]*domain.Post, error) {
+		assert.Equal(t, []string{"p_1", "p_2"}, ids)
+		return []*domain.Post{{ID: "p_1"}, {ID: "p_2"}}, nil
+	}}
+	s := newSearchService(t, nil, repo, nil)
+
+	posts, err := s.GetPostsByIDs(context.Background(), []string{"p_1", "p_2"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"p_1", "p_2"}, idsOf(posts))
+}
+
+func TestGetPostsByIDsEmptyInput(t *testing.T) {
+	s := newSearchService(t, nil, nil, nil)
+
+	posts, err := s.GetPostsByIDs(context.Background(), nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, posts)
 }

@@ -1,0 +1,95 @@
+name: topos-user-loadtest
+
+include:
+  - path: ../../../infrastructure/docker/users-postgres/postgres.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
+
+x-user-service-env: &user-service-env
+  NODE_ENV: production
+  PORT: 4001
+  DATABASE_URL: postgresql://topos_user:topos_pass@user-postgres:5432/topos_users
+  PG_POOL_MAX: ${USER_PG_POOL_MAX:-10}
+  PG_POOL_IDLE_TIMEOUT_MS: ${USER_PG_POOL_IDLE_TIMEOUT_MS:-30000}
+  PG_POOL_CONNECTION_TIMEOUT_MS: ${USER_PG_POOL_CONNECTION_TIMEOUT_MS:-5000}
+  JWT_SECRET: ${USER_JWT_SECRET:?USER_JWT_SECRET is required}
+  REDIS_URL: redis://user-redis:6379
+  REDIS_CACHE_TTL_MS: ${USER_CACHE_TTL_MS:-3600000}
+  REDIS_MISSING_CACHE_TTL_MS: ${USER_MISSING_CACHE_TTL_MS:-60000}
+  LOG_LEVEL: ${USER_LOG_LEVEL:-info}
+
+services:
+  user-migrator:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: loadtest-user-migrator
+    restart: "no"
+    environment:
+      DATABASE_URL_MIGRATE: postgresql://topos_user:topos_pass@user-postgres:5432/topos_users
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: loadtest-user-service
+    restart: unless-stopped
+    environment: *user-service-env
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      user-migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4001/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${SVC_MEM:-512M}
+        reservations:
+          memory: 256M
+
+  k6:
+    image: grafana/k6:latest
+    container_name: loadtest-k6
+    restart: "no"
+    command: ["run", "/load-tests/k6/${SCRIPT:-mixed}.js"]
+    environment:
+      TARGET: http://user-service:4001
+      VUS: ${VUS:-20}
+      DURATION: ${DURATION:-30s}
+      RPS: ${RPS:-50}
+      WEIGHTS: ${WEIGHTS:-users:30,user:15,me:20,signin:20,updateProfile:10,signup:5}
+      SEED_USERS: ${SEED_USERS:-100}
+    depends_on:
+      user-service:
+        condition: service_healthy
+    volumes:
+      - ../load-tests/k6:/load-tests/k6:ro
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${K6_MEM:-384M}
+        reservations:
+          memory: 64M
+
+networks:
+  app-network:
+    name: topos-user-loadtest-net
+    driver: bridge

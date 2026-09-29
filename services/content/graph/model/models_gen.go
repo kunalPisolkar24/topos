@@ -9,12 +9,44 @@ import (
 	"strconv"
 )
 
+type Chat struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type ChatMessage struct {
+	ID           string      `json:"id"`
+	ChatID       string      `json:"chatId"`
+	Role         MessageRole `json:"role"`
+	Content      string      `json:"content"`
+	CitedPostIds []string    `json:"citedPostIds"`
+	CreatedAt    string      `json:"createdAt"`
+}
+
+type ContentDraftInput struct {
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Summary  *string  `json:"summary,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	ImageURL *string  `json:"imageUrl,omitempty"`
+	PostID   *string  `json:"postId,omitempty"`
+}
+
 type CreatePostInput struct {
 	Title    string   `json:"title"`
 	Body     string   `json:"body"`
 	Summary  *string  `json:"summary,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
 	ImageURL *string  `json:"imageUrl,omitempty"`
+}
+
+type DraftEditsInput struct {
+	Title   *string  `json:"title,omitempty"`
+	Body    *string  `json:"body,omitempty"`
+	Summary *string  `json:"summary,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
 }
 
 type GeneratedPost struct {
@@ -27,11 +59,33 @@ type GeneratedPost struct {
 type Mutation struct {
 }
 
-type PaginatedPosts struct {
-	Posts       []*Post `json:"posts"`
+type PaginatedChats struct {
+	Chats       []*Chat `json:"chats"`
 	TotalPages  int     `json:"totalPages"`
 	CurrentPage int     `json:"currentPage"`
-	TotalPosts  int     `json:"totalPosts"`
+	TotalChats  int     `json:"totalChats"`
+}
+
+type PaginatedMessages struct {
+	Messages      []*ChatMessage `json:"messages"`
+	TotalPages    int            `json:"totalPages"`
+	CurrentPage   int            `json:"currentPage"`
+	TotalMessages int            `json:"totalMessages"`
+}
+
+type PaginatedPostDrafts struct {
+	Drafts      []*PostDraft `json:"drafts"`
+	TotalPages  int          `json:"totalPages"`
+	CurrentPage int          `json:"currentPage"`
+	TotalDrafts int          `json:"totalDrafts"`
+}
+
+type PaginatedPosts struct {
+	Posts       []*Post       `json:"posts"`
+	TotalPages  int           `json:"totalPages"`
+	CurrentPage int           `json:"currentPage"`
+	TotalPosts  int           `json:"totalPosts"`
+	Reasons     []*PostReason `json:"reasons"`
 }
 
 type Post struct {
@@ -43,14 +97,48 @@ type Post struct {
 	Summary       *string        `json:"summary,omitempty"`
 	SummaryStatus *SummaryStatus `json:"summaryStatus,omitempty"`
 	Author        *User          `json:"author"`
+	ApprovedByID  *string        `json:"approvedById,omitempty"`
 	Tags          []*Tag         `json:"tags"`
 	CreatedAt     string         `json:"createdAt"`
 	UpdatedAt     string         `json:"updatedAt"`
+	Related       []*Post        `json:"related"`
+	LikedByMe     bool           `json:"likedByMe"`
+	SavedByMe     bool           `json:"savedByMe"`
 }
 
 func (Post) IsEntity() {}
 
+type PostDraft struct {
+	ID            string      `json:"id"`
+	ApprovalID    string      `json:"approvalId"`
+	Prompt        string      `json:"prompt"`
+	Title         string      `json:"title"`
+	Body          string      `json:"body"`
+	Summary       string      `json:"summary"`
+	Tags          []string    `json:"tags"`
+	ImageURL      *string     `json:"imageUrl,omitempty"`
+	Author        *User       `json:"author"`
+	Status        DraftStatus `json:"status"`
+	AuthorID      string      `json:"authorId"`
+	PostID        *string     `json:"postId,omitempty"`
+	ReviewedByID  *string     `json:"reviewedById,omitempty"`
+	ReviewedAt    *string     `json:"reviewedAt,omitempty"`
+	RejectionNote *string     `json:"rejectionNote,omitempty"`
+	CreatedAt     string      `json:"createdAt"`
+	UpdatedAt     string      `json:"updatedAt"`
+}
+
+type PostReason struct {
+	PostID string `json:"postId"`
+	Reason string `json:"reason"`
+}
+
 type Query struct {
+}
+
+type SearchResult struct {
+	Hits  []*Post `json:"hits"`
+	Total int     `json:"total"`
 }
 
 type Tag struct {
@@ -71,6 +159,177 @@ type User struct {
 }
 
 func (User) IsEntity() {}
+
+type DraftStatus string
+
+const (
+	DraftStatusPending  DraftStatus = "PENDING"
+	DraftStatusApproved DraftStatus = "APPROVED"
+	DraftStatusRejected DraftStatus = "REJECTED"
+)
+
+var AllDraftStatus = []DraftStatus{
+	DraftStatusPending,
+	DraftStatusApproved,
+	DraftStatusRejected,
+}
+
+func (e DraftStatus) IsValid() bool {
+	switch e {
+	case DraftStatusPending, DraftStatusApproved, DraftStatusRejected:
+		return true
+	}
+	return false
+}
+
+func (e DraftStatus) String() string {
+	return string(e)
+}
+
+func (e *DraftStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = DraftStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid DraftStatus", str)
+	}
+	return nil
+}
+
+func (e DraftStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *DraftStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e DraftStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type MessageRole string
+
+const (
+	MessageRoleUser      MessageRole = "USER"
+	MessageRoleAssistant MessageRole = "ASSISTANT"
+)
+
+var AllMessageRole = []MessageRole{
+	MessageRoleUser,
+	MessageRoleAssistant,
+}
+
+func (e MessageRole) IsValid() bool {
+	switch e {
+	case MessageRoleUser, MessageRoleAssistant:
+		return true
+	}
+	return false
+}
+
+func (e MessageRole) String() string {
+	return string(e)
+}
+
+func (e *MessageRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MessageRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MessageRole", str)
+	}
+	return nil
+}
+
+func (e MessageRole) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *MessageRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e MessageRole) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type RecommendMode string
+
+const (
+	RecommendModeDefault  RecommendMode = "DEFAULT"
+	RecommendModeSurprise RecommendMode = "SURPRISE"
+	RecommendModeFresh    RecommendMode = "FRESH"
+	RecommendModeExplorer RecommendMode = "EXPLORER"
+)
+
+var AllRecommendMode = []RecommendMode{
+	RecommendModeDefault,
+	RecommendModeSurprise,
+	RecommendModeFresh,
+	RecommendModeExplorer,
+}
+
+func (e RecommendMode) IsValid() bool {
+	switch e {
+	case RecommendModeDefault, RecommendModeSurprise, RecommendModeFresh, RecommendModeExplorer:
+		return true
+	}
+	return false
+}
+
+func (e RecommendMode) String() string {
+	return string(e)
+}
+
+func (e *RecommendMode) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RecommendMode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RecommendMode", str)
+	}
+	return nil
+}
+
+func (e RecommendMode) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *RecommendMode) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e RecommendMode) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
 
 type SummaryStatus string
 

@@ -1,0 +1,25 @@
+services:
+  content-mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "${CONTENT_MONGO_EXT_PORT:-27017}:27017"
+    volumes:
+      - content_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongosh --quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${CONTENT_MONGO_MEM:-512M}
+        reservations:
+          memory: 256M
+
+volumes:
+  content_mongo_data:

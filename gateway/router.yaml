@@ -28,6 +28,12 @@ telemetry:
       prometheus:
         enabled: true
         listen: 0.0.0.0:8088
+    tracing:
+      otlp:
+        enabled: true
+        # Prod collector (gRPC). Local has no collector; export failures are
+        # logged and dropped, router keeps serving.
+        endpoint: ${env.OTEL_TRACING_ENDPOINT:-http://otel-collector:4317}
 
 headers:
   all:

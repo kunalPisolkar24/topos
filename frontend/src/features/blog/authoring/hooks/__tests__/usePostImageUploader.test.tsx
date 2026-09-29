@@ -3,16 +3,10 @@ import type React from "react";
 import type ReactQuill from "react-quill-new";
 
 const uploadMock = vi.fn();
-const richTextUploadMock = vi.fn();
 
-vi.mock("@/entities/upload", () => {
-  const useImageUpload = () => ({
-    upload: (file: File, options?: unknown) => uploadMock(file, options),
-    richTextUpload: (file: File, options?: unknown) => richTextUploadMock(file, options),
-    isUploading: false,
-  });
-  return { useImageUpload };
-});
+vi.mock("@/entities/upload", () => ({
+  useImageUpload: () => ({ upload: uploadMock, isUploading: false }),
+}));
 
 vi.mock("@/shared/ui/hooks/useToast", () => ({
   useToast: () => ({ toast: vi.fn(), dismiss: vi.fn(), toasts: [] }),
@@ -37,7 +31,6 @@ function renderImageUploader(args?: Parameters<typeof usePostImageUploader>[0]) 
 describe("usePostImageUploader", () => {
   beforeEach(() => {
     uploadMock.mockReset();
-    richTextUploadMock.mockReset();
   });
 
   it("seeds state from initialImageUrl when provided", () => {
@@ -136,5 +129,95 @@ describe("usePostImageUploader", () => {
     const url = await result.current.uploadCardImage();
     expect(url).toBeNull();
     expect(result.current.url).toBe("https://x/old.png");
+  });
+
+  it("uploads via richTextImageHandler and inserts into quill", async () => {
+    uploadMock.mockResolvedValueOnce("https://cloudinary/rich.png");
+    const { result } = renderImageUploader();
+
+    const mockInsertEmbed = vi.fn();
+    const mockSetSelection = vi.fn();
+    const mockGetSelection = vi.fn().mockReturnValue({ index: 5, length: 0 });
+    const mockGetEditor = vi.fn().mockReturnValue({
+      getSelection: mockGetSelection,
+      insertEmbed: mockInsertEmbed,
+      setSelection: mockSetSelection,
+    });
+    result.current.quillRef.current = {
+      getEditor: mockGetEditor,
+    } as unknown as ReactQuill;
+
+    let capturedInput: HTMLInputElement | null = null;
+    const originalCreateElement = document.createElement.bind(document);
+    const spy = vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      if (tagName === "input") {
+        const el = originalCreateElement(tagName) as HTMLInputElement;
+        capturedInput = el;
+        el.click = vi.fn();
+        return el;
+      }
+      return originalCreateElement(tagName);
+    }) as unknown as typeof document.createElement);
+
+    await act(async () => {
+      await result.current.richTextImageHandler();
+    });
+
+    expect(capturedInput).not.toBeNull();
+    expect(capturedInput!.getAttribute("type")).toBe("file");
+    expect(capturedInput!.getAttribute("accept")).toBe("image/*");
+
+    const file = makeFile("rich.png");
+    Object.defineProperty(capturedInput!, "files", { value: [file] });
+
+    await act(async () => {
+      await (capturedInput!.onchange as unknown as (ev: Event) => Promise<void>)(
+        new Event("change"),
+      );
+    });
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledWith(file));
+    expect(mockInsertEmbed).toHaveBeenCalledWith(5, "image", "https://cloudinary/rich.png");
+    expect(mockSetSelection).toHaveBeenCalledWith(6, 0);
+
+    spy.mockRestore();
+  });
+
+  it("blocks rich text upload when file is not an image", async () => {
+    const { result } = renderImageUploader();
+    const mockGetEditor = vi.fn();
+    result.current.quillRef.current = {
+      getEditor: mockGetEditor,
+    } as unknown as ReactQuill;
+
+    let capturedInput: HTMLInputElement | null = null;
+    const originalCreateElement = document.createElement.bind(document);
+    const spy = vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      if (tagName === "input") {
+        const el = originalCreateElement(tagName) as HTMLInputElement;
+        capturedInput = el;
+        el.click = vi.fn();
+        return el;
+      }
+      return originalCreateElement(tagName);
+    }) as unknown as typeof document.createElement);
+
+    await act(async () => {
+      await result.current.richTextImageHandler();
+    });
+
+    const file = makeFile("doc.txt", "text/plain");
+    Object.defineProperty(capturedInput!, "files", { value: [file] });
+
+    await act(async () => {
+      await (capturedInput!.onchange as unknown as (ev: Event) => Promise<void>)(
+        new Event("change"),
+      );
+    });
+
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(mockGetEditor).not.toHaveBeenCalled();
+
+    spy.mockRestore();
   });
 });

@@ -1,0 +1,241 @@
+"""Use-case — seed secrets from env dict into SSM/Secrets Manager."""
+
+from __future__ import annotations
+
+import secrets
+from collections.abc import Callable
+from urllib.parse import urlparse
+
+from src.core.exceptions import GuardError
+from src.domain.constants import (
+    APP_SECRETS,
+    DATA_PLANE_URL_KEYS,
+    FLOCI_UNREACHABLE_HOSTS,
+    SECRET_KEY_MAP,
+    TF_MANAGED_SECRETS,
+)
+from src.domain.schemas import SecretPayload, SeedConfig
+from src.interfaces.secrets_store import ISecretsStore
+
+
+def _default_key_gen(nbytes: int) -> str:
+    return secrets.token_hex(nbytes)
+
+
+def _is_floci_target(config: SeedConfig) -> bool:
+    ep = (config.endpoint_url or "").lower()
+    return "localhost:4566" in ep or "127.0.0.1:4566" in ep or "host.docker.internal:4566" in ep
+
+
+def _url_hosts(value: str) -> list[str]:
+    """Extract candidate hosts from a URL or comma-separated host list."""
+    hosts: list[str] = []
+    for part in value.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "://" in part:
+            try:
+                host = (urlparse(part).hostname or "").lower()
+            except ValueError:
+                host = ""
+            if host:
+                hosts.append(host)
+        else:
+            hosts.append(part.split(":")[0].strip().lower())
+    return hosts
+
+
+def _floci_unreachable_payloads(payloads: list[SecretPayload]) -> list[str]:
+    """Describe data-plane URLs pointing at container-unreachable hosts."""
+    bad: list[str] = []
+    for p in payloads:
+        for key in DATA_PLANE_URL_KEYS:
+            value = p.data.get(key, "")
+            if not value:
+                continue
+            for host in _url_hosts(value):
+                if host in FLOCI_UNREACHABLE_HOSTS:
+                    bad.append(f"{p.name}:{key} host {host!r} is unreachable from containers")
+                    break
+    return bad
+
+
+class SeedUseCase:
+    """Orchestrates payload building and guarded writes."""
+
+    def __init__(
+        self,
+        store: ISecretsStore,
+        key_gen: Callable[[int], str] | None = None,
+    ) -> None:
+        self.store = store
+        self._key_gen: Callable[[int], str] = key_gen or _default_key_gen
+
+    def _generate_hex(self, nbytes: int) -> str:
+        return self._key_gen(nbytes)
+
+    # USER_ alias mapping for local .env -> canonical SM/SSM keys
+    _USER_ALIASES: dict[str, list[str]] = {
+        "DATABASE_URL": ["USER_DATABASE_URL"],
+        "DATABASE_URL_MIGRATE": ["USER_DATABASE_URL_MIGRATE"],
+        "AI_CHECKPOINTER_PASSWORD": ["USER_AI_CHECKPOINTER_PASSWORD", "AI_POSTGRES_PASSWORD"],
+        "REDIS_URL": ["USER_REDIS_URL"],
+        "JWT_SECRET": ["USER_JWT_SECRET"],
+        "JWT_ISSUER": ["USER_JWT_ISSUER"],
+        "JWT_AUDIENCE": ["USER_JWT_AUDIENCE"],
+        "JWT_EXPIRES_IN": ["USER_JWT_EXPIRES_IN"],
+        "LOG_LEVEL": ["USER_LOG_LEVEL"],
+        "OTEL_EXPORTER_OTLP_ENDPOINT": ["USER_OTLP_ENDPOINT"],
+        "REDIS_CACHE_TTL_MS": ["USER_CACHE_TTL_MS"],
+        "REDIS_MISSING_CACHE_TTL_MS": ["USER_MISSING_CACHE_TTL_MS"],
+        "PORT": ["USER_SERVICE_INT_PORT", "USER_SERVICE_EXT_PORT"],
+        "PG_POOL_MAX": ["USER_PG_POOL_MAX"],
+        "PG_POOL_IDLE_TIMEOUT_MS": ["USER_PG_POOL_IDLE_TIMEOUT_MS"],
+        "PG_POOL_CONNECTION_TIMEOUT_MS": ["USER_PG_POOL_CONNECTION_TIMEOUT_MS"],
+    }
+
+    # AI_ alias mapping for local .env -> canonical SM/SSM keys
+    _AI_ALIASES: dict[str, list[str]] = {
+        "PORT": ["AI_SERVICE_INT_PORT"],
+        "METRICS_PORT": ["AI_METRICS_INT_PORT"],
+        "LOG_LEVEL": ["AI_LOG_LEVEL"],
+        "LLM_API_URL": ["AI_LLM_API_URL"],
+        "LLM_API_KEY": ["LIGHTNING_AI_API_KEY"],
+        "LLM_MODEL": ["AI_LIGHTNING_MODEL"],
+        "LLM_MODE": ["AI_LLM_MODE"],
+        "LLM_TIMEOUT_SECONDS": ["AI_TIMEOUT_SECONDS"],
+        "CHECKPOINT_DB_URL": ["AI_CHECKPOINT_DB_URL"],
+        "CHECKPOINT_DB_URL_MIGRATE": ["AI_CHECKPOINT_DB_URL_MIGRATE"],
+        "CHECKPOINT_POOL_MIN_SIZE": ["AI_CHECKPOINT_POOL_MIN_SIZE"],
+        "CHECKPOINT_POOL_MAX_SIZE": ["AI_CHECKPOINT_POOL_MAX_SIZE"],
+        "LANGCHAIN_TRACING": ["AI_LANGCHAIN_TRACING"],
+        "LANGCHAIN_API_KEY": ["AI_LANGCHAIN_API_KEY"],
+        "LANGCHAIN_PROJECT": ["AI_LANGCHAIN_PROJECT"],
+        "QDRANT_URL": ["AI_QDRANT_URL"],
+        "QDRANT_API_KEY": ["AI_QDRANT_API_KEY"],
+        "QDRANT_VECTOR_SIZE": ["AI_QDRANT_VECTOR_SIZE"],
+        "SEARCH_DENSE_SCORE_THRESHOLD": ["AI_SEARCH_DENSE_SCORE_THRESHOLD"],
+        "VECTOR_MODE": ["AI_VECTOR_MODE"],
+        "EMBEDDING_MODE": ["AI_EMBEDDING_MODE"],
+        "EMBEDDING_URL": ["AI_EMBEDDING_URL"],
+        "EMBEDDING_MODEL": ["AI_EMBEDDING_MODEL"],
+        "OTEL_EXPORTER_OTLP_ENDPOINT": ["AI_OTLP_ENDPOINT"],
+        "CONTENT_SERVICE_URL": ["AI_CONTENT_SERVICE_URL"],
+    }
+
+    # CONTENT_ alias mapping for local .env -> canonical SM/SSM keys
+    # (mirrors content service internal/config contentAliases; PORT comes
+    # from the service's own compose ports, not an alias there, so both
+    # INT/EXT variants are accepted here)
+    _CONTENT_ALIASES: dict[str, list[str]] = {
+        "MONGO_URI": ["CONTENT_MONGO_URI"],
+        "DB_NAME": ["CONTENT_DB_NAME"],
+        "REDIS_ADDR": ["CONTENT_REDIS_ADDR"],
+        "REDIS_PASSWORD": ["CONTENT_REDIS_PASSWORD"],
+        "JWT_SECRET": ["CONTENT_JWT_SECRET"],
+        "JWT_ISSUER": ["CONTENT_JWT_ISSUER"],
+        "JWT_AUDIENCE": ["CONTENT_JWT_AUDIENCE"],
+        "LOG_LEVEL": ["CONTENT_LOG_LEVEL"],
+        "LOG_FORMAT": ["CONTENT_LOG_FORMAT"],
+        "OTEL_EXPORTER_OTLP_ENDPOINT": ["CONTENT_OTLP_ENDPOINT"],
+        "INTERNAL_TOKEN": ["CONTENT_INTERNAL_TOKEN"],
+        "AI_SERVICE_URL": ["CONTENT_AI_SERVICE_URL"],
+        "KAFKA_BROKERS": ["CONTENT_KAFKA_BROKERS"],
+        "KAFKA_TOPIC": ["CONTENT_KAFKA_TOPIC"],
+        "WORKER_CONCURRENCY": ["CONTENT_WORKER_CONCURRENCY"],
+        "PORT": ["CONTENT_SERVICE_INT_PORT", "CONTENT_SERVICE_EXT_PORT"],
+    }
+
+    # Alias maps are scoped per secret family: PORT (and other shared
+    # canonical keys) must resolve from that service's own prefixed vars,
+    # never from another service's (e.g. content PORT from CONTENT_*,
+    # not USER_SERVICE_EXT_PORT).
+    _ALIASES_BY_SECRET: dict[str, dict[str, list[str]]] = {
+        "/topos/user/config": _USER_ALIASES,
+        "topos/user/secrets": _USER_ALIASES,
+        "/topos/ai/config": _AI_ALIASES,
+        "topos/ai/secrets": _AI_ALIASES,
+        "/topos/content/config": _CONTENT_ALIASES,
+        "topos/content/secrets": _CONTENT_ALIASES,
+    }
+
+    def build_payloads(self, env: dict[str, str], only: frozenset[str] | None = None) -> list[SecretPayload]:
+        """Build per-secret payloads from parsed env dict.
+
+        - Only keys in allowlist are considered.
+        - Empty values are skipped.
+        - USER_/AI_ prefixed aliases are resolved to canonical keys.
+        """
+        present: dict[str, str] = {k: v for k, v in env.items() if v != ""}
+
+        payloads: list[SecretPayload] = []
+        for secret_name, keys in SECRET_KEY_MAP.items():
+            if only and secret_name not in only:
+                continue
+            data: dict[str, str] = {}
+            aliases_for_secret = self._ALIASES_BY_SECRET.get(secret_name, {})
+            for k in keys:
+                v = present.get(k, "")
+                if v != "" and v is not None:
+                    data[k] = v
+                    continue
+                # Check this secret family's aliases for the canonical key
+                for alias in aliases_for_secret.get(k, []):
+                    av = present.get(alias, "")
+                    if av != "" and av is not None:
+                        data[k] = av
+                        break
+            if not data:
+                continue
+            payloads.append(SecretPayload(name=secret_name, data=data))
+
+        return payloads
+
+    def execute(self, config: SeedConfig, env: dict[str, str]) -> tuple[list[tuple[str, str]], list[str]]:
+        """Alias for seed."""
+        return self.seed(config, env)
+
+    def seed(
+        self, config: SeedConfig, env: dict[str, str]
+    ) -> tuple[list[tuple[str, str]], list[str]]:
+        """Execute seeding. Returns (results, generated_keys)."""
+        if config.only:
+            for name in config.only:
+                if name in TF_MANAGED_SECRETS and not config.force:
+                    raise GuardError(f"refusing to touch TF-managed secret {name} without --force")
+                if name not in APP_SECRETS and name not in TF_MANAGED_SECRETS:
+                    raise GuardError(f"unknown secret {name}")
+
+        if config.is_real_aws and not config.confirm_prod and not config.dry_run:
+            raise GuardError(
+                "refusing to write to real AWS without --confirm-prod (or use --dry-run to preview)"
+            )
+
+        payloads = self.build_payloads(env, only=config.only)
+
+        if _is_floci_target(config) and not config.force and not config.dry_run:
+            bad = _floci_unreachable_payloads(payloads)
+            if bad:
+                raise GuardError(
+                    "refusing to seed container-unreachable data-plane URLs to Floci "
+                    f"without --force ({'; '.join(bad)}). Use docker hostnames "
+                    "(e.g. user-postgres) instead of localhost."
+                )
+
+        generated: list[str] = []
+
+        results: list[tuple[str, str]] = []
+        for p in payloads:
+            if p.name in TF_MANAGED_SECRETS and not config.force:
+                raise GuardError(f"refusing to touch TF-managed secret {p.name} without --force")
+            if config.dry_run:
+                results.append((p.name, "dry-run"))
+                continue
+            status = self.store.upsert(p, dry_run=False)
+            results.append((p.name, status))
+        return results, generated
+
+
+# Backward-compat alias: original class name
+Seeder = SeedUseCase

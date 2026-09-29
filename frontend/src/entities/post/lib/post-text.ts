@@ -13,4 +13,3 @@ export function normalizeTags(values: string[]) {
 export const MIN_TAG_TITLE_LENGTH = 5;
 export const MIN_TAG_BODY_LENGTH = 80;
 export const MIN_PROMPT_LENGTH = 30;
-export const POST_SNIPPET_MAX_LENGTH = 150;

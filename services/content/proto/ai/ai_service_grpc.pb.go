@@ -19,9 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AIService_GenerateSummary_FullMethodName = "/ai.AIService/GenerateSummary"
-	AIService_GenerateTags_FullMethodName    = "/ai.AIService/GenerateTags"
-	AIService_GeneratePost_FullMethodName    = "/ai.AIService/GeneratePost"
+	AIService_GenerateSummary_FullMethodName   = "/ai.AIService/GenerateSummary"
+	AIService_GenerateTags_FullMethodName      = "/ai.AIService/GenerateTags"
+	AIService_GeneratePost_FullMethodName      = "/ai.AIService/GeneratePost"
+	AIService_GeneratePostDraft_FullMethodName = "/ai.AIService/GeneratePostDraft"
+	AIService_ApprovePost_FullMethodName       = "/ai.AIService/ApprovePost"
+	AIService_RejectPost_FullMethodName        = "/ai.AIService/RejectPost"
+	AIService_IndexPost_FullMethodName         = "/ai.AIService/IndexPost"
+	AIService_DeletePost_FullMethodName        = "/ai.AIService/DeletePost"
+	AIService_SearchPosts_FullMethodName       = "/ai.AIService/SearchPosts"
+	AIService_RelatedPosts_FullMethodName      = "/ai.AIService/RelatedPosts"
+	AIService_RelatedPostsBatch_FullMethodName = "/ai.AIService/RelatedPostsBatch"
+	AIService_Embed_FullMethodName             = "/ai.AIService/Embed"
+	AIService_ChatAnswer_FullMethodName        = "/ai.AIService/ChatAnswer"
+	AIService_UpdateUserProfile_FullMethodName = "/ai.AIService/UpdateUserProfile"
+	AIService_RecommendFeed_FullMethodName     = "/ai.AIService/RecommendFeed"
+	AIService_DeleteUserProfile_FullMethodName = "/ai.AIService/DeleteUserProfile"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -31,6 +44,19 @@ type AIServiceClient interface {
 	GenerateSummary(ctx context.Context, in *ContentRequest, opts ...grpc.CallOption) (*ContentResponse, error)
 	GenerateTags(ctx context.Context, in *ContextRequest, opts ...grpc.CallOption) (*TagsResponse, error)
 	GeneratePost(ctx context.Context, in *PostGenerationRequest, opts ...grpc.CallOption) (*PostGenerationResponse, error)
+	GeneratePostDraft(ctx context.Context, in *PostGenerationRequest, opts ...grpc.CallOption) (*PostWorkflowState, error)
+	ApprovePost(ctx context.Context, in *ApprovePostRequest, opts ...grpc.CallOption) (*PostWorkflowState, error)
+	RejectPost(ctx context.Context, in *RejectPostRequest, opts ...grpc.CallOption) (*PostWorkflowState, error)
+	IndexPost(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error)
+	DeletePost(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	SearchPosts(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+	RelatedPosts(ctx context.Context, in *RelatedRequest, opts ...grpc.CallOption) (*RelatedResponse, error)
+	RelatedPostsBatch(ctx context.Context, in *RelatedBatchRequest, opts ...grpc.CallOption) (*RelatedBatchResponse, error)
+	Embed(ctx context.Context, in *EmbedRequest, opts ...grpc.CallOption) (*EmbedResponse, error)
+	ChatAnswer(ctx context.Context, in *ChatAnswerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatChunk], error)
+	UpdateUserProfile(ctx context.Context, in *UserProfileUpdateRequest, opts ...grpc.CallOption) (*UserProfileUpdateResponse, error)
+	RecommendFeed(ctx context.Context, in *RecommendRequest, opts ...grpc.CallOption) (*RecommendResponse, error)
+	DeleteUserProfile(ctx context.Context, in *DeleteUserProfileRequest, opts ...grpc.CallOption) (*DeleteUserProfileResponse, error)
 }
 
 type aIServiceClient struct {
@@ -71,6 +97,145 @@ func (c *aIServiceClient) GeneratePost(ctx context.Context, in *PostGenerationRe
 	return out, nil
 }
 
+func (c *aIServiceClient) GeneratePostDraft(ctx context.Context, in *PostGenerationRequest, opts ...grpc.CallOption) (*PostWorkflowState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PostWorkflowState)
+	err := c.cc.Invoke(ctx, AIService_GeneratePostDraft_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) ApprovePost(ctx context.Context, in *ApprovePostRequest, opts ...grpc.CallOption) (*PostWorkflowState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PostWorkflowState)
+	err := c.cc.Invoke(ctx, AIService_ApprovePost_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) RejectPost(ctx context.Context, in *RejectPostRequest, opts ...grpc.CallOption) (*PostWorkflowState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PostWorkflowState)
+	err := c.cc.Invoke(ctx, AIService_RejectPost_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) IndexPost(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IndexResponse)
+	err := c.cc.Invoke(ctx, AIService_IndexPost_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) DeletePost(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteResponse)
+	err := c.cc.Invoke(ctx, AIService_DeletePost_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) SearchPosts(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchResponse)
+	err := c.cc.Invoke(ctx, AIService_SearchPosts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) RelatedPosts(ctx context.Context, in *RelatedRequest, opts ...grpc.CallOption) (*RelatedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RelatedResponse)
+	err := c.cc.Invoke(ctx, AIService_RelatedPosts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) RelatedPostsBatch(ctx context.Context, in *RelatedBatchRequest, opts ...grpc.CallOption) (*RelatedBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RelatedBatchResponse)
+	err := c.cc.Invoke(ctx, AIService_RelatedPostsBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) Embed(ctx context.Context, in *EmbedRequest, opts ...grpc.CallOption) (*EmbedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EmbedResponse)
+	err := c.cc.Invoke(ctx, AIService_Embed_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) ChatAnswer(ctx context.Context, in *ChatAnswerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &AIService_ServiceDesc.Streams[0], AIService_ChatAnswer_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChatAnswerRequest, ChatChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AIService_ChatAnswerClient = grpc.ServerStreamingClient[ChatChunk]
+
+func (c *aIServiceClient) UpdateUserProfile(ctx context.Context, in *UserProfileUpdateRequest, opts ...grpc.CallOption) (*UserProfileUpdateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserProfileUpdateResponse)
+	err := c.cc.Invoke(ctx, AIService_UpdateUserProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) RecommendFeed(ctx context.Context, in *RecommendRequest, opts ...grpc.CallOption) (*RecommendResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecommendResponse)
+	err := c.cc.Invoke(ctx, AIService_RecommendFeed_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) DeleteUserProfile(ctx context.Context, in *DeleteUserProfileRequest, opts ...grpc.CallOption) (*DeleteUserProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteUserProfileResponse)
+	err := c.cc.Invoke(ctx, AIService_DeleteUserProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AIServiceServer is the server API for AIService service.
 // All implementations must embed UnimplementedAIServiceServer
 // for forward compatibility.
@@ -78,6 +243,19 @@ type AIServiceServer interface {
 	GenerateSummary(context.Context, *ContentRequest) (*ContentResponse, error)
 	GenerateTags(context.Context, *ContextRequest) (*TagsResponse, error)
 	GeneratePost(context.Context, *PostGenerationRequest) (*PostGenerationResponse, error)
+	GeneratePostDraft(context.Context, *PostGenerationRequest) (*PostWorkflowState, error)
+	ApprovePost(context.Context, *ApprovePostRequest) (*PostWorkflowState, error)
+	RejectPost(context.Context, *RejectPostRequest) (*PostWorkflowState, error)
+	IndexPost(context.Context, *IndexRequest) (*IndexResponse, error)
+	DeletePost(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	SearchPosts(context.Context, *SearchRequest) (*SearchResponse, error)
+	RelatedPosts(context.Context, *RelatedRequest) (*RelatedResponse, error)
+	RelatedPostsBatch(context.Context, *RelatedBatchRequest) (*RelatedBatchResponse, error)
+	Embed(context.Context, *EmbedRequest) (*EmbedResponse, error)
+	ChatAnswer(*ChatAnswerRequest, grpc.ServerStreamingServer[ChatChunk]) error
+	UpdateUserProfile(context.Context, *UserProfileUpdateRequest) (*UserProfileUpdateResponse, error)
+	RecommendFeed(context.Context, *RecommendRequest) (*RecommendResponse, error)
+	DeleteUserProfile(context.Context, *DeleteUserProfileRequest) (*DeleteUserProfileResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
 }
 
@@ -96,6 +274,45 @@ func (UnimplementedAIServiceServer) GenerateTags(context.Context, *ContextReques
 }
 func (UnimplementedAIServiceServer) GeneratePost(context.Context, *PostGenerationRequest) (*PostGenerationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GeneratePost not implemented")
+}
+func (UnimplementedAIServiceServer) GeneratePostDraft(context.Context, *PostGenerationRequest) (*PostWorkflowState, error) {
+	return nil, status.Error(codes.Unimplemented, "method GeneratePostDraft not implemented")
+}
+func (UnimplementedAIServiceServer) ApprovePost(context.Context, *ApprovePostRequest) (*PostWorkflowState, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApprovePost not implemented")
+}
+func (UnimplementedAIServiceServer) RejectPost(context.Context, *RejectPostRequest) (*PostWorkflowState, error) {
+	return nil, status.Error(codes.Unimplemented, "method RejectPost not implemented")
+}
+func (UnimplementedAIServiceServer) IndexPost(context.Context, *IndexRequest) (*IndexResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method IndexPost not implemented")
+}
+func (UnimplementedAIServiceServer) DeletePost(context.Context, *DeleteRequest) (*DeleteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeletePost not implemented")
+}
+func (UnimplementedAIServiceServer) SearchPosts(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchPosts not implemented")
+}
+func (UnimplementedAIServiceServer) RelatedPosts(context.Context, *RelatedRequest) (*RelatedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RelatedPosts not implemented")
+}
+func (UnimplementedAIServiceServer) RelatedPostsBatch(context.Context, *RelatedBatchRequest) (*RelatedBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RelatedPostsBatch not implemented")
+}
+func (UnimplementedAIServiceServer) Embed(context.Context, *EmbedRequest) (*EmbedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Embed not implemented")
+}
+func (UnimplementedAIServiceServer) ChatAnswer(*ChatAnswerRequest, grpc.ServerStreamingServer[ChatChunk]) error {
+	return status.Error(codes.Unimplemented, "method ChatAnswer not implemented")
+}
+func (UnimplementedAIServiceServer) UpdateUserProfile(context.Context, *UserProfileUpdateRequest) (*UserProfileUpdateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUserProfile not implemented")
+}
+func (UnimplementedAIServiceServer) RecommendFeed(context.Context, *RecommendRequest) (*RecommendResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecommendFeed not implemented")
+}
+func (UnimplementedAIServiceServer) DeleteUserProfile(context.Context, *DeleteUserProfileRequest) (*DeleteUserProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteUserProfile not implemented")
 }
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
 func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
@@ -172,6 +389,233 @@ func _AIService_GeneratePost_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_GeneratePostDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostGenerationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GeneratePostDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GeneratePostDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GeneratePostDraft(ctx, req.(*PostGenerationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_ApprovePost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApprovePostRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).ApprovePost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_ApprovePost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).ApprovePost(ctx, req.(*ApprovePostRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_RejectPost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectPostRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).RejectPost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_RejectPost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).RejectPost(ctx, req.(*RejectPostRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_IndexPost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IndexRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).IndexPost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_IndexPost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).IndexPost(ctx, req.(*IndexRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_DeletePost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).DeletePost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_DeletePost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).DeletePost(ctx, req.(*DeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_SearchPosts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).SearchPosts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_SearchPosts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).SearchPosts(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_RelatedPosts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RelatedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).RelatedPosts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_RelatedPosts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).RelatedPosts(ctx, req.(*RelatedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_RelatedPostsBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RelatedBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).RelatedPostsBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_RelatedPostsBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).RelatedPostsBatch(ctx, req.(*RelatedBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_Embed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmbedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).Embed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_Embed_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).Embed(ctx, req.(*EmbedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_ChatAnswer_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ChatAnswerRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AIServiceServer).ChatAnswer(m, &grpc.GenericServerStream[ChatAnswerRequest, ChatChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AIService_ChatAnswerServer = grpc.ServerStreamingServer[ChatChunk]
+
+func _AIService_UpdateUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserProfileUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).UpdateUserProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_UpdateUserProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).UpdateUserProfile(ctx, req.(*UserProfileUpdateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_RecommendFeed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecommendRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).RecommendFeed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_RecommendFeed_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).RecommendFeed(ctx, req.(*RecommendRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_DeleteUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).DeleteUserProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_DeleteUserProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).DeleteUserProfile(ctx, req.(*DeleteUserProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -191,7 +635,61 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GeneratePost",
 			Handler:    _AIService_GeneratePost_Handler,
 		},
+		{
+			MethodName: "GeneratePostDraft",
+			Handler:    _AIService_GeneratePostDraft_Handler,
+		},
+		{
+			MethodName: "ApprovePost",
+			Handler:    _AIService_ApprovePost_Handler,
+		},
+		{
+			MethodName: "RejectPost",
+			Handler:    _AIService_RejectPost_Handler,
+		},
+		{
+			MethodName: "IndexPost",
+			Handler:    _AIService_IndexPost_Handler,
+		},
+		{
+			MethodName: "DeletePost",
+			Handler:    _AIService_DeletePost_Handler,
+		},
+		{
+			MethodName: "SearchPosts",
+			Handler:    _AIService_SearchPosts_Handler,
+		},
+		{
+			MethodName: "RelatedPosts",
+			Handler:    _AIService_RelatedPosts_Handler,
+		},
+		{
+			MethodName: "RelatedPostsBatch",
+			Handler:    _AIService_RelatedPostsBatch_Handler,
+		},
+		{
+			MethodName: "Embed",
+			Handler:    _AIService_Embed_Handler,
+		},
+		{
+			MethodName: "UpdateUserProfile",
+			Handler:    _AIService_UpdateUserProfile_Handler,
+		},
+		{
+			MethodName: "RecommendFeed",
+			Handler:    _AIService_RecommendFeed_Handler,
+		},
+		{
+			MethodName: "DeleteUserProfile",
+			Handler:    _AIService_DeleteUserProfile_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ChatAnswer",
+			Handler:       _AIService_ChatAnswer_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/ai/ai_service.proto",
 }

@@ -14,25 +14,53 @@ const (
 )
 
 type Post struct {
-	ID            string     `bson:"_id,omitempty"`
-	Title         string     `bson:"title"`
-	Body          string     `bson:"body"`
-	Slug          string     `bson:"slug"`
-	ImageUrl      *string    `bson:"imageUrl"`
-	AuthorID      string     `bson:"authorId"`
-	Tags          []string   `bson:"tags"`
-	Summary       string     `bson:"summary"`
-	SummaryStatus PostStatus `bson:"summaryStatus"`
-	CreatedAt     time.Time  `bson:"createdAt"`
-	UpdatedAt     time.Time  `bson:"updatedAt"`
-	ResetSummary  bool       `bson:"-"`
+	ID       string  `bson:"_id,omitempty" json:"id,omitempty"`
+	Title    string  `bson:"title" json:"title"`
+	Body     string  `bson:"body" json:"body"`
+	Slug     string  `bson:"slug" json:"slug"`
+	ImageUrl *string `bson:"imageUrl" json:"imageUrl,omitempty"`
+	AuthorID string  `bson:"authorId" json:"authorId"`
+	// ApprovedByID is the peer reviewer who approved the post into
+	// existence. Empty for posts published directly without review.
+	ApprovedByID  string     `bson:"approvedById,omitempty" json:"approvedById,omitempty"`
+	Tags          []string   `bson:"tags" json:"tags"`
+	Summary       string     `bson:"summary" json:"summary"`
+	SummaryStatus PostStatus `bson:"summaryStatus" json:"summaryStatus"`
+	CreatedAt     time.Time  `bson:"createdAt" json:"createdAt"`
+	UpdatedAt     time.Time  `bson:"updatedAt" json:"updatedAt"`
+	ResetSummary  bool       `bson:"-" json:"-"`
+}
+
+// MarkSummaryStale clears the stored summary and flags the post for
+// regeneration by the summary worker.
+func (p *Post) MarkSummaryStale() {
+	p.Summary = ""
+	p.SummaryStatus = PostStatusPending
+	p.ResetSummary = true
 }
 
 type PaginatedPosts struct {
-	Posts      []*Post
-	TotalPages int
-	TotalPosts int64
-	Page       int
+	Posts      []*Post `json:"posts"`
+	TotalPages int     `json:"totalPages"`
+	TotalPosts int64   `json:"totalPosts"`
+	Page       int     `json:"page"`
+	// Reasons pairs recommended posts with their evidence lines;
+	// empty for every non-recommended feed.
+	Reasons []*PostReason `json:"reasons,omitempty"`
+}
+
+// PostReason explains why a post was recommended to a user.
+type PostReason struct {
+	PostID string `json:"postId"`
+	Reason string `json:"reason"`
+}
+
+// SearchPostsResult is the outcome of a search query: the posts that
+// matched, ordered by relevance, and the total number of matches the
+// search engine found in its result window.
+type SearchPostsResult struct {
+	Hits  []*Post
+	Total int
 }
 
 type PostRepository interface {
@@ -41,7 +69,13 @@ type PostRepository interface {
 	UpdateSummary(ctx context.Context, id string, summary string, status PostStatus) error
 	Delete(ctx context.Context, id string) error
 	FindAll(ctx context.Context, page, limit int) (*PaginatedPosts, error)
+	// FindAllExceptAuthor is the recency-ordered list excluding one
+	// author, used by the personalized feed's cold-start fallback so a
+	// user never sees their own posts there either.
+	FindAllExceptAuthor(ctx context.Context, authorID string, page, limit int) (*PaginatedPosts, error)
 	FindByID(ctx context.Context, id string) (*Post, error)
+	FindBySlug(ctx context.Context, slug string) (*Post, error)
+	FindByIDs(ctx context.Context, ids []string) ([]*Post, error)
 	FindByAuthor(ctx context.Context, authorID string, page, limit int) (*PaginatedPosts, error)
 	FindByTag(ctx context.Context, tag string, page, limit int) (*PaginatedPosts, error)
 }

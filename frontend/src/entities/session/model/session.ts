@@ -1,3 +1,5 @@
+import { browserLocalStorage, type StoragePort } from "@/shared/lib/storage";
+
 export type AuthStatus = "anonymous" | "hydrating" | "authenticated";
 
 export interface SessionSnapshot {
@@ -20,23 +22,28 @@ export interface SessionStorageAdapter {
   clear(): void;
 }
 
-export const localStorageSessionAdapter: SessionStorageAdapter = {
+export const createSessionAdapter = (
+  storage: StoragePort = browserLocalStorage,
+): SessionStorageAdapter => ({
   load() {
     if (typeof window === "undefined") {
       return null;
     }
-    return window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+    return storage.getItem(SESSION_TOKEN_STORAGE_KEY);
   },
   save(token) {
     if (typeof window === "undefined") {
       return;
     }
-    window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    storage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
   },
   clear() {
     if (typeof window === "undefined") {
       return;
     }
-    window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    storage.removeItem(SESSION_TOKEN_STORAGE_KEY);
   },
-};
+});
+
+export const localStorageSessionAdapter: SessionStorageAdapter =
+  createSessionAdapter();

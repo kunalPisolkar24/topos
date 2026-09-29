@@ -1,34 +1,63 @@
 package graph
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
+	"github.com/99designs/gqlgen/graphql"
 )
 
-func TestMapDomainError(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       error
-		wantMessage string
-	}{
-		{"unauthorized", domain.ErrUnauthorized, "unauthorized"},
-		{"forbidden", domain.ErrForbidden, "forbidden"},
-		{"not found", domain.ErrNotFound, "not found"},
-		{"wrapped not found", errors.New("wrap: " + domain.ErrNotFound.Error()), ""},
-		{"unknown", errors.New("something else"), "something else"},
+func TestPresentErrorWithMalformedRequest(t *testing.T) {
+	// Request-level errors (parse/validation failures) reach the error
+	// presenter without an operation context. PresentError must not
+	// panic on them: it should fall back to "anonymous" and produce a
+	// generic internal error instead.
+	err := PresentError(context.Background(), errors.New("boom"))
+
+	if err == nil {
+		t.Fatal("expected a presented error")
+	}
+	if err.Message != "internal error" {
+		t.Fatalf("expected generic message, got %q", err.Message)
+	}
+}
+
+func TestPresentErrorWithOperationContext(t *testing.T) {
+	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
+		OperationName: "Posts",
+	})
+
+	err := PresentError(ctx, errors.New("boom"))
+
+	if err == nil {
+		t.Fatal("expected a presented error")
+	}
+	if err.Message != "internal error" {
+		t.Fatalf("expected generic message, got %q", err.Message)
+	}
+}
+
+func TestRecoverErrorWithMalformedRequest(t *testing.T) {
+	// The recover path logs with operationName, which must tolerate a
+	// missing operation context instead of panicking inside the panic
+	// handler.
+	userMessage := RecoverError(context.Background(), "boom")
+
+	if userMessage == nil || userMessage.Error() != "internal error" {
+		t.Fatalf("expected internal error, got %v", userMessage)
+	}
+}
+
+func TestOperationNameFallsBackWithoutContext(t *testing.T) {
+	if got := operationName(context.Background()); got != "anonymous" {
+		t.Fatalf("expected anonymous, got %q", got)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := mapDomainError(tt.input)
-			if got == nil {
-				t.Fatal("expected non-nil error")
-			}
-			if tt.wantMessage != "" && got.Message != tt.wantMessage {
-				t.Errorf("expected message %q, got %q", tt.wantMessage, got.Message)
-			}
-		})
+	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
+		OperationName: "Posts",
+	})
+	if got := operationName(ctx); got != "Posts" {
+		t.Fatalf("expected Posts, got %q", got)
 	}
 }

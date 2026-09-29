@@ -7,11 +7,15 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient, POST_LIST_QUERY_NAMES } from "@/shared/api";
 import { env } from "@/shared/config/env";
+import { sessionStoreActions } from "@/entities/session";
 import {
   MyPostsDocument,
   PostDocument,
   PostsDocument,
+  type RecordPostViewMutationVariables,
 } from "@/shared/graphql/content-documents";
+import { resetViewedPostsForTests } from "../viewed-posts";
+import { markFeedMode, resetFeedAttributionForTests } from "../feed-attribution";
 import { usePostViewerController } from "../usePostViewerController";
 
 const noopUnauthorized = async () => {};
@@ -29,6 +33,8 @@ const loadedPost = {
   summary: null,
   summaryStatus: "READY",
   createdAt: "2024-01-01T00:00:00Z",
+  likedByMe: false,
+  savedByMe: false,
   updatedAt: "2024-01-01T00:00:00Z",
   author: {
     __typename: "User" as const,
@@ -39,7 +45,9 @@ const loadedPost = {
     bio: null,
     avatarUrl: null,
   },
+  approvedById: null,
   tags: [],
+  related: [],
 };
 
 const staleListPost = {
@@ -49,6 +57,8 @@ const staleListPost = {
   body: "<p>body</p>",
   imageUrl: "https://x/y.png",
   createdAt: "2024-01-01T00:00:00Z",
+  likedByMe: false,
+  savedByMe: false,
   author: {
     __typename: "User" as const,
     id: "u1",
@@ -179,6 +189,58 @@ describe("usePostViewerController", () => {
     expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
   });
 
+  it("resets transient view and dialog state when navigating between posts", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.query("Post", ({ variables }) =>
+        HttpResponse.json({
+          data: { post: { ...loadedPost, id: variables.id } },
+        }),
+      ),
+    );
+
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <ApolloProvider client={localClient}>
+        <MemoryRouter initialEntries={["/blog/abc"]}>{children}</MemoryRouter>
+      </ApolloProvider>
+    );
+
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => usePostViewerController(id),
+      { wrapper: localWrapper, initialProps: { id: "abc" } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("ready");
+    });
+
+    act(() => {
+      result.current.setView("editing");
+      result.current.setDialog("summary");
+    });
+
+    expect(result.current.state).toMatchObject({ kind: "ready", view: "editing", dialog: "summary" });
+
+    rerender({ id: "def" });
+
+    await waitFor(() => {
+      expect(result.current.state).toMatchObject({
+        kind: "ready",
+        view: "reading",
+        dialog: "closed",
+      });
+    });
+    if (result.current.state.kind === "ready") {
+      expect(result.current.state.post.id).toBe("def");
+    }
+  });
+
   it("shows loading state when post is not yet loaded", () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
     server.use(
@@ -298,5 +360,123 @@ describe("usePostViewerController", () => {
         variables: myPostsVariables,
       }),
     ).toBeNull();
+  });
+});
+
+describe("usePostViewerController view tracking", () => {
+  beforeEach(() => {
+    resetViewedPostsForTests();
+    resetFeedAttributionForTests();
+  });
+
+  const viewWrapper = () => {
+    const localClient = createApolloClient({
+      uri: env.VITE_GRAPHQL_URL,
+      getToken: () => null,
+      onUnauthorized: noopUnauthorized,
+    });
+    return {
+      localClient,
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <ApolloProvider client={localClient}>
+          <MemoryRouter initialEntries={["/blog/abc"]}>{children}</MemoryRouter>
+        </ApolloProvider>
+      ),
+    };
+  };
+
+  it("reports a post view once per session per post when authenticated", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let viewCalls = 0;
+    server.use(
+      graphqlApi.query("Post", () =>
+        HttpResponse.json({ data: { post: loadedPost } }),
+      ),
+      graphqlApi.mutation("RecordPostView", ({ variables }) => {
+        expect(variables).toEqual({ postId: "abc" });
+        viewCalls += 1;
+        return HttpResponse.json({ data: { recordPostView: true } });
+      }),
+    );
+    sessionStoreActions.markAuthenticated("test-token");
+
+    const { wrapper } = viewWrapper();
+    const first = renderHook(() => usePostViewerController("abc"), { wrapper });
+    await waitFor(() => {
+      expect(first.result.current.state.kind).toBe("ready");
+    });
+    // The view fires after a 1s debounce, so the default waitFor window
+    // is too tight; give the mutation time to arrive.
+    await waitFor(
+      () => {
+        expect(viewCalls).toBe(1);
+      },
+      { timeout: 5000 },
+    );
+
+    first.unmount();
+    const second = renderHook(() => usePostViewerController("abc"), { wrapper });
+    await waitFor(() => {
+      expect(second.result.current.state.kind).toBe("ready");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(viewCalls).toBe(1);
+  });
+
+  it("never reports views for anonymous readers", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let viewCalls = 0;
+    server.use(
+      graphqlApi.query("Post", () =>
+        HttpResponse.json({ data: { post: loadedPost } }),
+      ),
+      graphqlApi.mutation("RecordPostView", () => {
+        viewCalls += 1;
+        return HttpResponse.json({ data: { recordPostView: true } });
+      }),
+    );
+
+    const { wrapper } = viewWrapper();
+    const { result } = renderHook(() => usePostViewerController("abc"), {
+      wrapper,
+    });
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("ready");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(viewCalls).toBe(0);
+  });
+
+  it("attributes the view to the stored feed mode", async () => {
+    markFeedMode("abc", "SURPRISE");
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let capturedVariables: RecordPostViewMutationVariables | undefined;
+    server.use(
+      graphqlApi.query("Post", () =>
+        HttpResponse.json({ data: { post: loadedPost } }),
+      ),
+      graphqlApi.mutation("RecordPostView", ({ variables }) => {
+        capturedVariables = variables as RecordPostViewMutationVariables;
+        return HttpResponse.json({ data: { recordPostView: true } });
+      }),
+    );
+    sessionStoreActions.markAuthenticated("test-token");
+
+    const { wrapper } = viewWrapper();
+    const { result } = renderHook(() => usePostViewerController("abc"), {
+      wrapper,
+    });
+    await waitFor(() => {
+      expect(result.current.state.kind).toBe("ready");
+    });
+    await waitFor(
+      () => {
+        expect(capturedVariables).toEqual({ postId: "abc", mode: "SURPRISE" });
+      },
+      { timeout: 5000 },
+    );
+    await waitFor(() => {
+      expect(sessionStorage.getItem("topos.feedMode.abc")).toBeNull();
+    });
   });
 });

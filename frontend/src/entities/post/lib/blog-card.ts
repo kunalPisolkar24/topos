@@ -26,6 +26,8 @@ type PostLike = {
   body: string;
   imageUrl?: string | null;
   createdAt: string;
+  likedByMe: boolean;
+  savedByMe: boolean;
   author: AuthorLike;
   tags: TagLike[];
 };
@@ -40,15 +42,17 @@ export interface BlogCardItem {
   tags: string[];
   imageUrl: string | null;
   publishedAt: string | null;
+  likedByMe: boolean;
+  savedByMe: boolean;
+  reason?: string;
 }
 
 export function stripHtml(html: string) {
-  if (typeof DOMParser !== "undefined") {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    return doc.body.textContent || "";
-  }
-
-  return html.replace(/<[^>]+>/g, "");
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function getAuthorDisplayName(author: AuthorLike) {
@@ -100,6 +104,8 @@ export function mapPostToBlogCardItem(post: PostLike): BlogCardItem {
     tags: post.tags.map((tag) => tag.name),
     imageUrl: post.imageUrl || DEFAULT_BLOG_CARD_IMAGE,
     publishedAt: post.createdAt,
+    likedByMe: post.likedByMe,
+    savedByMe: post.savedByMe,
   };
 }
 

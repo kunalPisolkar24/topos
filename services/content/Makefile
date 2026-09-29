@@ -1,0 +1,358 @@
+.PHONY: help test test-integration coverage vet lint fmt generate
+.PHONY: load-test load-test-worker load-test-reads load-test-writes load-test-chat load-test-build load-test-stop load-test-clean load-test-tail
+.PHONY: up up-service up-worker up-search up-personalizer up-all down logs clean ps
+
+# Default target shows help.
+.DEFAULT_GOAL := help
+
+# Excluded from coverage: only generated code. Keep wiring (bootstrap/cmd) and
+# data layers (db/repository) visible so coverage gaps are not hidden.
+GENERATED_RE := 'graph/generated.go|graph/model/|proto/ai/|\.pb\.go'
+
+help:
+	@echo "Content Service — make help"
+	@echo ""
+	@echo "Usage: make [target] [WITH_MONGO=0] [WITH_REDIS=0] [WITH_KAFKA=0] [SERVICE=...]"
+	@echo ""
+	@echo "Core (standalone: mongo + kafka + shared user-redis):"
+	@echo "  make up                 — content-service with deps (default: all deps on)"
+	@echo "  make up-service         — content-service only + required deps"
+	@echo "  make up-worker          — summary worker (mongo+redis+kafka)"
+	@echo "  make up-search          — search worker (kafka only)"
+	@echo "  make up-personalizer    — personalizer worker (kafka only)"
+	@echo "  make up-all             — all 4 services with deps"
+	@echo "  make down               — stop (keep volumes)"
+	@echo "  make clean              — stop and remove volumes"
+	@echo "  make logs [SERVICE=]    — tail logs (all or one service)"
+	@echo "  make ps                 — list running services"
+	@echo "  make up-floci           — content-service via Floci (ENV_TYPE=prod, DocumentDB/MSK mocked)"
+	@echo "  make down-floci         — stop Floci stack"
+	@echo ""
+	@echo "Flags (caps canonical, lowercase alias; 0 disables):"
+	@echo "  WITH_MONGO=0  with_mongo=0   — without mongo (boot degraded, /ready 503)"
+	@echo "  WITH_REDIS=0  with_redis=0   — without redis (fail-open, keep REDIS_ADDR for reconnect)"
+	@echo "  WITH_KAFKA=0  with_kafka=0   — without kafka (degraded publish/consume, /ready 503 for workers)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make up WITH_REDIS=0"
+	@echo "  make up-worker WITH_MONGO=0"
+	@echo "  make up-search WITH_KAFKA=0"
+	@echo "  make logs SERVICE=content-service"
+	@echo "  make up-floci           — Floci: ENV_TYPE=prod, fetches MONGO_URI/KAFKA_BROKERS from SM via Floci"
+	@echo ""
+	@echo "Dev:"
+	@echo "  make test / test-integration / vet / fmt / coverage / generate"
+	@echo "Load tests:"
+	@echo "  make load-test / load-test-worker / load-test-tail ..."
+
+# --- Standalone Stack (mongo + kafka + shared user-redis) --------------------
+
+COMPOSE := docker compose -f infra/compose.yml --project-name topos-content-local
+
+WITH_MONGO ?= 1
+WITH_REDIS ?= 1
+WITH_KAFKA ?= 1
+with_mongo ?= $(WITH_MONGO)
+with_redis ?= $(WITH_REDIS)
+with_kafka ?= $(WITH_KAFKA)
+WITH_MONGO := $(if $(filter 0,$(WITH_MONGO) $(with_mongo)),0,1)
+WITH_REDIS := $(if $(filter 0,$(WITH_REDIS) $(with_redis)),0,1)
+WITH_KAFKA := $(if $(filter 0,$(WITH_KAFKA) $(with_kafka)),0,1)
+
+up: up-service
+
+up-service:
+	@if [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-service: with mongo, redis and kafka"; \
+		$(COMPOSE) up -d --build --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-service: with mongo and redis, without kafka (degraded publish)"; \
+		$(COMPOSE) up -d --wait content-mongo user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-service: with mongo and kafka, without redis (fail-open)"; \
+		$(COMPOSE) up -d --wait content-mongo kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-service: without mongo (degraded /ready 503), with redis and kafka"; \
+		$(COMPOSE) up -d --wait user-redis kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-service: with mongo, without redis and kafka"; \
+		$(COMPOSE) up -d --wait content-mongo; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-service: without mongo and kafka, with redis"; \
+		$(COMPOSE) up -d --wait user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-service: without mongo and redis, with kafka"; \
+		$(COMPOSE) up -d --wait kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	else \
+		echo "up-service: without mongo, redis and kafka (fully degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service; \
+	fi
+
+up-worker:
+	@if [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-worker: with mongo, redis and kafka"; \
+		$(COMPOSE) up -d --build --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-worker: with mongo and redis, without kafka (worker will retry)"; \
+		$(COMPOSE) up -d --wait content-mongo user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-worker: with mongo and kafka, without redis"; \
+		$(COMPOSE) up -d --wait content-mongo kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-worker: without mongo, with redis and kafka (will be degraded)"; \
+		$(COMPOSE) up -d --wait user-redis kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-worker: with mongo, without redis and kafka"; \
+		$(COMPOSE) up -d --wait content-mongo; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-worker: without mongo and kafka, with redis"; \
+		$(COMPOSE) up -d --wait user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-worker: without mongo and redis, with kafka"; \
+		$(COMPOSE) up -d --wait kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	else \
+		echo "up-worker: without mongo, redis and kafka (fully degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait content-worker; \
+	fi
+
+up-search:
+	@if [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-search: with kafka"; \
+		$(COMPOSE) up -d --build --wait content-search-worker; \
+	else \
+		echo "up-search: without kafka (degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait content-search-worker; \
+	fi
+
+up-personalizer:
+	@if [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-personalizer: with kafka"; \
+		$(COMPOSE) up -d --build --wait content-personalizer; \
+	else \
+		echo "up-personalizer: without kafka (degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait content-personalizer; \
+	fi
+
+up-all:
+	@if [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-all: with mongo, redis and kafka"; \
+		$(COMPOSE) up -d --build --wait; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-all: with mongo and redis, without kafka"; \
+		$(COMPOSE) up -d --wait content-mongo user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-all: with mongo and kafka, without redis"; \
+		$(COMPOSE) up -d --wait content-mongo kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-all: without mongo, with redis and kafka"; \
+		$(COMPOSE) up -d --wait user-redis kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	elif [ "$(WITH_MONGO)" = "1" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-all: with mongo, without redis and kafka"; \
+		$(COMPOSE) up -d --wait content-mongo; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "1" ] && [ "$(WITH_KAFKA)" = "0" ]; then \
+		echo "up-all: without mongo and kafka, with redis"; \
+		$(COMPOSE) up -d --wait user-redis; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	elif [ "$(WITH_MONGO)" = "0" ] && [ "$(WITH_REDIS)" = "0" ] && [ "$(WITH_KAFKA)" = "1" ]; then \
+		echo "up-all: without mongo and redis, with kafka"; \
+		$(COMPOSE) up -d --wait kafka init-kafka; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	else \
+		echo "up-all: without mongo, redis and kafka (fully degraded)"; \
+		$(COMPOSE) up -d --build --no-deps --wait content-service content-worker content-search-worker content-personalizer; \
+	fi
+
+down:
+	$(COMPOSE) down
+
+logs:
+	@if [ -n "$(SERVICE)" ]; then \
+		$(COMPOSE) logs -f $(SERVICE); \
+	else \
+		$(COMPOSE) logs -f; \
+	fi
+
+clean:
+	$(COMPOSE) down -v --remove-orphans
+
+ps:
+	$(COMPOSE) ps
+
+# --- Prod (ENV_TYPE=prod, SM-driven, no bundled DB) ---
+# Against Floci: control plane (SM/SSM) and data plane (DocDB, MSK,
+# Valkey) all come from the `floci` container + sidecars on the
+# `floci-apps` network. Against real AWS later: same file,
+# AWS_ENDPOINT_URL empty + external injection.
+COMPOSE_PROD := docker compose -f infra/compose.prod.yml --project-name topos-content-prod
+
+up-prod:
+	$(COMPOSE_PROD) up -d --build --wait content-service
+
+down-prod:
+	$(COMPOSE_PROD) down
+
+logs-prod:
+	$(COMPOSE_PROD) logs -f
+
+clean-prod:
+	$(COMPOSE_PROD) down -v --remove-orphans
+
+# Backwards-compat aliases
+local-up: up
+local-down: down
+local-logs: logs
+local-clean: clean
+GENERATED_RE := 'graph/generated.go|graph/model/|proto/ai/|\.pb\.go|internal/db/|internal/repository/|internal/bootstrap/|internal/testutil/|cmd/'
+
+# Regenerates the AI proto stubs in proto/ai/. Requires protoc and the
+# matching Go plugins on PATH (install with:
+#   go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+#   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0)
+generate:
+	PATH="$(HOME)/go/bin:$$PATH" protoc -I . \
+		--go_out=. --go_opt=module=github.com/kunalPisolkar24/topos/services/content \
+		--go-grpc_out=. --go-grpc_opt=module=github.com/kunalPisolkar24/topos/services/content \
+		proto/ai/ai_service.proto
+
+test:
+	go test ./...
+
+# -p 4 caps how many packages boot testcontainers at once; running every
+# container-booting package in parallel starves docker and makes the
+# kafka/mongo suites flaky under load.
+test-integration:
+	go test -tags integration -p 4 ./...
+
+vet:
+	go vet ./...
+	go vet -tags integration ./...
+
+fmt:
+	gofmt -l .
+
+coverage:
+	go test ./... -coverprofile=/tmp/content-coverage.out
+	grep -vE $(GENERATED_RE) /tmp/content-coverage.out > /tmp/content-coverage.filtered.out
+	@go tool cover -func=/tmp/content-coverage.filtered.out | tail -1
+
+# --- Load tests --------------------------------------------------------------
+# Service profile: k6 -> content-service API (mongo + redis + kafka + ai).
+# Worker profile: Go producer -> kafka -> content-worker; k6 scrapes worker metrics.
+
+LOADTEST_DIR := load-tests
+COMPOSE_LT := docker compose -f infra/compose.load.yml --project-name topos-content-loadtest
+RPS ?= 50
+VUS ?= 20
+DURATION ?= 30s
+SCRIPT ?= mixed
+WEIGHTS ?= posts:30,post:20,tag:10,author:10,create:15,update:10,delete:5,chat:5
+SEED_POST_COUNT ?= 1000
+SEED_USERS ?= 20
+PARTITIONS ?= 3
+JWT_SECRET ?= local-dev-secret
+JWT_ISSUER ?= user-service
+JWT_AUDIENCE ?= topos
+MONGO_MEM ?= 768M
+REDIS_MEM ?= 640M
+SVC_MEM ?= 768M
+K6_MEM ?= 384M
+LLM_MODE ?= fake
+LLM_API_KEY ?=
+EMBEDDING_MODE ?= fake
+EMBEDDING_MODEL ?= snowflake-arctic-embed2:568m
+OLLAMA_MEM ?= 2G
+
+# Chat streams a full LLM answer per call, so budgets widen for real
+# embeddings and again for a real LLM.
+CHAT_P95 ?= $(if $(filter real,$(LLM_MODE)),15000,$(if $(filter ollama,$(EMBEDDING_MODE)),2000,500))
+CHAT_P99 ?= $(if $(filter real,$(LLM_MODE)),30000,$(if $(filter ollama,$(EMBEDDING_MODE)),4000,1500))
+
+# The ollama container is profile-gated so fake runs never pull the
+# model; embedding-real runs start it first (see the load-test target).
+LT_VARS = RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION) SCRIPT=$(SCRIPT) \
+	WEIGHTS=$(WEIGHTS) SEED_POST_COUNT=$(SEED_POST_COUNT) SEED_USERS=$(SEED_USERS) \
+	PARTITIONS=$(PARTITIONS) JWT_SECRET=$(JWT_SECRET) \
+	MONGO_MEM=$(MONGO_MEM) REDIS_MEM=$(REDIS_MEM) SVC_MEM=$(SVC_MEM) K6_MEM=$(K6_MEM) \
+	LLM_MODE=$(LLM_MODE) LLM_API_KEY=$(LLM_API_KEY) EMBEDDING_MODE=$(EMBEDDING_MODE) \
+	EMBEDDING_MODEL=$(EMBEDDING_MODEL) OLLAMA_MEM=$(OLLAMA_MEM) \
+	CHAT_P95=$(CHAT_P95) CHAT_P99=$(CHAT_P99)
+
+VALID_SCRIPTS := mixed reads writes chat interactions
+
+load-test: load-test-build
+	@if echo " $(VALID_SCRIPTS) " | grep -q " $(SCRIPT) "; then :; else \
+		echo "unknown SCRIPT=$(SCRIPT). valid: $(VALID_SCRIPTS)"; exit 2; \
+	fi
+	@if echo " fake ollama " | grep -q " $(EMBEDDING_MODE) "; then :; else \
+		echo "unknown EMBEDDING_MODE=$(EMBEDDING_MODE). valid: fake ollama"; exit 2; \
+	fi
+	@if [ "$(EMBEDDING_MODE)" = "ollama" ]; then \
+		$(LT_VARS) $(COMPOSE_LT) --profile embedding-real up -d --wait ollama; \
+	fi
+	$(LT_VARS) $(COMPOSE_LT) up -d --wait content-service
+	$(LT_VARS) $(COMPOSE_LT) run --rm \
+		-e SCRIPT=$(SCRIPT) -e RPS=$(RPS) -e VUS=$(VUS) -e DURATION=$(DURATION) \
+		-e WEIGHTS="$(WEIGHTS)" -e SEED_POST_COUNT=$(SEED_POST_COUNT) -e SEED_USERS=$(SEED_USERS) \
+		k6; \
+	EXIT=$$?; \
+	$(MAKE) --no-print-directory load-test-stop; \
+	exit $$EXIT
+
+load-test-worker: load-test-build
+	@export RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION); \
+	$(LT_VARS) $(COMPOSE_LT) up -d --wait content-worker content-search-worker content-personalizer && \
+	$(LT_VARS) $(COMPOSE_LT) up -d producer producer-interactions && \
+	$(LT_VARS) $(COMPOSE_LT) run --rm \
+		-e RPS=$(RPS) -e VUS=$(VUS) -e DURATION=$(DURATION) \
+		k6-worker
+	@EXIT=$$?; \
+	$(MAKE) --no-print-directory load-test-stop; \
+	exit $$EXIT
+
+load-test-reads:
+	$(MAKE) load-test SCRIPT=reads RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION)
+
+load-test-writes:
+	$(MAKE) load-test SCRIPT=writes RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION)
+
+load-test-chat:
+	$(MAKE) load-test SCRIPT=chat RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION) \
+		LLM_MODE=$(LLM_MODE) EMBEDDING_MODE=$(EMBEDDING_MODE)
+
+load-test-interactions:
+	$(MAKE) load-test SCRIPT=interactions RPS=$(RPS) VUS=$(VUS) DURATION=$(DURATION)
+
+load-test-build:
+	cd $(LOADTEST_DIR)/producer && go mod download
+	$(LT_VARS) $(COMPOSE_LT) build content-service content-worker content-search-worker content-personalizer producer
+
+load-test-stop:
+	$(LT_VARS) $(COMPOSE_LT) down -v --remove-orphans
+
+load-test-clean:
+	$(MAKE) load-test-stop
+	docker rm -f loadtest-content-mongo loadtest-content-kafka \
+		loadtest-content-init-kafka loadtest-content-service loadtest-content-k6 \
+		loadtest-content-qdrant loadtest-content-ai-service loadtest-content-ollama \
+		loadtest-worker-qdrant loadtest-worker-ai \
+		loadtest-content-worker loadtest-content-search-worker loadtest-content-personalizer \
+		loadtest-content-producer loadtest-content-interaction-producer loadtest-worker-k6 k6-worker 2>/dev/null || true
+
+load-test-tail:
+	$(LT_VARS) $(COMPOSE_LT) logs -f --tail=50

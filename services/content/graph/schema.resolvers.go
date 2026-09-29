@@ -7,10 +7,13 @@ package graph
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/kunalPisolkar24/blogapp/services/content/graph/model"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/domain"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
+	"github.com/kunalPisolkar24/topos/services/content/graph/model"
+	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
+	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
+	"github.com/kunalPisolkar24/topos/services/content/internal/middleware"
+	"github.com/kunalPisolkar24/topos/services/content/internal/pagination"
 )
 
 // CreatePost is the resolver for the createPost field.
@@ -25,12 +28,11 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePos
 		tags = append(tags, input.Tags...)
 	}
 
-	domainPost, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary)
+	post, err := r.PostService.CreatePost(ctx, input.Title, input.Body, userID, tags, input.ImageURL, input.Summary, "")
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
-
-	return mapDomainPostToModel(domainPost), nil
+	return mapDomainPostToModel(post), nil
 }
 
 // UpdatePost is the resolver for the updatePost field.
@@ -45,12 +47,11 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, id string, input mode
 		tags = append(tags, input.Tags...)
 	}
 
-	domainPost, err := r.PostService.UpdatePost(ctx, id, userID, input.Title, input.Body, tags, input.ImageURL)
+	post, err := r.PostService.UpdatePost(ctx, id, userID, input.Title, input.Body, tags, input.ImageURL, "")
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
-
-	return mapDomainPostToModel(domainPost), nil
+	return mapDomainPostToModel(post), nil
 }
 
 // DeletePost is the resolver for the deletePost field.
@@ -63,7 +64,6 @@ func (r *mutationResolver) DeletePost(ctx context.Context, id string) (bool, err
 	if err := r.PostService.DeletePost(ctx, id, userID); err != nil {
 		return false, mapDomainError(err)
 	}
-
 	return true, nil
 }
 
@@ -72,13 +72,7 @@ func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body 
 	if _, ok := middleware.UserIDFromContext(ctx); !ok {
 		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
-
-	tags, err := r.PostService.GenerateTags(ctx, title, body)
-	if err != nil {
-		return nil, mapDomainError(err)
-	}
-
-	return tags, nil
+	return r.PostService.GenerateTags(ctx, title, body)
 }
 
 // GeneratePostContent is the resolver for the generatePostContent field.
@@ -86,113 +80,370 @@ func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt strin
 	if _, ok := middleware.UserIDFromContext(ctx); !ok {
 		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
-
-	generated, err := r.PostService.GeneratePostContent(ctx, prompt)
+	post, err := r.PostService.GeneratePostContent(ctx, prompt)
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
+	return mapDomainGeneratedPostToModel(post), nil
+}
 
-	return &model.GeneratedPost{
-		Title:   generated.Title,
-		Body:    generated.Body,
-		Summary: generated.Summary,
-		Tags:    generated.Tags,
-	}, nil
+// CreateChat is the resolver for the createChat field.
+func (r *mutationResolver) CreateChat(ctx context.Context, title *string) (*model.Chat, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	chat, err := r.ChatService.CreateChat(ctx, userID, derefStr(title))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainChatToModel(chat), nil
+}
+
+// RenameChat is the resolver for the renameChat field.
+func (r *mutationResolver) RenameChat(ctx context.Context, id string, title string) (*model.Chat, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	chat, err := r.ChatService.RenameChat(ctx, id, userID, title)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainChatToModel(chat), nil
+}
+
+// DeleteChat is the resolver for the deleteChat field.
+func (r *mutationResolver) DeleteChat(ctx context.Context, id string) (bool, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return false, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	if err := r.ChatService.DeleteChat(ctx, id, userID); err != nil {
+		return false, mapDomainError(err)
+	}
+	return true, nil
+}
+
+// AskChat is the resolver for the askChat field.
+func (r *mutationResolver) AskChat(ctx context.Context, chatID string, query string) (*model.ChatMessage, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	msg, err := r.ChatService.AskChat(ctx, chatID, userID, query)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainChatMessageToModel(msg), nil
+}
+
+// RecordPostView is the resolver for the recordPostView field.
+func (r *mutationResolver) RecordPostView(ctx context.Context, postID string, mode *model.RecommendMode) (bool, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return false, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	if err := r.InteractionService.RecordView(ctx, userID, postID, interactionMode(mode)); err != nil {
+		return false, mapDomainError(err)
+	}
+	return true, nil
+}
+
+// LikePost is the resolver for the likePost field.
+func (r *mutationResolver) LikePost(ctx context.Context, postID string, mode *model.RecommendMode) (bool, error) {
+	return r.toggleInteraction(ctx, postID, interactionMode(mode), r.InteractionService.ToggleLike)
+}
+
+// SavePost is the resolver for the savePost field.
+func (r *mutationResolver) SavePost(ctx context.Context, postID string, mode *model.RecommendMode) (bool, error) {
+	return r.toggleInteraction(ctx, postID, interactionMode(mode), r.InteractionService.ToggleSave)
+}
+
+// CreatePostDraft is the resolver for the createPostDraft field.
+func (r *mutationResolver) CreatePostDraft(ctx context.Context, prompt string) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.CreateDraft(ctx, prompt, userID)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// CreateContentDraft files the caller's human-authored content for peer
+// review: a brand-new post when the input carries no post ID, otherwise a
+// revision proposal for that live post.
+func (r *mutationResolver) CreateContentDraft(ctx context.Context, input model.ContentDraftInput) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.CreateContentDraft(ctx, userID, contentDraftParams(input))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// ResubmitContentDraft sends the caller's rejected draft back to the
+// queue with edits.
+func (r *mutationResolver) ResubmitContentDraft(ctx context.Context, id string, input model.ContentDraftInput) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.ResubmitContentDraft(ctx, id, userID, contentDraftParams(input))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// ApprovePostDraft resumes a peer's draft into a published post; the
+// optional edits land on the AI workflow before it resumes.
+func (r *mutationResolver) ApprovePostDraft(ctx context.Context, id string, input *model.DraftEditsInput) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	var review *domain.DraftReview
+	if input != nil {
+		review = &domain.DraftReview{
+			Title:   input.Title,
+			Body:    input.Body,
+			Summary: input.Summary,
+			Tags:    input.Tags,
+		}
+	}
+
+	draft, err := r.DraftService.ApproveDraft(ctx, id, userID, review)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// RejectPostDraft is the resolver for the rejectPostDraft field.
+func (r *mutationResolver) RejectPostDraft(ctx context.Context, id string, reason *string) (*model.PostDraft, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	draft, err := r.DraftService.RejectDraft(ctx, id, userID, derefStr(reason))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostDraftToModel(draft), nil
+}
+
+// DeletePostDraft withdraws the caller's own pending draft.
+func (r *mutationResolver) DeletePostDraft(ctx context.Context, id string) (bool, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return false, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	if err := r.DraftService.WithdrawDraft(ctx, id, userID); err != nil {
+		return false, mapDomainError(err)
+	}
+	return true, nil
+}
+
+// Related is the resolver for the related field.
+func (r *postResolver) Related(ctx context.Context, obj *model.Post, limit *int) ([]*model.Post, error) {
+	posts, err := relatedPostsFrom(ctx, r.PostService, obj.ID, deref(limit))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPostsToModel(posts), nil
+}
+
+// LikedByMe is the resolver for the likedByMe field.
+func (r *postResolver) LikedByMe(ctx context.Context, obj *model.Post) (bool, error) {
+	state, err := r.interactionState(ctx, obj.ID)
+	if err != nil {
+		return false, mapDomainError(err)
+	}
+	return state.Liked, nil
+}
+
+// SavedByMe is the resolver for the savedByMe field.
+func (r *postResolver) SavedByMe(ctx context.Context, obj *model.Post) (bool, error) {
+	state, err := r.interactionState(ctx, obj.ID)
+	if err != nil {
+		return false, mapDomainError(err)
+	}
+	return state.Saved, nil
 }
 
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context, page *int, limit *int) (*model.PaginatedPosts, error) {
-	p := 1
-	if page != nil {
-		p = *page
-	}
-	l := 10
-	if limit != nil {
-		l = *limit
-	}
-
-	domainPaginated, err := r.PostService.GetPosts(ctx, p, l)
+	posts, err := r.PostService.GetPosts(ctx, deref(page), deref(limit))
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
-
-	return mapDomainPaginatedToModel(domainPaginated), nil
+	return mapDomainPaginatedToModel(posts), nil
 }
 
 // Post is the resolver for the post field.
 func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error) {
-	dp, err := r.PostService.GetPost(ctx, id)
+	post, err := r.PostService.GetPost(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
-	if dp == nil {
-		return nil, nil
-	}
-	return mapDomainPostToModel(dp), nil
+	return mapDomainPostToModel(post), nil
 }
 
 // Tags is the resolver for the tags field.
 func (r *queryResolver) Tags(ctx context.Context, query *string, limit *int) ([]*model.Tag, error) {
-	l := 0
-	if limit != nil {
-		l = *limit
-	}
-
-	domainTags, err := r.TagService.GetTags(ctx, query, l)
+	tags, err := r.TagService.GetTags(ctx, query, deref(limit))
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
-
-	var tags []*model.Tag
-	for _, dt := range domainTags {
-		tags = append(tags, &model.Tag{
-			ID:   dt.ID,
-			Name: dt.Name,
-		})
-	}
-	return tags, nil
+	return mapDomainTagsToModel(tags), nil
 }
 
 // PostsByTag is the resolver for the postsByTag field.
 func (r *queryResolver) PostsByTag(ctx context.Context, tag string, page *int, limit *int) (*model.PaginatedPosts, error) {
-	p := 1
-	if page != nil {
-		p = *page
-	}
-	l := 10
-	if limit != nil {
-		l = *limit
-	}
-
-	domainPaginated, err := r.PostService.GetPostsByTag(ctx, tag, p, l)
+	posts, err := r.PostService.GetPostsByTag(ctx, tag, deref(page), deref(limit))
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPaginatedToModel(posts), nil
+}
+
+// SearchPosts is the resolver for the searchPosts field.
+func (r *queryResolver) SearchPosts(ctx context.Context, query string, page *int, limit *int) (*model.SearchResult, error) {
+	posts, err := r.PostService.SearchPosts(ctx, query, deref(page), deref(limit))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainSearchResultToModel(posts), nil
+}
+
+// RecommendedPosts is the resolver for the recommendedPosts field.
+func (r *queryResolver) RecommendedPosts(ctx context.Context, page *int, limit *int, mode *model.RecommendMode, seed *int) (*model.PaginatedPosts, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
 
-	return mapDomainPaginatedToModel(domainPaginated), nil
+	feedMode := recommendModeToDomain(mode)
+	posts, err := r.PostService.RecommendedPosts(ctx, userID, deref(page), deref(limit), feedMode, seedToUint32(seed))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+
+	metrics.RecommendFeedServedTotal.WithLabelValues(string(feedMode)).Inc()
+	slog.Info("recommend feed served", "userID", userID, "mode", feedMode, "result_size", len(posts.Posts))
+	return mapDomainPaginatedToModel(posts), nil
+}
+
+// Chats is the resolver for the chats field.
+func (r *queryResolver) Chats(ctx context.Context, page *int, limit *int) (*model.PaginatedChats, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	pageValue, limitValue := 1, pagination.DefaultLimit
+	if page != nil {
+		pageValue = *page
+	}
+	if limit != nil {
+		limitValue = *limit
+	}
+
+	chats, err := r.ChatService.ListChats(ctx, userID, pageValue, limitValue)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainChatsToModel(chats), nil
+}
+
+// Chat is the resolver for the chat field.
+func (r *queryResolver) Chat(ctx context.Context, id string) (*model.Chat, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	chat, err := r.ChatService.GetChat(ctx, id, userID)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainChatToModel(chat), nil
+}
+
+// ChatMessages is the resolver for the chatMessages field.
+func (r *queryResolver) ChatMessages(ctx context.Context, chatID string, page *int, limit *int) (*model.PaginatedMessages, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	msgs, err := r.ChatService.GetMessages(ctx, chatID, userID, deref(page), deref(limit))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPaginatedMessagesToModel(msgs), nil
+}
+
+// PostDrafts is the resolver for the postDrafts field.
+func (r *queryResolver) PostDrafts(ctx context.Context, page *int, limit *int) (*model.PaginatedPostDrafts, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	drafts, err := r.DraftService.ListCommunity(ctx, userID, deref(page), deref(limit))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPaginatedPostDraftsToModel(drafts), nil
+}
+
+// MyPostDrafts is the resolver for the myPostDrafts field.
+func (r *queryResolver) MyPostDrafts(ctx context.Context, page *int, limit *int) (*model.PaginatedPostDrafts, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return nil, mapDomainError(domain.ErrUnauthorized)
+	}
+
+	drafts, err := r.DraftService.ListMine(ctx, userID, deref(page), deref(limit))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return mapDomainPaginatedPostDraftsToModel(drafts), nil
 }
 
 // Posts is the resolver for the posts field.
 func (r *userResolver) Posts(ctx context.Context, obj *model.User, page *int, limit *int) (*model.PaginatedPosts, error) {
-	p := 1
-	if page != nil {
-		p = *page
-	}
-	l := 10
-	if limit != nil {
-		l = *limit
-	}
-
-	domainPaginated, err := r.PostService.GetPostsByAuthor(ctx, obj.ID, p, l)
+	posts, err := r.PostService.GetPostsByAuthor(ctx, obj.ID, deref(page), deref(limit))
 	if err != nil {
-		return nil, err
+		return nil, mapDomainError(err)
 	}
-
-	return mapDomainPaginatedToModel(domainPaginated), nil
+	return mapDomainPaginatedToModel(posts), nil
 }
 
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+
+// Post returns PostResolver implementation.
+func (r *Resolver) Post() PostResolver { return &postResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
@@ -201,5 +452,6 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 func (r *Resolver) User() UserResolver { return &userResolver{r} }
 
 type mutationResolver struct{ *Resolver }
+type postResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type userResolver struct{ *Resolver }

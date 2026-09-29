@@ -1,13 +1,9 @@
 import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { GenerateTagsDocument } from "@/shared/graphql/content-documents";
+import { postRepository } from "@/entities/post/api/postRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
-import {
-  MIN_TAG_BODY_LENGTH,
-  MIN_TAG_TITLE_LENGTH,
-  normalizeTags,
-} from "@/entities/post/lib";
+import { canGenerateAiTags } from "@/entities/post/lib/post-rules";
+import { normalizeTags } from "@/entities/post/lib";
 
 export interface UsePostTagInputArgs {
   initialTags: string[];
@@ -39,12 +35,10 @@ export const usePostTagInput = ({
   const [newTag, setNewTag] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [mutate, { loading: isGenerating }] = useMutation(GenerateTagsDocument);
+  const [mutate, { loading: isGenerating }] = postRepository.useGenerateTags();
 
   const trimmedTitle = title.trim();
-  const canGenerate =
-    trimmedTitle.length >= MIN_TAG_TITLE_LENGTH &&
-    contentText.length >= MIN_TAG_BODY_LENGTH;
+  const canGenerate = canGenerateAiTags(title, contentText);
 
   const replaceTags = (next: string[]) => setTags(normalizeTags(next));
 
