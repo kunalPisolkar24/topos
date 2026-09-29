@@ -23,18 +23,25 @@ describe("PostAuthoringSubmitState helpers", () => {
 
   it("submitLabel reflects the in-flight state", () => {
     expect(submitLabel({ kind: "uploading" }, false)).toBe("Uploading...");
-    expect(submitLabel({ kind: "creating" }, false)).toBe("Publishing...");
-    expect(submitLabel({ kind: "updating" }, true)).toBe("Saving...");
+    expect(submitLabel({ kind: "creating" }, false)).toBe("Submitting...");
+    expect(submitLabel({ kind: "updating" }, true)).toBe("Submitting...");
   });
 
   it("submitLabel returns the idle label based on mode", () => {
-    expect(submitLabel({ kind: "idle" }, false)).toBe("Publish Post");
-    expect(submitLabel({ kind: "idle" }, true)).toBe("Save Changes");
+    expect(submitLabel({ kind: "idle" }, false)).toBe("Submit for Review");
+    expect(submitLabel({ kind: "idle" }, true)).toBe("Submit Revision");
+    expect(submitLabel({ kind: "idle" }, true, true)).toBe("Resubmit for review");
   });
 
   it("submitLabel treats error as idle for label purposes", () => {
-    expect(submitLabel({ kind: "error", message: "x" }, false)).toBe("Publish Post");
-    expect(submitLabel({ kind: "error", message: "x" }, true)).toBe("Save Changes");
+    expect(submitLabel({ kind: "error", message: "x" }, false)).toBe("Submit for Review");
+    expect(submitLabel({ kind: "error", message: "x" }, true)).toBe("Submit Revision");
+    expect(submitLabel({ kind: "error", message: "x" }, true, true)).toBe("Resubmit for review");
+  });
+
+  it("submitLabel shows resubmitting while a resubmit is in flight", () => {
+    expect(submitLabel({ kind: "updating" }, true, true)).toBe("Resubmitting...");
+    expect(submitLabel({ kind: "uploading" }, true, true)).toBe("Uploading...");
   });
 
   it("exhaustiveness: every state kind is accounted for", () => {

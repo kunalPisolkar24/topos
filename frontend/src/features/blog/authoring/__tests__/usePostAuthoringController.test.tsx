@@ -45,7 +45,7 @@ describe("usePostAuthoringController", () => {
     expect(result.current.state.tags).toEqual([]);
     expect(result.current.state.submit).toEqual({ kind: "idle" });
     expect(result.current.state.isSubmitting).toBe(false);
-    expect(result.current.state.submitLabel).toBe("Publish Post");
+    expect(result.current.state.submitLabel).toBe("Submit for Review");
     expect(result.current.state.isCoverImageReady).toBe(false);
     expect(result.current.state.isTitleReady).toBe(false);
     expect(result.current.refs.quillRef.current).toBeNull();
@@ -80,7 +80,7 @@ describe("usePostAuthoringController", () => {
     expect(result.current.state.isCoverImageReady).toBe(true);
     expect(result.current.state.isTitleReady).toBe(true);
     expect(result.current.state.isContentReady).toBe(true);
-    expect(result.current.state.submitLabel).toBe("Save Changes");
+    expect(result.current.state.submitLabel).toBe("Submit Revision");
   });
 
   it("updates title and content when the consumer changes them", () => {

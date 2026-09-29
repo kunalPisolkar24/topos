@@ -1,40 +1,68 @@
 import type React from "react";
 import { useRef } from "react";
-import { CheckCircle2, Circle, FileText, ImageIcon, Tags } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { BlogEditor } from "@/widgets";
+import { FileText, ImageIcon, Tags } from "lucide-react";
+import { Button } from "@/shared/ui/primitives/button";
+import { BlogTitleSection } from "./BlogTitleSection";
+import { FeaturedImageSection } from "./FeaturedImageSection";
+import { BlogTagSection } from "./BlogTagSection";
+import { PublishChecklistItem } from "./PublishChecklistItem";
 import {
-  BlogTitleSection,
-  FeaturedImageSection,
-  BlogTagSection,
   usePostAuthoringController,
+  type PostAuthoringMode,
   type PostForEditing,
-} from "@/features/blog";
+} from "../authoring";
+import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
+
+export interface BlogEditFormEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  onImageUpload: () => void;
+  quillRef: React.MutableRefObject<unknown>;
+}
 
 interface BlogEditFormProps {
   blog: PostForEditing;
   onCancel: () => void;
   onComplete: () => void;
+  renderEditor?: (props: BlogEditFormEditorProps) => React.ReactNode;
+  editor?: React.ReactNode;
+  mode?: PostAuthoringMode;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export const BlogEditForm: React.FC<BlogEditFormProps> = ({
   blog,
   onCancel,
   onComplete,
+  renderEditor,
+  editor,
+  mode = "edit",
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }) => {
   const { state, setters, handlers, refs } = usePostAuthoringController({
-    mode: "edit",
+    mode,
     post: blog,
     onComplete,
+    resubmitDraftId,
+    resubmitPostId,
+    initialSummary,
   });
   const cardImageInputRef = useRef<HTMLInputElement>(null);
 
+  const { titleReady, contentReady, imageReady } = evaluatePublishReadiness({
+    title: state.title,
+    body: state.content,
+    cardImage: state.cardImage,
+    cardImageUrl: state.cardImageUrl,
+    cardImagePreview: state.cardImagePreview,
+    previewCoverUrl: state.previewCoverUrl,
+    tags: state.tags,
+  });
   const { contentText } = state;
-  const titleReady = state.title.trim().length > 0;
-  const contentReady = contentText.length > 0;
-  const imageReady = Boolean(
-    state.cardImage || state.cardImageUrl || state.cardImagePreview,
-  );
 
   return (
     <form
@@ -54,14 +82,18 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
           isUploading={state.isUploadingCardImage}
           onFileChange={handlers.handleCardImageChange}
           inputRef={cardImageInputRef}
+          previewCoverUrl={state.previewCoverUrl}
+          onShufflePreviewCover={handlers.shufflePreviewCover}
         />
 
-        <BlogEditor
-          ref={refs.quillRef}
-          value={state.content}
-          onChange={setters.setContent}
-          onImageUpload={handlers.richTextimageHandler}
-        />
+        {renderEditor
+          ? renderEditor({
+              value: state.content,
+              onChange: setters.setContent,
+              onImageUpload: handlers.richTextimageHandler,
+              quillRef: refs.quillRef as React.MutableRefObject<unknown>,
+            })
+          : editor ?? null}
 
         <BlogTagSection
           tags={state.tags}
@@ -113,9 +145,9 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
               Revision Rule
             </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              All post fields are validated prior to save. Changes are instantly published.
-            </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                All post fields are validated prior to save. Changes stay pending until a peer approves them.
+              </p>
           </div>
 
           <div className="mt-5 grid gap-3">
@@ -140,32 +172,3 @@ export const BlogEditForm: React.FC<BlogEditFormProps> = ({
     </form>
   );
 };
-
-interface PublishChecklistItemProps {
-  icon: React.ElementType;
-  label: string;
-  detail: string;
-  complete: boolean;
-}
-
-const PublishChecklistItem: React.FC<PublishChecklistItemProps> = ({
-  icon: Icon,
-  label,
-  detail,
-  complete,
-}) => (
-  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
-    <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-    <div className="min-w-0">
-      <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-    </div>
-    {complete ? (
-      <CheckCircle2 className="h-4 w-4 text-primary" aria-label="Complete" />
-    ) : (
-      <Circle className="h-4 w-4 text-muted-foreground" aria-label="Incomplete" />
-    )}
-  </div>
-);

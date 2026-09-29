@@ -2,18 +2,19 @@
 
 import React from "react";
 import { Camera, Edit3 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/shared/ui/primitives/button";
+import { Card, CardContent } from "@/shared/ui/primitives/card";
+import { Skeleton } from "@/shared/ui/primitives/skeleton";
 import { useCurrentUser } from "@/entities/session";
 import { StickyNavbar } from "@/widgets";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   useProfileEditorController,
   useUserPostsController,
   ProfileBanner,
   ProfileViewInfo,
   ProfileEditForm,
-  ProfilePostsSection,
+  ProfilePublicationIndex,
 } from "@/features/user";
 
 const FALLBACK_BANNER_URL = "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&q=80&w=1974";
@@ -25,19 +26,18 @@ const UserProfile: React.FC = () => {
     currentUser,
   });
   const {
-    state: { blogs: userBlogs, loading: isPostsLoading, currentPage, totalPages, totalPosts },
-    handlePageChange,
+    state: { totalPosts },
   } = useUserPostsController({ userId: currentUser?.id });
 
   if (isUserLoading) {
     return (
       <div className="min-h-screen bg-surface text-foreground">
         <StickyNavbar />
-        <div className="pt-app-navbar">
-          <Skeleton className="h-[17rem] w-full rounded-none bg-surface-low sm:h-[21rem]" />
+        <div className="pt-app-chrome">
+          <Skeleton className="h-44 w-full rounded-none bg-surface-low sm:h-[17rem] lg:h-[21rem]" />
         </div>
-        <main className="container mx-auto px-4 pb-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
+        <main className="container mx-auto px-4 pb-20 sm:px-5 lg:px-6">
+          <div className="mx-auto max-w-[88rem]">
             <Card className="relative -mt-24 gap-0 bg-surface-low py-0">
               <CardContent className="grid gap-0 p-0 lg:grid-cols-[minmax(240px,0.38fr)_minmax(0,1fr)]">
                 <div className="bg-surface-lowest p-5 sm:p-6 lg:p-8">
@@ -87,7 +87,7 @@ const UserProfile: React.FC = () => {
     <div className="min-h-screen bg-surface text-foreground">
       <StickyNavbar />
 
-      <div className="pt-app-navbar">
+      <div className="pt-app-chrome">
         <ProfileBanner
           bannerUrl={bannerSrc}
           isEditing={profileState.isEditingProfile}
@@ -95,22 +95,21 @@ const UserProfile: React.FC = () => {
         />
       </div>
 
-      <main className="container mx-auto px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
+      <main className="container mx-auto px-4 pb-20 sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[88rem]">
           <Card className="relative -mt-24 gap-0 bg-surface-low py-0">
-            <div className="absolute left-0 top-0 h-1 w-28 bg-primary" aria-hidden="true" />
             <CardContent className="grid gap-0 p-0 lg:grid-cols-[minmax(240px,0.38fr)_minmax(0,1fr)]">
               <aside className="bg-surface-lowest p-5 sm:p-6 lg:p-8">
                 <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
                   Identity Node
                 </p>
 
-                <div className="group relative mt-6 aspect-square w-32 bg-surface-low ring-1 ring-outline-variant/20 md:w-40">
+                <div className="group relative mt-6 aspect-square w-32 overflow-hidden bg-surface-low ring-1 ring-outline-variant/20 md:w-40">
                   {avatarSrc ? (
                     <img
                       src={avatarSrc}
                       alt={displayName}
-                      className="h-full w-full object-cover"
+                      className="block h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-primary-container font-mono text-5xl font-medium uppercase tracking-[0.08em] text-primary-foreground">
@@ -121,7 +120,8 @@ const UserProfile: React.FC = () => {
                   {profileState.isEditingProfile && (
                     <label
                       htmlFor="avatarUpload"
-                      className="interactive-hover-primary absolute bottom-2 right-2 flex h-10 w-10 cursor-pointer items-center justify-center border border-outline-variant/20 bg-surface-lowest text-foreground"
+                      title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
+                      className={`interactive-hover-primary absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center border border-outline-variant/20 bg-surface-lowest text-foreground ${isPreview() ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                       aria-label="Change avatar"
                     >
                       <Camera className="h-5 w-5" />
@@ -131,12 +131,14 @@ const UserProfile: React.FC = () => {
                         accept="image/*"
                         onChange={(e) => profileHandlers.handleFileChange(e, "avatar")}
                         className="hidden"
+                        disabled={isPreview()}
+                        title={isPreview() ? PREVIEW_DISABLED_REASON : undefined}
                       />
                     </label>
                   )}
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-2 lg:grid-cols-1">
+                <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
                   <div className="bg-surface-low p-3 ring-1 ring-outline-variant/20">
                     <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">
                       Access
@@ -194,6 +196,7 @@ const UserProfile: React.FC = () => {
                 {profileState.isEditingProfile && (
                   <ProfileEditForm
                     formData={profileState.formData}
+                    fieldErrors={profileState.fieldErrors}
                     isSaving={profileState.isSaving}
                     onFormChange={profileHandlers.handleFormChange}
                     onSave={profileHandlers.handleSaveProfile}
@@ -204,14 +207,7 @@ const UserProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          <ProfilePostsSection
-            blogs={userBlogs}
-            isLoading={isPostsLoading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalPosts={totalPosts}
-            handlePageChange={handlePageChange}
-          />
+          <ProfilePublicationIndex userId={currentUser?.id} />
         </div>
       </main>
     </div>

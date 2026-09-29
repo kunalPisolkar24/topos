@@ -20,15 +20,37 @@ export interface ApolloClientDependencies {
   onUnauthorized: () => void | Promise<void>;
 }
 
+const isMutationOperation = (operation: { query: { definitions: ReadonlyArray<{ kind: string; operation?: string }> } }): boolean =>
+  operation.query.definitions.some(
+    (def) => def.kind === "OperationDefinition" && def.operation === "mutation",
+  );
+
+function isTimeoutError(error: unknown): boolean {
+  if (!error) return false;
+  const err = error as { name?: string; message?: string; statusCode?: number; status?: number };
+  if (err.name === "TimeoutError" || err.name === "AbortError" || err.name === "BootstrapTimeoutError") {
+    return true;
+  }
+  if (typeof err.message === "string" && /timeout|timed out|aborted/i.test(err.message)) {
+    return true;
+  }
+  return false;
+}
+
 const buildRetryLink = () =>
   new RetryLink({
     delay: { initial: 300, max: 3000, jitter: true },
     attempts: {
       max: 3,
-      retryIf: (error) => {
+      retryIf: (error, operation) => {
         if (!error) return false;
+        if (operation && isMutationOperation(operation as never)) return false;
         if (hasUnauthorizedNetworkError(error)) return false;
-        if (CombinedGraphQLErrors.is(error) && hasUnauthorizedGraphQLError(error.errors)) return false;
+        if (isTimeoutError(error)) return false;
+        if (CombinedGraphQLErrors.is(error)) {
+          if (hasUnauthorizedGraphQLError(error.errors)) return false;
+          return false;
+        }
         return true;
       },
     },

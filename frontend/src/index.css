@@ -10,7 +10,7 @@
   :root {
     --font-sans: "Inter";
     --font-mono: "Space Grotesk";
-    --app-navbar-height: 4.5rem;
+    --app-navbar-height: 3rem;
     --app-navbar-offset: calc(var(--app-navbar-height) + 1rem);
     --background: 248 248 249;
     --foreground: 20 20 20;
@@ -231,6 +231,10 @@
     padding-top: var(--app-navbar-offset);
   }
 
+  .pt-app-chrome {
+    padding-top: calc(var(--app-navbar-offset) - 1rem);
+  }
+
   .top-app-navbar-offset {
     top: var(--app-navbar-offset);
   }
@@ -273,8 +277,13 @@ html, body {
 .prose {
   font-family: 'Merriweather', serif;
   color: rgb(var(--foreground));
-  line-height: 1.8;
+  font-size: 0.94rem;
+  line-height: 1.75;
   letter-spacing: 0.3px;
+}
+
+.prose.prose-lg {
+  font-size: 1.02rem;
 }
 
 .prose h1,
@@ -289,15 +298,15 @@ html, body {
 }
 
 .prose h1 {
-  font-size: 2.25em;
+  font-size: 2em;
   margin-bottom: 0.8em;
 }
 .prose h2 {
-  font-size: 1.8em;
+  font-size: 1.6em;
   margin-bottom: 0.7em;
 }
 .prose h3 {
-  font-size: 1.5em;
+  font-size: 1.3em;
   margin-bottom: 0.6em;
 }
 
@@ -416,6 +425,7 @@ html, body {
 .quill-content-view {
   overflow-wrap: break-word;
   word-break: normal;
+  hyphens: none;
 }
 
 .quill-content-view img,

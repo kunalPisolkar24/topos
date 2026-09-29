@@ -1,0 +1,69 @@
+include:
+  - path: ../../../infrastructure/docker/users-postgres/postgres.yml
+  - path: ../../../infrastructure/docker/users-redis/redis.yml
+
+services:
+  user-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${USER_SERVICE_EXT_PORT:-4001}:4001"
+    environment:
+      # Dev standalone defaults (ENV_TYPE=dev: zero AWS calls). Prod
+      # (Floci / AWS) lives in infra/compose.prod.yml, so dev defaults
+      # here can never shadow SM secrets.
+      - PORT=4001
+      - NODE_ENV=${NODE_ENV:-production}
+      - ENV_TYPE=dev
+      - DATABASE_URL=${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
+      - PG_POOL_MAX=${USER_PG_POOL_MAX:-10}
+      - PG_POOL_IDLE_TIMEOUT_MS=${USER_PG_POOL_IDLE_TIMEOUT_MS:-30000}
+      - PG_POOL_CONNECTION_TIMEOUT_MS=${USER_PG_POOL_CONNECTION_TIMEOUT_MS:-5000}
+      - JWT_SECRET=${USER_JWT_SECRET:-local-dev-secret-0123456789abcdef0123456789abcdef}
+      - JWT_ISSUER=${USER_JWT_ISSUER:-user-service}
+      - JWT_AUDIENCE=${USER_JWT_AUDIENCE:-topos}
+      - JWT_EXPIRES_IN=${USER_JWT_EXPIRES_IN:-7d}
+      - REDIS_URL=${USER_REDIS_URL:-redis://user-redis:6379}
+      - REDIS_CACHE_TTL_MS=${USER_CACHE_TTL_MS:-3600000}
+      - REDIS_MISSING_CACHE_TTL_MS=${USER_MISSING_CACHE_TTL_MS:-60000}
+      - LOG_LEVEL=${USER_LOG_LEVEL:-info}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${USER_OTLP_ENDPOINT:-}
+      - OTEL_SERVICE_NAME=user-service
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+      user-migrator:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  user-migrator:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    environment:
+      - DATABASE_URL_MIGRATE=${USER_DATABASE_URL_MIGRATE:-${USER_DATABASE_URL:-postgresql://topos_user:topos_pass@user-postgres:5432/topos_users}}
+      - AI_CHECKPOINTER_PASSWORD=${USER_AI_CHECKPOINTER_PASSWORD:-${AI_POSTGRES_PASSWORD:-ai_checkpointer_pass}}
+      - AI_CHECKPOINTER_USER=${USER_AI_CHECKPOINTER_USER:-${AI_POSTGRES_USER:-ai_checkpointer}}
+      - AI_CHECKPOINT_DB=${USER_AI_CHECKPOINT_DB:-${AI_POSTGRES_DB:-ai_checkpoints}}
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: ${APP_NETWORK:-topos_local_network}
+    driver: bridge

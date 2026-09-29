@@ -1,12 +1,15 @@
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { ApolloProvider } from "@apollo/client/react";
+import type { ApolloClient } from "@apollo/client";
+import { createApolloClient } from "@/shared/api";
+import { env } from "@/shared/config/env";
 import type { UserCoreFragment } from "@/shared/graphql/generated/graphql";
+import { postRepository } from "@/entities/post/api/postRepository";
 
 const toastMock = vi.fn();
 const updateProfileMock = vi.fn();
-
-vi.mock("@apollo/client/react", () => ({
-  useMutation: () => [updateProfileMock, { loading: false }],
-}));
+const noopUnauthorized = async () => {};
 
 vi.mock("@/shared/ui/hooks/useToast", () => ({
   useToast: () => ({ toast: toastMock }),
@@ -19,21 +22,9 @@ vi.mock("@/entities/upload", () => ({
   }),
 }));
 
-vi.mock("@/entities/user", () => ({
-  sanitizeProfileName: (v: string) => v.trim(),
-  sanitizeProfileBioInput: (v: string) => v,
-  sanitizeProfileFormData: (v: { name?: string; bio?: string }) => ({
-    name: (v.name ?? "").trim(),
-    bio: v.bio ?? "",
-  }),
-  buildProfileUpdatePayload: (
-    next: { name: string; bio: string },
-    current: { name: string; bio: string },
-  ) => {
-    const payload: Record<string, string> = {};
-    if (next.name && next.name !== current.name) payload.name = next.name;
-    if (next.bio !== current.bio) payload.bio = next.bio;
-    return payload;
+vi.mock("@/entities/user/api/userRepository", () => ({
+  userRepository: {
+    useUpdateProfile: () => [updateProfileMock, { loading: false }],
   },
 }));
 
@@ -52,7 +43,15 @@ const mockUser: UserCoreFragment = {
 };
 
 function renderProfileEditor(currentUser: UserCoreFragment | null = mockUser) {
-  return renderHook(() => useProfileEditorController({ currentUser }));
+  const client: ApolloClient = createApolloClient({
+    uri: env.VITE_GRAPHQL_URL,
+    getToken: () => null,
+    onUnauthorized: noopUnauthorized,
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <ApolloProvider client={client}>{children}</ApolloProvider>
+  );
+  return renderHook(() => useProfileEditorController({ currentUser }), { wrapper });
 }
 
 describe("useProfileEditorController", () => {
@@ -149,7 +148,7 @@ describe("useProfileEditorController", () => {
 
   it("calls updateProfile mutation on save", async () => {
     updateProfileMock.mockResolvedValueOnce({
-      data: { updateProfile: true },
+      data: { updateProfile: mockUser },
     });
     const { result } = renderProfileEditor();
     act(() => {
@@ -168,7 +167,7 @@ describe("useProfileEditorController", () => {
 
   it("shows success toast on successful save", async () => {
     updateProfileMock.mockResolvedValueOnce({
-      data: { updateProfile: true },
+      data: { updateProfile: mockUser },
     });
     const { result } = renderProfileEditor();
     act(() => {
@@ -185,6 +184,27 @@ describe("useProfileEditorController", () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Success" }),
     );
+  });
+
+  it("revalidates post lists after a successful save", async () => {
+    updateProfileMock.mockResolvedValueOnce({
+      data: { updateProfile: mockUser },
+    });
+    const refreshSpy = vi.spyOn(postRepository, "refreshLists");
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "name", value: "Changed Name" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(refreshSpy).toHaveBeenCalled();
+    refreshSpy.mockRestore();
   });
 
   it("shows error toast when mutation fails", async () => {
@@ -254,5 +274,83 @@ describe("useProfileEditorController", () => {
       );
     });
     expect(result.current.state.bannerFile).toBe(file);
+  });
+
+  it("initializes username from currentUser", () => {
+    const { result } = renderProfileEditor();
+    expect(result.current.state.formData.username).toBe("testuser");
+  });
+
+  it("normalizes username input to lowercase", () => {
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "NewUser_99 " },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    expect(result.current.state.formData.username).toBe("newuser_99");
+  });
+
+  it("sends username in the update payload when changed", async () => {
+    updateProfileMock.mockResolvedValueOnce({
+      data: { updateProfile: { ...mockUser, username: "newuser_99" } },
+    });
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "newuser_99" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(updateProfileMock).toHaveBeenCalledWith({
+      variables: expect.objectContaining({ username: "newuser_99" }),
+    });
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Success" }),
+    );
+  });
+
+  it("shows an inline error for an invalid username without calling the mutation", async () => {
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "ab" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(result.current.state.fieldErrors.username).toMatch(/3-30/i);
+    expect(result.current.state.isEditingProfile).toBe(true);
+  });
+
+  it("shows an inline taken error and stays editing on username collision", async () => {
+    updateProfileMock.mockRejectedValueOnce(new Error("A user with that email or username already exists"));
+    const { result } = renderProfileEditor();
+    act(() => {
+      result.current.handlers.setIsEditingProfile(true);
+    });
+    act(() => {
+      result.current.handlers.handleFormChange({
+        target: { name: "username", value: "taken_name" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handlers.handleSaveProfile();
+    });
+    expect(result.current.state.fieldErrors.username).toBe("Username is already taken.");
+    expect(result.current.state.isEditingProfile).toBe(true);
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Username taken", variant: "destructive" }),
+    );
   });
 });

@@ -1,4 +1,5 @@
-import axios from "axios";
+import type { HttpClient } from "@/shared/api/httpClient";
+import { fetchHttpClient } from "@/shared/api/httpClient";
 
 export interface ImageProvider {
   upload(file: File): Promise<string>;
@@ -14,6 +15,7 @@ const buildCloudinaryUploadUrl = (cloudName: string) =>
 
 export const cloudinaryImageProvider = (
   config: CloudinaryConfig,
+  httpClient: HttpClient = fetchHttpClient,
 ): ImageProvider => {
   const uploadUrl = () => {
     if (!config.cloudName) {
@@ -36,13 +38,9 @@ export const cloudinaryImageProvider = (
       formData.append("file", file);
       formData.append("upload_preset", config.uploadPreset);
 
-      const response = await axios.post(uploadUrl(), formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const data = (await httpClient.postFormData(uploadUrl(), formData)) as { secure_url?: unknown };
 
-      const secureUrl = response.data?.secure_url;
+      const secureUrl = data?.secure_url;
       if (typeof secureUrl !== "string" || secureUrl.length === 0) {
         throw new Error("Failed to get secure URL from Cloudinary response.");
       }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,95 +12,162 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/kunalPisolkar24/blogapp/services/content/graph"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/bootstrap"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/config"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/health"
-	"github.com/kunalPisolkar24/blogapp/services/content/internal/middleware"
-	"github.com/kunalPisolkar24/blogapp/services/content/pkg/logger"
+	"github.com/kunalPisolkar24/topos/services/content/graph"
+	"github.com/kunalPisolkar24/topos/services/content/internal/bootstrap"
+	"github.com/kunalPisolkar24/topos/services/content/internal/cache"
+	"github.com/kunalPisolkar24/topos/services/content/internal/config"
+	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
+	"github.com/kunalPisolkar24/topos/services/content/internal/health"
+	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
+	"github.com/kunalPisolkar24/topos/services/content/internal/middleware"
+	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
+	"github.com/kunalPisolkar24/topos/services/content/internal/repository"
+	"github.com/kunalPisolkar24/topos/services/content/internal/service"
+	"github.com/kunalPisolkar24/topos/services/content/internal/shutdown"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+)
+
+const (
+	serviceName     = "content-service"
+	queryPath       = "/query"
+	shutdownTimeout = 10 * time.Second
+	healthTimeout   = 2 * time.Second
 )
 
 func main() {
-	logger.Init()
 	if err := run(); err != nil {
-		logger.Error("Server terminated with error", "error", err)
+		slog.Error("server terminated with error", "error", err)
 		os.Exit(1)
 	}
 }
 
+// run wires everything together and blocks until the server stops.
 func run() error {
-	cfg, err := config.LoadConfig()
-	if err != nil {
+	cfg := config.LoadConfig()
+	observability.SetupLogging(cfg.LogFormat, cfg.LogLevel, serviceName)
+	if err := validateConfig(cfg); err != nil {
 		return err
 	}
 
-	deps, err := bootstrap.Load(context.Background(), bootstrap.RoleServer, cfg)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	deps, err := bootstrap.New(ctx, cfg, serviceName)
 	if err != nil {
 		return err
 	}
-	defer deps.Shutdown()
+	defer deps.Close(context.Background())
 
-	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{
-			PostService: deps.PostService,
-			TagService:  deps.TagService,
-		},
-	}))
+	return serve(ctx, newServer(cfg, newResolver(cfg, deps), deps.Mongo, deps.Cache, deps.Producer))
+}
+
+// validateConfig returns an error when required settings are missing.
+func validateConfig(cfg config.Config) error {
+	if cfg.JwtSecret == "" {
+		return errors.New("JWT_SECRET is required")
+	}
+	if cfg.InternalToken == "" {
+		return errors.New("INTERNAL_TOKEN is required")
+	}
+	return nil
+}
+
+// newResolver builds the services and graph resolver used by the API.
+func newResolver(cfg config.Config, deps *bootstrap.Dependencies) *graph.Resolver {
+	database := deps.Mongo.Database(cfg.DbName)
+	postRepo := repository.NewMongoPostRepository(database)
+	tagRepo := repository.NewMongoTagRepository(database)
+	chatRepo := repository.NewMongoChatRepository(database)
+
+	draftRepo := repository.NewMongoPostDraftRepository(database)
+
+	return graph.NewResolver(
+		service.NewPostService(postRepo, tagRepo, deps.AI, deps.Producer, deps.Cache),
+		service.NewTagService(tagRepo, deps.Cache),
+		service.NewChatService(chatRepo, deps.AI),
+		service.NewPostInteractionService(repository.NewMongoPostInteractionRepository(database), deps.Producer, deps.Cache),
+		service.NewPostDraftService(draftRepo, deps.AI, service.NewPostService(postRepo, tagRepo, deps.AI, deps.Producer, deps.Cache)),
+	)
+}
+
+// newHandler wires the GraphQL endpoint, the playground, and the health
+// check. The /query handler is traced (span covers auth, resolution and
+// outbound calls); every request carries a request id in its context.
+func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) http.Handler {
+	gql := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
+	gql.SetErrorPresenter(graph.PresentError)
+	gql.SetRecoverFunc(graph.RecoverError)
+
+	var gqlHandler http.Handler = gql
+	if resolver != nil && resolver.PostService != nil {
+		gqlHandler = graph.WithBatching(resolver.PostService, resolver.InteractionService, gql)
+	}
+	// Record GraphQL operations (mirrors user metrics middleware).
+	inner := gqlHandler
+	gqlHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		inner.ServeHTTP(w, r)
+		metrics.GraphQLOperationsTotal.WithLabelValues("query", "success").Inc()
+		metrics.GraphQLOperationDuration.WithLabelValues("query", "success").Observe(time.Since(start).Seconds())
+	})
 
 	mux := http.NewServeMux()
-	mux.Handle("/query", middleware.CORS(middleware.CORSConfig{
-		AllowedOrigins: cfg.CORSOrigins,
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Authorization", "Content-Type", "Apollo-Require-Preflight"},
-		MaxAgeSeconds:  86400,
-	})(middleware.MetricsMiddleware(middleware.AuthMiddleware(cfg)(srv))))
-	mux.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	mux.Handle(queryPath, otelhttp.NewHandler(
+		middleware.RecoverMiddleware(middleware.MetricsMiddleware(middleware.AuthMiddleware(cfg)(gqlHandler))),
+		"graphql",
+	))
+	mux.Handle("/", playground.Handler("GraphQL playground", queryPath))
+	mux.HandleFunc("/healthz", health.LivenessHandler())
+	mux.HandleFunc("/readyz", health.ReadyzHandler(mongoClient))
 	mux.Handle("/metrics", promhttp.Handler())
-
-	healthChecker := health.NewChecker(2 * time.Second)
-	healthChecker.Register("redis", func(ctx context.Context) error {
-		return deps.RedisClient.Ping(ctx).Err()
-	})
-	healthChecker.Register("mongo", func(ctx context.Context) error {
-		return deps.MongoClient.Ping(ctx, readpref.Primary())
-	})
-	healthChecker.Register("kafka", func(ctx context.Context) error {
-		if deps.EventProd == nil {
-			return errors.New("kafka producer not initialized")
-		}
-		return deps.EventProd.Ping(ctx)
-	})
-	mux.Handle("/health", healthChecker.Handler())
-
-	logger.Info("Content Service starting", "port", cfg.Port)
-
-	server := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: mux,
+	if resolver != nil && resolver.PostService != nil {
+		mux.Handle(
+			"GET /internal/posts/{id}",
+			middleware.InternalAuthMiddleware(cfg.InternalToken)(
+				internalPostBodyHandler(resolver.PostService),
+			),
+		)
 	}
+	return middleware.RequestIDMiddleware(mux)
+}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+// pinger abstracts the mongo connectivity check so tests can fake it.
+type pinger = health.Pinger
 
+// newServer builds the HTTP server with routes attached.
+func newServer(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) *http.Server {
+	return &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           newHandler(cfg, resolver, mongoClient, cacheClient, producer),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+}
+
+// serve runs the server until it errors or ctx is cancelled, then shuts down gracefully.
+func serve(ctx context.Context, srv *http.Server) error {
+	errCh := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("Server failed", "error", err)
-			stop <- syscall.SIGTERM
-		}
+		slog.Info("content service listening", "addr", srv.Addr, "playground", queryPath)
+		errCh <- srv.ListenAndServe()
 	}()
 
-	<-stop
-	logger.Info("Shutting down server...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", "error", err)
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
 	}
 
-	logger.Info("Server exited properly")
+	shutdown.SetShuttingDown(true)
+	slog.Info("shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
+	if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
 	return nil
 }

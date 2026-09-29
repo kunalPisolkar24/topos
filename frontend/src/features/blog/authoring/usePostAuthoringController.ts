@@ -3,6 +3,7 @@ import type ReactQuill from "react-quill-new";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { toPlainText } from "@/entities/post/lib";
+import { evaluatePublishReadiness } from "@/entities/post/lib/post-rules";
 import {
   isSubmitInFlight,
   submitLabel as deriveSubmitLabel,
@@ -13,7 +14,7 @@ import { usePostImageUploader } from "./hooks/usePostImageUploader";
 import { usePostTagInput } from "./hooks/usePostTagInput";
 import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
 
-export type PostAuthoringMode = "create" | "edit";
+export type PostAuthoringMode = "create" | "edit" | "resubmit";
 
 export interface PostForEditing {
   id: string;
@@ -27,6 +28,9 @@ export interface UsePostAuthoringControllerProps {
   mode: PostAuthoringMode;
   post?: PostForEditing;
   onComplete?: () => void;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export interface PostAuthoringState {
@@ -36,6 +40,7 @@ export interface PostAuthoringState {
   cardImage: File | null;
   cardImageUrl: string | null;
   cardImagePreview: string | null;
+  previewCoverUrl: string | null;
   isUploadingCardImage: boolean;
   isUploadingRichText: boolean;
   tags: string[];
@@ -66,6 +71,7 @@ export interface PostAuthoringHandlers {
   handleCancel: () => void;
   handleGeneratePost: () => Promise<void>;
   richTextimageHandler: () => Promise<void>;
+  shufflePreviewCover: () => void;
   clearAIDraft: () => void;
   toggleSummary: () => void;
 }
@@ -92,8 +98,12 @@ export const usePostAuthoringController = ({
   mode,
   post,
   onComplete,
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }: UsePostAuthoringControllerProps): PostAuthoringController => {
   const isEdit = mode === "edit";
+  const isResubmit = mode === "resubmit";
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -111,7 +121,7 @@ export const usePostAuthoringController = ({
 
   const imageUploader = usePostImageUploader({
     initialImageUrl: post?.imageUrl ?? null,
-    isEdit,
+    isEdit: mode !== "create",
   });
 
   const aiDraft = usePostAIDraft({
@@ -128,20 +138,55 @@ export const usePostAuthoringController = ({
     contentText,
     imageFile: imageUploader.file,
     imageUrl: imageUploader.url,
+    previewCoverUrl: imageUploader.previewCoverUrl,
     tags: tagInput.tags,
     summary: aiDraft.summary,
     uploadCardImage: () => imageUploader.uploadCardImage(),
     onComplete,
+    resubmitDraftId,
+    resubmitPostId,
+    initialSummary,
   });
 
   const handleCancel = () => {
-    if (isEdit) {
+    if (isEdit || isResubmit) {
       onComplete?.();
       return;
     }
     toast({ title: "Action Cancelled", description: "Blog creation cancelled." });
     navigate("/");
   };
+
+  const readiness = useMemo(
+    () =>
+      evaluatePublishReadiness({
+        title,
+        body: content,
+        cardImage: imageUploader.file,
+        cardImageUrl: imageUploader.url,
+        cardImagePreview: imageUploader.preview,
+        previewCoverUrl: imageUploader.previewCoverUrl,
+        tags: tagInput.tags,
+        isUploadingCardImage: imageUploader.isCardUploading,
+        isCreatingPost: isSubmitInFlight(submitController.submit),
+      }),
+    [
+      title,
+      content,
+      imageUploader.file,
+      imageUploader.url,
+      imageUploader.preview,
+      imageUploader.previewCoverUrl,
+      imageUploader.isCardUploading,
+      tagInput.tags,
+      submitController.submit,
+    ],
+  );
+
+  const baseSubmitLabel = deriveSubmitLabel(submitController.submit, isEdit, isResubmit);
+  // Review-first publishing: nothing goes live directly, so the action
+  // always reads as a review submission.
+  const submitLabel = baseSubmitLabel;
 
   return {
     state: {
@@ -151,6 +196,7 @@ export const usePostAuthoringController = ({
       cardImage: imageUploader.file,
       cardImageUrl: imageUploader.url,
       cardImagePreview: imageUploader.preview,
+      previewCoverUrl: imageUploader.previewCoverUrl,
       isUploadingCardImage: imageUploader.isCardUploading,
       isUploadingRichText: imageUploader.isRichTextUploading,
       tags: tagInput.tags,
@@ -159,7 +205,7 @@ export const usePostAuthoringController = ({
       isGeneratingTags: tagInput.isGenerating,
       canGenerateTags: tagInput.canGenerate,
       isSubmitting: isSubmitInFlight(submitController.submit),
-      submitLabel: deriveSubmitLabel(submitController.submit, isEdit),
+      submitLabel,
       submit: submitController.submit,
       postPrompt: aiDraft.prompt,
       generatedSummary: aiDraft.summary,
@@ -167,11 +213,9 @@ export const usePostAuthoringController = ({
       isGeneratingPost: aiDraft.isGenerating,
       canGeneratePost: aiDraft.canGenerate,
       contentText,
-      isTitleReady: title.trim().length > 0,
-      isContentReady: contentText.length > 0,
-      isCoverImageReady: Boolean(
-        imageUploader.file || imageUploader.url || imageUploader.preview,
-      ),
+      isTitleReady: readiness.titleReady,
+      isContentReady: readiness.contentReady,
+      isCoverImageReady: readiness.imageReady,
     },
     setters: {
       setTitle,
@@ -191,6 +235,7 @@ export const usePostAuthoringController = ({
       handleCancel,
       handleGeneratePost: aiDraft.generate,
       richTextimageHandler: imageUploader.richTextImageHandler,
+      shufflePreviewCover: imageUploader.shufflePreviewCover,
       clearAIDraft: aiDraft.clear,
       toggleSummary: aiDraft.toggleSummary,
     },

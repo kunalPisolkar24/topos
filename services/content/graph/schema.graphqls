@@ -16,9 +16,13 @@ type Post @key(fields: "id") {
   summary: String
   summaryStatus: SummaryStatus
   author: User!
+  approvedById: ID
   tags: [Tag!]!
   createdAt: String!
   updatedAt: String!
+  related(limit: Int = 5): [Post!]!
+  likedByMe: Boolean!
+  savedByMe: Boolean!
 }
 
 type Tag {
@@ -31,6 +35,12 @@ type PaginatedPosts {
   totalPages: Int!
   currentPage: Int!
   totalPosts: Int!
+  reasons: [PostReason!]!
+}
+
+type PostReason {
+  postId: ID!
+  reason: String!
 }
 
 type GeneratedPost {
@@ -40,9 +50,101 @@ type GeneratedPost {
   tags: [String!]!
 }
 
+type SearchResult {
+  hits: [Post!]!
+  total: Int!
+}
+
+enum RecommendMode {
+  DEFAULT
+  SURPRISE
+  FRESH
+  EXPLORER
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+type Chat {
+  id: ID!
+  title: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type ChatMessage {
+  id: ID!
+  chatId: ID!
+  role: MessageRole!
+  content: String!
+  citedPostIds: [ID!]!
+  createdAt: String!
+}
+
+type PaginatedMessages {
+  messages: [ChatMessage!]!
+  totalPages: Int!
+  currentPage: Int!
+  totalMessages: Int!
+}
+
 extend type User @key(fields: "id") {
   id: ID! @external
   posts(page: Int, limit: Int): PaginatedPosts!
+}
+
+type PaginatedChats {
+  chats: [Chat!]!
+  totalPages: Int!
+  currentPage: Int!
+  totalChats: Int!
+}
+
+enum DraftStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+# PostDraft is a post paused for peer review. AI-generated drafts carry
+# the originating prompt; human-authored drafts (createContentDraft) store
+# the author's own title/body/tags/cover with the prompt echoing the title.
+# The author cannot act on their own draft; approval by a different user
+# publishes it through the regular createPost path.
+type PostDraft {
+  id: ID!
+  approvalId: ID!
+  prompt: String!
+  title: String!
+  body: String!
+  summary: String!
+  tags: [String!]!
+  imageUrl: String
+  author: User!
+  status: DraftStatus!
+  authorId: ID!
+  postId: ID
+  reviewedById: ID
+  reviewedAt: String
+  rejectionNote: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type PaginatedPostDrafts {
+  drafts: [PostDraft!]!
+  totalPages: Int!
+  currentPage: Int!
+  totalDrafts: Int!
+}
+
+input DraftEditsInput {
+  title: String
+  body: String
+  summary: String
+  tags: [String!]
 }
 
 type Query {
@@ -50,6 +152,15 @@ type Query {
   post(id: ID!): Post
   tags(query: String, limit: Int): [Tag!]!
   postsByTag(tag: String!, page: Int, limit: Int): PaginatedPosts!
+  searchPosts(query: String!, page: Int, limit: Int): SearchResult!
+  recommendedPosts(page: Int, limit: Int, mode: RecommendMode = DEFAULT, seed: Int): PaginatedPosts!
+  chats(page: Int, limit: Int): PaginatedChats!
+  chat(id: ID!): Chat
+  chatMessages(chatId: ID!, page: Int, limit: Int): PaginatedMessages!
+  # Community review queue: pending drafts from everyone but the caller.
+  postDrafts(page: Int, limit: Int): PaginatedPostDrafts!
+  # The caller's own drafts in every state.
+  myPostDrafts(page: Int, limit: Int): PaginatedPostDrafts!
 }
 
 type Mutation {
@@ -58,6 +169,28 @@ type Mutation {
   deletePost(id: ID!): Boolean!
   generateTags(title: String!, body: String!): [String!]!
   generatePostContent(prompt: String!): GeneratedPost!
+  createChat(title: String): Chat!
+  renameChat(id: ID!, title: String!): Chat!
+  deleteChat(id: ID!): Boolean!
+  askChat(chatId: ID!, query: String!): ChatMessage!
+  recordPostView(postId: ID!, mode: RecommendMode): Boolean!
+  likePost(postId: ID!, mode: RecommendMode): Boolean!
+  savePost(postId: ID!, mode: RecommendMode): Boolean!
+  createPostDraft(prompt: String!): PostDraft!
+  createContentDraft(input: ContentDraftInput!): PostDraft!
+  resubmitContentDraft(id: ID!, input: ContentDraftInput!): PostDraft!
+  approvePostDraft(id: ID!, input: DraftEditsInput): PostDraft!
+  rejectPostDraft(id: ID!, reason: String): PostDraft!
+  deletePostDraft(id: ID!): Boolean!
+}
+
+input ContentDraftInput {
+  title: String!
+  body: String!
+  summary: String
+  tags: [String!]
+  imageUrl: String
+  postId: ID
 }
 
 input CreatePostInput {

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
+import { browserLocalStorage } from "@/shared/lib/storage"
 
 type Theme = "dark" | "light" | "system"
 
@@ -26,9 +27,10 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  const [theme, setTheme] = useState<Theme>(() => {
+    const stored = browserLocalStorage.getItem(storageKey) as Theme | null;
+    return stored || defaultTheme;
+  })
 
   useEffect(() => {
     const root = window.document.documentElement
@@ -51,8 +53,8 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme)
-      setTheme(theme)
+      browserLocalStorage.setItem(storageKey, theme);
+      setTheme(theme);
     },
   }
 

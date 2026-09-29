@@ -1,21 +1,10 @@
-import { useCallback, useReducer } from "react";
-import { z } from "zod";
-import { useApolloClient, useMutation } from "@apollo/client/react";
+import { useCallback, useReducer, useRef } from "react";
+import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import {
-  CreatePostDocument,
-  UpdatePostDocument,
-  type UpdatePostInput,
-} from "@/shared/graphql/content-documents";
-import { getGraphQLErrorMessage, refreshPostListQueries } from "@/shared/api";
+import type { ContentDraftInput } from "@/shared/graphql/content-documents";
+import { draftRepository } from "@/entities/draft/api/draftRepository";
+import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
-import {
-  createPostSchema,
-  updatePostSchema,
-  type CreatePostFormValues,
-  type UpdatePostFormValues,
-} from "@/features/blog/authoring/model/post.schema";
-import { reportZodIssues } from "@/features/blog/authoring/lib/post-validation";
 import type { PostForEditing, PostAuthoringMode } from "../usePostAuthoringController";
 import type { PostAuthoringSubmitState } from "../model/submit-state";
 
@@ -52,10 +41,14 @@ export interface UsePostAuthoringSubmitArgs {
   contentText: string;
   imageFile: File | null;
   imageUrl: string | null;
+  previewCoverUrl?: string | null;
   tags: string[];
   summary: string | null;
   uploadCardImage: () => Promise<string | null>;
   onComplete?: () => void;
+  resubmitDraftId?: string;
+  resubmitPostId?: string | null;
+  initialSummary?: string | null;
 }
 
 export interface UsePostAuthoringSubmitResult {
@@ -71,84 +64,101 @@ export const usePostAuthoringSubmit = ({
   contentText,
   imageFile,
   imageUrl,
+  previewCoverUrl,
   tags,
   summary,
   uploadCardImage,
   onComplete,
+  resubmitDraftId,
+  resubmitPostId,
+  initialSummary,
 }: UsePostAuthoringSubmitArgs): UsePostAuthoringSubmitResult => {
   const isEdit = mode === "edit";
+  const isResubmit = mode === "resubmit";
   const navigate = useNavigate();
   const { toast } = useToast();
   const client = useApolloClient();
   const [submit, dispatch] = useReducer(reducer, { kind: "idle" });
+  const isSubmittingRef = useRef(false);
 
-  const [createPost] = useMutation(CreatePostDocument);
-  const [updatePost] = useMutation(UpdatePostDocument);
+  const [createContentDraft] = draftRepository.useCreateContentDraft();
+  const [resubmitContentDraft] = draftRepository.useResubmitContentDraft();
 
   const handleCreateSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      const trimmedTitle = title.trim();
-      if (!trimmedTitle || !contentText) {
-        toast({
-          title: "Missing Information",
-          description: "Title and content are required.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      let finalImageUrl = imageUrl;
-      if (imageFile && !finalImageUrl) {
-        dispatch({ type: "beginUpload" });
-        finalImageUrl = await uploadCardImage();
-        if (!finalImageUrl) {
-          dispatch({ type: "resolveIdle" });
-          return;
-        }
-      }
-
-      if (!finalImageUrl) {
-        toast({
-          title: "Missing Card Image",
-          description: "Please upload a card image for the blog.",
-          variant: "destructive",
-        });
-        dispatch({ type: "resolveIdle" });
-        return;
-      }
-
-      const candidate: CreatePostFormValues = {
-        title: trimmedTitle,
-        body: content,
-        summary: summary?.trim() || undefined,
-        tags,
-        imageUrl: finalImageUrl,
-      };
-
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
       try {
-        const parsed = createPostSchema.parse(candidate);
-        dispatch({ type: "beginCreate" });
-        await createPost({ variables: { input: parsed } });
-        await refreshPostListQueries(client);
-        toast({ title: "Blog Created", description: "Successfully created." });
-        dispatch({ type: "resolveIdle" });
-        navigate("/");
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          reportZodIssues(toast, error.issues);
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle || !contentText) {
+          toast({
+            title: "Missing Information",
+            description: "Title and content are required.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        let finalImageUrl = imageUrl;
+        if (imageFile && !finalImageUrl) {
+          dispatch({ type: "beginUpload" });
+          finalImageUrl = await uploadCardImage();
+          if (!finalImageUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+        }
+
+        if (!finalImageUrl && previewCoverUrl) {
+          finalImageUrl = previewCoverUrl;
+        }
+
+        if (!finalImageUrl) {
+          toast({
+            title: "Missing Card Image",
+            description: "Please upload a card image for the blog.",
+            variant: "destructive",
+          });
           dispatch({ type: "resolveIdle" });
           return;
         }
-        toast({
-          title: "Error",
-          description: getGraphQLErrorMessage(
-            error,
-            "Failed to create blog post.",
-          ),
-          variant: "destructive",
-        });
-        dispatch({ type: "fail", message: "create" });
+
+        // Review-first publishing: every new post enters the queue as
+        // PENDING. Nothing goes live until a peer approves it.
+        const draftInput: ContentDraftInput = {
+          title: trimmedTitle,
+          body: content,
+          summary: summary?.trim() || null,
+          tags,
+          imageUrl: finalImageUrl,
+          postId: null,
+        };
+        try {
+          dispatch({ type: "beginCreate" });
+          await createContentDraft({ variables: { input: draftInput } });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Submitted for review",
+            description: "Your post is pending. It goes live after peer approval.",
+          });
+          dispatch({ type: "resolveIdle" });
+          navigate("/review");
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: getGraphQLErrorMessage(
+              error,
+              "Failed to submit the post for review.",
+            ),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "create" });
+        } finally {
+          isSubmittingRef.current = false;
+        }
+      } finally {
+        isSubmittingRef.current = false;
       }
     },
     [
@@ -157,11 +167,12 @@ export const usePostAuthoringSubmit = ({
       contentText,
       imageFile,
       imageUrl,
+      previewCoverUrl,
       tags,
       summary,
       uploadCardImage,
       toast,
-      createPost,
+      createContentDraft,
       client,
       navigate,
     ],
@@ -170,54 +181,66 @@ export const usePostAuthoringSubmit = ({
   const handleEditSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
+      if (isSubmittingRef.current) return;
       if (!post) return;
-
-      let finalImageUrl = imageUrl;
-      if (imageFile) {
-        dispatch({ type: "beginUpload" });
-        const uploadedUrl = await uploadCardImage();
-        if (!uploadedUrl) {
-          dispatch({ type: "resolveIdle" });
-          return;
-        }
-        finalImageUrl = uploadedUrl;
-      }
-
-      const originalTagNames = post.tags.map((tag) => tag.name);
-      const updateData: Partial<UpdatePostFormValues> = {};
-      if (title !== post.title) updateData.title = title;
-      if (content !== post.body) updateData.body = content;
-      if (JSON.stringify(tags) !== JSON.stringify(originalTagNames)) {
-        updateData.tags = tags;
-      }
-      if (finalImageUrl !== post.imageUrl) updateData.imageUrl = finalImageUrl;
-
-      if (Object.keys(updateData).length === 0) {
-        toast({ title: "No Changes", description: "No changes detected." });
-        onComplete?.();
-        return;
-      }
-
+      isSubmittingRef.current = true;
       try {
-        const parsedInput = updatePostSchema.parse(updateData) as UpdatePostInput;
-        dispatch({ type: "beginUpdate" });
-        await updatePost({ variables: { id: post.id, input: parsedInput } });
-        await refreshPostListQueries(client);
-        toast({ title: "Success", description: "Post updated successfully." });
-        dispatch({ type: "resolveIdle" });
-        onComplete?.();
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          reportZodIssues(toast, error.issues);
-          dispatch({ type: "resolveIdle" });
+        let finalImageUrl = imageUrl;
+        if (imageFile) {
+          dispatch({ type: "beginUpload" });
+          const uploadedUrl = await uploadCardImage();
+          if (!uploadedUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          finalImageUrl = uploadedUrl;
+        }
+
+        const originalTagNames = post.tags.map((tag) => tag.name);
+        const hasChanges =
+          title !== post.title ||
+          content !== post.body ||
+          JSON.stringify(tags) !== JSON.stringify(originalTagNames) ||
+          finalImageUrl !== post.imageUrl;
+
+        if (!hasChanges) {
+          toast({ title: "No Changes", description: "No changes detected." });
+          onComplete?.();
           return;
         }
-        toast({
-          title: "Update Failed",
-          description: getGraphQLErrorMessage(error, "Could not update post."),
-          variant: "destructive",
-        });
-        dispatch({ type: "fail", message: "update" });
+
+        // Review-first publishing: edits become a revision proposal.
+        // The live post is untouched until a peer approves it.
+        const revisionInput: ContentDraftInput = {
+          title,
+          body: content,
+          summary: null,
+          tags,
+          imageUrl: finalImageUrl,
+          postId: post.id,
+        };
+        try {
+          dispatch({ type: "beginUpdate" });
+          await createContentDraft({ variables: { input: revisionInput } });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Revision submitted",
+            description: "Your changes are pending. They go live after peer approval.",
+          });
+          dispatch({ type: "resolveIdle" });
+          onComplete?.();
+        } catch (error) {
+          toast({
+            title: "Update Failed",
+            description: getGraphQLErrorMessage(error, "Could not submit the revision."),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "update" });
+        } finally {
+          isSubmittingRef.current = false;
+        }
+      } finally {
+        isSubmittingRef.current = false;
       }
     },
     [
@@ -229,18 +252,118 @@ export const usePostAuthoringSubmit = ({
       tags,
       uploadCardImage,
       toast,
-      updatePost,
+      createContentDraft,
       client,
       onComplete,
     ],
   );
 
+  const handleResubmitSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (isSubmittingRef.current) return;
+      if (!post || !resubmitDraftId) return;
+      isSubmittingRef.current = true;
+      try {
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle || !contentText) {
+          toast({
+            title: "Missing Information",
+            description: "Title and content are required.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        let finalImageUrl = imageUrl;
+        if (imageFile) {
+          dispatch({ type: "beginUpload" });
+          const uploadedUrl = await uploadCardImage();
+          if (!uploadedUrl) {
+            dispatch({ type: "resolveIdle" });
+            return;
+          }
+          finalImageUrl = uploadedUrl;
+        }
+
+        const originalTagNames = post.tags.map((tag) => tag.name);
+        const hasChanges =
+          trimmedTitle !== post.title ||
+          content !== post.body ||
+          JSON.stringify(tags) !== JSON.stringify(originalTagNames) ||
+          (finalImageUrl ?? null) !== (post.imageUrl ?? null);
+
+        if (!hasChanges) {
+          toast({
+            title: "No Changes",
+            description: "Edit something before resubmitting for review.",
+          });
+          return;
+        }
+
+        // Rejected stays rejected until the author changes something;
+        // saving sends it back to peer review, never live directly.
+        const draftInput: ContentDraftInput = {
+          title: trimmedTitle,
+          body: content,
+          summary: initialSummary?.trim() || summary?.trim() || null,
+          tags,
+          imageUrl: finalImageUrl,
+          postId: resubmitPostId ?? null,
+        };
+        try {
+          dispatch({ type: "beginUpdate" });
+          await resubmitContentDraft({
+            variables: { id: resubmitDraftId, input: draftInput },
+          });
+          await draftRepository.refreshDraftLists(client);
+          toast({
+            title: "Back in review",
+            description: "Your edits are pending. They go live after peer approval.",
+          });
+          dispatch({ type: "resolveIdle" });
+          navigate(`/review/${resubmitDraftId}`);
+        } catch (error) {
+          toast({
+            title: "Resubmit Failed",
+            description: getGraphQLErrorMessage(error, "Could not resubmit the draft."),
+            variant: "destructive",
+          });
+          dispatch({ type: "fail", message: "resubmit" });
+        } finally {
+          isSubmittingRef.current = false;
+        }
+      } finally {
+        isSubmittingRef.current = false;
+      }
+    },
+    [
+      post,
+      resubmitDraftId,
+      resubmitPostId,
+      initialSummary,
+      title,
+      content,
+      contentText,
+      imageFile,
+      imageUrl,
+      tags,
+      summary,
+      uploadCardImage,
+      toast,
+      resubmitContentDraft,
+      client,
+      navigate,
+    ],
+  );
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
+      if (isResubmit) return handleResubmitSubmit(event);
       if (isEdit) return handleEditSubmit(event);
       return handleCreateSubmit(event);
     },
-    [isEdit, handleCreateSubmit, handleEditSubmit],
+    [isResubmit, isEdit, handleResubmitSubmit, handleEditSubmit, handleCreateSubmit],
   );
 
   return { submit, handleSubmit };

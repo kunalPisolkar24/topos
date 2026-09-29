@@ -2,9 +2,9 @@ import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Edit3, Mail, Trash2, UserRound } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/primitives/avatar";
+import { Card, CardContent, CardHeader } from "@/shared/ui/primitives/card";
+import { Button } from "@/shared/ui/primitives/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,14 +16,14 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/shared/ui/primitives/alert-dialog";
 import { cn } from "@/shared/lib/cn";
 
 interface Author {
   id: string;
   name?: string | null;
   username: string;
-  email: string;
+  email?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
 }
@@ -54,7 +54,7 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
   const hasLongBio = (author.bio?.length ?? 0) > 120;
 
   return (
-    <aside className="w-full shrink-0 lg:w-80 xl:w-96">
+    <div className="w-full shrink-0 lg:w-80 xl:w-96">
       <Card className="sticky top-app-navbar-offset gap-0 bg-surface-low py-0">
         <CardHeader className="p-4 sm:p-5">
           <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
@@ -93,12 +93,14 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
         </CardHeader>
 
         <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
-          <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <p className="break-all text-sm leading-6">{author.email}</p>
+          {author.email ? (
+            <div className="bg-surface-lowest p-3 ring-1 ring-outline-variant/20">
+              <div className="flex items-start gap-2 text-muted-foreground">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <p className="break-all text-sm leading-6">{author.email}</p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="bg-surface-lowest p-4 ring-1 ring-outline-variant/20">
             <div className="flex items-center gap-2">
@@ -182,6 +184,6 @@ export const BlogAuthorSidebar: React.FC<BlogAuthorSidebarProps> = ({
           )}
         </CardContent>
       </Card>
-    </aside>
+    </div>
   );
 };

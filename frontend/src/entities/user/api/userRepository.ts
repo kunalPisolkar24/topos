@@ -25,14 +25,23 @@ export const userRepository = {
   },
 
   useUpdateProfile() {
-    return useMutation<UpdateProfileMutation, UpdateProfileMutationVariables>(
-      UpdateProfileDocument,
-    );
+    return useMutation<UpdateProfileMutation, UpdateProfileMutationVariables>(UpdateProfileDocument, {
+      update(cache, { data }) {
+        if (data?.updateProfile) {
+          cache.writeQuery<MeQuery>({
+            query: MeDocument,
+            data: { me: data.updateProfile },
+          });
+        }
+      },
+    });
   },
 
-  useMyPosts(page = 1, limit = 6) {
+  useMyPosts(page = 1, limit = 6, opts?: { skip?: boolean }) {
     return useQuery<MyPostsQuery, MyPostsQueryVariables>(MyPostsDocument, {
       variables: { page, limit },
+      skip: opts?.skip,
+      fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     });
   },

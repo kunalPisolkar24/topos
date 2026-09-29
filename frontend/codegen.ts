@@ -4,9 +4,11 @@ const config: CodegenConfig = {
   schema: [
     "../services/user/schema.graphql",
     "../services/content/graph/schema.graphqls",
-    "../services/search/schema.graphql",
   ],
-  documents: ["src/**/*.{graphql,ts,tsx}", "!src/shared/graphql/generated/**/*"],
+  documents: [
+    "src/**/*.{graphql,ts,tsx}",
+    "!src/shared/graphql/generated/**/*",
+  ],
   generates: {
     "./src/shared/graphql/generated/": {
       preset: "client",

@@ -18,7 +18,7 @@ export interface ContentPostAuthorPreview {
 }
 
 export interface ContentPostAuthorDetail extends ContentPostAuthorPreview {
-  email: string;
+  email?: string | null;
   bio?: string | null;
 }
 
@@ -29,6 +29,8 @@ export interface ContentPostCard {
   body: string;
   imageUrl?: string | null;
   createdAt: string;
+  likedByMe: boolean;
+  savedByMe: boolean;
   author: ContentPostAuthorPreview;
   tags: ContentTag[];
 }
@@ -39,6 +41,8 @@ export interface ContentPostDetail extends ContentPostCard {
   summaryStatus?: SummaryStatus | null;
   updatedAt: string;
   author: ContentPostAuthorDetail;
+  approvedById?: string | null;
+  related: ContentPostCard[];
 }
 
 export interface PaginatedContentPosts {
@@ -47,6 +51,12 @@ export interface PaginatedContentPosts {
   totalPages: number;
   currentPage: number;
   totalPosts: number;
+}
+
+export interface ContentPostReason {
+  __typename?: "PostReason";
+  postId: string;
+  reason: string;
 }
 
 export interface CreatePostInput {
@@ -144,6 +154,36 @@ export interface DeletePostMutation {
   deletePost: boolean;
 }
 
+export interface RecordPostViewMutationVariables {
+  postId: string;
+  mode?: RecommendMode | null;
+}
+
+export interface RecordPostViewMutation {
+  __typename?: "Mutation";
+  recordPostView: boolean;
+}
+
+export interface LikePostMutationVariables {
+  postId: string;
+  mode?: RecommendMode | null;
+}
+
+export interface LikePostMutation {
+  __typename?: "Mutation";
+  likePost: boolean;
+}
+
+export interface SavePostMutationVariables {
+  postId: string;
+  mode?: RecommendMode | null;
+}
+
+export interface SavePostMutation {
+  __typename?: "Mutation";
+  savePost: boolean;
+}
+
 export interface GenerateTagsMutationVariables {
   title: string;
   body: string;
@@ -192,6 +232,20 @@ export interface SearchPostsQuery {
   };
 }
 
+export type RecommendMode = "DEFAULT" | "SURPRISE" | "FRESH" | "EXPLORER";
+
+export interface RecommendedPostsQueryVariables {
+  page?: number;
+  limit?: number;
+  mode?: RecommendMode;
+  seed?: number;
+}
+
+export interface RecommendedPostsQuery {
+  __typename?: "Query";
+  recommendedPosts: PaginatedContentPosts & { reasons: ContentPostReason[] };
+}
+
 const POST_CARD_FIELDS = gql`
   fragment PostCardFields on Post {
     id
@@ -199,6 +253,8 @@ const POST_CARD_FIELDS = gql`
     body
     imageUrl
     createdAt
+    likedByMe
+    savedByMe
     author {
       id
       username
@@ -223,6 +279,8 @@ const POST_DETAIL_FIELDS = gql`
     summaryStatus
     createdAt
     updatedAt
+    likedByMe
+    savedByMe
     author {
       id
       username
@@ -231,11 +289,16 @@ const POST_DETAIL_FIELDS = gql`
       bio
       avatarUrl
     }
+    approvedById
     tags {
       id
       name
     }
+    related {
+      ...PostCardFields
+    }
   }
+  ${POST_CARD_FIELDS}
 `;
 
 const PAGINATED_POST_FIELDS = gql`
@@ -309,6 +372,24 @@ export const DeletePostDocument = gql`
   }
 ` as DocumentNode<DeletePostMutation, DeletePostMutationVariables>;
 
+export const RecordPostViewDocument = gql`
+  mutation RecordPostView($postId: ID!, $mode: RecommendMode) {
+    recordPostView(postId: $postId, mode: $mode)
+  }
+` as DocumentNode<RecordPostViewMutation, RecordPostViewMutationVariables>;
+
+export const LikePostDocument = gql`
+  mutation LikePost($postId: ID!, $mode: RecommendMode) {
+    likePost(postId: $postId, mode: $mode)
+  }
+` as DocumentNode<LikePostMutation, LikePostMutationVariables>;
+
+export const SavePostDocument = gql`
+  mutation SavePost($postId: ID!, $mode: RecommendMode) {
+    savePost(postId: $postId, mode: $mode)
+  }
+` as DocumentNode<SavePostMutation, SavePostMutationVariables>;
+
 export const GenerateTagsDocument = gql`
   mutation GenerateTags($title: String!, $body: String!) {
     generateTags(title: $title, body: $body)
@@ -352,3 +433,259 @@ export const SearchPostsDocument = gql`
   }
   ${POST_CARD_FIELDS}
 ` as DocumentNode<SearchPostsQuery, SearchPostsQueryVariables>;
+
+export const RecommendedPostsDocument = gql`
+  query RecommendedPosts(
+    $page: Int
+    $limit: Int
+    $mode: RecommendMode
+    $seed: Int
+  ) {
+    recommendedPosts(page: $page, limit: $limit, mode: $mode, seed: $seed) {
+      ...PaginatedPostFields
+      reasons {
+        postId
+        reason
+      }
+    }
+  }
+  ${PAGINATED_POST_FIELDS}
+` as DocumentNode<RecommendedPostsQuery, RecommendedPostsQueryVariables>;
+
+export type DraftStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface PostDraft {
+  __typename?: "PostDraft";
+  id: string;
+  approvalId: string;
+  prompt: string;
+  title: string;
+  body: string;
+  summary: string;
+  tags: string[];
+  imageUrl?: string | null;
+  status: DraftStatus;
+  author: ContentPostAuthorPreview;
+  authorId: string;
+  postId?: string | null;
+  reviewedById?: string | null;
+  reviewedAt?: string | null;
+  rejectionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedPostDrafts {
+  __typename?: "PaginatedPostDrafts";
+  drafts: PostDraft[];
+  totalPages: number;
+  currentPage: number;
+  totalDrafts: number;
+}
+
+export interface DraftEditsInput {
+  title?: string | null;
+  body?: string | null;
+  summary?: string | null;
+  tags?: string[] | null;
+}
+
+export interface ContentDraftInput {
+  title: string;
+  body: string;
+  summary?: string | null;
+  tags?: string[] | null;
+  imageUrl?: string | null;
+  postId?: string | null;
+}
+
+export interface PostDraftsQueryVariables {
+  page?: number;
+  limit?: number;
+}
+
+export interface PostDraftsQuery {
+  __typename?: "Query";
+  postDrafts: PaginatedPostDrafts;
+}
+
+export interface MyPostDraftsQueryVariables {
+  page?: number;
+  limit?: number;
+}
+
+export interface MyPostDraftsQuery {
+  __typename?: "Query";
+  myPostDrafts: PaginatedPostDrafts;
+}
+
+export interface CreatePostDraftMutationVariables {
+  prompt: string;
+}
+
+export interface CreatePostDraftMutation {
+  __typename?: "Mutation";
+  createPostDraft: PostDraft;
+}
+
+export interface ApprovePostDraftMutationVariables {
+  id: string;
+  input?: DraftEditsInput | null;
+}
+
+export interface ApprovePostDraftMutation {
+  __typename?: "Mutation";
+  approvePostDraft: PostDraft;
+}
+
+export interface RejectPostDraftMutationVariables {
+  id: string;
+  reason?: string | null;
+}
+
+export interface RejectPostDraftMutation {
+  __typename?: "Mutation";
+  rejectPostDraft: PostDraft;
+}
+
+export interface DeletePostDraftMutationVariables {
+  id: string;
+}
+
+export interface DeletePostDraftMutation {
+  __typename?: "Mutation";
+  deletePostDraft: boolean;
+}
+
+export interface CreateContentDraftMutationVariables {
+  input: ContentDraftInput;
+}
+
+export interface CreateContentDraftMutation {
+  __typename?: "Mutation";
+  createContentDraft: PostDraft;
+}
+
+export interface ResubmitContentDraftMutationVariables {
+  id: string;
+  input: ContentDraftInput;
+}
+
+export interface ResubmitContentDraftMutation {
+  __typename?: "Mutation";
+  resubmitContentDraft: PostDraft;
+}
+
+const POST_DRAFT_FIELDS = gql`
+  fragment PostDraftFields on PostDraft {
+    id
+    approvalId
+    prompt
+    title
+    body
+    summary
+    tags
+    imageUrl
+    status
+    author {
+      id
+      username
+      name
+      avatarUrl
+    }
+    authorId
+    postId
+    reviewedById
+    reviewedAt
+    rejectionNote
+    createdAt
+    updatedAt
+  }
+`;
+
+const PAGINATED_POST_DRAFT_FIELDS = gql`
+  fragment PaginatedPostDraftFields on PaginatedPostDrafts {
+    drafts {
+      ...PostDraftFields
+    }
+    totalPages
+    currentPage
+    totalDrafts
+  }
+  ${POST_DRAFT_FIELDS}
+`;
+
+export const PostDraftsDocument = gql`
+  query PostDrafts($page: Int, $limit: Int) {
+    postDrafts(page: $page, limit: $limit) {
+      ...PaginatedPostDraftFields
+    }
+  }
+  ${PAGINATED_POST_DRAFT_FIELDS}
+` as DocumentNode<PostDraftsQuery, PostDraftsQueryVariables>;
+
+export const MyPostDraftsDocument = gql`
+  query MyPostDrafts($page: Int, $limit: Int) {
+    myPostDrafts(page: $page, limit: $limit) {
+      ...PaginatedPostDraftFields
+    }
+  }
+  ${PAGINATED_POST_DRAFT_FIELDS}
+` as DocumentNode<MyPostDraftsQuery, MyPostDraftsQueryVariables>;
+
+export const CreatePostDraftDocument = gql`
+  mutation CreatePostDraft($prompt: String!) {
+    createPostDraft(prompt: $prompt) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<CreatePostDraftMutation, CreatePostDraftMutationVariables>;
+
+export const ApprovePostDraftDocument = gql`
+  mutation ApprovePostDraft($id: ID!, $input: DraftEditsInput) {
+    approvePostDraft(id: $id, input: $input) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<
+  ApprovePostDraftMutation,
+  ApprovePostDraftMutationVariables
+>;
+
+export const RejectPostDraftDocument = gql`
+  mutation RejectPostDraft($id: ID!, $reason: String) {
+    rejectPostDraft(id: $id, reason: $reason) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<
+  RejectPostDraftMutation,
+  RejectPostDraftMutationVariables
+>;
+
+export const DeletePostDraftDocument = gql`
+  mutation DeletePostDraft($id: ID!) {
+    deletePostDraft(id: $id)
+  }
+` as DocumentNode<DeletePostDraftMutation, DeletePostDraftMutationVariables>;
+
+export const CreateContentDraftDocument = gql`
+  mutation CreateContentDraft($input: ContentDraftInput!) {
+    createContentDraft(input: $input) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<CreateContentDraftMutation, CreateContentDraftMutationVariables>;
+
+export const ResubmitContentDraftDocument = gql`
+  mutation ResubmitContentDraft($id: ID!, $input: ContentDraftInput!) {
+    resubmitContentDraft(id: $id, input: $input) {
+      ...PostDraftFields
+    }
+  }
+  ${POST_DRAFT_FIELDS}
+` as DocumentNode<ResubmitContentDraftMutation, ResubmitContentDraftMutationVariables>;

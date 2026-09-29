@@ -1,74 +1,185 @@
 import asyncio
 import logging
+import signal
+
 import grpc
-import httpx
+from grpc_health.v1._async import HealthServicer
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from prometheus_client import start_http_server
-from src.config.settings import settings
-from src.api.handlers import AIHandler
-from src.generated import ai_service_pb2_grpc
-from src.infrastructure.llm.lightning_client import LightningClient
-from src.infrastructure.llm.mock_provider import MockLLMProvider
-from src.infrastructure.logging.config import setup_logging
-from src.infrastructure.monitoring.interceptors import PrometheusInterceptor
-from src.usecases.content_logic import ContentLogic
+
+from src.api.server import create_server
+from src.api.service import AIService
+from src.config import settings
+from src.embeddings import (
+    EmbeddingProvider,
+    FakeEmbeddingClient,
+    NoopEmbeddingClient,
+    OllamaEmbeddingClient,
+)
+from src.graphs.chat_graph import ChatGraphs, build_chat_graph
+from src.graphs.checkpointer import (
+    build_checkpointer,
+    close_checkpointer,
+    start_checkpointer,
+)
+from src.graphs.feed_graph import FeedAgent
+from src.graphs.post_graph import build_post_generation_graph
+from src.llm import FakeLLMClient, LLMClient
+from src.observability.langsmith import setup_langsmith
+from src.observability.logging import setup_logging
+from src.observability.tracing import setup_tracing
+from src.posts import PostFetcher
+from src.vector import MemoryIndex, SearchIndex, SearchStore
+
+logger = logging.getLogger(__name__)
 
 
-async def serve():
+def handle_graceful_shutdown(
+    server: grpc.aio.Server,
+    health_servicer: HealthServicer,
+    grace: int = settings.GRACE_SECONDS,
+) -> None:
+    async def _shutdown() -> None:
+        await health_servicer.enter_graceful_shutdown()
+        await server.stop(grace=grace)
+
+    def shutdown() -> None:
+        asyncio.create_task(_shutdown())
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, shutdown)
+
+
+async def _ensure_search_ready(search: SearchStore) -> None:
+    """Wait for Qdrant with a short backoff instead of crashing on a
+    transient startup blip (e.g. the store still restarting)."""
+    for attempt in range(1, settings.QDRANT_STARTUP_RETRIES + 1):
+        try:
+            await search.ensure_collection()
+            return
+        except Exception:
+            if attempt == settings.QDRANT_STARTUP_RETRIES:
+                raise
+            logger.warning(
+                "qdrant not ready, retrying (%d/%d)",
+                attempt,
+                settings.QDRANT_STARTUP_RETRIES,
+            )
+            await asyncio.sleep(5)
+
+
+async def _ensure_checkpointer_ready(saver: BaseCheckpointSaver) -> None:
+    """Wait for the checkpoint store with a short backoff instead of
+    crashing on a transient startup blip (e.g. Postgres still booting)."""
+    for attempt in range(1, settings.CHECKPOINT_STARTUP_RETRIES + 1):
+        try:
+            await start_checkpointer(saver)
+            return
+        except Exception:
+            if attempt == settings.CHECKPOINT_STARTUP_RETRIES:
+                raise
+            logger.warning(
+                "checkpoint store not ready, retrying (%d/%d)",
+                attempt,
+                settings.CHECKPOINT_STARTUP_RETRIES,
+            )
+            await asyncio.sleep(5)
+
+
+def build_embeddings() -> EmbeddingProvider:
+    """Provider for the configured mode.
+
+    Inference mode returns a Noop placeholder: Qdrant embeds server-side,
+    so the provider must never be called (it fails loudly if it is).
+    """
+    if settings.EMBEDDING_MODE == "fake":
+        return FakeEmbeddingClient()
+    if settings.EMBEDDING_MODE == "inference":
+        return NoopEmbeddingClient()
+    return OllamaEmbeddingClient()
+
+
+def build_search(embeddings: EmbeddingProvider) -> SearchStore:
+    """Store for the configured mode.
+
+    Inference mode needs the qdrant store: the in-memory twin has no
+    server to embed for it.
+    """
+    if settings.EMBEDDING_MODE == "inference" and settings.VECTOR_MODE == "fake":
+        raise RuntimeError("EMBEDDING_MODE=inference requires VECTOR_MODE=qdrant")
+    if settings.VECTOR_MODE == "fake":
+        return MemoryIndex(embeddings)
+    return SearchIndex(embeddings)
+
+
+async def serve() -> None:
     setup_logging()
-    logger = logging.getLogger("Main")
+    setup_tracing()
+    setup_langsmith()
+    logger.info("AI service starting")
 
     start_http_server(settings.METRICS_PORT)
-    logger.info(f"Prometheus metrics exposed on port {settings.METRICS_PORT}")
+    logger.info("prometheus metrics exposed on port %s", settings.METRICS_PORT)
 
-    if settings.LOAD_TEST_MODE:
-        logger.info("Running in load test mode with mock LLM provider")
-        llm_provider = MockLLMProvider()
-        content_logic = ContentLogic(llm_provider)
-        handler = AIHandler(content_logic)
+    llm = FakeLLMClient() if settings.LLM_MODE == "fake" else LLMClient()
+    logger.info("llm provider: mode %s model %s", settings.LLM_MODE, settings.LLM_MODEL)
+    embeddings = build_embeddings()
+    search = build_search(embeddings)
 
-        interceptors = [PrometheusInterceptor()]
-        server = grpc.aio.server(interceptors=interceptors)
+    feed_agent = None
+    if settings.AGENT_MODE != "deterministic":
+        agent_llm = FakeLLMClient() if settings.AGENT_MODE == "fake" else llm
+        feed_agent = FeedAgent(agent_llm, search)
+    logger.info("feed agent: %s", settings.AGENT_MODE)
 
-        ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
+    await _ensure_search_ready(search)
 
-        listen_addr = f"[::]:{settings.PORT}"
-        server.add_insecure_port(listen_addr)
+    checkpointer = build_checkpointer()
+    await _ensure_checkpointer_ready(checkpointer)
 
-        logger.info(
-            f"AI Intelligence Service (load test mode) starting on {listen_addr}"
-        )
-        await server.start()
-        await server.wait_for_termination()
-        return
-
-    http_client = httpx.AsyncClient(
-        timeout=settings.TIMEOUT_SECONDS,
-        limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+    # Both graph variants share nodes; serving code (#156) picks per
+    # request: checkpointed sessions resume by thread_id, empty thread
+    # ids stay stateless.
+    post_fetcher = PostFetcher() if settings.CONTENT_INTERNAL_TOKEN else None
+    _session_graph = build_chat_graph(
+        llm,
+        search,
+        embeddings,
+        post_fetcher=post_fetcher,
+        checkpointer=checkpointer,
     )
+    _stateless_graph = build_chat_graph(
+        llm, search, embeddings, post_fetcher=post_fetcher
+    )
+    logger.info("chat graphs compiled for sessions and stateless runs")
+    chat_graphs = ChatGraphs(sessioned=_session_graph, stateless=_stateless_graph)
 
+    # Drafts share the chat checkpointer: the interrupt survives restarts
+    # and reviewers resume by approval id.
+    post_generation_graph = build_post_generation_graph(llm, checkpointer=checkpointer)
+    logger.info("post generation graph compiled with review interrupt")
+
+    server, health_servicer = await create_server(
+        AIService(
+            llm,
+            search,
+            embeddings,
+            chat_graphs=chat_graphs,
+            post_generation_graph=post_generation_graph,
+            feed_agent=feed_agent,
+        )
+    )
+    handle_graceful_shutdown(server, health_servicer)
     try:
-        llm_provider = LightningClient(http_client)
-        content_logic = ContentLogic(llm_provider)
-        handler = AIHandler(content_logic)
-
-        interceptors = [PrometheusInterceptor()]
-        server = grpc.aio.server(interceptors=interceptors)
-
-        ai_service_pb2_grpc.add_AIServiceServicer_to_server(handler, server)
-
-        listen_addr = f"[::]:{settings.PORT}"
-        server.add_insecure_port(listen_addr)
-
-        logger.info(f"AI Intelligence Service starting on {listen_addr}")
         await server.start()
         await server.wait_for_termination()
-
-    except Exception:
-        logger.exception("Server crashed")
-        raise
     finally:
-        logger.info("Shutting down HTTP client...")
-        await http_client.aclose()
+        await close_checkpointer(checkpointer)
+        await llm.close()
+        await search.close()
+        await embeddings.close()
+        await server.stop(grace=None)
 
 
 if __name__ == "__main__":

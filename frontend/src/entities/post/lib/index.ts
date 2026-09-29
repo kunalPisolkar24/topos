@@ -15,7 +15,6 @@ export {
   MIN_PROMPT_LENGTH,
   MIN_TAG_BODY_LENGTH,
   MIN_TAG_TITLE_LENGTH,
-  POST_SNIPPET_MAX_LENGTH,
   normalizeTags,
   toPlainText,
 } from "./post-text";
@@ -25,4 +24,3 @@ export {
   type PublishReadiness,
   type PublishReadinessInput,
 } from "./post-rules";
-export { postRepository } from "../api/postRepository";

@@ -3,24 +3,31 @@
 import type React from "react";
 import { Sparkles } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { StickyNavbar } from "@/widgets";
+import { StickyNavbar, BlogEditor, BlogAuthorSidebar } from "@/widgets";
 import { ViewBlogPageSkeleton } from "@/shared/ui/feedback";
 import {
   usePostViewerController,
-  BlogEditForm,
   AISummaryDialog,
   BlogHeader,
   BlogBody,
+  BlogRelatedSection,
   type PostForEditing,
 } from "@/features/blog";
-import { BlogAuthorSidebar } from "@/widgets";
+import { BlogEditForm } from "@/features/blog/components/BlogEditForm";
+import { PendingRevisionNotice } from "@/features/blog/review";
+import { ApprovedByCard } from "@/features/blog/review/ApprovedByCard";
 import { useCurrentUser } from "@/entities/session";
+import { useReviewerIdentity } from "@/features/blog/review/hooks/useReviewerIdentity";
 
 const ViewBlogPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useCurrentUser();
   const { state, setView, setDialog, deletePost, refetch } =
     usePostViewerController(id);
+  // Approver credit rides on the post itself in every env.
+  const { user: postReviewer } = useReviewerIdentity(
+    state.kind === "ready" ? state.post.approvedById ?? null : null,
+  );
 
   if (state.kind === "loading") return <ViewBlogPageSkeleton />;
 
@@ -57,6 +64,7 @@ const ViewBlogPage: React.FC = () => {
   const isEditView = view === "editing";
   const summaryOpen = dialog === "summary";
   const deleteDialogOpen = dialog === "delete";
+  const hasApproval = Boolean(post.approvedById);
 
   return (
     <div className="min-h-screen bg-surface text-foreground">
@@ -78,11 +86,11 @@ const ViewBlogPage: React.FC = () => {
                       Revision Console
                     </span>
                   </div>
-                  <h1 className="text-4xl font-semibold leading-none tracking-[-0.05em] text-foreground md:text-6xl">
+                  <h1 className="break-words text-3xl font-semibold leading-none tracking-[-0.05em] text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
                     Revise your Topos post.
                   </h1>
                   <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
-                    Modify the title, cover image, body text, or tags. Saved revisions are updated instantly across all channels.
+                    Modify the title, cover image, body text, or tags. Submitted revisions stay pending until a peer approves them.
                   </p>
                 </div>
               </header>
@@ -94,10 +102,23 @@ const ViewBlogPage: React.FC = () => {
                   setView("reading");
                   refetch();
                 }}
+                renderEditor={({ value, onChange, onImageUpload, quillRef }) => (
+                  <BlogEditor
+                    ref={quillRef as React.MutableRefObject<never>}
+                    value={value}
+                    onChange={onChange}
+                    onImageUpload={onImageUpload}
+                  />
+                )}
               />
             </>
           ) : (
             <>
+              <PendingRevisionNotice
+                postId={post.id}
+                authorId={post.author.id}
+                currentUserId={currentUser?.id}
+              />
               <BlogHeader
                 title={post.title}
                 imageUrl={post.imageUrl}
@@ -107,7 +128,7 @@ const ViewBlogPage: React.FC = () => {
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_384px]">
                 <section className="min-w-0 space-y-6">
                   <BlogBody body={post.body} tags={post.tags} />
-                  <div className="bg-surface-low p-4 ring-1 ring-outline-variant/20 sm:p-5">
+                  <div className="bg-surface-low p-3 ring-1 ring-outline-variant/20 sm:p-5">
                     <p className="mb-4 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary">
                       Reading Utility
                     </p>
@@ -120,20 +141,34 @@ const ViewBlogPage: React.FC = () => {
                       }
                     />
                   </div>
+                  <BlogRelatedSection posts={post.related} />
                 </section>
 
-                <BlogAuthorSidebar
-                  author={post.author}
-                  isAuthor={isAuthor}
-                  isEditing={isEditView}
-                  onEdit={() => setView("editing")}
-                  onDelete={deletePost}
-                  isDeleting={isDeleting}
-                  isDeleteDialogOpen={deleteDialogOpen}
-                  setIsDeleteDialogOpen={(open) =>
-                    setDialog(open ? "delete" : "closed")
-                  }
-                />
+                <div className="w-full shrink-0 lg:w-80 xl:w-96">
+                  <BlogAuthorSidebar
+                    author={post.author}
+                    isAuthor={isAuthor}
+                    isEditing={isEditView}
+                    onEdit={() => setView("editing")}
+                    onDelete={deletePost}
+                    isDeleting={isDeleting}
+                    isDeleteDialogOpen={deleteDialogOpen}
+                    setIsDeleteDialogOpen={(open) =>
+                      setDialog(open ? "delete" : "closed")
+                    }
+                  />
+                  {hasApproval && (
+                    <div className="mt-6">
+                      <ApprovedByCard
+                        approvedById={post.approvedById ?? null}
+                        reviewedAt={null}
+                        reviewerName={postReviewer?.name ?? null}
+                        reviewerAvatarUrl={postReviewer?.avatarUrl ?? null}
+                        draftId={null}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

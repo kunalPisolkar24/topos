@@ -5,7 +5,7 @@ export {
   hasUnauthorizedGraphQLError,
   hasUnauthorizedNetworkError,
 } from "./links/auth";
-export { getGraphQLErrorMessage } from "./errors";
+export { getGraphQLErrorCodes, getGraphQLErrorMessage } from "./errors";
 export {
   invalidatePostListCaches,
   POST_LIST_QUERY_NAMES,

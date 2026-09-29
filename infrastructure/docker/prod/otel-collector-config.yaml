@@ -1,0 +1,173 @@
+# OTEL Collector — prod only. Receives OTLP from all Topos services and
+# forwards to New Relic. Apps talk insecure locally; only this collector
+# talks TLS to NR with the license key.
+# Single OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 works for
+# every service: user uses it as HTTP base, content/ai normalize to gRPC
+# :4317 internally, gateway uses OTEL_TRACING_ENDPOINT (gRPC).
+# Local compose has no collector; empty endpoint keeps tracing disabled.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  # Docker stdout shipping (prod only): tails every container's json-file
+  # log via the /var/log/docker host mount (see compose.yml). No per-service
+  # code changes needed and the Apollo Router is covered too. start_at: end
+  # avoids reshipping history on collector restarts. No drop filter on
+  # purpose: user/content already exclude probe paths in-app, so the only
+  # residue is the router's own access lines (negligible); tune later from
+  # real NR ingest data if needed.
+  filelog:
+    include:
+      - /var/log/docker/*/*.log
+    start_at: end
+    poll_interval: 500ms
+    include_file_name: false
+    include_file_path: true
+    operators:
+      # Docker wraps every line: {"log":"<line>\n","stream":"...","time":"..."}.
+      - type: json_parser
+        id: docker-wrapper
+        parse_from: body
+        parse_to: attributes
+        on_error: send
+      # Structured app lines (pino/slog/python-json/router) flatten into
+      # attributes; anything else passes through untouched. Quiet errors:
+      # non-JSON lines (nginx access, floci internals) are expected and
+      # handled downstream, so they must not spam the collector log.
+      - type: json_parser
+        id: app-json
+        parse_from: attributes.log
+        parse_to: attributes
+        on_error: send_quiet
+        if: 'attributes["log"] != nil'
+      # Prefer the human message as the record body. Copy (not move):
+      # sequential moves would mutate state and let the raw fallback
+      # clobber a body set by an earlier branch.
+      - type: copy
+        id: body-msg
+        from: attributes.msg
+        to: body
+        if: 'attributes["msg"] != nil'
+      - type: copy
+        id: body-message
+        from: attributes.message
+        to: body
+        if: 'attributes["msg"] == nil and attributes["message"] != nil'
+      - type: copy
+        id: body-raw
+        from: attributes.log
+        to: body
+        if: 'attributes["msg"] == nil and attributes["message"] == nil and attributes["log"] != nil'
+      - type: remove
+        id: drop-raw-json
+        field: attributes.log
+        if: 'attributes["log"] != nil'
+      # Mixed formats: pino uses numeric levels (30/50), slog/python use text.
+      - type: severity_parser
+        id: app-level
+        parse_from: attributes.level
+        if: 'attributes["level"] != nil'
+        mapping:
+          trace: [trace, TRACE, 10]
+          debug: [debug, DEBUG, 20]
+          info: [info, INFO, 30]
+          warn: [warn, WARN, warning, WARNING, 40]
+          error: [error, ERROR, err, ERR, 50]
+          fatal: [fatal, FATAL, critical, CRITICAL, 60]
+      # Every app service logs a service field; lines without one are the
+      # gateway's, so they get that name for NR filtering.
+      - type: add
+        id: service-gateway-default
+        field: resource["service.name"]
+        value: gateway
+        if: 'attributes["service"] == nil'
+      - type: move
+        id: service-name
+        from: attributes.service
+        to: resource["service.name"]
+        if: 'attributes["service"] != nil'
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: topos
+          scrape_interval: 15s
+          static_configs:
+            - targets:
+                - user-service:4001
+                - content-service:4002
+                - content-worker:4003
+                - content-search-worker:4004
+                - content-personalizer:4005
+                - ai-service:12666
+                - gateway:8088
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+  batch:
+    timeout: 10s
+  # Normalizes log attributes for dashboards/alerts so NRQL never depends on
+  # per-format quirks (pino numerics vs text levels) or NR severity mapping:
+  # log_level is always TRACE/DEBUG/INFO/WARN/ERROR/FATAL, and trace.id lets
+  # the NR log UI jump straight to the correlated trace.
+  transform/log-attrs:
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["log_level"], "TRACE") where Int(severity_number) >= 1 and Int(severity_number) <= 4
+          - set(attributes["log_level"], "DEBUG") where Int(severity_number) >= 5 and Int(severity_number) <= 8
+          - set(attributes["log_level"], "INFO") where Int(severity_number) >= 9 and Int(severity_number) <= 12
+          - set(attributes["log_level"], "WARN") where Int(severity_number) >= 13 and Int(severity_number) <= 16
+          - set(attributes["log_level"], "ERROR") where Int(severity_number) >= 17 and Int(severity_number) <= 20
+          - set(attributes["log_level"], "FATAL") where Int(severity_number) >= 21 and Int(severity_number) <= 24
+          - set(attributes["trace.id"], attributes["trace_id"]) where attributes["trace_id"] != nil and attributes["trace.id"] == nil
+  # Drops unattributed noise before export: nginx access lines (frontend)
+  # and Java-style internals (floci sidecars) both arrive without a service
+  # field and would otherwise pollute the gateway facet in NR. Router JSON
+  # and all app JSON carry service/message fields, so neither pattern can
+  # match a real application log line.
+  filter/drop-gateway-noise:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'IsMatch(body, "^\\S+ - - \\[") and resource.attributes["service.name"] == "gateway"'
+        - 'IsMatch(body, "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3}") and resource.attributes["service.name"] == "gateway"'
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: prod
+        action: upsert
+
+exporters:
+  otlphttp/newrelic:
+    endpoint: ${env:NEW_RELIC_OTLP_HTTP_ENDPOINT}
+    headers:
+      api-key: ${env:NEW_RELIC_LICENSE_KEY}
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/newrelic]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/newrelic]
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, resource, transform/log-attrs, filter/drop-gateway-noise, batch]
+      exporters: [otlphttp/newrelic]
+  telemetry:
+    logs:
+      level: info

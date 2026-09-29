@@ -12,5 +12,9 @@ htmlcov
 .vscode
 .idea
 *.log
-src/generated
+src/generated/*
+!src/generated/__init__.py
+!src/generated/*.pyi
 .venv
+eval_dataset.jsonl
+reco_eval_baseline.json

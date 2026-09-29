@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from src.application.use_cases import SeedUseCase  # noqa: E402
+from src.core.exceptions import GuardError  # noqa: E402
+from src.domain.schemas import SeedConfig  # noqa: E402
+from src.interfaces.secrets_store import ISecretsStore  # noqa: E402
+
+
+class FakeStore(ISecretsStore):
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.payloads: list = []
+
+    def upsert(self, payload, dry_run: bool = False) -> str:  # type: ignore[no-untyped-def]
+        self.calls.append(payload.name)
+        self.payloads.append(payload)
+        return "dry-run" if dry_run else "created"
+
+    def list_secrets(self) -> list[str]:
+        return []
+
+
+def test_build_payloads_frontend() -> None:
+    env = {
+        "VITE_GRAPHQL_URL": "https://example.com/graphql",
+        "VITE_ENV_TYPE": "prod",
+        "FRONTEND_CONTAINER": "prod-frontend",
+        "APP_NETWORK": "topos_network",
+        "VITE_CLOUDINARY_CLOUD_NAME": "",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env)
+    assert len(payloads) == 1
+    p = payloads[0]
+    assert p.name == "/topos/frontend/config"
+    assert p.data["VITE_GRAPHQL_URL"] == "https://example.com/graphql"
+    assert p.data["VITE_ENV_TYPE"] == "prod"
+    assert "VITE_CLOUDINARY_CLOUD_NAME" not in p.data  # empty skipped
+
+
+def test_build_payloads_empty_skipped() -> None:
+    env = {"VITE_GRAPHQL_URL": ""}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env)
+    assert payloads == []
+
+
+def test_dry_run_no_store_calls() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=True)
+    results, generated = seeder.seed(cfg, env)
+    assert all(s == "dry-run" for _, s in results)
+    assert store.calls == []  # dry-run should not call upsert
+    assert generated == []
+
+
+def test_real_aws_guard() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
+    seeder = SeedUseCase(FakeStore())
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url=None, dry_run=False)
+    try:
+        seeder.seed(cfg, env)
+        raise AssertionError("should have raised GuardError")
+    except GuardError:
+        pass
+
+
+def test_unknown_secret_guard() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
+    seeder = SeedUseCase(FakeStore())
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", only=frozenset({"unknown/secret"}))
+    try:
+        seeder.seed(cfg, env)
+        raise AssertionError("should have raised GuardError")
+    except GuardError as e:
+        assert "unknown secret" in str(e).lower()
+
+
+def test_only_filter() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql", "VITE_ENV_TYPE": "prod"}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/frontend/config"}))
+    assert all(p.name == "/topos/frontend/config" for p in payloads)
+    assert len(payloads) == 1
+
+
+def test_execute_alias() -> None:
+    env = {"VITE_GRAPHQL_URL": "https://example.com/graphql"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=True)
+    results, _ = seeder.execute(cfg, env)
+    assert results
+
+
+def test_build_payloads_ai_aliases() -> None:
+    env = {
+        "AI_LIGHTNING_MODEL": "lightning-ai/gpt-oss-20b",
+        "AI_LLM_MODE": "fake",
+        "LIGHTNING_AI_API_KEY": "test-llm-key",
+        "AI_QDRANT_URL": "http://qdrant:6333",
+        "AI_CHECKPOINT_DB_URL": "postgresql://ai:pass@user-postgres:5432/ai_checkpoints",
+        "AI_CHECKPOINT_DB_URL_MIGRATE": "postgresql://ai:pass@writer:5432/ai_checkpoints",
+        "AI_CHECKPOINT_POOL_MIN_SIZE": "2",
+        "AI_CHECKPOINT_POOL_MAX_SIZE": "5",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config", "topos/ai/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["/topos/ai/config"]["LLM_MODEL"] == "lightning-ai/gpt-oss-20b"
+    assert by_name["/topos/ai/config"]["LLM_MODE"] == "fake"
+    assert by_name["/topos/ai/config"]["CHECKPOINT_POOL_MIN_SIZE"] == "2"
+    assert by_name["/topos/ai/config"]["CHECKPOINT_POOL_MAX_SIZE"] == "5"
+    assert by_name["topos/ai/secrets"]["LLM_API_KEY"] == "test-llm-key"
+    assert by_name["topos/ai/secrets"]["QDRANT_URL"] == "http://qdrant:6333"
+    assert "ai_checkpoints" in by_name["topos/ai/secrets"]["CHECKPOINT_DB_URL"]
+    assert "writer" in by_name["topos/ai/secrets"]["CHECKPOINT_DB_URL_MIGRATE"]
+
+
+def test_build_payloads_user_pool_aliases() -> None:
+    env = {
+        "USER_DATABASE_URL": "postgresql://u:p@proxy:5432/topos_users?sslmode=require",
+        "USER_DATABASE_URL_MIGRATE": "postgresql://u:p@writer:5432/topos_users?sslmode=require",
+        "USER_PG_POOL_MAX": "8",
+        "USER_PG_POOL_IDLE_TIMEOUT_MS": "20000",
+        "USER_PG_POOL_CONNECTION_TIMEOUT_MS": "4000",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/user/config", "topos/user/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert "proxy" in by_name["topos/user/secrets"]["DATABASE_URL"]
+    assert "writer" in by_name["topos/user/secrets"]["DATABASE_URL_MIGRATE"]
+    assert by_name["/topos/user/config"]["PG_POOL_MAX"] == "8"
+    assert by_name["/topos/user/config"]["PG_POOL_IDLE_TIMEOUT_MS"] == "20000"
+    assert by_name["/topos/user/config"]["PG_POOL_CONNECTION_TIMEOUT_MS"] == "4000"
+
+
+def test_build_payloads_ai_canonical_wins() -> None:
+    env = {"LLM_MODEL": "canonical-model", "AI_LIGHTNING_MODEL": "alias-model"}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/ai/config"}))
+    assert payloads[0].data["LLM_MODEL"] == "canonical-model"
+
+
+def test_floci_localhost_db_url_guard() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@localhost:5432/topos_users"}
+    seeder = SeedUseCase(FakeStore())
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=False)
+    try:
+        seeder.seed(cfg, env)
+        raise AssertionError("should have raised GuardError")
+    except GuardError as e:
+        assert "localhost" in str(e)
+
+
+def test_floci_docker_hostname_allowed() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@user-postgres:5432/topos_users"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=True)
+    results, _ = seeder.seed(cfg, env)
+    assert results
+
+
+def test_floci_guard_force_override() -> None:
+    env = {"USER_DATABASE_URL": "postgresql://u:p@localhost:5432/topos_users"}
+    store = FakeStore()
+    seeder = SeedUseCase(store)
+    cfg = SeedConfig(env_file="/tmp/x", endpoint_url="http://localhost:4566", dry_run=False, force=True)
+    results, _ = seeder.seed(cfg, env)
+    assert results
+    assert store.calls == ["topos/user/secrets"]
+
+
+def test_build_payloads_content_aliases() -> None:
+    env = {
+        "CONTENT_MONGO_URI": "mongodb://content-mongo:27017",
+        "CONTENT_DB_NAME": "blog_content",
+        "CONTENT_REDIS_ADDR": "user-redis:6379",
+        "CONTENT_JWT_SECRET": "content-jwt-secret",
+        "CONTENT_INTERNAL_TOKEN": "content-internal",
+        "CONTENT_AI_SERVICE_URL": "ai-service:50051",
+        "CONTENT_KAFKA_BROKERS": "kafka-1:9092",
+        "CONTENT_KAFKA_TOPIC": "posts",
+        "CONTENT_SERVICE_INT_PORT": "4002",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"/topos/content/config", "topos/content/secrets"}))
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["topos/content/secrets"]["MONGO_URI"] == "mongodb://content-mongo:27017"
+    assert by_name["topos/content/secrets"]["REDIS_ADDR"] == "user-redis:6379"
+    assert by_name["topos/content/secrets"]["JWT_SECRET"] == "content-jwt-secret"
+    assert by_name["topos/content/secrets"]["INTERNAL_TOKEN"] == "content-internal"
+    assert by_name["topos/content/secrets"]["AI_SERVICE_URL"] == "ai-service:50051"
+    assert by_name["topos/content/secrets"]["KAFKA_BROKERS"] == "kafka-1:9092"
+    assert by_name["/topos/content/config"]["DB_NAME"] == "blog_content"
+    assert by_name["/topos/content/config"]["KAFKA_TOPIC"] == "posts"
+    assert by_name["/topos/content/config"]["PORT"] == "4002"
+
+
+def test_build_payloads_content_canonical_wins() -> None:
+    env = {"MONGO_URI": "mongodb://canonical:27017", "CONTENT_MONGO_URI": "mongodb://alias:27017"}
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(env, only=frozenset({"topos/content/secrets"}))
+    assert payloads[0].data["MONGO_URI"] == "mongodb://canonical:27017"
+
+
+def test_build_payloads_port_aliases_stay_separate() -> None:
+    env = {
+        "USER_SERVICE_EXT_PORT": "4001",
+        "CONTENT_SERVICE_INT_PORT": "4002",
+        "AI_SERVICE_INT_PORT": "50051",
+    }
+    seeder = SeedUseCase(FakeStore())
+    payloads = seeder.build_payloads(
+        env, only=frozenset({"/topos/user/config", "/topos/content/config", "/topos/ai/config"})
+    )
+    by_name = {p.name: p.data for p in payloads}
+    assert by_name["/topos/user/config"]["PORT"] == "4001"
+    assert by_name["/topos/content/config"]["PORT"] == "4002"
+    assert by_name["/topos/ai/config"]["PORT"] == "50051"

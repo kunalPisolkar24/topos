@@ -1,5 +1,5 @@
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/shared/ui/primitives/skeleton";
+import { Card } from "@/shared/ui/primitives/card";
 
 export const ViewBlogPageSkeleton: React.FC = () => {
   return (

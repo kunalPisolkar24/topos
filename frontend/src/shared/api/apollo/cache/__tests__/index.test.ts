@@ -44,6 +44,8 @@ const buildPostCard = (id: string): ContentPostCard => ({
   body: "<p>body</p>",
   imageUrl: "https://x/y.png",
   createdAt: "2024-01-01T00:00:00Z",
+  likedByMe: false,
+  savedByMe: false,
   author: {
     __typename: "User",
     id: "author-1",
@@ -74,6 +76,8 @@ const buildPostDetail = (id: string): ContentPostDetail => {
       email: "alice@example.com",
       bio: null,
     },
+    approvedById: null,
+    related: [],
   };
 };
 
@@ -96,12 +100,12 @@ describe("mergePaginatedPostLists", () => {
     expect(merged).toEqual(buildList(1, ["c"]));
   });
 
-  it("appends deduped items on subsequent pages", () => {
+  it("replaces the list on subsequent pages", () => {
     const merged = mergePaginatedPostLists(buildList(1, ["a", "b"]), buildList(2, ["b", "c"]), {
       args: { page: 2, limit: 2 },
     });
     const list = (merged as { posts: Array<{ id: string }> }).posts;
-    expect(list.map((p) => p.id)).toEqual(["a", "b", "c"]);
+    expect(list.map((p) => p.id)).toEqual(["b", "c"]);
   });
 
   it("preserves incoming when there is no existing data", () => {
@@ -144,6 +148,12 @@ describe("paginatedPostListKeyArgs", () => {
     const result = paginatedPostListKeyArgs({ tag: "alpha" });
     expect(result).toContain("tag:alpha");
   });
+
+  it("includes mode and seed in key args", () => {
+    const result = paginatedPostListKeyArgs({ mode: "SURPRISE", seed: 42 });
+    expect(result).toContain("mode:SURPRISE");
+    expect(result).toContain("seed:42");
+  });
 });
 
 describe("mergePaginatedPostLists edge cases", () => {
@@ -180,7 +190,7 @@ describe("mergePaginatedPostLists edge cases", () => {
       args: { page: 2, limit: 2 },
     });
     const list = (merged as { posts: Array<{ __ref: string }> }).posts;
-    expect(list.map((p) => p.__ref)).toEqual(["Post:a", "Post:b", "Post:c"]);
+    expect(list.map((p) => p.__ref)).toEqual(["Post:b", "Post:c"]);
   });
 });
 
@@ -209,7 +219,7 @@ describe("buildApolloCache", () => {
       { page: 2, limit: 2 },
     );
     const list = (merged as { posts: Array<{ id: string }> }).posts;
-    expect(list.map((p) => p.id)).toEqual(["a", "b", "c"]);
+    expect(list.map((p) => p.id)).toEqual(["b", "c"]);
   });
 });
 

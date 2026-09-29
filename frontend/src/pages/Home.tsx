@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { StickyNavbar } from "@/widgets";
-import { BlogList } from "@/features/blog";
+import { BlogList, ForYouList } from "@/features/blog";
 import { SearchBar } from "@/features/search";
 import { ErrorBoundary } from "@/app/providers/ErrorBoundary";
-import { Button } from "@/components/ui/button";
+import { PreviewNoticeDialog } from "@/features/preview/components/PreviewNoticeDialog";
+import { Button } from "@/shared/ui/primitives/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs";
 import { X } from "lucide-react";
 
 const Home: React.FC = () => {
@@ -15,9 +17,10 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface">
+      <PreviewNoticeDialog trigger="landing" />
       <StickyNavbar />
 
-      <main className="mx-auto pt-4 md:pt-4 pt-8">
+      <main className="mx-auto pb-8 pt-app-navbar-offset">
         <ErrorBoundary>
           <SearchBar onTagSelect={handleTagSelect} currentFilterTag={selectedTag} />
         </ErrorBoundary>
@@ -28,12 +31,12 @@ const Home: React.FC = () => {
               role="status"
               aria-live="polite"
               data-slot="filter-chip"
-              className="inline-flex items-center gap-1 bg-surface-highest p-1 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+              className="inline-flex max-w-full flex-wrap items-center gap-1 bg-surface-highest p-1 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground"
             >
               <span className="px-2 py-1">Filtering by:</span>
               <span
                 data-slot="filter-chip-tag"
-                className="bg-primary-container px-2 py-1 text-primary-foreground"
+                className="max-w-[calc(100vw-4rem)] truncate bg-primary-container px-2 py-1 text-primary-foreground sm:max-w-xs"
               >
                 {selectedTag}
               </span>
@@ -42,7 +45,7 @@ const Home: React.FC = () => {
                 onClick={() => handleTagSelect(null)}
                 size="icon-xs"
                 variant="ghost"
-                className="ml-1 text-muted-foreground hover:bg-surface-high hover:text-foreground"
+                className="ml-1 shrink-0 text-muted-foreground hover:bg-surface-high hover:text-foreground"
                 aria-label={`Clear filter for ${selectedTag}`}
               >
                 <X className="h-3.5 w-3.5" />
@@ -52,7 +55,24 @@ const Home: React.FC = () => {
         )}
 
         <ErrorBoundary>
-          <BlogList filterTag={selectedTag || undefined} />
+          {selectedTag ? (
+            <BlogList filterTag={selectedTag} />
+          ) : (
+            <div className="mx-auto w-full max-w-[88rem] px-4 pt-8 sm:px-5 lg:px-6">
+              <Tabs defaultValue="latest">
+                <TabsList>
+                  <TabsTrigger value="latest">Latest</TabsTrigger>
+                  <TabsTrigger value="for-you">For You</TabsTrigger>
+                </TabsList>
+                <TabsContent value="latest">
+                  <BlogList />
+                </TabsContent>
+                <TabsContent value="for-you">
+                  <ForYouList />
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
         </ErrorBoundary>
       </main>
     </div>

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { env } from "@/shared/config/env";
+import { isPreview, PREVIEW_DISABLED_REASON } from "@/shared/config/preview";
 import {
   cloudinaryImageProvider,
   type ImageProvider,
@@ -40,6 +41,10 @@ export const useImageUpload = (
       file: File,
       options?: ImageUploadOptions,
     ): Promise<string | null> => {
+      if (isPreview()) {
+        toast({ title: PREVIEW_DISABLED_REASON, variant: "destructive" });
+        return null;
+      }
       setIsUploading(true);
       try {
         toast({

@@ -9,6 +9,7 @@ package ai
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -20,6 +21,177 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+// WorkflowStatus is the lifecycle state of a human-in-the-loop post
+// generation workflow.
+type WorkflowStatus int32
+
+const (
+	WorkflowStatus_WORKFLOW_STATUS_UNSPECIFIED WorkflowStatus = 0
+	// Generated and paused for review.
+	WorkflowStatus_WORKFLOW_STATUS_PENDING WorkflowStatus = 1
+	// Approved; the final post payload is populated.
+	WorkflowStatus_WORKFLOW_STATUS_APPROVED WorkflowStatus = 2
+	// Rejected by a reviewer. The workflow stays resumable, so approval
+	// can still happen later.
+	WorkflowStatus_WORKFLOW_STATUS_REJECTED WorkflowStatus = 3
+)
+
+// Enum value maps for WorkflowStatus.
+var (
+	WorkflowStatus_name = map[int32]string{
+		0: "WORKFLOW_STATUS_UNSPECIFIED",
+		1: "WORKFLOW_STATUS_PENDING",
+		2: "WORKFLOW_STATUS_APPROVED",
+		3: "WORKFLOW_STATUS_REJECTED",
+	}
+	WorkflowStatus_value = map[string]int32{
+		"WORKFLOW_STATUS_UNSPECIFIED": 0,
+		"WORKFLOW_STATUS_PENDING":     1,
+		"WORKFLOW_STATUS_APPROVED":    2,
+		"WORKFLOW_STATUS_REJECTED":    3,
+	}
+)
+
+func (x WorkflowStatus) Enum() *WorkflowStatus {
+	p := new(WorkflowStatus)
+	*p = x
+	return p
+}
+
+func (x WorkflowStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WorkflowStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_ai_ai_service_proto_enumTypes[0].Descriptor()
+}
+
+func (WorkflowStatus) Type() protoreflect.EnumType {
+	return &file_proto_ai_ai_service_proto_enumTypes[0]
+}
+
+func (x WorkflowStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WorkflowStatus.Descriptor instead.
+func (WorkflowStatus) EnumDescriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{0}
+}
+
+// InteractionKind is the type of a user interaction with a post that
+// shapes the user's interest profile.
+type InteractionKind int32
+
+const (
+	InteractionKind_INTERACTION_KIND_UNSPECIFIED InteractionKind = 0
+	InteractionKind_INTERACTION_KIND_VIEW        InteractionKind = 1
+	InteractionKind_INTERACTION_KIND_LIKE        InteractionKind = 2
+	InteractionKind_INTERACTION_KIND_SAVE        InteractionKind = 3
+)
+
+// Enum value maps for InteractionKind.
+var (
+	InteractionKind_name = map[int32]string{
+		0: "INTERACTION_KIND_UNSPECIFIED",
+		1: "INTERACTION_KIND_VIEW",
+		2: "INTERACTION_KIND_LIKE",
+		3: "INTERACTION_KIND_SAVE",
+	}
+	InteractionKind_value = map[string]int32{
+		"INTERACTION_KIND_UNSPECIFIED": 0,
+		"INTERACTION_KIND_VIEW":        1,
+		"INTERACTION_KIND_LIKE":        2,
+		"INTERACTION_KIND_SAVE":        3,
+	}
+)
+
+func (x InteractionKind) Enum() *InteractionKind {
+	p := new(InteractionKind)
+	*p = x
+	return p
+}
+
+func (x InteractionKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InteractionKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_ai_ai_service_proto_enumTypes[1].Descriptor()
+}
+
+func (InteractionKind) Type() protoreflect.EnumType {
+	return &file_proto_ai_ai_service_proto_enumTypes[1]
+}
+
+func (x InteractionKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InteractionKind.Descriptor instead.
+func (InteractionKind) EnumDescriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{1}
+}
+
+// RecommendMode selects how a feed is ranked for a user: DEFAULT follows
+// the user's learned taste, SURPRISE deliberately strays from it, FRESH
+// narrows the window to recent posts, EXPLORER blends surprise pages
+// into the default ranking.
+type RecommendMode int32
+
+const (
+	RecommendMode_RECOMMEND_MODE_UNSPECIFIED RecommendMode = 0
+	RecommendMode_RECOMMEND_MODE_DEFAULT     RecommendMode = 1
+	RecommendMode_RECOMMEND_MODE_SURPRISE    RecommendMode = 2
+	RecommendMode_RECOMMEND_MODE_FRESH       RecommendMode = 3
+	RecommendMode_RECOMMEND_MODE_EXPLORER    RecommendMode = 4
+)
+
+// Enum value maps for RecommendMode.
+var (
+	RecommendMode_name = map[int32]string{
+		0: "RECOMMEND_MODE_UNSPECIFIED",
+		1: "RECOMMEND_MODE_DEFAULT",
+		2: "RECOMMEND_MODE_SURPRISE",
+		3: "RECOMMEND_MODE_FRESH",
+		4: "RECOMMEND_MODE_EXPLORER",
+	}
+	RecommendMode_value = map[string]int32{
+		"RECOMMEND_MODE_UNSPECIFIED": 0,
+		"RECOMMEND_MODE_DEFAULT":     1,
+		"RECOMMEND_MODE_SURPRISE":    2,
+		"RECOMMEND_MODE_FRESH":       3,
+		"RECOMMEND_MODE_EXPLORER":    4,
+	}
+)
+
+func (x RecommendMode) Enum() *RecommendMode {
+	p := new(RecommendMode)
+	*p = x
+	return p
+}
+
+func (x RecommendMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RecommendMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_ai_ai_service_proto_enumTypes[2].Descriptor()
+}
+
+func (RecommendMode) Type() protoreflect.EnumType {
+	return &file_proto_ai_ai_service_proto_enumTypes[2]
+}
+
+func (x RecommendMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RecommendMode.Descriptor instead.
+func (RecommendMode) EnumDescriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{2}
+}
 
 type ContentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -317,11 +489,1417 @@ func (x *PostGenerationResponse) GetTags() []string {
 	return nil
 }
 
+// PostWorkflowState is the shared response for the draft workflow RPCs:
+// GeneratePostDraft returns it paused at pending, ApprovePost resumes
+// it to approved with the final payload, RejectPost marks it rejected.
+type PostWorkflowState struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Title   string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Body    string                 `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	Summary string                 `protobuf:"bytes,3,opt,name=summary,proto3" json:"summary,omitempty"`
+	Tags    []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	// approval_id identifies this workflow; pass it back to ApprovePost
+	// or RejectPost to resume or reject it.
+	ApprovalId    string         `protobuf:"bytes,5,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	Status        WorkflowStatus `protobuf:"varint,6,opt,name=status,proto3,enum=ai.WorkflowStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PostWorkflowState) Reset() {
+	*x = PostWorkflowState{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PostWorkflowState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PostWorkflowState) ProtoMessage() {}
+
+func (x *PostWorkflowState) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PostWorkflowState.ProtoReflect.Descriptor instead.
+func (*PostWorkflowState) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PostWorkflowState) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *PostWorkflowState) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *PostWorkflowState) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *PostWorkflowState) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *PostWorkflowState) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *PostWorkflowState) GetStatus() WorkflowStatus {
+	if x != nil {
+		return x.Status
+	}
+	return WorkflowStatus_WORKFLOW_STATUS_UNSPECIFIED
+}
+
+type ApprovePostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// approval_id returned by GeneratePostDraft.
+	ApprovalId string `protobuf:"bytes,1,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	// Optional edits applied before the workflow resumes: unset fields
+	// keep the generated value, a non-empty tags list replaces the
+	// generated tags.
+	Title         *string  `protobuf:"bytes,2,opt,name=title,proto3,oneof" json:"title,omitempty"`
+	Body          *string  `protobuf:"bytes,3,opt,name=body,proto3,oneof" json:"body,omitempty"`
+	Summary       *string  `protobuf:"bytes,4,opt,name=summary,proto3,oneof" json:"summary,omitempty"`
+	Tags          []string `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApprovePostRequest) Reset() {
+	*x = ApprovePostRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApprovePostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApprovePostRequest) ProtoMessage() {}
+
+func (x *ApprovePostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApprovePostRequest.ProtoReflect.Descriptor instead.
+func (*ApprovePostRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ApprovePostRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *ApprovePostRequest) GetTitle() string {
+	if x != nil && x.Title != nil {
+		return *x.Title
+	}
+	return ""
+}
+
+func (x *ApprovePostRequest) GetBody() string {
+	if x != nil && x.Body != nil {
+		return *x.Body
+	}
+	return ""
+}
+
+func (x *ApprovePostRequest) GetSummary() string {
+	if x != nil && x.Summary != nil {
+		return *x.Summary
+	}
+	return ""
+}
+
+func (x *ApprovePostRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+type RejectPostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// approval_id returned by GeneratePostDraft.
+	ApprovalId string `protobuf:"bytes,1,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	// Optional reviewer-facing reason recorded with the rejection.
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectPostRequest) Reset() {
+	*x = RejectPostRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectPostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectPostRequest) ProtoMessage() {}
+
+func (x *RejectPostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectPostRequest.ProtoReflect.Descriptor instead.
+func (*RejectPostRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RejectPostRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *RejectPostRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type IndexRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	PostId  string                 `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	Title   string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Body    string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	Summary string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	Tags    []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	// created_at is the post's creation time, UTC. It is carried as a
+	// typed timestamp so consumers never have to guess a string format.
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IndexRequest) Reset() {
+	*x = IndexRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IndexRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexRequest) ProtoMessage() {}
+
+func (x *IndexRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexRequest.ProtoReflect.Descriptor instead.
+func (*IndexRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *IndexRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+func (x *IndexRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *IndexRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *IndexRequest) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *IndexRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *IndexRequest) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type IndexResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IndexResponse) Reset() {
+	*x = IndexResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IndexResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexResponse) ProtoMessage() {}
+
+func (x *IndexResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexResponse.ProtoReflect.Descriptor instead.
+func (*IndexResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{10}
+}
+
+type DeleteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PostId        string                 `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteRequest) Reset() {
+	*x = DeleteRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteRequest) ProtoMessage() {}
+
+func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteRequest.ProtoReflect.Descriptor instead.
+func (*DeleteRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DeleteRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+type DeleteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteResponse) Reset() {
+	*x = DeleteResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteResponse) ProtoMessage() {}
+
+func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
+func (*DeleteResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{12}
+}
+
+type SearchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	Offset        uint32                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         uint32                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchRequest) Reset() {
+	*x = SearchRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchRequest) ProtoMessage() {}
+
+func (x *SearchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
+func (*SearchRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SearchRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchRequest) GetOffset() uint32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *SearchRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type SearchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PostIds       []string               `protobuf:"bytes,1,rep,name=post_ids,json=postIds,proto3" json:"post_ids,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchResponse) Reset() {
+	*x = SearchResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchResponse) ProtoMessage() {}
+
+func (x *SearchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
+func (*SearchResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SearchResponse) GetPostIds() []string {
+	if x != nil {
+		return x.PostIds
+	}
+	return nil
+}
+
+func (x *SearchResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type RelatedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PostId        string                 `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	Limit         uint32                 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelatedRequest) Reset() {
+	*x = RelatedRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelatedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelatedRequest) ProtoMessage() {}
+
+func (x *RelatedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelatedRequest.ProtoReflect.Descriptor instead.
+func (*RelatedRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RelatedRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+func (x *RelatedRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type RelatedResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	PostIds []string               `protobuf:"bytes,1,rep,name=post_ids,json=postIds,proto3" json:"post_ids,omitempty"`
+	// total is the number of indexed posts available as related
+	// candidates, not the size of this page.
+	Total         int32 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelatedResponse) Reset() {
+	*x = RelatedResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelatedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelatedResponse) ProtoMessage() {}
+
+func (x *RelatedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelatedResponse.ProtoReflect.Descriptor instead.
+func (*RelatedResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RelatedResponse) GetPostIds() []string {
+	if x != nil {
+		return x.PostIds
+	}
+	return nil
+}
+
+func (x *RelatedResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type RelatedBatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PostIds       []string               `protobuf:"bytes,1,rep,name=post_ids,json=postIds,proto3" json:"post_ids,omitempty"`
+	Limit         uint32                 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelatedBatchRequest) Reset() {
+	*x = RelatedBatchRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelatedBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelatedBatchRequest) ProtoMessage() {}
+
+func (x *RelatedBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelatedBatchRequest.ProtoReflect.Descriptor instead.
+func (*RelatedBatchRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *RelatedBatchRequest) GetPostIds() []string {
+	if x != nil {
+		return x.PostIds
+	}
+	return nil
+}
+
+func (x *RelatedBatchRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type RelatedBatchItem struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PostId         string                 `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	RelatedPostIds []string               `protobuf:"bytes,2,rep,name=related_post_ids,json=relatedPostIds,proto3" json:"related_post_ids,omitempty"`
+	Total          int32                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RelatedBatchItem) Reset() {
+	*x = RelatedBatchItem{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelatedBatchItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelatedBatchItem) ProtoMessage() {}
+
+func (x *RelatedBatchItem) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelatedBatchItem.ProtoReflect.Descriptor instead.
+func (*RelatedBatchItem) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *RelatedBatchItem) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+func (x *RelatedBatchItem) GetRelatedPostIds() []string {
+	if x != nil {
+		return x.RelatedPostIds
+	}
+	return nil
+}
+
+func (x *RelatedBatchItem) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type RelatedBatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []*RelatedBatchItem    `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelatedBatchResponse) Reset() {
+	*x = RelatedBatchResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelatedBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelatedBatchResponse) ProtoMessage() {}
+
+func (x *RelatedBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelatedBatchResponse.ProtoReflect.Descriptor instead.
+func (*RelatedBatchResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RelatedBatchResponse) GetResults() []*RelatedBatchItem {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+type EmbedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmbedRequest) Reset() {
+	*x = EmbedRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmbedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmbedRequest) ProtoMessage() {}
+
+func (x *EmbedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmbedRequest.ProtoReflect.Descriptor instead.
+func (*EmbedRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *EmbedRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type EmbedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Vector        []float32              `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmbedResponse) Reset() {
+	*x = EmbedResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmbedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmbedResponse) ProtoMessage() {}
+
+func (x *EmbedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmbedResponse.ProtoReflect.Descriptor instead.
+func (*EmbedResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *EmbedResponse) GetVector() []float32 {
+	if x != nil {
+		return x.Vector
+	}
+	return nil
+}
+
+type ChatMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatMessage) Reset() {
+	*x = ChatMessage{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatMessage) ProtoMessage() {}
+
+func (x *ChatMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
+func (*ChatMessage) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ChatMessage) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *ChatMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type ChatAnswerRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Query   string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	History []*ChatMessage         `protobuf:"bytes,2,rep,name=history,proto3" json:"history,omitempty"`
+	TopK    uint32                 `protobuf:"varint,3,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	// thread_id groups a conversation for checkpointed sessions. Empty
+	// keeps the request stateless.
+	ThreadId      string `protobuf:"bytes,4,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatAnswerRequest) Reset() {
+	*x = ChatAnswerRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatAnswerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatAnswerRequest) ProtoMessage() {}
+
+func (x *ChatAnswerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatAnswerRequest.ProtoReflect.Descriptor instead.
+func (*ChatAnswerRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ChatAnswerRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ChatAnswerRequest) GetHistory() []*ChatMessage {
+	if x != nil {
+		return x.History
+	}
+	return nil
+}
+
+func (x *ChatAnswerRequest) GetTopK() uint32 {
+	if x != nil {
+		return x.TopK
+	}
+	return 0
+}
+
+func (x *ChatAnswerRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+type ChatChunk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Delta         string                 `protobuf:"bytes,1,opt,name=delta,proto3" json:"delta,omitempty"`
+	Done          bool                   `protobuf:"varint,2,opt,name=done,proto3" json:"done,omitempty"`
+	CitedPostIds  []string               `protobuf:"bytes,3,rep,name=cited_post_ids,json=citedPostIds,proto3" json:"cited_post_ids,omitempty"`
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatChunk) Reset() {
+	*x = ChatChunk{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatChunk) ProtoMessage() {}
+
+func (x *ChatChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatChunk.ProtoReflect.Descriptor instead.
+func (*ChatChunk) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ChatChunk) GetDelta() string {
+	if x != nil {
+		return x.Delta
+	}
+	return ""
+}
+
+func (x *ChatChunk) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+func (x *ChatChunk) GetCitedPostIds() []string {
+	if x != nil {
+		return x.CitedPostIds
+	}
+	return nil
+}
+
+func (x *ChatChunk) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type UserProfileUpdateRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PostId string                 `protobuf:"bytes,2,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	Kind   InteractionKind        `protobuf:"varint,3,opt,name=kind,proto3,enum=ai.InteractionKind" json:"kind,omitempty"`
+	// source_mode attributes the interaction to the feed surface it came
+	// from; SURPRISE folds the post into the taste profile with a reduced
+	// weight. Unspecified means unattributed.
+	SourceMode    RecommendMode `protobuf:"varint,4,opt,name=source_mode,json=sourceMode,proto3,enum=ai.RecommendMode" json:"source_mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserProfileUpdateRequest) Reset() {
+	*x = UserProfileUpdateRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserProfileUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserProfileUpdateRequest) ProtoMessage() {}
+
+func (x *UserProfileUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserProfileUpdateRequest.ProtoReflect.Descriptor instead.
+func (*UserProfileUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *UserProfileUpdateRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UserProfileUpdateRequest) GetPostId() string {
+	if x != nil {
+		return x.PostId
+	}
+	return ""
+}
+
+func (x *UserProfileUpdateRequest) GetKind() InteractionKind {
+	if x != nil {
+		return x.Kind
+	}
+	return InteractionKind_INTERACTION_KIND_UNSPECIFIED
+}
+
+func (x *UserProfileUpdateRequest) GetSourceMode() RecommendMode {
+	if x != nil {
+		return x.SourceMode
+	}
+	return RecommendMode_RECOMMEND_MODE_UNSPECIFIED
+}
+
+type UserProfileUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserProfileUpdateResponse) Reset() {
+	*x = UserProfileUpdateResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserProfileUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserProfileUpdateResponse) ProtoMessage() {}
+
+func (x *UserProfileUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserProfileUpdateResponse.ProtoReflect.Descriptor instead.
+func (*UserProfileUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{26}
+}
+
+type RecommendRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Offset uint32                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit  uint32                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Mode   RecommendMode          `protobuf:"varint,4,opt,name=mode,proto3,enum=ai.RecommendMode" json:"mode,omitempty"`
+	// seed makes surprise ordering deterministic: the same seed and
+	// profile always yield the same feed.
+	Seed          uint32 `protobuf:"varint,5,opt,name=seed,proto3" json:"seed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecommendRequest) Reset() {
+	*x = RecommendRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecommendRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecommendRequest) ProtoMessage() {}
+
+func (x *RecommendRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecommendRequest.ProtoReflect.Descriptor instead.
+func (*RecommendRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RecommendRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RecommendRequest) GetOffset() uint32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *RecommendRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *RecommendRequest) GetMode() RecommendMode {
+	if x != nil {
+		return x.Mode
+	}
+	return RecommendMode_RECOMMEND_MODE_UNSPECIFIED
+}
+
+func (x *RecommendRequest) GetSeed() uint32 {
+	if x != nil {
+		return x.Seed
+	}
+	return 0
+}
+
+type RecommendResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	PostIds []string               `protobuf:"bytes,1,rep,name=post_ids,json=postIds,proto3" json:"post_ids,omitempty"`
+	// total is the number of rankable posts for the user, not the size of
+	// this page.
+	Total int32 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	// reasons maps post_id -> evidence line derived from the user's real
+	// interaction profile; posts without usable evidence are absent.
+	Reasons       map[string]string `protobuf:"bytes,3,rep,name=reasons,proto3" json:"reasons,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecommendResponse) Reset() {
+	*x = RecommendResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecommendResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecommendResponse) ProtoMessage() {}
+
+func (x *RecommendResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecommendResponse.ProtoReflect.Descriptor instead.
+func (*RecommendResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RecommendResponse) GetPostIds() []string {
+	if x != nil {
+		return x.PostIds
+	}
+	return nil
+}
+
+func (x *RecommendResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *RecommendResponse) GetReasons() map[string]string {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+type DeleteUserProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserProfileRequest) Reset() {
+	*x = DeleteUserProfileRequest{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserProfileRequest) ProtoMessage() {}
+
+func (x *DeleteUserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserProfileRequest.ProtoReflect.Descriptor instead.
+func (*DeleteUserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *DeleteUserProfileRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type DeleteUserProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserProfileResponse) Reset() {
+	*x = DeleteUserProfileResponse{}
+	mi := &file_proto_ai_ai_service_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserProfileResponse) ProtoMessage() {}
+
+func (x *DeleteUserProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ai_ai_service_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserProfileResponse.ProtoReflect.Descriptor instead.
+func (*DeleteUserProfileResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ai_ai_service_proto_rawDescGZIP(), []int{30}
+}
+
 var File_proto_ai_ai_service_proto protoreflect.FileDescriptor
 
 const file_proto_ai_ai_service_proto_rawDesc = "" +
 	"\n" +
-	"\x19proto/ai/ai_service.proto\x12\x02ai\"$\n" +
+	"\x19proto/ai/ai_service.proto\x12\x02ai\x1a\x1fgoogle/protobuf/timestamp.proto\"$\n" +
 	"\x0eContentRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"+\n" +
 	"\x0fContentResponse\x12\x18\n" +
@@ -337,11 +1915,140 @@ const file_proto_ai_ai_service_proto_rawDesc = "" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x12\x18\n" +
 	"\asummary\x18\x03 \x01(\tR\asummary\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags2\xc4\x01\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\"\xb8\x01\n" +
+	"\x11PostWorkflowState\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x02 \x01(\tR\x04body\x12\x18\n" +
+	"\asummary\x18\x03 \x01(\tR\asummary\x12\x12\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12\x1f\n" +
+	"\vapproval_id\x18\x05 \x01(\tR\n" +
+	"approvalId\x12*\n" +
+	"\x06status\x18\x06 \x01(\x0e2\x12.ai.WorkflowStatusR\x06status\"\xbb\x01\n" +
+	"\x12ApprovePostRequest\x12\x1f\n" +
+	"\vapproval_id\x18\x01 \x01(\tR\n" +
+	"approvalId\x12\x19\n" +
+	"\x05title\x18\x02 \x01(\tH\x00R\x05title\x88\x01\x01\x12\x17\n" +
+	"\x04body\x18\x03 \x01(\tH\x01R\x04body\x88\x01\x01\x12\x1d\n" +
+	"\asummary\x18\x04 \x01(\tH\x02R\asummary\x88\x01\x01\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tagsB\b\n" +
+	"\x06_titleB\a\n" +
+	"\x05_bodyB\n" +
+	"\n" +
+	"\b_summary\"L\n" +
+	"\x11RejectPostRequest\x12\x1f\n" +
+	"\vapproval_id\x18\x01 \x01(\tR\n" +
+	"approvalId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xba\x01\n" +
+	"\fIndexRequest\x12\x17\n" +
+	"\apost_id\x18\x01 \x01(\tR\x06postId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\x12\x18\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x0f\n" +
+	"\rIndexResponse\"(\n" +
+	"\rDeleteRequest\x12\x17\n" +
+	"\apost_id\x18\x01 \x01(\tR\x06postId\"\x10\n" +
+	"\x0eDeleteResponse\"S\n" +
+	"\rSearchRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\rR\x06offset\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\rR\x05limit\"A\n" +
+	"\x0eSearchResponse\x12\x19\n" +
+	"\bpost_ids\x18\x01 \x03(\tR\apostIds\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"?\n" +
+	"\x0eRelatedRequest\x12\x17\n" +
+	"\apost_id\x18\x01 \x01(\tR\x06postId\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\rR\x05limit\"B\n" +
+	"\x0fRelatedResponse\x12\x19\n" +
+	"\bpost_ids\x18\x01 \x03(\tR\apostIds\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"F\n" +
+	"\x13RelatedBatchRequest\x12\x19\n" +
+	"\bpost_ids\x18\x01 \x03(\tR\apostIds\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\rR\x05limit\"k\n" +
+	"\x10RelatedBatchItem\x12\x17\n" +
+	"\apost_id\x18\x01 \x01(\tR\x06postId\x12(\n" +
+	"\x10related_post_ids\x18\x02 \x03(\tR\x0erelatedPostIds\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\"F\n" +
+	"\x14RelatedBatchResponse\x12.\n" +
+	"\aresults\x18\x01 \x03(\v2\x14.ai.RelatedBatchItemR\aresults\"\"\n" +
+	"\fEmbedRequest\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"'\n" +
+	"\rEmbedResponse\x12\x16\n" +
+	"\x06vector\x18\x01 \x03(\x02R\x06vector\";\n" +
+	"\vChatMessage\x12\x12\n" +
+	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\x86\x01\n" +
+	"\x11ChatAnswerRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12)\n" +
+	"\ahistory\x18\x02 \x03(\v2\x0f.ai.ChatMessageR\ahistory\x12\x13\n" +
+	"\x05top_k\x18\x03 \x01(\rR\x04topK\x12\x1b\n" +
+	"\tthread_id\x18\x04 \x01(\tR\bthreadId\"q\n" +
+	"\tChatChunk\x12\x14\n" +
+	"\x05delta\x18\x01 \x01(\tR\x05delta\x12\x12\n" +
+	"\x04done\x18\x02 \x01(\bR\x04done\x12$\n" +
+	"\x0ecited_post_ids\x18\x03 \x03(\tR\fcitedPostIds\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xa9\x01\n" +
+	"\x18UserProfileUpdateRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\apost_id\x18\x02 \x01(\tR\x06postId\x12'\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x13.ai.InteractionKindR\x04kind\x122\n" +
+	"\vsource_mode\x18\x04 \x01(\x0e2\x11.ai.RecommendModeR\n" +
+	"sourceMode\"\x1b\n" +
+	"\x19UserProfileUpdateResponse\"\x94\x01\n" +
+	"\x10RecommendRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\rR\x06offset\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\rR\x05limit\x12%\n" +
+	"\x04mode\x18\x04 \x01(\x0e2\x11.ai.RecommendModeR\x04mode\x12\x12\n" +
+	"\x04seed\x18\x05 \x01(\rR\x04seed\"\xbe\x01\n" +
+	"\x11RecommendResponse\x12\x19\n" +
+	"\bpost_ids\x18\x01 \x03(\tR\apostIds\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12<\n" +
+	"\areasons\x18\x03 \x03(\v2\".ai.RecommendResponse.ReasonsEntryR\areasons\x1a:\n" +
+	"\fReasonsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"3\n" +
+	"\x18DeleteUserProfileRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x1b\n" +
+	"\x19DeleteUserProfileResponse*\x8a\x01\n" +
+	"\x0eWorkflowStatus\x12\x1f\n" +
+	"\x1bWORKFLOW_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17WORKFLOW_STATUS_PENDING\x10\x01\x12\x1c\n" +
+	"\x18WORKFLOW_STATUS_APPROVED\x10\x02\x12\x1c\n" +
+	"\x18WORKFLOW_STATUS_REJECTED\x10\x03*\x84\x01\n" +
+	"\x0fInteractionKind\x12 \n" +
+	"\x1cINTERACTION_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15INTERACTION_KIND_VIEW\x10\x01\x12\x19\n" +
+	"\x15INTERACTION_KIND_LIKE\x10\x02\x12\x19\n" +
+	"\x15INTERACTION_KIND_SAVE\x10\x03*\x9f\x01\n" +
+	"\rRecommendMode\x12\x1e\n" +
+	"\x1aRECOMMEND_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16RECOMMEND_MODE_DEFAULT\x10\x01\x12\x1b\n" +
+	"\x17RECOMMEND_MODE_SURPRISE\x10\x02\x12\x18\n" +
+	"\x14RECOMMEND_MODE_FRESH\x10\x03\x12\x1b\n" +
+	"\x17RECOMMEND_MODE_EXPLORER\x10\x042\xe9\a\n" +
 	"\tAIService\x12:\n" +
 	"\x0fGenerateSummary\x12\x12.ai.ContentRequest\x1a\x13.ai.ContentResponse\x124\n" +
 	"\fGenerateTags\x12\x12.ai.ContextRequest\x1a\x10.ai.TagsResponse\x12E\n" +
-	"\fGeneratePost\x12\x19.ai.PostGenerationRequest\x1a\x1a.ai.PostGenerationResponseB>Z<github.com/kunalPisolkar24/blogapp/services/content/proto/aib\x06proto3"
+	"\fGeneratePost\x12\x19.ai.PostGenerationRequest\x1a\x1a.ai.PostGenerationResponse\x12E\n" +
+	"\x11GeneratePostDraft\x12\x19.ai.PostGenerationRequest\x1a\x15.ai.PostWorkflowState\x12<\n" +
+	"\vApprovePost\x12\x16.ai.ApprovePostRequest\x1a\x15.ai.PostWorkflowState\x12:\n" +
+	"\n" +
+	"RejectPost\x12\x15.ai.RejectPostRequest\x1a\x15.ai.PostWorkflowState\x120\n" +
+	"\tIndexPost\x12\x10.ai.IndexRequest\x1a\x11.ai.IndexResponse\x123\n" +
+	"\n" +
+	"DeletePost\x12\x11.ai.DeleteRequest\x1a\x12.ai.DeleteResponse\x124\n" +
+	"\vSearchPosts\x12\x11.ai.SearchRequest\x1a\x12.ai.SearchResponse\x127\n" +
+	"\fRelatedPosts\x12\x12.ai.RelatedRequest\x1a\x13.ai.RelatedResponse\x12F\n" +
+	"\x11RelatedPostsBatch\x12\x17.ai.RelatedBatchRequest\x1a\x18.ai.RelatedBatchResponse\x12,\n" +
+	"\x05Embed\x12\x10.ai.EmbedRequest\x1a\x11.ai.EmbedResponse\x124\n" +
+	"\n" +
+	"ChatAnswer\x12\x15.ai.ChatAnswerRequest\x1a\r.ai.ChatChunk0\x01\x12P\n" +
+	"\x11UpdateUserProfile\x12\x1c.ai.UserProfileUpdateRequest\x1a\x1d.ai.UserProfileUpdateResponse\x12<\n" +
+	"\rRecommendFeed\x12\x14.ai.RecommendRequest\x1a\x15.ai.RecommendResponse\x12P\n" +
+	"\x11DeleteUserProfile\x12\x1c.ai.DeleteUserProfileRequest\x1a\x1d.ai.DeleteUserProfileResponseB<Z:github.com/kunalPisolkar24/topos/services/content/proto/aib\x06proto3"
 
 var (
 	file_proto_ai_ai_service_proto_rawDescOnce sync.Once
@@ -355,27 +2062,92 @@ func file_proto_ai_ai_service_proto_rawDescGZIP() []byte {
 	return file_proto_ai_ai_service_proto_rawDescData
 }
 
-var file_proto_ai_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_proto_ai_ai_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_proto_ai_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_proto_ai_ai_service_proto_goTypes = []any{
-	(*ContentRequest)(nil),         // 0: ai.ContentRequest
-	(*ContentResponse)(nil),        // 1: ai.ContentResponse
-	(*ContextRequest)(nil),         // 2: ai.ContextRequest
-	(*TagsResponse)(nil),           // 3: ai.TagsResponse
-	(*PostGenerationRequest)(nil),  // 4: ai.PostGenerationRequest
-	(*PostGenerationResponse)(nil), // 5: ai.PostGenerationResponse
+	(WorkflowStatus)(0),               // 0: ai.WorkflowStatus
+	(InteractionKind)(0),              // 1: ai.InteractionKind
+	(RecommendMode)(0),                // 2: ai.RecommendMode
+	(*ContentRequest)(nil),            // 3: ai.ContentRequest
+	(*ContentResponse)(nil),           // 4: ai.ContentResponse
+	(*ContextRequest)(nil),            // 5: ai.ContextRequest
+	(*TagsResponse)(nil),              // 6: ai.TagsResponse
+	(*PostGenerationRequest)(nil),     // 7: ai.PostGenerationRequest
+	(*PostGenerationResponse)(nil),    // 8: ai.PostGenerationResponse
+	(*PostWorkflowState)(nil),         // 9: ai.PostWorkflowState
+	(*ApprovePostRequest)(nil),        // 10: ai.ApprovePostRequest
+	(*RejectPostRequest)(nil),         // 11: ai.RejectPostRequest
+	(*IndexRequest)(nil),              // 12: ai.IndexRequest
+	(*IndexResponse)(nil),             // 13: ai.IndexResponse
+	(*DeleteRequest)(nil),             // 14: ai.DeleteRequest
+	(*DeleteResponse)(nil),            // 15: ai.DeleteResponse
+	(*SearchRequest)(nil),             // 16: ai.SearchRequest
+	(*SearchResponse)(nil),            // 17: ai.SearchResponse
+	(*RelatedRequest)(nil),            // 18: ai.RelatedRequest
+	(*RelatedResponse)(nil),           // 19: ai.RelatedResponse
+	(*RelatedBatchRequest)(nil),       // 20: ai.RelatedBatchRequest
+	(*RelatedBatchItem)(nil),          // 21: ai.RelatedBatchItem
+	(*RelatedBatchResponse)(nil),      // 22: ai.RelatedBatchResponse
+	(*EmbedRequest)(nil),              // 23: ai.EmbedRequest
+	(*EmbedResponse)(nil),             // 24: ai.EmbedResponse
+	(*ChatMessage)(nil),               // 25: ai.ChatMessage
+	(*ChatAnswerRequest)(nil),         // 26: ai.ChatAnswerRequest
+	(*ChatChunk)(nil),                 // 27: ai.ChatChunk
+	(*UserProfileUpdateRequest)(nil),  // 28: ai.UserProfileUpdateRequest
+	(*UserProfileUpdateResponse)(nil), // 29: ai.UserProfileUpdateResponse
+	(*RecommendRequest)(nil),          // 30: ai.RecommendRequest
+	(*RecommendResponse)(nil),         // 31: ai.RecommendResponse
+	(*DeleteUserProfileRequest)(nil),  // 32: ai.DeleteUserProfileRequest
+	(*DeleteUserProfileResponse)(nil), // 33: ai.DeleteUserProfileResponse
+	nil,                               // 34: ai.RecommendResponse.ReasonsEntry
+	(*timestamppb.Timestamp)(nil),     // 35: google.protobuf.Timestamp
 }
 var file_proto_ai_ai_service_proto_depIdxs = []int32{
-	0, // 0: ai.AIService.GenerateSummary:input_type -> ai.ContentRequest
-	2, // 1: ai.AIService.GenerateTags:input_type -> ai.ContextRequest
-	4, // 2: ai.AIService.GeneratePost:input_type -> ai.PostGenerationRequest
-	1, // 3: ai.AIService.GenerateSummary:output_type -> ai.ContentResponse
-	3, // 4: ai.AIService.GenerateTags:output_type -> ai.TagsResponse
-	5, // 5: ai.AIService.GeneratePost:output_type -> ai.PostGenerationResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: ai.PostWorkflowState.status:type_name -> ai.WorkflowStatus
+	35, // 1: ai.IndexRequest.created_at:type_name -> google.protobuf.Timestamp
+	21, // 2: ai.RelatedBatchResponse.results:type_name -> ai.RelatedBatchItem
+	25, // 3: ai.ChatAnswerRequest.history:type_name -> ai.ChatMessage
+	1,  // 4: ai.UserProfileUpdateRequest.kind:type_name -> ai.InteractionKind
+	2,  // 5: ai.UserProfileUpdateRequest.source_mode:type_name -> ai.RecommendMode
+	2,  // 6: ai.RecommendRequest.mode:type_name -> ai.RecommendMode
+	34, // 7: ai.RecommendResponse.reasons:type_name -> ai.RecommendResponse.ReasonsEntry
+	3,  // 8: ai.AIService.GenerateSummary:input_type -> ai.ContentRequest
+	5,  // 9: ai.AIService.GenerateTags:input_type -> ai.ContextRequest
+	7,  // 10: ai.AIService.GeneratePost:input_type -> ai.PostGenerationRequest
+	7,  // 11: ai.AIService.GeneratePostDraft:input_type -> ai.PostGenerationRequest
+	10, // 12: ai.AIService.ApprovePost:input_type -> ai.ApprovePostRequest
+	11, // 13: ai.AIService.RejectPost:input_type -> ai.RejectPostRequest
+	12, // 14: ai.AIService.IndexPost:input_type -> ai.IndexRequest
+	14, // 15: ai.AIService.DeletePost:input_type -> ai.DeleteRequest
+	16, // 16: ai.AIService.SearchPosts:input_type -> ai.SearchRequest
+	18, // 17: ai.AIService.RelatedPosts:input_type -> ai.RelatedRequest
+	20, // 18: ai.AIService.RelatedPostsBatch:input_type -> ai.RelatedBatchRequest
+	23, // 19: ai.AIService.Embed:input_type -> ai.EmbedRequest
+	26, // 20: ai.AIService.ChatAnswer:input_type -> ai.ChatAnswerRequest
+	28, // 21: ai.AIService.UpdateUserProfile:input_type -> ai.UserProfileUpdateRequest
+	30, // 22: ai.AIService.RecommendFeed:input_type -> ai.RecommendRequest
+	32, // 23: ai.AIService.DeleteUserProfile:input_type -> ai.DeleteUserProfileRequest
+	4,  // 24: ai.AIService.GenerateSummary:output_type -> ai.ContentResponse
+	6,  // 25: ai.AIService.GenerateTags:output_type -> ai.TagsResponse
+	8,  // 26: ai.AIService.GeneratePost:output_type -> ai.PostGenerationResponse
+	9,  // 27: ai.AIService.GeneratePostDraft:output_type -> ai.PostWorkflowState
+	9,  // 28: ai.AIService.ApprovePost:output_type -> ai.PostWorkflowState
+	9,  // 29: ai.AIService.RejectPost:output_type -> ai.PostWorkflowState
+	13, // 30: ai.AIService.IndexPost:output_type -> ai.IndexResponse
+	15, // 31: ai.AIService.DeletePost:output_type -> ai.DeleteResponse
+	17, // 32: ai.AIService.SearchPosts:output_type -> ai.SearchResponse
+	19, // 33: ai.AIService.RelatedPosts:output_type -> ai.RelatedResponse
+	22, // 34: ai.AIService.RelatedPostsBatch:output_type -> ai.RelatedBatchResponse
+	24, // 35: ai.AIService.Embed:output_type -> ai.EmbedResponse
+	27, // 36: ai.AIService.ChatAnswer:output_type -> ai.ChatChunk
+	29, // 37: ai.AIService.UpdateUserProfile:output_type -> ai.UserProfileUpdateResponse
+	31, // 38: ai.AIService.RecommendFeed:output_type -> ai.RecommendResponse
+	33, // 39: ai.AIService.DeleteUserProfile:output_type -> ai.DeleteUserProfileResponse
+	24, // [24:40] is the sub-list for method output_type
+	8,  // [8:24] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_ai_ai_service_proto_init() }
@@ -383,18 +2155,20 @@ func file_proto_ai_ai_service_proto_init() {
 	if File_proto_ai_ai_service_proto != nil {
 		return
 	}
+	file_proto_ai_ai_service_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_ai_ai_service_proto_rawDesc), len(file_proto_ai_ai_service_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   6,
+			NumEnums:      3,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_proto_ai_ai_service_proto_goTypes,
 		DependencyIndexes: file_proto_ai_ai_service_proto_depIdxs,
+		EnumInfos:         file_proto_ai_ai_service_proto_enumTypes,
 		MessageInfos:      file_proto_ai_ai_service_proto_msgTypes,
 	}.Build()
 	File_proto_ai_ai_service_proto = out.File
