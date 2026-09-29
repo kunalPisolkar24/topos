@@ -111,17 +111,22 @@ const hasCacheRecord = (client: ApolloClient, id: string) =>
 describe("usePostViewerController", () => {
   it("refreshes post list queries and invalidates stale post cache after a successful delete", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    // Once deleted, the post no longer exists server-side: any refetch
+    // triggered by the still-mounted query must resolve to null, otherwise
+    // the test races cache eviction against the refetch response.
+    let deleted = false;
     server.use(
       graphqlApi.query("Post", () =>
         HttpResponse.json({
           data: {
-            post: loadedPost,
+            post: deleted ? null : loadedPost,
           },
         }),
       ),
-      graphqlApi.mutation("DeletePost", () =>
-        HttpResponse.json({ data: { deletePost: true } }),
-      ),
+      graphqlApi.mutation("DeletePost", () => {
+        deleted = true;
+        return HttpResponse.json({ data: { deletePost: true } });
+      }),
     );
 
     const localClient = createApolloClient({
@@ -180,12 +185,16 @@ describe("usePostViewerController", () => {
         variables: postListVariables,
       }),
     ).toBeNull();
-    expect(
-      localClient.readQuery({
-        query: PostDocument,
-        variables: postVariables,
-      }),
-    ).toBeNull();
+    // The viewer query stays mounted (cache-and-network), so it refetches
+    // after eviction and settles on the deleted-post null from the mock.
+    await waitFor(() => {
+      expect(
+        localClient.readQuery({
+          query: PostDocument,
+          variables: postVariables,
+        }),
+      ).toEqual({ post: null });
+    });
     expect(hasCacheRecord(localClient, postCacheId)).toBe(false);
   });
 
@@ -302,17 +311,21 @@ describe("usePostViewerController", () => {
 
   it("evicts the me.posts profile cache after a successful delete", async () => {
     const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    // Same deleted-post semantics as above: keep refetches resolving to
+    // null so the test cannot race cache eviction against the mock.
+    let deleted = false;
     server.use(
       graphqlApi.query("Post", () =>
         HttpResponse.json({
           data: {
-            post: loadedPost,
+            post: deleted ? null : loadedPost,
           },
         }),
       ),
-      graphqlApi.mutation("DeletePost", () =>
-        HttpResponse.json({ data: { deletePost: true } }),
-      ),
+      graphqlApi.mutation("DeletePost", () => {
+        deleted = true;
+        return HttpResponse.json({ data: { deletePost: true } });
+      }),
     );
 
     const localClient = createApolloClient({
