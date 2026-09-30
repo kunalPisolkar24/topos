@@ -46,7 +46,7 @@ infrastructure/ Docker compose (prod/local), logging (filebeat/logstash)
 
 | Service | Stack | Entrypoint | Ports | Run | Unit tests | Integration tests | Lint / format | Codegen |
 |---|---|---|---|---|---|---|---|---|
-| `services/ai` | Python 3.12, poetry, gRPC | `src/main.py` | gRPC 50051, metrics 12666 | `make run` | `make test` (pytest, skips container tests) | `make integration` (testcontainers) | `make lint` (ruff check), `make format` (ruff format) | `make generate` (protoc → `src/generated/`, gitignored) |
+| `services/ai` | Python 3.12, poetry, gRPC | `src/main.py` | gRPC 50051, metrics 12666 | `make run` | `make test` (pytest, skips container tests) | `make integration` (testcontainers) | `make lint` (ruff check), `make format` (ruff format) | `make generate` (protoc → `src/generated/`; `*.py` gitignored, `__init__.py` + `*.pyi` tracked) |
 | `services/content` | Go 1.25, gqlgen, gRPC client | `cmd/server`, `cmd/worker`, `cmd/search-worker`, `cmd/personalizer`, `cmd/dlq-replay` | server 4002 (`/query`, `/healthz`, `/readyz`, `/metrics`), worker 4003, search worker 4004, personalizer 4005 | `go run ./cmd/server` | `make test` (`go test ./...`) | `make test-integration` (`go test -tags integration -p 4`, testcontainers) | `make vet` (`go vet ./...` + `-tags integration`), `make fmt` (`gofmt -l .`) — there is no `lint` target | `make generate` (protoc → `proto/ai/`); gqlgen via `go run github.com/99designs/gqlgen` |
 | `services/user` | TypeScript Node 22, Apollo Federation subgraph, Prisma | `src/index.ts` | 4001 | `npm run dev` | `npm test` (vitest) | `npm run test:integration` (testcontainers) | `npm run lint` (`tsc --noEmit && eslint .`) | `npx prisma generate` |
 | `frontend` | React + Vite, shadcn/ui, Tailwind, GraphQL codegen | `src/main.tsx` | dev 5173, docker 3000 | `npm run dev` | `npm test` (vitest) | `npm run test:integration` | `npm run lint` (eslint) | `npm run codegen` (graphql-codegen) |
@@ -109,8 +109,15 @@ Write clean, simple, readable, maintainable code. Rules for every change:
 
 ## Codegen
 
-Generated code is gitignored in `services/ai/src/generated/` and
-`services/user/src/generated/` and must be regenerated, not edited:
+Generated code must be regenerated, not edited. Two directories, two
+different rules:
+
+- **`services/ai/src/generated/`** is *partly* gitignored — the generated
+  `*.py` modules are ignored, but `__init__.py` and the two `*.pyi` stubs are
+  tracked. A fresh clone still needs `make generate`.
+- **`services/user/src/generated/`** is fully gitignored.
+
+The specific changes:
 
 - **Proto changes** (`services/ai/proto/ai/ai_service.proto`): run
   `make generate` in `services/ai` (Python stubs) **and** in

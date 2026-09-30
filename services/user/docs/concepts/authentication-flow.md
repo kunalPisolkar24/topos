@@ -46,7 +46,7 @@ sequenceDiagram
 
     rect rgb(255, 248, 240)
     Note over B,P: 3. Authenticated request
-    B->>G: query me + Authorization: Bearer &lt;token&gt;
+    B->>G: query me + Authorization: Bearer <token>
     G->>U: forward operation and header
     U->>U: verify JWT signature, issuer, audience, expiry
     U->>U: context.user = { id }
