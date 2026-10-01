@@ -19,7 +19,7 @@ services/
                 AI summary/vector indexing, DLQ replay
   user/         TypeScript (Node 22) Apollo Federation subgraph: accounts,
                 profiles, JWTs, Prisma over Postgres
-infrastructure/ Docker compose (prod/local), logging (filebeat/logstash)
+infrastructure/ Docker compose (prod/local), Terraform, OTel collector
 ```
 
 ## Architecture

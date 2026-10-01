@@ -23,7 +23,7 @@ Open <http://localhost:3000>. The main endpoints are:
 | --- | --- |
 | <http://localhost:3000> | Frontend application |
 | <http://localhost:4000/graphql> | Federated GraphQL API |
-| <http://localhost:4000/health> | Gateway health endpoint |
+| `docker exec local-gateway bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088; printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3; cat <&3'` | Gateway health check. Port `8088` is never published, and the router image ships no `curl` or `wget`, so the probe uses bash's `/dev/tcp`. Returns `{"status":"UP"}` |
 
 The gateway composes the user and content subgraphs. The frontend should talk
 to the gateway, not directly to a subgraph.
