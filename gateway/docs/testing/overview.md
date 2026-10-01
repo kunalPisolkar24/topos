@@ -15,7 +15,7 @@ running gateway to probe. Then come back here before opening a PR.
 | --- | --- | --- | --- |
 | Composition | Rover, in CI | `rover supergraph compose --config ./supergraph.yaml` | No |
 | Image build | Docker | `docker build -f gateway/Dockerfile .` | Yes |
-| Manual probes | `curl` + `docker exec` | see [the matrix](#manual-test-matrix) | Yes |
+| Manual probes | `curl` in a throwaway container | see [the matrix](#manual-test-matrix) | Yes |
 | Unit tests | — | none | — |
 | Integration tests | — | none | — |
 
@@ -125,8 +125,8 @@ verified answer.
 | 1 | `curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ __typename }"}'` | `{"data":{"__typename":"Query"}}` |
 | 2 | `curl -s -o /dev/null -w '%{http_code}' localhost:4000/` | `404` |
 | 3 | `curl -s -o /dev/null -w '%{http_code}' localhost:4000/health` | `404` |
-| 4 | `docker exec local-gateway wget -qO- http://localhost:8088/health` | `{"status":"UP"}` |
-| 5 | `docker exec local-gateway wget -qO- http://localhost:8088/metrics \| head -1` | a `# HELP`/`# TYPE` line |
+| 4 | `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health` | `{"status":"UP"}` |
+| 5 | `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/metrics \| head -1` | a `# HELP`/`# TYPE` line |
 | 6 | `curl -s -o /dev/null -w '%{http_code}' localhost:8088/health` | connection refused (8088 is not published) |
 
 ### Validation versus execution
@@ -187,7 +187,7 @@ the Docker network.
 [ ] docker build -f gateway/Dockerfile . succeeds      (Option B)
 [ ] make local-up brings the stack up cleanly
 [ ] Test 1 returns {"data":{"__typename":"Query"}}
-[ ] Test 4 returns {"status":"UP"} via docker exec
+[ ] Test 4 returns {"status":"UP"} via the throwaway curl container
 [ ] A cross-entity query (test 11 or 12) returns no errors
 [ ] docker logs local-gateway shows no new ERROR lines
 [ ] Only .md or intended files are changed (git status)

@@ -156,11 +156,12 @@ health_check:
 ```
 
 Both listeners are on 8088, which is deliberate — one port for probes, one for
-traffic. Port 8088 is **not published** by either Compose file, so from the
-host you must `docker exec`:
+traffic. Port 8088 is **not published** by either Compose file, and the router
+image contains neither `curl` nor `wget`, so probe it from a throwaway
+container attached to the gateway's network namespace:
 
 ```bash
-docker exec local-gateway wget -qO- http://localhost:8088/health
+docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health
 ```
 
 The response is always `{"status":"UP"}` with HTTP 200 while the process is
@@ -202,7 +203,7 @@ telemetry:
 ### Metrics
 
 Prometheus scrapes itself onto the same port as health. `GET /metrics` returns
-roughly 365 lines of `0.0.0.4` text including:
+a little over 200 lines of `0.0.4` text (240 after a handful of requests) including:
 
 | Metric | Meaning |
 | --- | --- |

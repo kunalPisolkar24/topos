@@ -86,10 +86,12 @@ single most useful debugging skill here — see
 ## 3. Check health
 
 Health is **not** on port 4000. It lives on 8088, which neither Compose file
-publishes, so you have to go through Docker:
+publishes, so you have to go through Docker. The router image ships neither
+`curl` nor `wget`, so this runs `curl` in a throwaway container attached to the
+gateway's network namespace:
 
 ```bash
-docker exec local-gateway wget -qO- http://localhost:8088/health
+docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health
 ```
 
 ```json
@@ -117,7 +119,7 @@ make local-down
 | --- | --- |
 | `make local-up` / `make local-down` | Start/stop the whole stack, gateway included |
 | `curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ __typename }"}'` | Smoke-test the router |
-| `docker exec local-gateway wget -qO- http://localhost:8088/health` | Probe health without publishing the port |
+| `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health` | Probe health without publishing the port |
 | `docker logs -f local-gateway` | Watch boot lines and errors |
 
 ## Troubleshooting
@@ -125,7 +127,7 @@ make local-down
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `curl: (7) Failed to connect to localhost port 4000` | Stack not running, or still starting | `docker compose -f infrastructure/docker/local/compose.yml ps`, then `docker logs local-gateway` |
-| `Connection refused` on 8088 from the host | Expected — 8088 is never published | Use `docker exec`, as above |
+| `Connection refused` on 8088 from the host | Expected — 8088 is never published | Use the throwaway `curl` container, as above |
 | Boot log shows repeated `OpenTelemetry trace error ... dns error` | No collector on the local network | Harmless. `router.yaml` documents that export failures are logged and dropped |
 | `WARN telemetry.instrumentation.spans.mode is currently set to 'deprecated'` | That key is not set | Expected; see [Configuration](configuration.md#telemetry) |
 | `SUBREQUEST_HTTP_ERROR` with a `dns error` naming `user-service` or `content-service` | A subgraph is down, or its hostname does not resolve on that network | Restart the stack; check `supergraph.yaml` if you changed a hostname |

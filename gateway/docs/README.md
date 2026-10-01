@@ -67,17 +67,18 @@ Verified against a running router built from these files:
 | `POST /graphql` | `0.0.0.0:4000` | Yes, `4000:4000` | The federated API |
 | `GET /` | `0.0.0.0:4000` | Yes | `404` — there is no landing page |
 | `GET /health` | `0.0.0.0:8088` | **No** | `200` `{"status":"UP"}` |
-| `GET /metrics` | `0.0.0.0:8088` | **No** | Prometheus text, `0.0.0.4` |
+| `GET /metrics` | `0.0.0.0:8088` | **No** | Prometheus text, `0.0.4` |
 
 Only port `4000` is published by `compose.yml` and `compose.local.yml`. Port
 `8088` stays on the Docker network, where `otel-collector` scrapes
 `gateway:8088` (`infrastructure/docker/prod/otel-collector-config.yaml`). To
-reach it from your machine you have to `docker exec` into the container.
+reach it from your machine, probe it from a container on that network.
 
 > **Common gotcha:** health is **not** on port 4000.
 > `health_check.listen` is `0.0.0.0:8088`, and `GET :4000/health` returns
 > `404`. Probe it with
-> `docker exec <container> wget -qO- http://localhost:8088/health` — see
+> `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health`
+> (the router image ships no `curl` or `wget`) — see
 > [Health and observability](operations/health-and-observability.md).
 
 ## Where the gateway sits

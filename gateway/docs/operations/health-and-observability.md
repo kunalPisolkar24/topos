@@ -15,7 +15,7 @@ one-line health check. This page is the full reference.
 flowchart LR
   B["Browser, curl,<br/>frontend"] -->|"HTTP on 4000"| P4["gateway:4000<br/>/graphql<br/><b>published</b>"]
   OC["otel-collector<br/>Prometheus scrape"] -->|"gateway:8088<br/>on the Docker network"| P8["gateway:8088<br/>/health  /metrics<br/><b>not published</b>"]
-  DE["docker exec into<br/>the gateway container"] -.-> P8
+  DE["throwaway curl container<br/>on the gateway's network"] -.-> P8
   HC["curl localhost:8088<br/>from the host"] -.->|"connection refused"| NR["never reaches the gateway"]
 ```
 
@@ -23,10 +23,35 @@ flowchart LR
 `0.0.0.0:8088`, and both Compose files publish only `4000:4000`. That is why
 every probe below goes through Docker.
 
+The router image is `ghcr.io/apollographql/router:v1.38.0`, and it ships
+**neither `curl` nor `wget`**, so the intuitive probe fails:
+
+```console
+$ docker exec local-gateway wget -qO- http://localhost:8088/health
+OCI runtime exec failed: exec: "wget": executable file not found in $PATH
+```
+
+Two commands that do work. The first needs no extra image; the second is the
+one used throughout this page:
+
+```console
+$ docker exec local-gateway bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088; printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3; cat <&3'
+HTTP/1.1 200 OK
+...
+{"status":"UP"}
+
+$ docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health
+{"status":"UP"}
+```
+
+`--network container:local-gateway` attaches the throwaway container to the
+gateway's own network namespace, so `localhost:8088` inside it *is* the
+gateway's `8088`.
+
 | Probe | Command | Expected |
 | --- | --- | --- |
-| Health | `docker exec local-gateway wget -qO- http://localhost:8088/health` | `{"status":"UP"}` |
-| Metrics | `docker exec local-gateway wget -qO- http://localhost:8088/metrics` | ~365 lines, `# TYPE apollo_router_...` |
+| Health | `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health` | `{"status":"UP"}` |
+| Metrics | `docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/metrics` | a little over 200 lines, all `# TYPE apollo_router_...` |
 | Liveness of the API | `curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ __typename }"}'` | `{"data":{"__typename":"Query"}}` |
 | Wrong health path | `curl -s localhost:4000/health` | `404`, empty body |
 
@@ -38,7 +63,7 @@ this configuration, measured:
 ```console
 $ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4000/health
 404
-$ docker exec local-gateway wget -qO- http://localhost:8088/health
+$ docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/health
 {"status":"UP"}
 ```
 
@@ -74,15 +99,21 @@ curl -s http://localhost:4000/graphql \
 ### Endpoint
 
 ```console
-$ docker exec local-gateway wget -qO- http://localhost:8088/metrics | head -3
-# HELP apollo_router_lifecycle_license
+$ docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/metrics | grep -A1 '^# TYPE apollo_router_lifecycle_license'
 # TYPE apollo_router_lifecycle_license gauge
 apollo_router_lifecycle_license{license_state="unlicensed",otel_scope_name="apollo/router"} 1
 ```
 
-Content type is `text/plain; version=0.0.4`. Roughly 365 lines with this
-configuration, all of them self-scraped — the router does not need an external
-Prometheus.
+Ordering is alphabetical by metric family, so the *first* lines depend on which
+counters exist yet: a freshly started router leads with
+`apollo_router_lifecycle_license`, and one that has served queries leads with
+`apollo_router_cache_hit_count_total`. Grep for a metric rather than slicing
+the head when you need a stable answer.
+
+Content type is `text/plain; version=0.0.4`. The block is a little over 200
+lines: **240** after a handful of requests, 227 before any. Each counter
+appears the first time it is recorded, so the exact count grows with use.
+Everything is self-scraped — the router does not need an external Prometheus.
 
 ### What is available
 
@@ -119,13 +150,22 @@ something to fetch them.
 ### Quick metric queries
 
 ```bash
-# Requests since boot
-docker exec local-gateway wget -qO- http://localhost:8088/metrics \
-  | grep '^apollo_router_http_requests_total'
+# Requests since boot (empty until something has called the gateway)
+docker run --rm --network container:local-gateway curlimages/curl:latest \
+  -fsS http://localhost:8088/metrics | grep '^apollo_router_http_requests_total'
 
 # Cache hit ratio
-docker exec local-gateway wget -qO- http://localhost:8088/metrics \
-  | grep -E 'apollo_router_cache_(hit|miss)_count_total'
+docker run --rm --network container:local-gateway curlimages/curl:latest \
+  -fsS http://localhost:8088/metrics | grep -E '^apollo_router_cache_(hit|miss)_count_total'
+```
+
+Both return nothing on a freshly started router: a counter does not exist
+until it is first incremented. Send one query and retry:
+
+```console
+$ curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ __typename }"}' >/dev/null
+$ docker run --rm --network container:local-gateway curlimages/curl:latest -fsS http://localhost:8088/metrics | grep '^apollo_router_http_requests_total'
+apollo_router_http_requests_total{status="200",otel_scope_name="apollo/router"} 1
 ```
 
 ## Tracing
@@ -213,7 +253,7 @@ traces, or on the subgraphs' own logs.
 | Supergraph did not load | `curl ... -d '{"query":"{ __typename }"}'` | `{"data":{"__typename":"Query"}}` |
 | A subgraph is down | Same query for a real field | No `SUBREQUEST_HTTP_ERROR` |
 | Port confusion | `curl -s -o /dev/null -w '%{http_code}' localhost:4000/health` | `404` — this is normal |
-| Metrics unreachable from host | `curl localhost:8088/metrics` | Connection refused — also normal; use `docker exec` |
+| Metrics unreachable from host | `curl localhost:8088/metrics` | Connection refused — also normal; use the throwaway `curl` container |
 | Traces not arriving | `docker logs local-gateway \| grep -i opentelemetry` | No repeating errors |
 | CORS origin rejected | `curl -s -D - -o /dev/null -X OPTIONS -H 'Origin: ...' -H 'Access-Control-Request-Method: POST' localhost:4000/graphql` | `access-control-allow-origin` echoed |
 | Stale schema after an edit | Rebuild the gateway image | `PARSING_ERROR` disappears |

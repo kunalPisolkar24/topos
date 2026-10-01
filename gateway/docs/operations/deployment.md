@@ -213,7 +213,8 @@ After changing anything that affects the schema:
      -d '{"query":"{ posts(page:1, limit:1) { posts { id author { username } } } }"}'
    ```
 
-5. **Check health on 8088** — `docker exec local-gateway wget -qO-
+5. **Check health on 8088** — `docker run --rm --network
+   container:local-gateway curlimages/curl:latest -fsS
    http://localhost:8088/health`.
 
 The `{ __typename }` check in step 4's counterpart is deliberately not enough:

@@ -151,7 +151,7 @@ flowchart LR
 | Port | Listen | Published | Consumed by |
 | --- | --- | --- | --- |
 | `4000` | `0.0.0.0:4000` | Yes | Browser, `curl`, the frontend's `VITE_GRAPHQL_URL` |
-| `8088` | `0.0.0.0:8088` | No | `otel-collector` Prometheus scrape at `gateway:8088`; `docker exec` for manual probes |
+| `8088` | `0.0.0.0:8088` | No | `otel-collector` Prometheus scrape at `gateway:8088`; a throwaway `curl` container for manual probes |
 
 This is the single most common source of confusion when verifying a change, so
 [Health and observability](../operations/health-and-observability.md) gives the
