@@ -1,19 +1,209 @@
-# Local infrastructure quick start
+# Local stack
+
+One command brings up the entire platform on a laptop: application containers,
+both databases, the cache, the broker, the vector store, and the embedding
+model. This page tells you what starts, on which ports, how to prove it is
+healthy, and how to stop it without losing data.
+
+## New to this service?
+
+Run the three blocks below and you have a working Topos. The tables after them
+exist so that when something does not answer, you know which of the 17
+containers to look at.
+
+## 1. Start it
 
 From the repository root:
 
 ```bash
 make local-up
-make local-ps
-make local-logs
+```
+
+Two things happen, in order:
+
+1. If `infrastructure/docker/local/.env.local` does not exist, the Makefile
+   copies it from `.env.local.example`. That file is gitignored; every value in
+   it has a working default, so you do not normally need to edit it.
+2. Compose runs `docker compose --env-file ... -f infrastructure/docker/local/compose.yml up -d --build --wait`.
+
+`--wait` blocks until containers report healthy. Containers without a
+healthcheck are considered started as soon as they are running, which is why
+the first query you send right after boot sometimes fails once.
+
+The entry point itself is only 26 lines:
+
+```yaml
+name: topos-local
+
+include:
+  - path: ../../../services/user/infra/compose.yml
+  - path: ../../../services/content/infra/compose.yml
+  - path: ../../../services/ai/infra/compose.yml
+  - path: ../../../gateway/compose.local.yml
+  - path: ../../../frontend/infra/compose.yml
+```
+
+There is not a single container definition in it. Each service remains the
+source of truth for its own containers, and this file only merges them into one
+Compose project so shared dependencies get deduplicated rather than started
+twice.
+
+## 2. Prove it answers
+
+```bash
+curl -s http://localhost:4000/graphql \
+  -H 'content-type: application/json' \
+  -d '{"query":"{ __typename }"}'
+```
+
+```json
+{"data":{"__typename":"Query"}}
+```
+
+And the frontend:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000
+```
+
+```text
+200
+```
+
+## What started
+
+Seventeen containers. Confirmed by rendering the merged file:
+
+```bash
+docker compose --env-file infrastructure/docker/local/.env.local \
+  -f infrastructure/docker/local/compose.yml config --services
+```
+
+### Applications
+
+| Container | Published | Health check |
+| --- | --- | --- |
+| `frontend` | `3000` | none |
+| `gateway` | `4000` | none (health is on `8088`, not published) |
+| `user-service` | `4001` | `GET /health` |
+| `content-service` | `4002` | `GET /healthz` |
+| `content-worker` | none | `GET /healthz` |
+| `content-search-worker` | none | `GET /healthz` |
+| `content-personalizer` | none | `GET /healthz` |
+| `ai-service` | `50051`, `12666` | gRPC health |
+
+`content-worker` listens on `4012` inside the network but does not publish it.
+You reach those three workers with `docker logs`, not from the host.
+
+### Dependencies
+
+| Container | Image | Published | Why it exists |
+| --- | --- | --- | --- |
+| `user-postgres` | `postgres:16-alpine` | `5432`, `5433` | Accounts and profiles; `5433` is the same instance aliased for the AI checkpoint database |
+| `user-redis` | `redis:7.2-alpine` | `6380` | User-service cache, and the content service's cache client |
+| `content-mongo` | `mongo:7` | `27017` | Posts, tags, chats, drafts |
+| `kafka` | `apache/kafka:3.7.0` | `9092` | `posts`, `posts-dlq`, `user-interacted` events |
+| `qdrant` | `qdrant/qdrant:v1.19.0` | `6333` | Vectors for search and recommendations |
+| `embedding-service` | `ollama/ollama` | `11434` | Local embeddings for indexing and retrieval |
+
+Both host ports on `user-postgres` land on the same container. The user stack
+asks for `5432` and the AI stack asks for `5433`; publishing both lets the two
+Compose definitions stay identical, which is a requirement of the `include:`
+merge.
+
+### One-shot helpers
+
+| Container | Runs | What it does |
+| --- | --- | --- |
+| `init-kafka` | once, after Kafka is healthy | Creates `posts` (3 partitions), `posts-dlq` (1), `user-interacted` (3) if they do not exist |
+| `embedding-model-init` | once, after Ollama is healthy | Pulls `snowflake-arctic-embed2:568m` through Ollama's REST API |
+| `user-migrator` | on demand | Applies database migrations |
+
+`embedding-model-init` uses the REST API rather than the `ollama pull` CLI on
+purpose: recent Ollama images run the CLI as a text UI, which fails without a
+terminal attached and would leave `/api/embed` returning 404.
+
+The model pull is the slowest step of a cold start. Until it finishes, search
+and recommendation features are unavailable even though everything reports
+healthy.
+
+## 3. Watch it
+
+```bash
+make local-ps    # container states
+make local-logs  # follow every container's output
+```
+
+### Container names
+
+Only two containers get an explicit name. Everything else is generated by
+Compose as `<project>-<service>-<index>`, and the project name comes from the
+`name:` field in the Compose file (`topos-local`).
+
+| Container | How it gets its name |
+| --- | --- |
+| `local-gateway` | `container_name: ${GATEWAY_CONTAINER:-local-gateway}` |
+| `local-frontend` | `container_name: ${FRONTEND_CONTAINER:-local-frontend}` |
+| `topos-local-user-service-1` | generated: project `topos-local`, service `user-service` |
+| `topos-local-content-service-1` | generated |
+| `topos-local-init-kafka-1` | generated |
+| `topos-local-kafka-1`, `topos-local-qdrant-1`, `topos-local-user-postgres-1`, … | generated |
+
+`docker compose logs <service>` and `docker compose exec <service>` take the
+**service** name, so they work regardless:
+
+```bash
+export LOCAL="docker compose --env-file infrastructure/docker/local/.env.local \
+  -f infrastructure/docker/local/compose.yml"
+
+$LOCAL logs init-kafka          # service name, always correct
+$LOCAL exec user-service curl -fsS http://localhost:4001/health
+```
+
+> [!WARNING]
+> `infrastructure/docker/local/.env.local.example` declares nine `*_CONTAINER`
+> variables (`CONTENT_SERVICE_CONTAINER=local-content-service`,
+> `QDRANT_CONTAINER=local-qdrant`, `EMBEDDING_MODEL_INIT_CONTAINER=local-embedding-model-init`,
+> and six more). **Only `GATEWAY_CONTAINER` and `FRONTEND_CONTAINER` are
+> referenced by a Compose file.** Setting the other seven changes nothing, so
+> `docker logs local-qdrant` fails no matter what the variable says.
+
+## 4. Stop it
+
+```bash
 make local-down
 ```
 
-The root Makefile creates the local environment file when absent and runs
-`infrastructure/docker/local/compose.yml`. That Compose file includes the
-service-owned Compose definitions, preventing a second copied container
-definition from becoming stale.
+`local-down` runs `docker compose down`, which removes containers and networks
+but **keeps volumes**. Your accounts, posts, vectors and broker offsets are
+still there next time.
 
-> [!WARNING]
-> `make local-clean` removes volumes. It is an intentional reset, not the
-> normal stop command.
+```bash
+make local-clean
+```
+
+`local-clean` runs `down -v --remove-orphans`, which deletes those volumes too.
+Use it for a deliberate reset, never as a routine stop.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `local-up` recreates `.env.local` every time | You deleted it, or it is not at `infrastructure/docker/local/.env.local` | Let the Makefile recreate it; it is gitignored |
+| Port already in use on `5432` | A previous stack or a local Postgres is holding it | `make local-down`, or find the process with `ss -ltnp \| grep 5432` |
+| `5433` refused | The AI stack's alias only exists while `user-postgres` is up | `docker ps --filter name=user-postgres` |
+| Search returns nothing right after boot | `embedding-model-init` still pulling the model | `$LOCAL logs embedding-model-init` |
+| A topic is missing | `init-kafka` ran before Kafka was ready | `$LOCAL logs init-kafka`, then `$LOCAL start init-kafka` (it is idempotent) |
+| Gateway answers but a subgraph errors | That service is still starting, or a migration has not run | `make local-logs` and look at `user-migrator` |
+| Everything is unhealthy after a big change | Stale volumes from an older schema | `make local-clean`, accepting the data loss |
+| Telemetry not arriving anywhere | Expected | Local has no collector and no New Relic account; see [Observability architecture](../concepts/observability-architecture.md) |
+
+## Where to go next
+
+| If you want to... | Read |
+| --- | --- |
+| Know what each dependency is for | [Compose dependencies](../components/compose-dependencies.md) |
+| Understand why production looks different | [Local and managed topology](../concepts/local-and-managed-topology.md) |
+| Run the managed stack | [Managed stack](managed-stack.md) |
+| Change an environment setting | [Configuration and secrets](../components/configuration-and-secrets.md) |
+| Reset without wondering what you deleted | [Deployment](../operations/deployment.md) |
