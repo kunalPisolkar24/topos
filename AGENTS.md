@@ -19,7 +19,7 @@ services/
                 AI summary/vector indexing, DLQ replay
   user/         TypeScript (Node 22) Apollo Federation subgraph: accounts,
                 profiles, JWTs, Prisma over Postgres
-infrastructure/ Docker compose (prod/local), logging (filebeat/logstash)
+infrastructure/ Docker compose (prod/local), Terraform, OTel collector
 ```
 
 ## Architecture
@@ -39,14 +39,15 @@ infrastructure/ Docker compose (prod/local), logging (filebeat/logstash)
   - Kafka — `content` events: `posts`, `posts-dlq`, `user-interacted`
 - **Async work:** `content-service` publishes post events to Kafka;
   `content-worker` generates AI summaries; `content-search-worker` indexes
-  posts into Qdrant via `ai`.
+  posts into Qdrant via `ai`; `content-personalizer` updates recommendation
+  profiles from `user-interacted` events.
 
 ## Service matrix
 
 | Service | Stack | Entrypoint | Ports | Run | Unit tests | Integration tests | Lint / format | Codegen |
 |---|---|---|---|---|---|---|---|---|
-| `services/ai` | Python 3.12, poetry, gRPC | `src/main.py` | gRPC 50051, metrics 12666 | `make run` | `make test` (pytest, skips container tests) | `make integration` (testcontainers) | `make lint` (ruff check), `make format` (ruff format) | `make generate` (protoc → `src/generated/`, gitignored) |
-| `services/content` | Go 1.25, gqlgen, gRPC client | `cmd/server`, `cmd/worker`, `cmd/search-worker`, `cmd/dlq-replay` | server 4002 (`/query`, `/health`), worker 4003, search worker 4004 | `go run ./cmd/server` | `make test` (`go test ./...`) | `make test-integration` (`go test -tags integration -p 4`, testcontainers) | `make vet` (`go vet ./...`), `make fmt` (`gofmt -l .`) | `make generate` (protoc → `proto/ai/`, gqlgen) |
+| `services/ai` | Python 3.12, poetry, gRPC | `src/main.py` | gRPC 50051, metrics 12666 | `make run` | `make test` (pytest, skips container tests) | `make integration` (testcontainers) | `make lint` (ruff check), `make format` (ruff format) | `make generate` (protoc → `src/generated/`; `*.py` gitignored, `__init__.py` + `*.pyi` tracked) |
+| `services/content` | Go 1.25, gqlgen, gRPC client | `cmd/server`, `cmd/worker`, `cmd/search-worker`, `cmd/personalizer`, `cmd/dlq-replay` | server 4002 (`/query`, `/healthz`, `/readyz`, `/metrics`), worker 4003, search worker 4004, personalizer 4005 | `go run ./cmd/server` | `make test` (`go test ./...`) | `make test-integration` (`go test -tags integration -p 4`, testcontainers) | `make vet` (`go vet ./...` + `-tags integration`), `make fmt` (`gofmt -l .`) — there is no `lint` target | `make generate` (protoc → `proto/ai/`); gqlgen via `go run github.com/99designs/gqlgen` |
 | `services/user` | TypeScript Node 22, Apollo Federation subgraph, Prisma | `src/index.ts` | 4001 | `npm run dev` | `npm test` (vitest) | `npm run test:integration` (testcontainers) | `npm run lint` (`tsc --noEmit && eslint .`) | `npx prisma generate` |
 | `frontend` | React + Vite, shadcn/ui, Tailwind, GraphQL codegen | `src/main.tsx` | dev 5173, docker 3000 | `npm run dev` | `npm test` (vitest) | `npm run test:integration` | `npm run lint` (eslint) | `npm run codegen` (graphql-codegen) |
 | `gateway` | Apollo Router | `router.yaml`, `supergraph.yaml` | graphql 4000, health/metrics 8088 | docker only (see `compose.yml`) | — | — | — | — |
@@ -108,8 +109,15 @@ Write clean, simple, readable, maintainable code. Rules for every change:
 
 ## Codegen
 
-Generated code is gitignored in `services/ai/src/generated/` and
-`services/user/src/generated/` and must be regenerated, not edited:
+Generated code must be regenerated, not edited. Two directories, two
+different rules:
+
+- **`services/ai/src/generated/`** is *partly* gitignored — the generated
+  `*.py` modules are ignored, but `__init__.py` and the two `*.pyi` stubs are
+  tracked. A fresh clone still needs `make generate`.
+- **`services/user/src/generated/`** is fully gitignored.
+
+The specific changes:
 
 - **Proto changes** (`services/ai/proto/ai/ai_service.proto`): run
   `make generate` in `services/ai` (Python stubs) **and** in
@@ -121,8 +129,10 @@ Generated code is gitignored in `services/ai/src/generated/` and
 
 ## Testing conventions
 
-- Unit tests are fast and need no Docker. Integration tests use
-  testcontainers and need Docker running.
+- Unit tests are fast and need no Docker. Integration tests in the backend
+  services use testcontainers and need Docker running. The frontend's
+  integration tests are Vitest + MSW running in jsdom, so
+  `npm run test:integration` needs no Docker.
 - `ai` splits tests by pytest marker: `make test` skips `container`-marked
   tests; `make integration` runs `tests/integration/`.
 - `content` excludes generated code, db, repositories, bootstrap, cmd, and

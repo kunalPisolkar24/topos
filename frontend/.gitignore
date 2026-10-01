@@ -7,4 +7,4 @@ dist
 
 coverage
 
-src/graphql/generated/
+src/shared/graphql/generated/

@@ -17,7 +17,8 @@ an error.
 
 | Area | Runtime | Source |
 | --- | --- | --- |
-| Frontend and user service | Node.js 22 | `frontend/package.json`, `services/user/package.json` |
+| Frontend | Node.js 20 | `.github/workflows/service-frontend.yaml`, `frontend/Dockerfile` |
+| User service | Node.js 22 | `.github/workflows/service-user.yaml`, `services/user/Dockerfile` |
 | Content service | Go 1.25 | `services/content/go.mod` |
 | AI service | Python 3.12 and Poetry | `services/ai/pyproject.toml` |
 | Seed Secrets | Python 3.11 and Poetry | `tools/seed-secrets/pyproject.toml` |
