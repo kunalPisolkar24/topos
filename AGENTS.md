@@ -129,8 +129,10 @@ The specific changes:
 
 ## Testing conventions
 
-- Unit tests are fast and need no Docker. Integration tests use
-  testcontainers and need Docker running.
+- Unit tests are fast and need no Docker. Integration tests in the backend
+  services use testcontainers and need Docker running. The frontend's
+  integration tests are Vitest + MSW running in jsdom, so
+  `npm run test:integration` needs no Docker.
 - `ai` splits tests by pytest marker: `make test` skips `container`-marked
   tests; `make integration` runs `tests/integration/`.
 - `content` excludes generated code, db, repositories, bootstrap, cmd, and
