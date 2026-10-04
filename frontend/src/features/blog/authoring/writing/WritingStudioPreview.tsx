@@ -38,6 +38,12 @@ interface OptionRowProps<T extends string> {
   onChange: (value: T) => void;
 }
 
+const formatOptionLabel = (value: string) =>
+  value
+    .split(/[-_]/g)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 function StudioSelect<T extends string>({
   label,
   options,
@@ -54,7 +60,7 @@ function StudioSelect<T extends string>({
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {option}
+              {formatOptionLabel(option)}
             </SelectItem>
           ))}
         </SelectContent>

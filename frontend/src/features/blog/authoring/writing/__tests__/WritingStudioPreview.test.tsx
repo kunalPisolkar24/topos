@@ -28,20 +28,20 @@ describe("WritingStudioPreview selects", () => {
     const { hook, view } = renderStudio();
     expect(hook.result.current.brief.tone).toBe("professional");
 
-    await selectOption("Tone", "witty");
+    await selectOption("Tone", "Witty");
     view.rerender(<WritingStudioPreview studio={hook.result.current} />);
     expect(hook.result.current.brief.tone).toBe("witty");
     expect(screen.getByRole("combobox", { name: "Tone" })).toHaveTextContent(
-      "witty",
+      "Witty",
     );
 
-    await selectOption("Audience", "expert");
+    await selectOption("Audience", "Expert");
     expect(hook.result.current.brief.audience).toBe("expert");
 
-    await selectOption("Length", "deep");
+    await selectOption("Length", "Deep");
     expect(hook.result.current.brief.length).toBe("deep");
 
-    await selectOption("Structure", "opinion");
+    await selectOption("Structure", "Opinion");
     expect(hook.result.current.brief.structure).toBe("opinion");
   });
 
