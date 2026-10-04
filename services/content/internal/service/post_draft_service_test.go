@@ -353,9 +353,10 @@ func TestResubmitContentDraftReplacesGeneration(t *testing.T) {
 	retyped := humanParams()
 	retyped.Title = "Retyped title"
 	rejected.Status = domain.DraftStatusRejected
-	cleared, err := s.ResubmitContentDraft(context.Background(), "d1", draftAuthorID, retyped)
+	preserved, err := s.ResubmitContentDraft(context.Background(), "d1", draftAuthorID, retyped)
 	require.NoError(t, err)
-	assert.Nil(t, cleared.Generation)
+	require.NotNil(t, preserved.Generation, "omitted generation preserves the original record")
+	assert.Equal(t, domain.DraftSourceGuidedStudio, preserved.Generation.Source)
 }
 
 func TestCreateContentDraftMergesIntoPendingRevision(t *testing.T) {

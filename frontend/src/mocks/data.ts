@@ -842,6 +842,17 @@ export const generatePostContent = (prompt: string) => {
   };
 };
 
+export interface MockDraftGeneration {
+  source: "QUICK_PROMPT" | "GUIDED_STUDIO";
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
 export interface MockDraft {
   id: string;
   approvalId: string;
@@ -853,6 +864,9 @@ export interface MockDraft {
   // Cover proposed with the draft. Optional so older seeds stay valid;
   // preview responses normalize it to null.
   imageUrl?: string | null;
+  // How the draft content was produced. Absent for hand-typed drafts;
+  // responses normalize it to null.
+  generation?: MockDraftGeneration | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   authorId: string;
   postId: string | null;
@@ -871,6 +885,10 @@ const drafts: MockDraft[] = [
     id: "draft-1",
     approvalId: "approval-1",
     prompt: "Write about connection pooling for Postgres at scale",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Write about connection pooling for Postgres at scale",
+    },
     title: "Postgres Connection Pooling at Scale",
     body: buildBody(
       "Pooling Postgres connections behind a proxy lets many app instances share a bounded set of backend sessions.",
@@ -893,6 +911,10 @@ const drafts: MockDraft[] = [
     id: "draft-2",
     approvalId: "approval-2",
     prompt: "Explain hybrid dense and sparse search with Qdrant",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Explain hybrid dense and sparse search with Qdrant",
+    },
     title: "Hybrid Search with Dense and Sparse Vectors",
     body: buildBody(
       "Hybrid retrieval combines semantic recall from dense embeddings with lexical precision from sparse vectors.",
@@ -915,6 +937,10 @@ const drafts: MockDraft[] = [
     id: "draft-3",
     approvalId: "approval-3",
     prompt: "Design idempotent APIs with client-generated keys",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Design idempotent APIs with client-generated keys",
+    },
     title: "Designing Idempotent APIs for Retries",
     body: buildBody(
       "At-least-once retries are the normal path in distributed systems; APIs must tolerate safe replay.",
@@ -937,6 +963,10 @@ const drafts: MockDraft[] = [
     id: "draft-4",
     approvalId: "approval-4",
     prompt: "Guide to rolling out zero-trust mTLS between services",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Guide to rolling out zero-trust mTLS between services",
+    },
     title: "Zero-Trust mTLS Between Services",
     body: buildBody(
       "Zero-trust replaces implicit network trust with short-lived cryptographic identity per service.",
@@ -961,6 +991,10 @@ const drafts: MockDraft[] = [
     id: "draft-5",
     approvalId: "approval-5",
     prompt: "Compare TypeScript conditional types to generics",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Compare TypeScript conditional types to generics",
+    },
     title: "Conditional Types Versus Generics in TypeScript",
     body: buildBody(
       "Conditional types turn generics from placeholders into type-level programs.",
@@ -1041,6 +1075,7 @@ const toDraftResponse = (draft: MockDraft) => ({
   reviewedById: draft.reviewedById ?? null,
   reviewedAt: draft.reviewedAt ?? null,
   rejectionNote: draft.rejectionNote ?? null,
+  generation: draft.generation ?? null,
 });
 
 const toPaginatedDraftsResponse = (items: MockDraft[], page: number, limit: number) => {
@@ -1111,6 +1146,7 @@ export const createPostDraft = (prompt: string) => {
     body: generated.body,
     summary: generated.summary,
     tags: generated.tags,
+    generation: { source: "QUICK_PROMPT", prompt },
     status: "PENDING",
     authorId,
     postId: null,

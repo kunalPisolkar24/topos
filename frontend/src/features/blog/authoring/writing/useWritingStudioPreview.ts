@@ -19,6 +19,7 @@ export interface UseWritingStudioPreviewArgs {
   onContentChange: (content: string) => void;
   onTagsChange: (tags: string[]) => void;
   onSummaryChange: (summary: string | null) => void;
+  onApplied?: (brief: WritingBrief) => void;
 }
 
 export interface UseWritingStudioPreviewResult {
@@ -51,6 +52,7 @@ export const useWritingStudioPreview = ({
   onContentChange,
   onTagsChange,
   onSummaryChange,
+  onApplied,
 }: UseWritingStudioPreviewArgs): UseWritingStudioPreviewResult => {
   const [brief, setBrief] = useState<WritingBrief>(DEFAULT_WRITING_BRIEF);
   const [step, setStep] = useState<StudioStep>("brief");
@@ -158,6 +160,7 @@ export const useWritingStudioPreview = ({
     onContentChange(draftPreview.body);
     onTagsChange(draftPreview.tags);
     onSummaryChange(draftPreview.summary);
+    onApplied?.(brief);
   };
 
   const reset = () => {

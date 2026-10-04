@@ -454,6 +454,31 @@ export const RecommendedPostsDocument = gql`
 
 export type DraftStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export type DraftSource = "QUICK_PROMPT" | "GUIDED_STUDIO";
+
+export interface DraftGeneration {
+  __typename?: "DraftGeneration";
+  source: DraftSource;
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
+export interface DraftGenerationInput {
+  source: DraftSource;
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
 export interface PostDraft {
   __typename?: "PostDraft";
   id: string;
@@ -471,6 +496,7 @@ export interface PostDraft {
   reviewedById?: string | null;
   reviewedAt?: string | null;
   rejectionNote?: string | null;
+  generation?: DraftGeneration | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -497,6 +523,7 @@ export interface ContentDraftInput {
   tags?: string[] | null;
   imageUrl?: string | null;
   postId?: string | null;
+  generation?: DraftGenerationInput | null;
 }
 
 export interface PostDraftsQueryVariables {
@@ -598,6 +625,16 @@ const POST_DRAFT_FIELDS = gql`
     reviewedById
     reviewedAt
     rejectionNote
+    generation {
+      source
+      prompt
+      audience
+      tone
+      length
+      structure
+      keywords
+      keyPoints
+    }
     createdAt
     updatedAt
   }

@@ -36,6 +36,11 @@ const statusBadge: Record<PostDraft["status"], { label: string; className: strin
   },
 };
 
+const generationSourceLabel: Record<string, string> = {
+  QUICK_PROMPT: "Quick prompt",
+  GUIDED_STUDIO: "Guided studio",
+};
+
 export const DraftDetail: React.FC = () => {
   const { draftId } = useParams<{ draftId: string }>();
   const navigate = useNavigate();
@@ -122,6 +127,17 @@ export const DraftDetail: React.FC = () => {
   const canResubmit = isOwnDraft && draft.status === "REJECTED";
   const isApproved = draft.status === "APPROVED";
   const authorLabel = getDisplayName(draft.author, draft.authorId.slice(0, 8));
+  const generation = draft.generation ?? null;
+  const originVerb = generation ? "Prompted by" : "Written by";
+  const generationSettings = generation
+    ? [
+        generation.audience,
+        generation.tone,
+        generation.length,
+        generation.structure,
+        generation.keywords,
+      ].filter((value): value is string => Boolean(value))
+    : [];
   const reviewerLabel = reviewer
     ? reviewer.name || reviewer.username
     : draft.reviewedById
@@ -151,7 +167,7 @@ export const DraftDetail: React.FC = () => {
             </div>
             <h1 className="mt-6 max-w-3xl break-words text-balance font-sans text-2xl font-semibold leading-[1.05] tracking-[-0.025em] text-foreground sm:text-3xl md:text-4xl lg:text-5xl">{draft.title}</h1>
             <p className="mt-3 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Prompted by {authorLabel} · {new Date(draft.createdAt).toLocaleDateString()} · {draft.status.toLowerCase()}
+              {originVerb} {authorLabel} · {new Date(draft.createdAt).toLocaleDateString()} · {draft.status.toLowerCase()}
             </p>
             {draft.postId && (
               <Button asChild size="sm" variant="outline" className="mt-4">
@@ -201,12 +217,24 @@ export const DraftDetail: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="gap-0 rounded-none bg-surface-lowest py-0 ring-1 ring-outline-variant/20">
-                <CardContent className="p-4 sm:p-5">
-                  <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">Prompt</p>
-                  <p className="mt-2 font-mono text-xs leading-6 text-muted-foreground">{draft.prompt}</p>
-                </CardContent>
-              </Card>
+              {generation && (
+                <Card className="gap-0 rounded-none bg-surface-lowest py-0 ring-1 ring-outline-variant/20">
+                  <CardContent className="p-4 sm:p-5">
+                    <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">How this was made</p>
+                    <p className="mt-2 font-mono text-xs font-medium uppercase tracking-[0.08em] text-foreground">
+                      {generationSourceLabel[generation.source] ?? generation.source}
+                    </p>
+                    <p className="mt-2 font-mono text-xs leading-6 text-muted-foreground">{generation.prompt}</p>
+                    {generationSettings.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-primary">
+                        {generationSettings.map((setting) => (
+                          <span key={setting}>#{setting.toLowerCase()}</span>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </section>
 
             {draft.tags.length > 0 && (

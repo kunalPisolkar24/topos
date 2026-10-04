@@ -1,7 +1,10 @@
 import { useCallback, useReducer, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
-import type { ContentDraftInput } from "@/shared/graphql/content-documents";
+import type {
+  ContentDraftInput,
+  DraftGenerationInput,
+} from "@/shared/graphql/content-documents";
 import { draftRepository } from "@/entities/draft/api/draftRepository";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
@@ -44,6 +47,7 @@ export interface UsePostAuthoringSubmitArgs {
   previewCoverUrl?: string | null;
   tags: string[];
   summary: string | null;
+  generation: DraftGenerationInput | null;
   uploadCardImage: () => Promise<string | null>;
   onComplete?: () => void;
   resubmitDraftId?: string;
@@ -67,6 +71,7 @@ export const usePostAuthoringSubmit = ({
   previewCoverUrl,
   tags,
   summary,
+  generation,
   uploadCardImage,
   onComplete,
   resubmitDraftId,
@@ -133,6 +138,7 @@ export const usePostAuthoringSubmit = ({
           tags,
           imageUrl: finalImageUrl,
           postId: null,
+          generation: generation ?? null,
         };
         try {
           dispatch({ type: "beginCreate" });
@@ -170,6 +176,7 @@ export const usePostAuthoringSubmit = ({
       previewCoverUrl,
       tags,
       summary,
+      generation,
       uploadCardImage,
       toast,
       createContentDraft,
@@ -218,6 +225,7 @@ export const usePostAuthoringSubmit = ({
           tags,
           imageUrl: finalImageUrl,
           postId: post.id,
+          generation: generation ?? null,
         };
         try {
           dispatch({ type: "beginUpdate" });
@@ -250,6 +258,7 @@ export const usePostAuthoringSubmit = ({
       imageFile,
       imageUrl,
       tags,
+      generation,
       uploadCardImage,
       toast,
       createContentDraft,
@@ -310,6 +319,7 @@ export const usePostAuthoringSubmit = ({
           tags,
           imageUrl: finalImageUrl,
           postId: resubmitPostId ?? null,
+          generation: generation ?? null,
         };
         try {
           dispatch({ type: "beginUpdate" });
@@ -349,6 +359,7 @@ export const usePostAuthoringSubmit = ({
       imageUrl,
       tags,
       summary,
+      generation,
       uploadCardImage,
       toast,
       resubmitContentDraft,

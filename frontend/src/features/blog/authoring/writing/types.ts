@@ -1,3 +1,5 @@
+import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
+
 export const WRITING_AUDIENCES = [
   "beginner",
   "practitioner",
@@ -64,3 +66,21 @@ export const DEFAULT_WRITING_BRIEF: WritingBrief = {
   structure: "how-to",
   keywords: "",
 };
+
+const orNull = (value: string): string | null => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+export const toDraftGenerationInput = (
+  brief: WritingBrief,
+): DraftGenerationInput => ({
+  source: "GUIDED_STUDIO",
+  prompt: brief.topic.trim(),
+  audience: brief.audience,
+  tone: brief.tone,
+  length: brief.length,
+  structure: brief.structure,
+  keywords: orNull(brief.keywords),
+  keyPoints: orNull(brief.keyPoints),
+});

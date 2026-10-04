@@ -15,8 +15,10 @@ import { usePostTagInput } from "./hooks/usePostTagInput";
 import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
 import {
   useWritingStudioPreview,
+  toDraftGenerationInput,
   type UseWritingStudioPreviewResult,
 } from "./writing";
+import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
 
 export type PostAuthoringMode = "create" | "edit" | "resubmit";
 
@@ -60,6 +62,7 @@ export interface PostAuthoringState {
   isSummaryVisible: boolean;
   isGeneratingPost: boolean;
   canGeneratePost: boolean;
+  generation: DraftGenerationInput | null;
   contentText: string;
   isTitleReady: boolean;
   isContentReady: boolean;
@@ -114,6 +117,8 @@ export const usePostAuthoringController = ({
 
   const [title, setTitle] = useState(post?.title ?? "");
   const [content, setContent] = useState(post?.body ?? "");
+  const [generation, setGeneration] =
+    useState<DraftGenerationInput | null>(null);
 
   const contentText = useMemo(() => toPlainText(content), [content]);
   const cardImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -133,6 +138,7 @@ export const usePostAuthoringController = ({
     onTitleChange: setTitle,
     onContentChange: setContent,
     onTagsChange: tagInput.replaceTags,
+    onGenerated: (prompt) => setGeneration({ source: "QUICK_PROMPT", prompt }),
   });
 
   const studio = useWritingStudioPreview({
@@ -140,6 +146,7 @@ export const usePostAuthoringController = ({
     onContentChange: setContent,
     onTagsChange: tagInput.replaceTags,
     onSummaryChange: aiDraft.setSummary,
+    onApplied: (brief) => setGeneration(toDraftGenerationInput(brief)),
   });
 
   const submitController = usePostAuthoringSubmit({
@@ -153,6 +160,7 @@ export const usePostAuthoringController = ({
     previewCoverUrl: imageUploader.previewCoverUrl,
     tags: tagInput.tags,
     summary: aiDraft.summary,
+    generation,
     uploadCardImage: () => imageUploader.uploadCardImage(),
     onComplete,
     resubmitDraftId,
@@ -224,6 +232,7 @@ export const usePostAuthoringController = ({
       isSummaryVisible: aiDraft.isSummaryVisible,
       isGeneratingPost: aiDraft.isGenerating,
       canGeneratePost: aiDraft.canGenerate,
+      generation,
       contentText,
       isTitleReady: readiness.titleReady,
       isContentReady: readiness.contentReady,

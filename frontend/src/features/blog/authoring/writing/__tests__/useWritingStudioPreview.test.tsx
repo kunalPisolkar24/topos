@@ -1,8 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { MIN_PROMPT_LENGTH } from "@/entities/post/lib";
+import type { WritingBrief } from "../types";
 import { useWritingStudioPreview } from "../useWritingStudioPreview";
 
-const renderStudio = () => {
+const renderStudio = (onApplied?: (brief: WritingBrief) => void) => {
   const onTitleChange = vi.fn();
   const onContentChange = vi.fn();
   const onTagsChange = vi.fn();
@@ -13,6 +14,7 @@ const renderStudio = () => {
       onContentChange,
       onTagsChange,
       onSummaryChange,
+      ...(onApplied ? { onApplied } : {}),
     }),
   );
   return {
@@ -62,8 +64,9 @@ describe("useWritingStudioPreview", () => {
   });
 
   it("removes a section and applies the preview to the editor", async () => {
+    const onApplied = vi.fn();
     const { result, onTitleChange, onContentChange, onTagsChange } =
-      renderStudio();
+      renderStudio(onApplied);
 
     act(() => {
       result.current.setBriefField("topic", "a".repeat(MIN_PROMPT_LENGTH + 1));
@@ -85,5 +88,8 @@ describe("useWritingStudioPreview", () => {
     expect(onTitleChange).toHaveBeenCalled();
     expect(onContentChange).toHaveBeenCalled();
     expect(onTagsChange).toHaveBeenCalled();
+    expect(onApplied).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "professional", structure: "how-to" }),
+    );
   });
 });

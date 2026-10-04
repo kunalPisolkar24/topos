@@ -176,9 +176,11 @@ func (s *PostDraftService) ResubmitContentDraft(
 	draft.Body = body
 	draft.Summary = summary
 	draft.Tags = tags
-	// Generation follows the resubmitted content: re-typing by hand
-	// clears the record, reusing AI assistance replaces it.
-	draft.Generation = params.Generation
+	// Generation only moves when the resubmit carries it: omitting it
+	// preserves how the original content was produced.
+	if params.Generation != nil {
+		draft.Generation = params.Generation
+	}
 	// The resubmit dialog edits text only; a missing cover means "keep
 	// the stored one", never "clear it".
 	if params.ImageURL != nil {
