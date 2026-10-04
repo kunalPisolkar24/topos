@@ -1,10 +1,10 @@
 import type {
   DraftGenerationInput,
-  WritingAudience,
+  WritingAudience as WritingAudienceInput,
   WritingBriefInput,
-  WritingLength,
-  WritingStructure,
-  WritingTone,
+  WritingLength as WritingLengthInput,
+  WritingStructure as WritingStructureInput,
+  WritingTone as WritingToneInput,
 } from "@/shared/graphql/content-documents";
 
 export const WRITING_AUDIENCES = [
@@ -92,13 +92,13 @@ export const toDraftGenerationInput = (
   keyPoints: orNull(brief.keyPoints),
 });
 
-const BRIEF_AUDIENCE: Record<WritingAudience, WritingAudience> = {
+const BRIEF_AUDIENCE: Record<WritingAudience, WritingAudienceInput> = {
   beginner: "BEGINNER",
   practitioner: "PRACTITIONER",
   expert: "EXPERT",
 };
 
-const BRIEF_TONE: Record<WritingTone, WritingTone> = {
+const BRIEF_TONE: Record<WritingTone, WritingToneInput> = {
   professional: "PROFESSIONAL",
   conversational: "CONVERSATIONAL",
   technical: "TECHNICAL",
@@ -107,13 +107,13 @@ const BRIEF_TONE: Record<WritingTone, WritingTone> = {
   minimal: "MINIMAL",
 };
 
-const BRIEF_LENGTH: Record<WritingLength, WritingLength> = {
+const BRIEF_LENGTH: Record<WritingLength, WritingLengthInput> = {
   quick: "QUICK",
   standard: "STANDARD",
   deep: "DEEP_DIVE",
 };
 
-const BRIEF_STRUCTURE: Record<WritingStructure, WritingStructure> = {
+const BRIEF_STRUCTURE: Record<WritingStructure, WritingStructureInput> = {
   "how-to": "HOW_TO",
   listicle: "LISTICLE",
   tutorial: "TUTORIAL",
