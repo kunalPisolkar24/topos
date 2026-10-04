@@ -13,6 +13,10 @@ import { usePostAIDraft } from "./hooks/usePostAIDraft";
 import { usePostImageUploader } from "./hooks/usePostImageUploader";
 import { usePostTagInput } from "./hooks/usePostTagInput";
 import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
+import {
+  useWritingStudioPreview,
+  type UseWritingStudioPreviewResult,
+} from "./writing";
 
 export type PostAuthoringMode = "create" | "edit" | "resubmit";
 
@@ -92,6 +96,7 @@ export interface PostAuthoringController {
     quillRef: React.MutableRefObject<ReactQuill | null>;
     cardImageInputRef: React.MutableRefObject<HTMLInputElement | null>;
   };
+  studio: UseWritingStudioPreviewResult;
 }
 
 export const usePostAuthoringController = ({
@@ -128,6 +133,13 @@ export const usePostAuthoringController = ({
     onTitleChange: setTitle,
     onContentChange: setContent,
     onTagsChange: tagInput.replaceTags,
+  });
+
+  const studio = useWritingStudioPreview({
+    onTitleChange: setTitle,
+    onContentChange: setContent,
+    onTagsChange: tagInput.replaceTags,
+    onSummaryChange: aiDraft.setSummary,
   });
 
   const submitController = usePostAuthoringSubmit({
@@ -243,5 +255,6 @@ export const usePostAuthoringController = ({
       quillRef: imageUploader.quillRef,
       cardImageInputRef,
     },
+    studio,
   };
 };

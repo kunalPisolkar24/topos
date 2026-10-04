@@ -12,4 +12,5 @@ export * from "./components/AIDraftGenerator";
 export * from "./components/BlogEditForm";
 export * from "./components/PublishChecklistItem";
 export * from "./authoring";
+export * from "./authoring/writing";
 export * from "./viewing";
