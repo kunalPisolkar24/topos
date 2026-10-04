@@ -19,14 +19,11 @@ import {
   WritingStudioPreview,
 } from "@/features/blog";
 import { PublishChecklistItem } from "@/features/blog/components/PublishChecklistItem";
-import { useCreatePostDraft } from "@/features/blog/review";
 
 const CreateNewBlog: React.FC = () => {
   const { state, setters, handlers, refs, studio } = usePostAuthoringController({
     mode: "create",
   });
-  const { submitForReview, isSubmitting: isSubmittingForReview } =
-    useCreatePostDraft();
   const {
     contentText,
     isTitleReady: titleReady,
@@ -85,8 +82,6 @@ const CreateNewBlog: React.FC = () => {
                     isGenerating={state.isGeneratingPost}
                     canGenerate={state.canGeneratePost}
                     onClear={handlers.clearAIDraft}
-                    onSubmitForReview={() => void submitForReview(state.postPrompt)}
-                    isSubmittingForReview={isSubmittingForReview}
                     summary={state.generatedSummary}
                     isSummaryVisible={state.isSummaryVisible}
                     onToggleSummary={handlers.toggleSummary}
