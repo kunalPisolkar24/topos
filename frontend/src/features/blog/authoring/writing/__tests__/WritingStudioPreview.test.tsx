@@ -1,82 +1,61 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { act, renderHook } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useWritingStudioPreview } from "../useWritingStudioPreview";
 import { WritingStudioPreview } from "../WritingStudioPreview";
 
-describe("WritingStudioPreview option rows", () => {
-  it("selects tone, audience, length, and structure through segmented chips", () => {
-    const { result } = renderHook(() =>
-      useWritingStudioPreview({
-        onTitleChange: () => {},
-        onContentChange: () => {},
-        onTagsChange: () => {},
-        onSummaryChange: () => {},
-      }),
-    );
-    render(<WritingStudioPreview studio={result.current} />);
+const renderStudio = () => {
+  const hook = renderHook(() =>
+    useWritingStudioPreview({
+      onTitleChange: () => {},
+      onContentChange: () => {},
+      onTagsChange: () => {},
+      onSummaryChange: () => {},
+    }),
+  );
+  const view = render(<WritingStudioPreview studio={hook.result.current} />);
+  return { hook, view };
+};
 
-    expect(result.current.brief.tone).toBe("professional");
+const selectOption = async (label: string, option: string) => {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("combobox", { name: label }));
+  await user.click(screen.getByRole("option", { name: option }));
+};
 
-    const witty = screen.getByRole("button", { name: "witty" });
-    expect(witty).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(witty);
-    expect(result.current.brief.tone).toBe("witty");
+describe("WritingStudioPreview selects", () => {
+  it("selects tone, audience, length, and structure through dropdowns", async () => {
+    const { hook, view } = renderStudio();
+    expect(hook.result.current.brief.tone).toBe("professional");
 
-    fireEvent.click(screen.getByRole("button", { name: "expert" }));
-    expect(result.current.brief.audience).toBe("expert");
-
-    fireEvent.click(screen.getByRole("button", { name: "deep" }));
-    expect(result.current.brief.length).toBe("deep");
-
-    fireEvent.click(screen.getByRole("button", { name: "opinion" }));
-    expect(result.current.brief.structure).toBe("opinion");
-  });
-
-  it("marks the active option as pressed", () => {
-    const { result } = renderHook(() =>
-      useWritingStudioPreview({
-        onTitleChange: () => {},
-        onContentChange: () => {},
-        onTagsChange: () => {},
-        onSummaryChange: () => {},
-      }),
-    );
-    const { rerender } = render(
-      <WritingStudioPreview studio={result.current} />,
+    await selectOption("Tone", "witty");
+    view.rerender(<WritingStudioPreview studio={hook.result.current} />);
+    expect(hook.result.current.brief.tone).toBe("witty");
+    expect(screen.getByRole("combobox", { name: "Tone" })).toHaveTextContent(
+      "witty",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "minimal" }));
-    rerender(<WritingStudioPreview studio={result.current} />);
-    expect(screen.getByRole("button", { name: "minimal" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(
-      screen.getByRole("button", { name: "professional" }),
-    ).toHaveAttribute("aria-pressed", "false");
+    await selectOption("Audience", "expert");
+    expect(hook.result.current.brief.audience).toBe("expert");
+
+    await selectOption("Length", "deep");
+    expect(hook.result.current.brief.length).toBe("deep");
+
+    await selectOption("Structure", "opinion");
+    expect(hook.result.current.brief.structure).toBe("opinion");
   });
 
   it("generates an outline only after the topic is long enough", async () => {
-    const { result } = renderHook(() =>
-      useWritingStudioPreview({
-        onTitleChange: () => {},
-        onContentChange: () => {},
-        onTagsChange: () => {},
-        onSummaryChange: () => {},
-      }),
-    );
-    const { rerender } = render(
-      <WritingStudioPreview studio={result.current} />,
-    );
+    const { hook, view } = renderStudio();
 
     expect(
       screen.getByRole("button", { name: /generate outline/i }),
     ).toBeDisabled();
 
     await act(async () => {
-      result.current.setBriefField("topic", "a".repeat(31));
+      hook.result.current.setBriefField("topic", "a".repeat(31));
     });
-    rerender(<WritingStudioPreview studio={result.current} />);
+    view.rerender(<WritingStudioPreview studio={hook.result.current} />);
     expect(
       screen.getByRole("button", { name: /generate outline/i }),
     ).not.toBeDisabled();

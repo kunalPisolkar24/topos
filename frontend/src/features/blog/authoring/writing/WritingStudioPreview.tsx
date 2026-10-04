@@ -8,6 +8,13 @@ import {
   CardTitle,
 } from "@/shared/ui/primitives/card";
 import { Input } from "@/shared/ui/primitives/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/primitives/select";
 import { Textarea } from "@/shared/ui/primitives/textarea";
 import type { UseWritingStudioPreviewResult } from "./useWritingStudioPreview";
 import {
@@ -31,7 +38,7 @@ interface OptionRowProps<T extends string> {
   onChange: (value: T) => void;
 }
 
-function OptionRow<T extends string>({
+function StudioSelect<T extends string>({
   label,
   options,
   value,
@@ -40,20 +47,18 @@ function OptionRow<T extends string>({
   return (
     <div className="space-y-2">
       <span className={fieldLabelClassName}>{label}</span>
-      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
-        {options.map((option) => (
-          <Button
-            key={option}
-            type="button"
-            size="xs"
-            variant={option === value ? "default" : "outline"}
-            aria-pressed={option === value}
-            onClick={() => onChange(option)}
-          >
-            {option}
-          </Button>
-        ))}
-      </div>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -139,25 +144,25 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <OptionRow
+              <StudioSelect
                 label="Audience"
                 options={WRITING_AUDIENCES}
                 value={brief.audience}
                 onChange={(value) => studio.setBriefField("audience", value)}
               />
-              <OptionRow
+              <StudioSelect
                 label="Tone"
                 options={WRITING_TONES}
                 value={brief.tone}
                 onChange={(value) => studio.setBriefField("tone", value)}
               />
-              <OptionRow
+              <StudioSelect
                 label="Length"
                 options={WRITING_LENGTHS}
                 value={brief.length}
                 onChange={(value) => studio.setBriefField("length", value)}
               />
-              <OptionRow
+              <StudioSelect
                 label="Structure"
                 options={WRITING_STRUCTURES}
                 value={brief.structure}
