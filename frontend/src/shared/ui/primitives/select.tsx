@@ -31,7 +31,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-12 w-full min-w-0 items-center justify-between gap-2 rounded-none border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary-container disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-surface-low disabled:text-muted-foreground disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&>span]:line-clamp-1",
+        "flex h-12 w-full min-w-0 items-center justify-between gap-2 rounded-none border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:border-primary/60 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary-container disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-surface-low disabled:text-muted-foreground disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&>span]:line-clamp-1",
         className
       )}
       {...props}
@@ -104,7 +104,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default select-none items-center gap-2 rounded-none py-2 pl-2 pr-8 text-sm text-foreground outline-none hover:bg-surface-low focus:bg-surface-low data-[highlighted]:bg-surface-low data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex w-full cursor-default select-none items-center gap-2 rounded-none py-2 pl-2 pr-8 text-sm text-foreground outline-none hover:bg-accent focus:bg-accent data-[highlighted]:bg-accent data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
