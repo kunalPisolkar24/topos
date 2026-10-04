@@ -164,7 +164,7 @@ sequenceDiagram
 ```
 
 Note that mocks start **before** the first render. That ordering is what makes
-`dev:mock` work at all: if React mounted first, the initial `Me` query would
+mock mode work at all: if React mounted first, the initial `Me` query would
 already be in flight when the service worker came up.
 
 ## Writing a new feature
