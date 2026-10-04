@@ -21,11 +21,42 @@ interface WritingStudioPreviewProps {
   studio: UseWritingStudioPreviewResult;
 }
 
-const selectClassName =
-  "h-12 w-full min-w-0 rounded-none border border-outline-variant/20 bg-surface-lowest px-4 py-2 text-sm text-foreground outline-none focus-visible:border-primary";
-
 const fieldLabelClassName =
   "font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground";
+
+interface OptionRowProps<T extends string> {
+  label: string;
+  options: readonly T[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+function OptionRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: OptionRowProps<T>) {
+  return (
+    <div className="space-y-2">
+      <span className={fieldLabelClassName}>{label}</span>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+        {options.map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="xs"
+            variant={option === value ? "default" : "outline"}
+            aria-pressed={option === value}
+            onClick={() => onChange(option)}
+          >
+            {option}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const steps = ["brief", "outline", "draft"] as const;
 
@@ -108,94 +139,30 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="studioAudience" className={fieldLabelClassName}>
-                  Audience
-                </label>
-                <select
-                  id="studioAudience"
-                  value={brief.audience}
-                  onChange={(event) =>
-                    studio.setBriefField(
-                      "audience",
-                      event.target.value as typeof brief.audience,
-                    )
-                  }
-                  className={selectClassName}
-                >
-                  {WRITING_AUDIENCES.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="studioTone" className={fieldLabelClassName}>
-                  Tone
-                </label>
-                <select
-                  id="studioTone"
-                  value={brief.tone}
-                  onChange={(event) =>
-                    studio.setBriefField(
-                      "tone",
-                      event.target.value as typeof brief.tone,
-                    )
-                  }
-                  className={selectClassName}
-                >
-                  {WRITING_TONES.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="studioLength" className={fieldLabelClassName}>
-                  Length
-                </label>
-                <select
-                  id="studioLength"
-                  value={brief.length}
-                  onChange={(event) =>
-                    studio.setBriefField(
-                      "length",
-                      event.target.value as typeof brief.length,
-                    )
-                  }
-                  className={selectClassName}
-                >
-                  {WRITING_LENGTHS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="studioStructure" className={fieldLabelClassName}>
-                  Structure
-                </label>
-                <select
-                  id="studioStructure"
-                  value={brief.structure}
-                  onChange={(event) =>
-                    studio.setBriefField(
-                      "structure",
-                      event.target.value as typeof brief.structure,
-                    )
-                  }
-                  className={selectClassName}
-                >
-                  {WRITING_STRUCTURES.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <OptionRow
+                label="Audience"
+                options={WRITING_AUDIENCES}
+                value={brief.audience}
+                onChange={(value) => studio.setBriefField("audience", value)}
+              />
+              <OptionRow
+                label="Tone"
+                options={WRITING_TONES}
+                value={brief.tone}
+                onChange={(value) => studio.setBriefField("tone", value)}
+              />
+              <OptionRow
+                label="Length"
+                options={WRITING_LENGTHS}
+                value={brief.length}
+                onChange={(value) => studio.setBriefField("length", value)}
+              />
+              <OptionRow
+                label="Structure"
+                options={WRITING_STRUCTURES}
+                value={brief.structure}
+                onChange={(value) => studio.setBriefField("structure", value)}
+              />
             </div>
             <div className="space-y-2">
               <label htmlFor="studioKeywords" className={fieldLabelClassName}>
