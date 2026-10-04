@@ -12,6 +12,18 @@ type GeneratedPost struct {
 	Tags    []string
 }
 
+// WritingBrief carries the author's style choices into AI generation.
+// Empty means the legacy single-prompt behavior; selectors use the
+// uppercase proto enum names (e.g. "WITTY", "HOW_TO").
+type WritingBrief struct {
+	Audience  string
+	Tone      string
+	Length    string
+	Structure string
+	Keywords  string
+	KeyPoints string
+}
+
 // GeneratedDraft is a paused human-in-the-loop draft: the generated
 // payload plus the approval id used to resume or reject the workflow.
 type GeneratedDraft struct {
@@ -43,7 +55,9 @@ const (
 type AIService interface {
 	GenerateSummary(ctx context.Context, text string) (string, error)
 	GenerateTags(ctx context.Context, title, body string) ([]string, error)
-	GeneratePost(ctx context.Context, prompt string) (*GeneratedPost, error)
+	// GeneratePost renders a full post; a nil brief keeps the legacy
+	// single-prompt behavior.
+	GeneratePost(ctx context.Context, prompt string, brief *WritingBrief) (*GeneratedPost, error)
 	// GeneratePostDraft produces a paused draft and returns its approval
 	// id; ApprovePost resumes it (with optional reviewer edits) into the
 	// final payload, RejectPost records a rejection.

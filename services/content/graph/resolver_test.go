@@ -248,16 +248,24 @@ func TestMutationResolverGenerateTags(t *testing.T) {
 
 func TestMutationResolverGeneratePostContent(t *testing.T) {
 	postRepo := &testutil.MockPostRepository{}
-	aiSvc := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+	var captured *domain.WritingBrief
+	aiSvc := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
+		captured = brief
 		return &domain.GeneratedPost{Title: "T", Body: "B", Summary: "S", Tags: []string{"go"}}, nil
 	}}
 	postSvc := service.NewPostService(postRepo, nil, aiSvc, nil, nil)
 	resolver := NewResolver(postSvc, service.NewTagService(nil, nil), service.NewChatService(&testutil.MockChatRepository{}, &testutil.MockAIService{}), service.NewPostInteractionService(&testutil.MockPostInteractionRepository{}, &testutil.MockEventPublisher{}, nil), service.NewPostDraftService(&testutil.MockPostDraftRepository{}, &testutil.MockAIService{}, postSvc))
 
-	post, err := resolver.Mutation().GeneratePostContent(authenticatedContext("u_1"), "prompt")
+	post, err := resolver.Mutation().GeneratePostContent(authenticatedContext("u_1"), "prompt", &model.WritingBriefInput{Tone: ptrWritingTone(model.WritingToneWitty)})
 	require.NoError(t, err)
 	assert.Equal(t, "T", post.Title)
 	assert.Equal(t, []string{"go"}, post.Tags)
+	require.NotNil(t, captured)
+	assert.Equal(t, "WITTY", captured.Tone)
+}
+
+func ptrWritingTone(tone model.WritingTone) *model.WritingTone {
+	return &tone
 }
 
 func TestUserResolverPosts(t *testing.T) {

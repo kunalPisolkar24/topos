@@ -100,7 +100,7 @@ type ComplexityRoot struct {
 		DeleteChat           func(childComplexity int, id string) int
 		DeletePost           func(childComplexity int, id string) int
 		DeletePostDraft      func(childComplexity int, id string) int
-		GeneratePostContent  func(childComplexity int, prompt string) int
+		GeneratePostContent  func(childComplexity int, prompt string, brief *model.WritingBriefInput) int
 		GenerateTags         func(childComplexity int, title string, body string) int
 		LikePost             func(childComplexity int, postID string, mode *model.RecommendMode) int
 		RecordPostView       func(childComplexity int, postID string, mode *model.RecommendMode) int
@@ -229,7 +229,7 @@ type MutationResolver interface {
 	UpdatePost(ctx context.Context, id string, input model.UpdatePostInput) (*model.Post, error)
 	DeletePost(ctx context.Context, id string) (bool, error)
 	GenerateTags(ctx context.Context, title string, body string) ([]string, error)
-	GeneratePostContent(ctx context.Context, prompt string) (*model.GeneratedPost, error)
+	GeneratePostContent(ctx context.Context, prompt string, brief *model.WritingBriefInput) (*model.GeneratedPost, error)
 	CreateChat(ctx context.Context, title *string) (*model.Chat, error)
 	RenameChat(ctx context.Context, id string, title string) (*model.Chat, error)
 	DeleteChat(ctx context.Context, id string) (bool, error)
@@ -553,7 +553,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.GeneratePostContent(childComplexity, args["prompt"].(string)), true
+		return e.complexity.Mutation.GeneratePostContent(childComplexity, args["prompt"].(string), args["brief"].(*model.WritingBriefInput)), true
 	case "Mutation.generateTags":
 		if e.complexity.Mutation.GenerateTags == nil {
 			break
@@ -1170,6 +1170,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDraftEditsInput,
 		ec.unmarshalInputDraftGenerationInput,
 		ec.unmarshalInputUpdatePostInput,
+		ec.unmarshalInputWritingBriefInput,
 	)
 	first := true
 
@@ -1495,6 +1496,11 @@ func (ec *executionContext) field_Mutation_generatePostContent_args(ctx context.
 		return nil, err
 	}
 	args["prompt"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "brief", ec.unmarshalOWritingBriefInput2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingBriefInput)
+	if err != nil {
+		return nil, err
+	}
+	args["brief"] = arg1
 	return args, nil
 }
 
@@ -2912,7 +2918,7 @@ func (ec *executionContext) _Mutation_generatePostContent(ctx context.Context, f
 		ec.fieldContext_Mutation_generatePostContent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().GeneratePostContent(ctx, fc.Args["prompt"].(string))
+			return ec.resolvers.Mutation().GeneratePostContent(ctx, fc.Args["prompt"].(string), fc.Args["brief"].(*model.WritingBriefInput))
 		},
 		nil,
 		ec.marshalNGeneratedPost2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐGeneratedPost,
@@ -8164,6 +8170,68 @@ func (ec *executionContext) unmarshalInputUpdatePostInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputWritingBriefInput(ctx context.Context, obj any) (model.WritingBriefInput, error) {
+	var it model.WritingBriefInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"audience", "tone", "length", "structure", "keywords", "keyPoints"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "audience":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("audience"))
+			data, err := ec.unmarshalOWritingAudience2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingAudience(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Audience = data
+		case "tone":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tone"))
+			data, err := ec.unmarshalOWritingTone2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingTone(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tone = data
+		case "length":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("length"))
+			data, err := ec.unmarshalOWritingLength2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingLength(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Length = data
+		case "structure":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("structure"))
+			data, err := ec.unmarshalOWritingStructure2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingStructure(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Structure = data
+		case "keywords":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("keywords"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Keywords = data
+		case "keyPoints":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("keyPoints"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KeyPoints = data
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -11423,6 +11491,78 @@ func (ec *executionContext) unmarshalOSummaryStatus2ᚖgithubᚗcomᚋkunalPisol
 }
 
 func (ec *executionContext) marshalOSummaryStatus2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐSummaryStatus(ctx context.Context, sel ast.SelectionSet, v *model.SummaryStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOWritingAudience2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingAudience(ctx context.Context, v any) (*model.WritingAudience, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.WritingAudience)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOWritingAudience2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingAudience(ctx context.Context, sel ast.SelectionSet, v *model.WritingAudience) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOWritingBriefInput2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingBriefInput(ctx context.Context, v any) (*model.WritingBriefInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputWritingBriefInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOWritingLength2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingLength(ctx context.Context, v any) (*model.WritingLength, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.WritingLength)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOWritingLength2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingLength(ctx context.Context, sel ast.SelectionSet, v *model.WritingLength) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOWritingStructure2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingStructure(ctx context.Context, v any) (*model.WritingStructure, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.WritingStructure)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOWritingStructure2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingStructure(ctx context.Context, sel ast.SelectionSet, v *model.WritingStructure) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOWritingTone2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingTone(ctx context.Context, v any) (*model.WritingTone, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.WritingTone)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOWritingTone2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐWritingTone(ctx context.Context, sel ast.SelectionSet, v *model.WritingTone) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

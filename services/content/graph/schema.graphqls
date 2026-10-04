@@ -50,6 +50,47 @@ type GeneratedPost {
   tags: [String!]!
 }
 
+enum WritingAudience {
+  BEGINNER
+  PRACTITIONER
+  EXPERT
+}
+
+enum WritingTone {
+  PROFESSIONAL
+  CONVERSATIONAL
+  TECHNICAL
+  STORYTELLING
+  WITTY
+  MINIMAL
+}
+
+enum WritingLength {
+  QUICK
+  STANDARD
+  DEEP_DIVE
+}
+
+enum WritingStructure {
+  HOW_TO
+  LISTICLE
+  TUTORIAL
+  COMPARISON
+  OPINION
+  CASE_STUDY
+}
+
+# WritingBriefInput carries the author's style choices into generation.
+# Null means the legacy single-prompt behavior.
+input WritingBriefInput {
+  audience: WritingAudience
+  tone: WritingTone
+  length: WritingLength
+  structure: WritingStructure
+  keywords: String
+  keyPoints: String
+}
+
 type SearchResult {
   hits: [Post!]!
   total: Int!
@@ -198,7 +239,7 @@ type Mutation {
   updatePost(id: ID!, input: UpdatePostInput!): Post!
   deletePost(id: ID!): Boolean!
   generateTags(title: String!, body: String!): [String!]!
-  generatePostContent(prompt: String!): GeneratedPost!
+  generatePostContent(prompt: String!, brief: WritingBriefInput): GeneratedPost!
   createChat(title: String): Chat!
   renameChat(id: ID!, title: String!): Chat!
   deleteChat(id: ID!): Boolean!

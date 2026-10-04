@@ -184,6 +184,15 @@ type User struct {
 
 func (User) IsEntity() {}
 
+type WritingBriefInput struct {
+	Audience  *WritingAudience  `json:"audience,omitempty"`
+	Tone      *WritingTone      `json:"tone,omitempty"`
+	Length    *WritingLength    `json:"length,omitempty"`
+	Structure *WritingStructure `json:"structure,omitempty"`
+	Keywords  *string           `json:"keywords,omitempty"`
+	KeyPoints *string           `json:"keyPoints,omitempty"`
+}
+
 type DraftSource string
 
 const (
@@ -462,6 +471,246 @@ func (e *SummaryStatus) UnmarshalJSON(b []byte) error {
 }
 
 func (e SummaryStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type WritingAudience string
+
+const (
+	WritingAudienceBeginner     WritingAudience = "BEGINNER"
+	WritingAudiencePractitioner WritingAudience = "PRACTITIONER"
+	WritingAudienceExpert       WritingAudience = "EXPERT"
+)
+
+var AllWritingAudience = []WritingAudience{
+	WritingAudienceBeginner,
+	WritingAudiencePractitioner,
+	WritingAudienceExpert,
+}
+
+func (e WritingAudience) IsValid() bool {
+	switch e {
+	case WritingAudienceBeginner, WritingAudiencePractitioner, WritingAudienceExpert:
+		return true
+	}
+	return false
+}
+
+func (e WritingAudience) String() string {
+	return string(e)
+}
+
+func (e *WritingAudience) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WritingAudience(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WritingAudience", str)
+	}
+	return nil
+}
+
+func (e WritingAudience) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WritingAudience) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WritingAudience) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type WritingLength string
+
+const (
+	WritingLengthQuick    WritingLength = "QUICK"
+	WritingLengthStandard WritingLength = "STANDARD"
+	WritingLengthDeepDive WritingLength = "DEEP_DIVE"
+)
+
+var AllWritingLength = []WritingLength{
+	WritingLengthQuick,
+	WritingLengthStandard,
+	WritingLengthDeepDive,
+}
+
+func (e WritingLength) IsValid() bool {
+	switch e {
+	case WritingLengthQuick, WritingLengthStandard, WritingLengthDeepDive:
+		return true
+	}
+	return false
+}
+
+func (e WritingLength) String() string {
+	return string(e)
+}
+
+func (e *WritingLength) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WritingLength(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WritingLength", str)
+	}
+	return nil
+}
+
+func (e WritingLength) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WritingLength) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WritingLength) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type WritingStructure string
+
+const (
+	WritingStructureHowTo      WritingStructure = "HOW_TO"
+	WritingStructureListicle   WritingStructure = "LISTICLE"
+	WritingStructureTutorial   WritingStructure = "TUTORIAL"
+	WritingStructureComparison WritingStructure = "COMPARISON"
+	WritingStructureOpinion    WritingStructure = "OPINION"
+	WritingStructureCaseStudy  WritingStructure = "CASE_STUDY"
+)
+
+var AllWritingStructure = []WritingStructure{
+	WritingStructureHowTo,
+	WritingStructureListicle,
+	WritingStructureTutorial,
+	WritingStructureComparison,
+	WritingStructureOpinion,
+	WritingStructureCaseStudy,
+}
+
+func (e WritingStructure) IsValid() bool {
+	switch e {
+	case WritingStructureHowTo, WritingStructureListicle, WritingStructureTutorial, WritingStructureComparison, WritingStructureOpinion, WritingStructureCaseStudy:
+		return true
+	}
+	return false
+}
+
+func (e WritingStructure) String() string {
+	return string(e)
+}
+
+func (e *WritingStructure) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WritingStructure(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WritingStructure", str)
+	}
+	return nil
+}
+
+func (e WritingStructure) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WritingStructure) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WritingStructure) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type WritingTone string
+
+const (
+	WritingToneProfessional   WritingTone = "PROFESSIONAL"
+	WritingToneConversational WritingTone = "CONVERSATIONAL"
+	WritingToneTechnical      WritingTone = "TECHNICAL"
+	WritingToneStorytelling   WritingTone = "STORYTELLING"
+	WritingToneWitty          WritingTone = "WITTY"
+	WritingToneMinimal        WritingTone = "MINIMAL"
+)
+
+var AllWritingTone = []WritingTone{
+	WritingToneProfessional,
+	WritingToneConversational,
+	WritingToneTechnical,
+	WritingToneStorytelling,
+	WritingToneWitty,
+	WritingToneMinimal,
+}
+
+func (e WritingTone) IsValid() bool {
+	switch e {
+	case WritingToneProfessional, WritingToneConversational, WritingToneTechnical, WritingToneStorytelling, WritingToneWitty, WritingToneMinimal:
+		return true
+	}
+	return false
+}
+
+func (e WritingTone) String() string {
+	return string(e)
+}
+
+func (e *WritingTone) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WritingTone(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WritingTone", str)
+	}
+	return nil
+}
+
+func (e WritingTone) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WritingTone) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WritingTone) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

@@ -30,7 +30,7 @@ func (s *stubAI) GenerateTags(ctx context.Context, title, body string) ([]string
 	return nil, s.err
 }
 
-func (s *stubAI) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+func (s *stubAI) GeneratePost(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
 	return nil, s.err
 }
 
@@ -238,7 +238,7 @@ func TestResilientClientTagsAndPostPropagateErrors(t *testing.T) {
 
 	_, err := client.GenerateTags(context.Background(), "t", "b")
 	require.ErrorIs(t, err, errUnavailable)
-	_, err = client.GeneratePost(context.Background(), "p")
+	_, err = client.GeneratePost(context.Background(), "p", nil)
 	require.ErrorIs(t, err, errUnavailable)
 }
 

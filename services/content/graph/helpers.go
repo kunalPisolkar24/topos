@@ -323,6 +323,30 @@ func draftGenerationParams(input *model.DraftGenerationInput) *domain.DraftGener
 	}
 }
 
+// writingBriefParams maps the optional generation brief onto the domain.
+// A nil input keeps the legacy single-prompt behavior.
+func writingBriefParams(input *model.WritingBriefInput) *domain.WritingBrief {
+	if input == nil {
+		return nil
+	}
+	brief := &domain.WritingBrief{}
+	if input.Audience != nil {
+		brief.Audience = string(*input.Audience)
+	}
+	if input.Tone != nil {
+		brief.Tone = string(*input.Tone)
+	}
+	if input.Length != nil {
+		brief.Length = string(*input.Length)
+	}
+	if input.Structure != nil {
+		brief.Structure = string(*input.Structure)
+	}
+	brief.Keywords = derefStr(input.Keywords)
+	brief.KeyPoints = derefStr(input.KeyPoints)
+	return brief
+}
+
 func strOrNil(value string) *string {
 	if value == "" {
 		return nil

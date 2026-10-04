@@ -76,11 +76,11 @@ func (r *mutationResolver) GenerateTags(ctx context.Context, title string, body 
 }
 
 // GeneratePostContent is the resolver for the generatePostContent field.
-func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt string) (*model.GeneratedPost, error) {
+func (r *mutationResolver) GeneratePostContent(ctx context.Context, prompt string, brief *model.WritingBriefInput) (*model.GeneratedPost, error) {
 	if _, ok := middleware.UserIDFromContext(ctx); !ok {
 		return nil, mapDomainError(domain.ErrUnauthorized)
 	}
-	post, err := r.PostService.GeneratePostContent(ctx, prompt)
+	post, err := r.PostService.GeneratePostContent(ctx, prompt, writingBriefParams(brief))
 	if err != nil {
 		return nil, mapDomainError(err)
 	}

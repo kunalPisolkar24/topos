@@ -164,9 +164,9 @@ func (c *resilientClient) GenerateTags(ctx context.Context, title, body string) 
 	})
 }
 
-func (c *resilientClient) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+func (c *resilientClient) GeneratePost(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
 	return noFallback(c.breaker(domainGeneration), "post", func() (*domain.GeneratedPost, error) {
-		return c.primary.GeneratePost(ctx, prompt)
+		return c.primary.GeneratePost(ctx, prompt, brief)
 	})
 }
 
@@ -337,11 +337,11 @@ func (c *grpcClient) GenerateTags(ctx context.Context, title, body string) ([]st
 	return resp.Tags, nil
 }
 
-func (c *grpcClient) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+func (c *grpcClient) GeneratePost(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
 	ctx, cancel := context.WithTimeout(ctx, postTimeout)
 	defer cancel()
 
-	resp, err := c.client.GeneratePost(ctx, &pb.PostGenerationRequest{Prompt: prompt})
+	resp, err := c.client.GeneratePost(ctx, writingBriefRequest(prompt, brief))
 	if err != nil {
 		return nil, err
 	}
@@ -351,6 +351,31 @@ func (c *grpcClient) GeneratePost(ctx context.Context, prompt string) (*domain.G
 		Summary: resp.Summary,
 		Tags:    resp.Tags,
 	}, nil
+}
+
+// writingBriefRequest maps the domain brief onto the proto request. A
+// nil brief keeps the legacy single-prompt behavior; unknown selectors
+// fall back to UNSPECIFIED and the AI service ignores them.
+func writingBriefRequest(prompt string, brief *domain.WritingBrief) *pb.PostGenerationRequest {
+	req := &pb.PostGenerationRequest{Prompt: prompt}
+	if brief == nil {
+		return req
+	}
+	if v, ok := pb.WritingAudience_value["WRITING_AUDIENCE_"+brief.Audience]; ok {
+		req.Audience = pb.WritingAudience(v)
+	}
+	if v, ok := pb.WritingTone_value["WRITING_TONE_"+brief.Tone]; ok {
+		req.Tone = pb.WritingTone(v)
+	}
+	if v, ok := pb.WritingLength_value["WRITING_LENGTH_"+brief.Length]; ok {
+		req.Length = pb.WritingLength(v)
+	}
+	if v, ok := pb.WritingStructure_value["WRITING_STRUCTURE_"+brief.Structure]; ok {
+		req.Structure = pb.WritingStructure(v)
+	}
+	req.Keywords = brief.Keywords
+	req.KeyPoints = brief.KeyPoints
+	return req
 }
 
 func (c *grpcClient) GeneratePostDraft(ctx context.Context, prompt string) (*domain.GeneratedDraft, error) {
