@@ -84,10 +84,12 @@ Non-string entries are dropped rather than rejected, so a model that returns
 ### `GeneratePost`
 
 ```text
-len(prompt) > MAX_POST_CHARS (5000)?  → INVALID_ARGUMENT
-POST_PROMPT + post_user_prompt(prompt) → LLM
-extract_json(raw)                     → GeneratedPost.model_validate_json(...)
-sanitize_post_html(post.body)         → bleach allowlist clean
+len(prompt) > MAX_POST_CHARS (5000)?        → INVALID_ARGUMENT
+len(keywords) > MAX_KEYWORDS_CHARS (500)?   → INVALID_ARGUMENT
+len(key_points) > MAX_KEY_POINTS_CHARS?     → INVALID_ARGUMENT
+brief fields set? styled_post_user_prompt   : post_user_prompt(prompt) → LLM
+extract_json(raw)                           → GeneratedPost.model_validate_json(...)
+sanitize_post_html(post.body)               → bleach allowlist clean
 ```
 
 `GeneratedPost` is a pydantic model requiring all four fields, so a reply

@@ -6,6 +6,7 @@ State: self._llm (provided by AIService).
 """
 
 import json
+import re
 
 import grpc
 
@@ -17,10 +18,36 @@ from src.domain.prompts import (
     SUMMARY_PROMPT,
     TAGS_PROMPT,
     post_user_prompt,
+    styled_post_user_prompt,
 )
 from src.domain.sanitize import sanitize_post_html
 from src.domain.text import clean_html, extract_json
 from src.generated import ai_service_pb2
+
+
+def _enum_name(enum_type, value: int) -> str:
+    """Proto enum value to its bare selector (e.g. 5 -> "WITTY").
+
+    Unknown values yield "" so prompt builders fall back to defaults.
+    """
+    try:
+        full_name = enum_type.Name(value)
+    except ValueError:
+        return ""
+    prefix = re.sub(r"(?<!^)(?=[A-Z])", "_", enum_type.DESCRIPTOR.name).upper() + "_"
+    return full_name.removeprefix(prefix)
+
+
+def _has_brief(request: ai_service_pb2.PostGenerationRequest) -> bool:
+    """Whether the caller filled any writing-brief field."""
+    return bool(
+        request.audience
+        or request.tone
+        or request.length
+        or request.structure
+        or request.keywords.strip()
+        or request.key_points.strip()
+    )
 
 
 class GenerationMixin:
@@ -67,10 +94,26 @@ class GenerationMixin:
     ) -> ai_service_pb2.PostGenerationResponse:
         if len(request.prompt) > settings.MAX_POST_CHARS:
             raise TooLargeError(settings.MAX_POST_CHARS)
+        if len(request.keywords) > settings.MAX_KEYWORDS_CHARS:
+            raise TooLargeError(settings.MAX_KEYWORDS_CHARS)
+        if len(request.key_points) > settings.MAX_KEY_POINTS_CHARS:
+            raise TooLargeError(settings.MAX_KEY_POINTS_CHARS)
 
-        raw = await self._llm.generate_completion(
-            POST_PROMPT, post_user_prompt(request.prompt)
-        )
+        if _has_brief(request):
+            user_prompt = styled_post_user_prompt(
+                request.prompt,
+                audience=_enum_name(ai_service_pb2.WritingAudience, request.audience),
+                tone=_enum_name(ai_service_pb2.WritingTone, request.tone),
+                length=_enum_name(ai_service_pb2.WritingLength, request.length),
+                structure=_enum_name(
+                    ai_service_pb2.WritingStructure, request.structure
+                ),
+                keywords=request.keywords,
+                key_points=request.key_points,
+            )
+        else:
+            user_prompt = post_user_prompt(request.prompt)
+        raw = await self._llm.generate_completion(POST_PROMPT, user_prompt)
         post = GeneratedPost.model_validate_json(extract_json(raw))
         post.body = sanitize_post_html(post.body)
         return ai_service_pb2.PostGenerationResponse(

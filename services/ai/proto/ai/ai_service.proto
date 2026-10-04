@@ -44,6 +44,54 @@ message TagsResponse {
 
 message PostGenerationRequest {
   string prompt = 1;
+  // Optional writing brief: unset (all UNSPECIFIED/empty) keeps the
+  // legacy single-prompt behavior.
+  WritingAudience audience = 2;
+  WritingTone tone = 3;
+  WritingLength length = 4;
+  WritingStructure structure = 5;
+  // Comma-separated SEO keywords steering titles and tags.
+  string keywords = 6;
+  // Author's key points, one per line, shaping the middle sections.
+  string key_points = 7;
+}
+
+// WritingAudience is who the post is written for.
+enum WritingAudience {
+  WRITING_AUDIENCE_UNSPECIFIED = 0;
+  WRITING_AUDIENCE_BEGINNER = 1;
+  WRITING_AUDIENCE_PRACTITIONER = 2;
+  WRITING_AUDIENCE_EXPERT = 3;
+}
+
+// WritingTone is the voice of the post.
+enum WritingTone {
+  WRITING_TONE_UNSPECIFIED = 0;
+  WRITING_TONE_PROFESSIONAL = 1;
+  WRITING_TONE_CONVERSATIONAL = 2;
+  WRITING_TONE_TECHNICAL = 3;
+  WRITING_TONE_STORYTELLING = 4;
+  WRITING_TONE_WITTY = 5;
+  WRITING_TONE_MINIMAL = 6;
+}
+
+// WritingLength selects the target depth of the post.
+enum WritingLength {
+  WRITING_LENGTH_UNSPECIFIED = 0;
+  WRITING_LENGTH_QUICK = 1;
+  WRITING_LENGTH_STANDARD = 2;
+  WRITING_LENGTH_DEEP_DIVE = 3;
+}
+
+// WritingStructure selects the shape of the post.
+enum WritingStructure {
+  WRITING_STRUCTURE_UNSPECIFIED = 0;
+  WRITING_STRUCTURE_HOW_TO = 1;
+  WRITING_STRUCTURE_LISTICLE = 2;
+  WRITING_STRUCTURE_TUTORIAL = 3;
+  WRITING_STRUCTURE_COMPARISON = 4;
+  WRITING_STRUCTURE_OPINION = 5;
+  WRITING_STRUCTURE_CASE_STUDY = 6;
 }
 
 message PostGenerationResponse {
