@@ -26,12 +26,13 @@ type ChatMessage struct {
 }
 
 type ContentDraftInput struct {
-	Title    string   `json:"title"`
-	Body     string   `json:"body"`
-	Summary  *string  `json:"summary,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	ImageURL *string  `json:"imageUrl,omitempty"`
-	PostID   *string  `json:"postId,omitempty"`
+	Title      string                `json:"title"`
+	Body       string                `json:"body"`
+	Summary    *string               `json:"summary,omitempty"`
+	Tags       []string              `json:"tags,omitempty"`
+	ImageURL   *string               `json:"imageUrl,omitempty"`
+	PostID     *string               `json:"postId,omitempty"`
+	Generation *DraftGenerationInput `json:"generation,omitempty"`
 }
 
 type CreatePostInput struct {
@@ -47,6 +48,28 @@ type DraftEditsInput struct {
 	Body    *string  `json:"body,omitempty"`
 	Summary *string  `json:"summary,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
+}
+
+type DraftGeneration struct {
+	Source    DraftSource `json:"source"`
+	Prompt    string      `json:"prompt"`
+	Audience  *string     `json:"audience,omitempty"`
+	Tone      *string     `json:"tone,omitempty"`
+	Length    *string     `json:"length,omitempty"`
+	Structure *string     `json:"structure,omitempty"`
+	Keywords  *string     `json:"keywords,omitempty"`
+	KeyPoints *string     `json:"keyPoints,omitempty"`
+}
+
+type DraftGenerationInput struct {
+	Source    DraftSource `json:"source"`
+	Prompt    string      `json:"prompt"`
+	Audience  *string     `json:"audience,omitempty"`
+	Tone      *string     `json:"tone,omitempty"`
+	Length    *string     `json:"length,omitempty"`
+	Structure *string     `json:"structure,omitempty"`
+	Keywords  *string     `json:"keywords,omitempty"`
+	KeyPoints *string     `json:"keyPoints,omitempty"`
 }
 
 type GeneratedPost struct {
@@ -109,23 +132,24 @@ type Post struct {
 func (Post) IsEntity() {}
 
 type PostDraft struct {
-	ID            string      `json:"id"`
-	ApprovalID    string      `json:"approvalId"`
-	Prompt        string      `json:"prompt"`
-	Title         string      `json:"title"`
-	Body          string      `json:"body"`
-	Summary       string      `json:"summary"`
-	Tags          []string    `json:"tags"`
-	ImageURL      *string     `json:"imageUrl,omitempty"`
-	Author        *User       `json:"author"`
-	Status        DraftStatus `json:"status"`
-	AuthorID      string      `json:"authorId"`
-	PostID        *string     `json:"postId,omitempty"`
-	ReviewedByID  *string     `json:"reviewedById,omitempty"`
-	ReviewedAt    *string     `json:"reviewedAt,omitempty"`
-	RejectionNote *string     `json:"rejectionNote,omitempty"`
-	CreatedAt     string      `json:"createdAt"`
-	UpdatedAt     string      `json:"updatedAt"`
+	ID            string           `json:"id"`
+	ApprovalID    string           `json:"approvalId"`
+	Prompt        string           `json:"prompt"`
+	Title         string           `json:"title"`
+	Body          string           `json:"body"`
+	Summary       string           `json:"summary"`
+	Tags          []string         `json:"tags"`
+	ImageURL      *string          `json:"imageUrl,omitempty"`
+	Author        *User            `json:"author"`
+	Status        DraftStatus      `json:"status"`
+	AuthorID      string           `json:"authorId"`
+	PostID        *string          `json:"postId,omitempty"`
+	ReviewedByID  *string          `json:"reviewedById,omitempty"`
+	ReviewedAt    *string          `json:"reviewedAt,omitempty"`
+	RejectionNote *string          `json:"rejectionNote,omitempty"`
+	Generation    *DraftGeneration `json:"generation,omitempty"`
+	CreatedAt     string           `json:"createdAt"`
+	UpdatedAt     string           `json:"updatedAt"`
 }
 
 type PostReason struct {
@@ -159,6 +183,61 @@ type User struct {
 }
 
 func (User) IsEntity() {}
+
+type DraftSource string
+
+const (
+	DraftSourceQuickPrompt  DraftSource = "QUICK_PROMPT"
+	DraftSourceGUIDEdStudio DraftSource = "GUIDED_STUDIO"
+)
+
+var AllDraftSource = []DraftSource{
+	DraftSourceQuickPrompt,
+	DraftSourceGUIDEdStudio,
+}
+
+func (e DraftSource) IsValid() bool {
+	switch e {
+	case DraftSourceQuickPrompt, DraftSourceGUIDEdStudio:
+		return true
+	}
+	return false
+}
+
+func (e DraftSource) String() string {
+	return string(e)
+}
+
+func (e *DraftSource) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = DraftSource(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid DraftSource", str)
+	}
+	return nil
+}
+
+func (e DraftSource) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *DraftSource) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e DraftSource) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
 
 type DraftStatus string
 

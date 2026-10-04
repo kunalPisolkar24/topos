@@ -74,8 +74,12 @@ func (s *PostDraftService) CreateDraft(ctx context.Context, prompt, authorID str
 		Tags:       generated.Tags,
 		Status:     domain.DraftStatusPending,
 		AuthorID:   authorID,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		Generation: &domain.DraftGeneration{
+			Source: domain.DraftSourceQuickPrompt,
+			Prompt: prompt,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	return s.draftRepo.Create(ctx, draft)
 }
@@ -95,6 +99,9 @@ func (s *PostDraftService) CreateContentDraft(
 	if err != nil {
 		return nil, err
 	}
+	if !params.Generation.Valid() {
+		return nil, fmt.Errorf("%w: unknown draft generation source", domain.ErrValidation)
+	}
 
 	now := s.clock()
 	if params.PostID != "" {
@@ -104,6 +111,7 @@ func (s *PostDraftService) CreateContentDraft(
 			existing.Body = body
 			existing.Summary = summary
 			existing.Tags = tags
+			existing.Generation = params.Generation
 			if params.ImageURL != nil {
 				existing.ImageURL = params.ImageURL
 			}
@@ -129,6 +137,7 @@ func (s *PostDraftService) CreateContentDraft(
 		Status:     domain.DraftStatusPending,
 		AuthorID:   authorID,
 		PostID:     params.PostID,
+		Generation: params.Generation,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -155,6 +164,9 @@ func (s *PostDraftService) ResubmitContentDraft(
 	if err != nil {
 		return nil, err
 	}
+	if !params.Generation.Valid() {
+		return nil, fmt.Errorf("%w: unknown draft generation source", domain.ErrValidation)
+	}
 	if title == draft.Title && body == draft.Body && summary == draft.Summary &&
 		equalStrings(tags, draft.Tags) && equalImageURL(params.ImageURL, draft.ImageURL) {
 		return nil, fmt.Errorf("%w: no changes to resubmit", domain.ErrValidation)
@@ -164,6 +176,9 @@ func (s *PostDraftService) ResubmitContentDraft(
 	draft.Body = body
 	draft.Summary = summary
 	draft.Tags = tags
+	// Generation follows the resubmitted content: re-typing by hand
+	// clears the record, reusing AI assistance replaces it.
+	draft.Generation = params.Generation
 	// The resubmit dialog edits text only; a missing cover means "keep
 	// the stored one", never "clear it".
 	if params.ImageURL != nil {

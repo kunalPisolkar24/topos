@@ -108,6 +108,35 @@ enum DraftStatus {
   REJECTED
 }
 
+enum DraftSource {
+  QUICK_PROMPT
+  GUIDED_STUDIO
+}
+
+# DraftGeneration records the AI assistance behind a draft so reviewers
+# can see what produced it. Null means the author typed it by hand.
+type DraftGeneration {
+  source: DraftSource!
+  prompt: String!
+  audience: String
+  tone: String
+  length: String
+  structure: String
+  keywords: String
+  keyPoints: String
+}
+
+input DraftGenerationInput {
+  source: DraftSource!
+  prompt: String!
+  audience: String
+  tone: String
+  length: String
+  structure: String
+  keywords: String
+  keyPoints: String
+}
+
 # PostDraft is a post paused for peer review. AI-generated drafts carry
 # the originating prompt; human-authored drafts (createContentDraft) store
 # the author's own title/body/tags/cover with the prompt echoing the title.
@@ -129,6 +158,7 @@ type PostDraft {
   reviewedById: ID
   reviewedAt: String
   rejectionNote: String
+  generation: DraftGeneration
   createdAt: String!
   updatedAt: String!
 }
@@ -191,6 +221,7 @@ input ContentDraftInput {
   tags: [String!]
   imageUrl: String
   postId: ID
+  generation: DraftGenerationInput
 }
 
 input CreatePostInput {

@@ -67,6 +67,17 @@ type ComplexityRoot struct {
 		Role         func(childComplexity int) int
 	}
 
+	DraftGeneration struct {
+		Audience  func(childComplexity int) int
+		KeyPoints func(childComplexity int) int
+		Keywords  func(childComplexity int) int
+		Length    func(childComplexity int) int
+		Prompt    func(childComplexity int) int
+		Source    func(childComplexity int) int
+		Structure func(childComplexity int) int
+		Tone      func(childComplexity int) int
+	}
+
 	Entity struct {
 		FindPostByID func(childComplexity int, id string) int
 		FindUserByID func(childComplexity int, id string) int
@@ -153,6 +164,7 @@ type ComplexityRoot struct {
 		AuthorID      func(childComplexity int) int
 		Body          func(childComplexity int) int
 		CreatedAt     func(childComplexity int) int
+		Generation    func(childComplexity int) int
 		ID            func(childComplexity int) int
 		ImageURL      func(childComplexity int) int
 		PostID        func(childComplexity int) int
@@ -334,6 +346,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChatMessage.Role(childComplexity), true
+
+	case "DraftGeneration.audience":
+		if e.complexity.DraftGeneration.Audience == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Audience(childComplexity), true
+	case "DraftGeneration.keyPoints":
+		if e.complexity.DraftGeneration.KeyPoints == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.KeyPoints(childComplexity), true
+	case "DraftGeneration.keywords":
+		if e.complexity.DraftGeneration.Keywords == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Keywords(childComplexity), true
+	case "DraftGeneration.length":
+		if e.complexity.DraftGeneration.Length == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Length(childComplexity), true
+	case "DraftGeneration.prompt":
+		if e.complexity.DraftGeneration.Prompt == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Prompt(childComplexity), true
+	case "DraftGeneration.source":
+		if e.complexity.DraftGeneration.Source == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Source(childComplexity), true
+	case "DraftGeneration.structure":
+		if e.complexity.DraftGeneration.Structure == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Structure(childComplexity), true
+	case "DraftGeneration.tone":
+		if e.complexity.DraftGeneration.Tone == nil {
+			break
+		}
+
+		return e.complexity.DraftGeneration.Tone(childComplexity), true
 
 	case "Entity.findPostByID":
 		if e.complexity.Entity.FindPostByID == nil {
@@ -814,6 +875,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PostDraft.CreatedAt(childComplexity), true
+	case "PostDraft.generation":
+		if e.complexity.PostDraft.Generation == nil {
+			break
+		}
+
+		return e.complexity.PostDraft.Generation(childComplexity), true
 	case "PostDraft.id":
 		if e.complexity.PostDraft.ID == nil {
 			break
@@ -1101,6 +1168,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputContentDraftInput,
 		ec.unmarshalInputCreatePostInput,
 		ec.unmarshalInputDraftEditsInput,
+		ec.unmarshalInputDraftGenerationInput,
 		ec.unmarshalInputUpdatePostInput,
 	)
 	first := true
@@ -2140,6 +2208,238 @@ func (ec *executionContext) fieldContext_ChatMessage_createdAt(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _DraftGeneration_source(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_source,
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		ec.marshalNDraftSource2githubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftSource,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DraftSource does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_prompt(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_prompt,
+		func(ctx context.Context) (any, error) {
+			return obj.Prompt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_prompt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_audience(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_audience,
+		func(ctx context.Context) (any, error) {
+			return obj.Audience, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_audience(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_tone(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_tone,
+		func(ctx context.Context) (any, error) {
+			return obj.Tone, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_tone(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_length(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_length,
+		func(ctx context.Context) (any, error) {
+			return obj.Length, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_length(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_structure(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_structure,
+		func(ctx context.Context) (any, error) {
+			return obj.Structure, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_structure(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_keywords(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_keywords,
+		func(ctx context.Context) (any, error) {
+			return obj.Keywords, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_keywords(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DraftGeneration_keyPoints(ctx context.Context, field graphql.CollectedField, obj *model.DraftGeneration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DraftGeneration_keyPoints,
+		func(ctx context.Context) (any, error) {
+			return obj.KeyPoints, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DraftGeneration_keyPoints(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DraftGeneration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Entity_findPostByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3031,6 +3331,8 @@ func (ec *executionContext) fieldContext_Mutation_createPostDraft(ctx context.Co
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -3108,6 +3410,8 @@ func (ec *executionContext) fieldContext_Mutation_createContentDraft(ctx context
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -3185,6 +3489,8 @@ func (ec *executionContext) fieldContext_Mutation_resubmitContentDraft(ctx conte
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -3262,6 +3568,8 @@ func (ec *executionContext) fieldContext_Mutation_approvePostDraft(ctx context.C
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -3339,6 +3647,8 @@ func (ec *executionContext) fieldContext_Mutation_rejectPostDraft(ctx context.Co
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -3712,6 +4022,8 @@ func (ec *executionContext) fieldContext_PaginatedPostDrafts_drafts(_ context.Co
 				return ec.fieldContext_PostDraft_reviewedAt(ctx, field)
 			case "rejectionNote":
 				return ec.fieldContext_PostDraft_rejectionNote(ctx, field)
+			case "generation":
+				return ec.fieldContext_PostDraft_generation(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_PostDraft_createdAt(ctx, field)
 			case "updatedAt":
@@ -4920,6 +5232,53 @@ func (ec *executionContext) fieldContext_PostDraft_rejectionNote(_ context.Conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostDraft_generation(ctx context.Context, field graphql.CollectedField, obj *model.PostDraft) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PostDraft_generation,
+		func(ctx context.Context) (any, error) {
+			return obj.Generation, nil
+		},
+		nil,
+		ec.marshalODraftGeneration2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftGeneration,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PostDraft_generation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostDraft",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "source":
+				return ec.fieldContext_DraftGeneration_source(ctx, field)
+			case "prompt":
+				return ec.fieldContext_DraftGeneration_prompt(ctx, field)
+			case "audience":
+				return ec.fieldContext_DraftGeneration_audience(ctx, field)
+			case "tone":
+				return ec.fieldContext_DraftGeneration_tone(ctx, field)
+			case "length":
+				return ec.fieldContext_DraftGeneration_length(ctx, field)
+			case "structure":
+				return ec.fieldContext_DraftGeneration_structure(ctx, field)
+			case "keywords":
+				return ec.fieldContext_DraftGeneration_keywords(ctx, field)
+			case "keyPoints":
+				return ec.fieldContext_DraftGeneration_keyPoints(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DraftGeneration", field.Name)
 		},
 	}
 	return fc, nil
@@ -7516,7 +7875,7 @@ func (ec *executionContext) unmarshalInputContentDraftInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"title", "body", "summary", "tags", "imageUrl", "postId"}
+	fieldsInOrder := [...]string{"title", "body", "summary", "tags", "imageUrl", "postId", "generation"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -7565,6 +7924,13 @@ func (ec *executionContext) unmarshalInputContentDraftInput(ctx context.Context,
 				return it, err
 			}
 			it.PostID = data
+		case "generation":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("generation"))
+			data, err := ec.unmarshalODraftGenerationInput2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftGenerationInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Generation = data
 		}
 	}
 
@@ -7668,6 +8034,82 @@ func (ec *executionContext) unmarshalInputDraftEditsInput(ctx context.Context, o
 				return it, err
 			}
 			it.Tags = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputDraftGenerationInput(ctx context.Context, obj any) (model.DraftGenerationInput, error) {
+	var it model.DraftGenerationInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"source", "prompt", "audience", "tone", "length", "structure", "keywords", "keyPoints"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "source":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("source"))
+			data, err := ec.unmarshalNDraftSource2githubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftSource(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Source = data
+		case "prompt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("prompt"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Prompt = data
+		case "audience":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("audience"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Audience = data
+		case "tone":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tone"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tone = data
+		case "length":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("length"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Length = data
+		case "structure":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("structure"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Structure = data
+		case "keywords":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("keywords"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Keywords = data
+		case "keyPoints":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("keyPoints"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KeyPoints = data
 		}
 	}
 
@@ -7852,6 +8294,62 @@ func (ec *executionContext) _ChatMessage(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var draftGenerationImplementors = []string{"DraftGeneration"}
+
+func (ec *executionContext) _DraftGeneration(ctx context.Context, sel ast.SelectionSet, obj *model.DraftGeneration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, draftGenerationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DraftGeneration")
+		case "source":
+			out.Values[i] = ec._DraftGeneration_source(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "prompt":
+			out.Values[i] = ec._DraftGeneration_prompt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "audience":
+			out.Values[i] = ec._DraftGeneration_audience(ctx, field, obj)
+		case "tone":
+			out.Values[i] = ec._DraftGeneration_tone(ctx, field, obj)
+		case "length":
+			out.Values[i] = ec._DraftGeneration_length(ctx, field, obj)
+		case "structure":
+			out.Values[i] = ec._DraftGeneration_structure(ctx, field, obj)
+		case "keywords":
+			out.Values[i] = ec._DraftGeneration_keywords(ctx, field, obj)
+		case "keyPoints":
+			out.Values[i] = ec._DraftGeneration_keyPoints(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8665,6 +9163,8 @@ func (ec *executionContext) _PostDraft(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = ec._PostDraft_reviewedAt(ctx, field, obj)
 		case "rejectionNote":
 			out.Values[i] = ec._PostDraft_rejectionNote(ctx, field, obj)
+		case "generation":
+			out.Values[i] = ec._PostDraft_generation(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._PostDraft_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -9748,6 +10248,16 @@ func (ec *executionContext) unmarshalNCreatePostInput2githubᚗcomᚋkunalPisolk
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNDraftSource2githubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftSource(ctx context.Context, v any) (model.DraftSource, error) {
+	var res model.DraftSource
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDraftSource2githubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftSource(ctx context.Context, sel ast.SelectionSet, v model.DraftSource) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNDraftStatus2githubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftStatus(ctx context.Context, v any) (model.DraftStatus, error) {
 	var res model.DraftStatus
 	err := res.UnmarshalGQL(v)
@@ -10760,6 +11270,21 @@ func (ec *executionContext) unmarshalODraftEditsInput2ᚖgithubᚗcomᚋkunalPis
 		return nil, nil
 	}
 	res, err := ec.unmarshalInputDraftEditsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODraftGeneration2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftGeneration(ctx context.Context, sel ast.SelectionSet, v *model.DraftGeneration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DraftGeneration(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalODraftGenerationInput2ᚖgithubᚗcomᚋkunalPisolkar24ᚋtoposᚋservicesᚋcontentᚋgraphᚋmodelᚐDraftGenerationInput(ctx context.Context, v any) (*model.DraftGenerationInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDraftGenerationInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
