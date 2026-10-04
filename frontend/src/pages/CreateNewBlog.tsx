@@ -16,7 +16,7 @@ import {
   AIDraftGenerator,
   FeaturedImageSection,
   BlogTagSection,
-  WritingStudioPreview,
+  WritingStudio,
 } from "@/features/blog";
 import { PublishChecklistItem } from "@/features/blog/components/PublishChecklistItem";
 
@@ -88,7 +88,7 @@ const CreateNewBlog: React.FC = () => {
                   />
                 </TabsContent>
                 <TabsContent value="studio" className="mt-4">
-                  <WritingStudioPreview studio={studio} />
+                  <WritingStudio studio={studio} />
                 </TabsContent>
               </Tabs>
 

@@ -1,4 +1,4 @@
 export * from "./types";
-export * from "./fakeWritingAgent";
-export * from "./useWritingStudioPreview";
-export * from "./WritingStudioPreview";
+export * from "./sections";
+export * from "./useWritingStudio";
+export * from "./WritingStudio";

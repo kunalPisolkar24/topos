@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/shared/ui/primitives/select";
 import { Textarea } from "@/shared/ui/primitives/textarea";
-import type { UseWritingStudioPreviewResult } from "./useWritingStudioPreview";
+import type { UseWritingStudioResult } from "./useWritingStudio";
 import {
   WRITING_AUDIENCES,
   WRITING_LENGTHS,
@@ -24,14 +24,14 @@ import {
   WRITING_TONES,
 } from "./types";
 
-interface WritingStudioPreviewProps {
-  studio: UseWritingStudioPreviewResult;
+interface WritingStudioProps {
+  studio: UseWritingStudioResult;
 }
 
 const fieldLabelClassName =
   "font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-muted-foreground";
 
-interface OptionRowProps<T extends string> {
+interface StudioSelectProps<T extends string> {
   label: string;
   options: readonly T[];
   value: T;
@@ -49,7 +49,7 @@ function StudioSelect<T extends string>({
   options,
   value,
   onChange,
-}: OptionRowProps<T>) {
+}: StudioSelectProps<T>) {
   return (
     <div className="space-y-2">
       <span className={fieldLabelClassName}>{label}</span>
@@ -69,21 +69,15 @@ function StudioSelect<T extends string>({
   );
 }
 
-const steps = ["brief", "outline", "draft"] as const;
+const steps = ["brief", "draft"] as const;
 
-export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
-  studio,
-}) => {
+export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
   const {
     brief,
     step,
-    outline,
-    bodies,
-    isGeneratingOutline,
-    isExpanding,
-    expandingId,
-    canGenerateOutline,
-    canExpand,
+    sections,
+    isGenerating,
+    canGenerate,
     canApply,
   } = studio;
 
@@ -91,15 +85,15 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
     <Card className="gap-0 bg-surface-lowest py-0">
       <CardHeader className="bg-primary-container p-4 text-primary-foreground sm:p-5">
         <p className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-primary-foreground/80">
-          03 // Guided Studio — Preview
+          03 // Guided Studio
         </p>
         <CardTitle className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-[-0.04em]">
           <Sparkles className="h-5 w-5" aria-hidden="true" />
           Write with outline control
         </CardTitle>
         <p className="max-w-2xl text-sm leading-6 text-primary-foreground/70">
-          Emulated run: no backend call yet. Applying copies the preview into
-          the title, body, and tags above.
+          Pick a style, generate a full draft, rearrange its sections, then
+          apply it to the editor.
         </p>
       </CardHeader>
       <CardContent className="space-y-5 p-4 sm:p-5">
@@ -190,22 +184,22 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
             </div>
             <Button
               type="button"
-              onClick={() => void studio.generateOutline()}
-              disabled={!canGenerateOutline}
+              onClick={() => void studio.generate()}
+              disabled={!canGenerate}
             >
-              {isGeneratingOutline ? "Planning outline..." : "Generate outline"}
+              {isGenerating ? "Generating draft..." : "Generate draft"}
             </Button>
           </div>
         )}
 
-        {step !== "brief" && (
+        {step === "draft" && (
           <div className="space-y-4">
             <p className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
               <ListOrdered className="h-4 w-4" aria-hidden="true" />
-              Outline ({outline.length} sections)
+              Draft ({sections.length} sections)
             </p>
             <div className="space-y-3">
-              {outline.map((section, index) => (
+              {sections.map((section, index) => (
                 <div
                   key={section.id}
                   className="space-y-2 bg-surface-low p-3 ring-1 ring-outline-variant/20"
@@ -217,6 +211,7 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
                     <Input
                       aria-label={`Section ${index + 1} heading`}
                       value={section.heading}
+                      placeholder="Introduction (no heading)"
                       onChange={(event) =>
                         studio.updateSectionHeading(
                           section.id,
@@ -225,15 +220,15 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
                       }
                     />
                   </div>
-                  <p className="text-xs leading-6 text-muted-foreground">
-                    {section.bullets.join(" • ")} — ~{section.targetWords} words
-                  </p>
-                  {bodies[section.id] && (
-                    <div
-                      className="bg-surface-lowest p-3 text-sm leading-7"
-                      dangerouslySetInnerHTML={{ __html: bodies[section.id] }}
-                    />
+                  {section.heading && (
+                    <p className="text-sm font-medium leading-7 text-foreground">
+                      {section.heading}
+                    </p>
                   )}
+                  <div
+                    className="bg-surface-lowest p-3 text-sm leading-7"
+                    dangerouslySetInnerHTML={{ __html: section.bodyHtml }}
+                  />
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -249,20 +244,9 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
                       size="xs"
                       variant="outline"
                       onClick={() => studio.moveSection(section.id, 1)}
-                      disabled={index === outline.length - 1}
+                      disabled={index === sections.length - 1}
                     >
                       Move down
-                    </Button>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={() => void studio.regenerateSection(section.id)}
-                      disabled={isExpanding}
-                    >
-                      {expandingId === section.id
-                        ? "Writing..."
-                        : "Regenerate section"}
                     </Button>
                     <Button
                       type="button"
@@ -277,30 +261,19 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
               ))}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              {step === "outline" && (
-                <Button
-                  type="button"
-                  onClick={() => void studio.expandAll()}
-                  disabled={!canExpand}
-                >
-                  {isExpanding ? "Drafting sections..." : "Draft all sections"}
-                </Button>
-              )}
-              {step === "draft" && (
-                <Button
-                  type="button"
-                  onClick={studio.applyToEditor}
-                  disabled={!canApply}
-                >
-                  <PenLine className="h-4 w-4" aria-hidden="true" />
-                  Apply preview to editor
-                </Button>
-              )}
+              <Button
+                type="button"
+                onClick={studio.applyToEditor}
+                disabled={!canApply}
+              >
+                <PenLine className="h-4 w-4" aria-hidden="true" />
+                Apply to editor
+              </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={studio.reset}
-                disabled={isExpanding || isGeneratingOutline}
+                disabled={isGenerating}
               >
                 Start over
               </Button>

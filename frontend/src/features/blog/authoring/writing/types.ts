@@ -1,4 +1,11 @@
-import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
+import type {
+  DraftGenerationInput,
+  WritingAudience,
+  WritingBriefInput,
+  WritingLength,
+  WritingStructure,
+  WritingTone,
+} from "@/shared/graphql/content-documents";
 
 export const WRITING_AUDIENCES = [
   "beginner",
@@ -81,6 +88,45 @@ export const toDraftGenerationInput = (
   tone: brief.tone,
   length: brief.length,
   structure: brief.structure,
+  keywords: orNull(brief.keywords),
+  keyPoints: orNull(brief.keyPoints),
+});
+
+const BRIEF_AUDIENCE: Record<WritingAudience, WritingAudience> = {
+  beginner: "BEGINNER",
+  practitioner: "PRACTITIONER",
+  expert: "EXPERT",
+};
+
+const BRIEF_TONE: Record<WritingTone, WritingTone> = {
+  professional: "PROFESSIONAL",
+  conversational: "CONVERSATIONAL",
+  technical: "TECHNICAL",
+  storytelling: "STORYTELLING",
+  witty: "WITTY",
+  minimal: "MINIMAL",
+};
+
+const BRIEF_LENGTH: Record<WritingLength, WritingLength> = {
+  quick: "QUICK",
+  standard: "STANDARD",
+  deep: "DEEP_DIVE",
+};
+
+const BRIEF_STRUCTURE: Record<WritingStructure, WritingStructure> = {
+  "how-to": "HOW_TO",
+  listicle: "LISTICLE",
+  tutorial: "TUTORIAL",
+  comparison: "COMPARISON",
+  opinion: "OPINION",
+  "case-study": "CASE_STUDY",
+};
+
+export const toWritingBriefInput = (brief: WritingBrief): WritingBriefInput => ({
+  audience: BRIEF_AUDIENCE[brief.audience],
+  tone: BRIEF_TONE[brief.tone],
+  length: BRIEF_LENGTH[brief.length],
+  structure: BRIEF_STRUCTURE[brief.structure],
   keywords: orNull(brief.keywords),
   keyPoints: orNull(brief.keyPoints),
 });

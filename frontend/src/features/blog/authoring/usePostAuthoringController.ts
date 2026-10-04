@@ -14,9 +14,9 @@ import { usePostImageUploader } from "./hooks/usePostImageUploader";
 import { usePostTagInput } from "./hooks/usePostTagInput";
 import { usePostAuthoringSubmit } from "./hooks/usePostAuthoringSubmit";
 import {
-  useWritingStudioPreview,
+  useWritingStudio,
   toDraftGenerationInput,
-  type UseWritingStudioPreviewResult,
+  type UseWritingStudioResult,
 } from "./writing";
 import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
 
@@ -99,7 +99,7 @@ export interface PostAuthoringController {
     quillRef: React.MutableRefObject<ReactQuill | null>;
     cardImageInputRef: React.MutableRefObject<HTMLInputElement | null>;
   };
-  studio: UseWritingStudioPreviewResult;
+  studio: UseWritingStudioResult;
 }
 
 export const usePostAuthoringController = ({
@@ -141,7 +141,7 @@ export const usePostAuthoringController = ({
     onGenerated: (prompt) => setGeneration({ source: "QUICK_PROMPT", prompt }),
   });
 
-  const studio = useWritingStudioPreview({
+  const studio = useWritingStudio({
     onTitleChange: setTitle,
     onContentChange: setContent,
     onTagsChange: tagInput.replaceTags,
