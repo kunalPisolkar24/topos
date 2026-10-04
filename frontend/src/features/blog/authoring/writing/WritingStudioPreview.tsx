@@ -90,7 +90,7 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
                   studio.setBriefField("topic", event.target.value)
                 }
                 placeholder="What is this post about? Include reader and angle..."
-                className="min-h-24 bg-surface-lowest leading-7"
+                className="min-h-24 resize-y bg-surface-lowest leading-7"
               />
             </div>
             <div className="space-y-2">
@@ -104,7 +104,7 @@ export const WritingStudioPreview: React.FC<WritingStudioPreviewProps> = ({
                   studio.setBriefField("keyPoints", event.target.value)
                 }
                 placeholder={"First insight\nSecond insight\nTrade-off to cover"}
-                className="min-h-20 bg-surface-lowest leading-7"
+                className="min-h-20 max-h-64 resize-y overflow-auto bg-surface-lowest leading-7"
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
