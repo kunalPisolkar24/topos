@@ -9,6 +9,9 @@ services:
       context: ..
       dockerfile: Dockerfile
     restart: unless-stopped
+    # The Dockerfile's final stage defaults to the personalizer binary;
+    # pin the server binary like the worker entries below do.
+    command: ["./content-service"]
     ports:
       - "${CONTENT_SERVICE_EXT_PORT:-4002}:${CONTENT_SERVICE_INT_PORT:-4002}"
     environment:
