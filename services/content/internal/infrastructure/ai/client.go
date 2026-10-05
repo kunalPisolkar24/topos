@@ -26,7 +26,9 @@ import (
 const (
 	summaryTimeout = 30 * time.Second
 	tagsTimeout    = 15 * time.Second
-	postTimeout    = 60 * time.Second
+	// Post generation verifies structure and may repair twice; deep
+	// posts make each attempt slow, so budget for the full loop.
+	postTimeout    = 120 * time.Second
 	draftTimeout   = 60 * time.Second
 	approveTimeout = 30 * time.Second
 	rejectTimeout  = 10 * time.Second
