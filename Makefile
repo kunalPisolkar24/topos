@@ -1,4 +1,4 @@
-.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure infra-test-unit infra-test-floci obs-plan obs-apply obs-test-unit obs-test-live obs-test-collector prune
+.PHONY: help local-up local-down local-logs local-ps local-clean prod-up prod-down prod-logs prod-ps prod-clean prod-sync-env prod-nuke check-tfvars infra-plan infra-up infra-output infra-destroy infra-floci-ensure infra-floci-down infra-test-unit infra-test-floci obs-plan obs-apply obs-test-unit obs-test-live obs-test-collector prune
 
 OBS_DIR := infrastructure/observability
 
@@ -43,12 +43,17 @@ help:
 	@echo "  make prod-ps      - List prod containers"
 	@echo "  make prod-down    - Stop prod (keeps volumes)"
 	@echo "  make prod-clean   - Stop prod and delete volumes"
+	@echo "  make prod-sync-env - Refresh prod .env connection strings from Floci SM"
+	@echo "                      (passwords + MSK sidecar; run after infra-up)"
+	@echo "  make prod-nuke ENV=floci - Full teardown: prod-clean + infra-destroy"
+	@echo "                      + floci emulator/network removal"
 	@echo ""
 	@echo "  Managed infra (terraform RDS/DocDB/MSK/ElastiCache, ENV=floci|prod):"
 	@echo "  make infra-plan   - Plan infra changes"
 	@echo "  make infra-up     - Apply infra (Floci: starts emulator + network first)"
 	@echo "  make infra-output - Show infra endpoints (fill prod .env from this)"
 	@echo "  make infra-destroy - Destroy infra (prod needs CONFIRM_DESTROY=1)"
+	@echo "  make infra-floci-down ENV=floci - Stop Floci emulator + remove floci-apps"
 	@echo "  make infra-test-unit - Run mocked Terraform contract tests"
 	@echo "  make infra-test-floci - Apply and verify live Floci resource contracts"
 	@echo ""
@@ -110,6 +115,14 @@ prod-ps: $(PROD_ENV)
 prod-clean: $(PROD_ENV)
 	$(COMPOSE_PROD) down -v --remove-orphans
 
+prod-sync-env: $(PROD_ENV)
+	python3 $(PROD_DIR)/sync-env-from-floci.py --env-file $(PROD_ENV) --endpoint-url $${AWS_ENDPOINT_URL:-http://localhost:4566} --region $${AWS_REGION:-ap-south-1}
+
+prod-nuke: check-tfvars
+	$(MAKE) --no-print-directory prod-clean
+	$(MAKE) --no-print-directory infra-destroy ENV=$(ENV)
+	@if [ "$(ENV)" = "floci" ]; then $(MAKE) --no-print-directory infra-floci-down ENV=floci; fi
+
 # --- Managed infra (terraform) ------------------------------------------------
 # Floci is the default target (envs/floci.tfvars). Real AWS needs
 # infrastructure/terraform/envs/prod.tfvars + backend.hcl (see its README).
@@ -141,8 +154,15 @@ infra-up: check-tfvars
 infra-output:
 	terraform -chdir=$(TF_DIR) output
 
+infra-floci-down:
+	@if [ "$(ENV)" != "floci" ]; then echo "infra-floci-down only supports ENV=floci"; exit 1; fi
+	-@docker stop floci 2>/dev/null || true
+	-@docker rm floci 2>/dev/null || true
+	-@docker network rm floci-apps 2>/dev/null || true
+
 infra-destroy: check-tfvars
 	@if [ "$(ENV)" = "prod" ] && [ "$(CONFIRM_DESTROY)" != "1" ]; then echo "refusing to destroy prod without CONFIRM_DESTROY=1"; exit 1; fi
+	terraform -chdir=$(TF_DIR) init -input=false
 	terraform -chdir=$(TF_DIR) destroy -input=false -auto-approve -var-file=envs/$(ENV).tfvars
 
 infra-test-unit:

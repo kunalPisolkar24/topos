@@ -102,9 +102,11 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
     var.environment == "floci" ? {
       # Floci data plane (real, Docker-backed): DocumentDB (Mongo 7) and
       # MSK (Redpanda, Kafka protocol) run as Floci sidecars. DocDB is
-      # reached by its stable sidecar name; MSK advertises its container
-      # hostname, so KAFKA_BROKERS pins the current sidecar name (changes
-      # only if the cluster is recreated — then re-apply refreshes this).
+      # reached by its stable sidecar name; MSK advertises a random
+      # sidecar hostname per cluster, so the KAFKA_BROKERS value below is
+      # only a placeholder. The live broker comes from the synced
+      # infrastructure/docker/prod/.env (see `make prod-sync-env`),
+      # which wins over this secret via external injection.
       # Redis goes via the Floci proxy (plaintext + AUTH token). App
       # containers must share the `floci-apps` network with these sidecars
       # (see services/content/infra/compose.prod.yml). No docker
