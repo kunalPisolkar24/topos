@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { postRepository } from "@/entities/post/api/postRepository";
-import { MIN_PROMPT_LENGTH, normalizeTags } from "@/entities/post/lib";
+import { MIN_PROMPT_LENGTH, normalizeTags, toPlainText } from "@/entities/post/lib";
 import { getGraphQLErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/ui/hooks/useToast";
 import { joinBodySections, splitBodySections, type BodySection } from "./sections";
@@ -29,6 +29,7 @@ export interface UseWritingStudioResult {
   step: "brief" | "draft";
   sections: BodySection[];
   isGenerating: boolean;
+  regeneratingSectionId: string | null;
   canGenerate: boolean;
   canApply: boolean;
   setBriefField: <K extends keyof WritingBrief>(
@@ -36,10 +37,14 @@ export interface UseWritingStudioResult {
     value: WritingBrief[K],
   ) => void;
   generate: () => Promise<void>;
+  regenerateAll: () => Promise<void>;
+  regenerateSection: (id: string, instruction?: string) => Promise<void>;
   moveSection: (id: string, direction: -1 | 1) => void;
   updateSectionHeading: (id: string, heading: string) => void;
+  updateSectionBody: (id: string, bodyHtml: string) => void;
   removeSection: (id: string) => void;
   applyToEditor: () => void;
+  editBrief: () => void;
   reset: () => void;
 }
 
@@ -58,10 +63,15 @@ export const useWritingStudio = ({
 
   const [mutate, { loading: isGenerating }] =
     postRepository.useGenerateDraft();
+  const [regeneratingSectionId, setRegeneratingSectionId] = useState<string | null>(null);
 
   const canGenerate =
     brief.topic.trim().length >= MIN_PROMPT_LENGTH && !isGenerating;
-  const canApply = step === "draft" && sections.length > 0 && !isGenerating;
+  const canApply =
+    step === "draft" &&
+    sections.length > 0 &&
+    !isGenerating &&
+    regeneratingSectionId === null;
 
   const setBriefField = <K extends keyof WritingBrief>(
     field: K,
@@ -139,8 +149,91 @@ export const useWritingStudio = ({
     );
   };
 
+  const updateSectionBody = (id: string, bodyHtml: string) => {
+    setSections((current) =>
+      current.map((section) =>
+        section.id === id ? { ...section, bodyHtml } : section,
+      ),
+    );
+  };
+
   const removeSection = (id: string) => {
     setSections((current) => current.filter((section) => section.id !== id));
+  };
+
+  const regenerateAll = async () => {
+    await generate();
+  };
+
+  const regenerateSection = async (id: string, instruction?: string) => {
+    const target = sections.find((section) => section.id === id);
+    if (!target || isGenerating || regeneratingSectionId !== null) return;
+    const topic = brief.topic.trim();
+    if (topic.length < MIN_PROMPT_LENGTH) {
+      toast({
+        title: "Topic Too Short",
+        description: "Describe the topic, reader, and angle in a few more words.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const heading = target.heading || "Introduction";
+    const siblings = sections
+      .filter((section) => section.id !== id)
+      .map((section) => section.heading || "Introduction")
+      .join(", ");
+    const currentText = toPlainText(target.bodyHtml).slice(0, 2000);
+    const prompt = [
+      `Rewrite section "${heading}" for post about "${topic}".`,
+      `Instruction: ${(instruction ?? "").trim() || "Rewrite with a fresh angle"}.`,
+      siblings ? `Other sections: ${siblings}.` : "",
+      currentText ? `Current section content: ${currentText}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    setRegeneratingSectionId(id);
+    try {
+      const { data } = await mutate({
+        variables: { prompt, brief: toWritingBriefInput(brief) },
+      });
+      const candidates = splitBodySections(data?.generatePostContent?.body ?? "");
+      const match =
+        candidates.find(
+          (candidate) =>
+            candidate.heading.toLowerCase() === heading.toLowerCase(),
+        ) ??
+        candidates.find((candidate) => candidate.bodyHtml.trim()) ??
+        candidates[0];
+      if (!match?.bodyHtml.trim()) {
+        toast({
+          title: "Incomplete Section",
+          description: "The regenerated section came back empty.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSections((current) =>
+        current.map((section) =>
+          section.id === id ? { ...section, bodyHtml: match.bodyHtml } : section,
+        ),
+      );
+      toast({
+        title: "Section Regenerated",
+        description: `Rewrote "${heading}". Review it, then apply to the editor.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Section Regeneration Failed",
+        description: getGraphQLErrorMessage(
+          error,
+          "Unable to regenerate this section right now.",
+        ),
+        variant: "destructive",
+      });
+    } finally {
+      setRegeneratingSectionId(null);
+    }
   };
 
   const applyToEditor = () => {
@@ -156,6 +249,11 @@ export const useWritingStudio = ({
     setStep("brief");
     setSections([]);
     setDraftMeta(null);
+    setRegeneratingSectionId(null);
+  };
+
+  const editBrief = () => {
+    setStep("brief");
   };
 
   return {
@@ -163,14 +261,19 @@ export const useWritingStudio = ({
     step,
     sections,
     isGenerating,
+    regeneratingSectionId,
     canGenerate,
     canApply,
     setBriefField,
     generate,
+    regenerateAll,
+    regenerateSection,
     moveSection,
     updateSectionHeading,
+    updateSectionBody,
     removeSection,
     applyToEditor,
+    editBrief,
     reset,
   };
 };

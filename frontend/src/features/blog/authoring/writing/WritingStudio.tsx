@@ -1,5 +1,6 @@
 import type React from "react";
-import { ListOrdered, PenLine, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { ListOrdered, PenLine, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
 import {
   Card,
@@ -77,9 +78,12 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
     step,
     sections,
     isGenerating,
+    regeneratingSectionId,
     canGenerate,
     canApply,
   } = studio;
+  const [instructions, setInstructions] = useState<Record<string, string>>({});
+  const isBusy = isGenerating || regeneratingSectionId !== null;
 
   return (
     <Card className="gap-0 bg-surface-lowest py-0">
@@ -194,12 +198,37 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
 
         {step === "draft" && (
           <div className="space-y-4">
-            <p className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
-              <ListOrdered className="h-4 w-4" aria-hidden="true" />
-              Draft ({sections.length} sections)
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">
+                <ListOrdered className="h-4 w-4" aria-hidden="true" />
+                Draft ({sections.length} sections)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void studio.regenerateAll()}
+                  disabled={!canGenerate || isBusy}
+                >
+                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                  {isGenerating ? "Regenerating..." : "Regenerate draft"}
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={studio.editBrief}
+                  disabled={isBusy}
+                >
+                  Edit brief
+                </Button>
+              </div>
+            </div>
             <div className="space-y-3">
-              {sections.map((section, index) => (
+              {sections.map((section, index) => {
+                const isRegenerating = regeneratingSectionId === section.id;
+                return (
                 <div
                   key={section.id}
                   className="space-y-2 bg-surface-low p-3 ring-1 ring-outline-variant/20"
@@ -229,13 +258,63 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                     className="bg-surface-lowest p-3 text-sm leading-7"
                     dangerouslySetInnerHTML={{ __html: section.bodyHtml }}
                   />
+                  <div className="space-y-2">
+                    <label
+                      htmlFor={`regen-${section.id}`}
+                      className={fieldLabelClassName}
+                    >
+                      Regenerate instruction (optional)
+                    </label>
+                    <Input
+                      id={`regen-${section.id}`}
+                      value={instructions[section.id] ?? ""}
+                      placeholder="Try: shorter, more code, friendlier..."
+                      onChange={(event) =>
+                        setInstructions((current) => ({
+                          ...current,
+                          [section.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor={`body-${section.id}`}
+                      className={fieldLabelClassName}
+                    >
+                      Section body (HTML)
+                    </label>
+                    <Textarea
+                      id={`body-${section.id}`}
+                      value={section.bodyHtml}
+                      onChange={(event) =>
+                        studio.updateSectionBody(section.id, event.target.value)
+                      }
+                      className="min-h-20 max-h-64 resize-y overflow-auto bg-surface-lowest font-mono text-xs leading-6"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       size="xs"
                       variant="outline"
+                      onClick={() =>
+                        void studio.regenerateSection(
+                          section.id,
+                          instructions[section.id],
+                        )
+                      }
+                      disabled={isBusy}
+                    >
+                      <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                      {isRegenerating ? "Regenerating..." : "Regenerate"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
                       onClick={() => studio.moveSection(section.id, -1)}
-                      disabled={index === 0}
+                      disabled={index === 0 || isBusy}
                     >
                       Move up
                     </Button>
@@ -244,7 +323,7 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                       size="xs"
                       variant="outline"
                       onClick={() => studio.moveSection(section.id, 1)}
-                      disabled={index === sections.length - 1}
+                      disabled={index === sections.length - 1 || isBusy}
                     >
                       Move down
                     </Button>
@@ -253,12 +332,14 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                       size="xs"
                       variant="ghost"
                       onClick={() => studio.removeSection(section.id)}
+                      disabled={isBusy}
                     >
                       Remove
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
@@ -273,7 +354,7 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                 type="button"
                 variant="outline"
                 onClick={studio.reset}
-                disabled={isGenerating}
+                disabled={isBusy}
               >
                 Start over
               </Button>

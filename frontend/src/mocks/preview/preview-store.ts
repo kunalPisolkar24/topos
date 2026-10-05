@@ -1077,6 +1077,13 @@ export function previewGenerateTags(title: string, body: string) {
   return generateTags(title, body);
 }
 
-export function previewGeneratePostContent(prompt: string) {
-  return generatePostContent(prompt);
+export function previewGeneratePostContent(prompt: string, brief?: {
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+} | null) {
+  return generatePostContent(prompt, brief);
 }

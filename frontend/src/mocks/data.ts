@@ -822,14 +822,59 @@ export const generateTags = (title: string, body: string) => {
   return unique.length > 0 ? unique.slice(0, 4) : ["Architecture", "Distributed Systems", "Go"];
 };
 
-export const generatePostContent = (prompt: string) => {
+let generatePostContentCalls = 0;
+
+export interface MockWritingBrief {
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
+const describeBrief = (brief?: MockWritingBrief | null): string | null => {
+  if (!brief) return null;
+  const parts: string[] = [];
+  if (brief.audience) parts.push(`audience ${brief.audience}`);
+  if (brief.tone) parts.push(`${brief.tone} tone`);
+  if (brief.length) parts.push(`${brief.length} length`);
+  if (brief.structure) parts.push(`${brief.structure} structure`);
+  if (brief.keywords) parts.push(`keywords ${brief.keywords}`);
+  return parts.length > 0 ? parts.join(", ") : null;
+};
+
+export const generatePostContent = (prompt: string, brief?: MockWritingBrief | null) => {
+  generatePostContentCalls += 1;
+  const revision = generatePostContentCalls > 1 ? ` Revision ${generatePostContentCalls}.` : "";
+  const briefLine = describeBrief(brief);
+  const rewriteMatch = prompt.match(/Rewrite section "([^"]+)"([\s\S]*)/);
+  const instructionMatch = prompt.match(/Instruction:\s*([^\n]+)/);
+  const instruction = instructionMatch?.[1]?.trim() ?? "";
+  if (rewriteMatch) {
+    const heading = rewriteMatch[1] ?? "Section";
+    const detail = instruction ? ` ${instruction}.` : " Rewritten with a fresh angle.";
+    const style = briefLine ? ` Written with ${briefLine}.` : "";
+    return {
+      __typename: "GeneratedPost",
+      title: titleCase(prompt.trim().split(/\s+/).slice(0, 10).join(" ")) || "Untitled Draft",
+      body: [
+        `<p>This draft was generated from your prompt: "${prompt.trim()}". It provides a starting point you can edit into a full post.${revision}</p>`,
+        `<h2>${heading}</h2>`,
+        `<p>Regenerated "${heading}".${detail}${style}${revision}</p>`,
+      ].join(""),
+      summary: `A regenerated section exploring ${heading.toLowerCase()}.${revision}`,
+      tags: generateTags(prompt, ""),
+    };
+  }
   const titleWords = prompt.trim().split(/\s+/).slice(0, 10).join(" ");
   const title = titleCase(titleWords) || "Untitled Draft";
+  const styleSuffix = briefLine ? ` Written with ${briefLine}.` : "";
   return {
     __typename: "GeneratedPost",
     title,
     body: buildBody(
-      `This draft was generated from your prompt: "${prompt.trim()}". It provides a starting point you can edit into a full post.`,
+      `This draft was generated from your prompt: "${prompt.trim()}".${styleSuffix}${revision} It provides a starting point you can edit into a full post.`,
       [
         "Start with the concrete problem your readers face before introducing your approach.",
         "Include a real example with numbers; abstract advice is hard to evaluate.",
