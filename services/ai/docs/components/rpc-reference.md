@@ -43,7 +43,7 @@ Regenerating after a proto change requires `make generate` **here** *and* in
 | --- | --- | --- | --- |
 | `GenerateSummary` | unary | LLM-bound | text ≤ `MAX_INPUT_CHARS` (5000) |
 | `GenerateTags` | unary | LLM-bound | body ≤ 5000; prompt sees ≤ 200 title / 3000 body |
-| `GeneratePost` | unary | LLM-bound | prompt ≤ `MAX_POST_CHARS` (5000) |
+| `GeneratePost` | unary | LLM-bound, up to 3 calls | prompt ≤ 5000; keywords ≤ 500; key points ≤ 2000 |
 | `GeneratePostDraft` | unary | LLM-bound | prompt must be non-empty and ≤ 5000 |
 | `ApprovePost` | unary | checkpoint-bound | `approval_id` required |
 | `RejectPost` | unary | checkpoint-bound | `approval_id` required |
@@ -105,12 +105,31 @@ non-string entries are silently dropped.
 ### `GeneratePost(PostGenerationRequest) → PostGenerationResponse`
 
 ```text
-request:  prompt
+request:  prompt, optional audience/tone/length/structure, keywords, key_points
 response: title, body, summary, repeated tags
 ```
 
-`body` is sanitised through `sanitize_post_html()` — a bleach allowlist over a
-fixed tag set. No emptiness check on `prompt`, unlike `GeneratePostDraft`.
+Limits: `prompt` ≤ `MAX_POST_CHARS` (5000), `keywords` ≤
+`MAX_KEYWORDS_CHARS` (500), `key_points` ≤ `MAX_KEY_POINTS_CHARS` (2000) —
+over any of them → `INVALID_ARGUMENT`. When any brief field is set, the
+prompt is built with `styled_post_user_prompt` (audience, tone, length,
+structure steer the outline; keywords shape titles and tags; key points
+shape the middle sections); otherwise the legacy `post_user_prompt`
+runs. `body` is sanitised through `sanitize_post_html()` — a bleach
+allowlist over a fixed tag set. No emptiness check on `prompt`, unlike
+`GeneratePostDraft`.
+
+Every reply goes through a bounded verify-and-repair loop (up to
+`MAX_POST_ATTEMPTS = 3` LLM calls): the JSON must parse into all four
+fields, and the body must match the section shape for the chosen length
+(`QUICK` 2 sections, `STANDARD` 3–4, `DEEP_DIVE` 5–6, no fenced code,
+no page-structure tags). A failing draft is sent back with a repair
+prompt describing the issues; cosmetic gaps (empty title/summary, tag
+count outside 5–7) are only logged. If all attempts fail, the last
+unparseable error raises, otherwise the best-effort draft is returned.
+Outcomes are counted in `POST_GENERATION_VERIFICATIONS`
+(`first-pass`/`repaired`/`best-effort`) with per-rule
+`POST_GENERATION_ISSUES` and `POST_GENERATION_DURATION` timing.
 
 ---
 

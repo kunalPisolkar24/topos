@@ -50,8 +50,8 @@ Three fields, no more:
 > ### The `kind` extension never reaches you
 >
 > Internally every error is tagged with a `kind` — `unauthorized`,
-> `forbidden`, `not_found`, `validation`, `conflict`, `internal`,
-> `client`. It is attached in `mapDomainError` and used to pick the
+> `forbidden`, `not_found`, `validation`, `conflict`, `unavailable`,
+> `internal`, `client`. It is attached in `mapDomainError` and used to pick the
 > message and increment a metric.
 >
 > But `PresentError` in [`graph/errors.go`](../../graph/errors.go)
@@ -72,6 +72,7 @@ Produced by `mapDomainError`. This is the complete set:
 | `domain.ErrNotFound` | `not_found` | `not found` |
 | `domain.ErrValidation` | `validation` | the full wrapped text, e.g. `validation error: title is required` |
 | `domain.ErrConflict` | `conflict` | `already reviewed by someone else` |
+| `domain.ErrAIUnavailable` | `unavailable` | `AI service is temporarily unavailable, please try again` |
 | anything unclassified | `internal` | `internal error` |
 | gqlgen validation/protocol | `client` | gqlgen's own message |
 
