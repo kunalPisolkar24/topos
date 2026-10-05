@@ -7,9 +7,21 @@ services:
     restart: unless-stopped
     ports:
       - "${GATEWAY_EXT_PORT:-4000}:${GATEWAY_INT_PORT:-4000}"
+    environment:
+      - OTEL_TRACING_ENABLED=${OTEL_TRACING_ENABLED:-true}
+    # The router image ships no curl/wget, so probe the health listener
+    # with bash's /dev/tcp instead.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088 && printf \"GET /health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -qm1 200 <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - user-service
-      - content-service
+      user-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
     networks:
       - app-network
 

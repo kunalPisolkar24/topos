@@ -13,11 +13,14 @@ make local-up
 
 The root [Makefile](../../Makefile) creates
 `infrastructure/docker/local/.env.local` from its example if it does not
-exist, then runs Compose with the local stack definition.
+exist, then runs Compose with the local stack definition. A first boot downloads
+several gigabytes of images and pulls the embedding model, so allow 10-15
+minutes; warm boots take about 2 minutes.
 
 ## 2. Open the application
 
-Open <http://localhost:3000>. The main endpoints are:
+Open <http://localhost:3000>. Sign-up passwords need 12-128 characters with both
+letters and digits. The main endpoints are:
 
 | Endpoint | Purpose |
 | --- | --- |

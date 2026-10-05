@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
 	pb "github.com/kunalPisolkar24/topos/services/content/proto/ai"
@@ -18,6 +19,7 @@ import (
 type fakeAIServiceServer struct {
 	pb.UnimplementedAIServiceServer
 	summaryErr         error
+	indexDelay         time.Duration
 	chatReq            *pb.ChatAnswerRequest
 	lastProfileRequest *pb.UserProfileUpdateRequest
 	lastPostRequest    *pb.PostGenerationRequest
@@ -37,6 +39,17 @@ func (f *fakeAIServiceServer) GenerateTags(ctx context.Context, req *pb.ContextR
 func (f *fakeAIServiceServer) GeneratePost(ctx context.Context, req *pb.PostGenerationRequest) (*pb.PostGenerationResponse, error) {
 	f.lastPostRequest = req
 	return &pb.PostGenerationResponse{Title: "t", Body: "b", Summary: "s", Tags: []string{"go"}}, nil
+}
+
+func (f *fakeAIServiceServer) IndexPost(ctx context.Context, req *pb.IndexRequest) (*pb.IndexResponse, error) {
+	if f.indexDelay > 0 {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(f.indexDelay):
+		}
+	}
+	return &pb.IndexResponse{}, nil
 }
 
 func (f *fakeAIServiceServer) ChatAnswer(
@@ -176,6 +189,19 @@ func TestGRPCClientGeneratePostUnknownBriefSelectorsStayUnspecified(t *testing.T
 func TestGRPCClientClose(t *testing.T) {
 	client := newTestGRPCClient(t, &fakeAIServiceServer{})
 	require.NoError(t, client.Close())
+}
+
+func TestGRPCClientIndexPostToleratesSlowEmbed(t *testing.T) {
+	client := newTestGRPCClient(t, &fakeAIServiceServer{indexDelay: 300 * time.Millisecond})
+
+	err := client.IndexPost(context.Background(), "p_1", "t", "b", "s", []string{"go"}, time.Now())
+
+	require.NoError(t, err, "cold CPU embeds take seconds; the index deadline must tolerate them")
+}
+
+func TestIndexTimeoutCoversServerSideBudget(t *testing.T) {
+	assert.GreaterOrEqual(t, indexTimeout, 60*time.Second,
+		"index embeds via Ollama (30s server budget) then writes Qdrant; shrinking this reintroduces e2e DeadlineExceeded flakes")
 }
 
 func TestGRPCClientRelatedPostsCarriesTotal(t *testing.T) {

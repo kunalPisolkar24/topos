@@ -28,7 +28,9 @@ const (
 	draftTimeout   = 60 * time.Second
 	approveTimeout = 30 * time.Second
 	rejectTimeout  = 10 * time.Second
-	indexTimeout   = 15 * time.Second
+	// Indexing embeds via Ollama (up to 30s server-side) then writes to
+	// Qdrant; cold CPU embeds exceed short deadlines, so budget generously.
+	indexTimeout   = 90 * time.Second
 	deleteTimeout  = 10 * time.Second
 	searchTimeout  = 10 * time.Second
 	relatedTimeout = 5 * time.Second
