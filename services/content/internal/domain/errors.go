@@ -17,4 +17,8 @@ var (
 	// fast-failing condition and dead-letter the message immediately
 	// instead of burning the retry backoff.
 	ErrAICircuitOpen = errors.New("ai circuit breaker open")
+	// ErrAIUnavailable marks a failed AI RPC (e.g. provider outage or
+	// malformed provider response after retries). Workers treat it as
+	// retryable; user-facing resolvers map it to a friendly message.
+	ErrAIUnavailable = errors.New("ai service unavailable")
 )

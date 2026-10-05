@@ -9,6 +9,8 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var errUnavailable = errors.New("unavailable")
@@ -256,6 +258,14 @@ func TestResilientClientIndexPostPropagatesError(t *testing.T) {
 
 	err := client.IndexPost(context.Background(), "p1", "t", "b", "", nil, time.Now())
 	require.ErrorIs(t, err, errUnavailable)
+}
+
+func TestResilientClientUnavailableMapsToDomainError(t *testing.T) {
+	primary := &stubAI{err: status.Error(codes.Unavailable, "LLM provider unavailable")}
+	client := newTestResilientClient(primary, &stubAI{})
+
+	_, err := client.GenerateTags(context.Background(), "t", "b")
+	require.ErrorIs(t, err, domain.ErrAIUnavailable)
 }
 
 func TestResilientClientIndexPostOpenBreaker(t *testing.T) {

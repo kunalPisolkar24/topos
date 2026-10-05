@@ -15,8 +15,10 @@ import (
 	pb "github.com/kunalPisolkar24/topos/services/content/proto/ai"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -119,6 +121,9 @@ func noFallback[T any](b *circuitBreaker, operation string, primary func() (T, e
 		b.recordFailure()
 		metrics.AIFallbackEngaged.WithLabelValues(operation).Inc()
 		slog.Warn("ai "+operation+" failed", "error", err)
+		if status.Code(err) == codes.Unavailable {
+			return result, fmt.Errorf("%w: %s", domain.ErrAIUnavailable, status.Convert(err).Message())
+		}
 		return result, err
 	}
 	b.recordSuccess()

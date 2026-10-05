@@ -319,6 +319,7 @@ func TestMapDomainError(t *testing.T) {
 	assert.Equal(t, "unauthorized", mapDomainError(domain.ErrUnauthorized).Message)
 	assert.Equal(t, "forbidden", mapDomainError(domain.ErrForbidden).Message)
 	assert.Equal(t, "not found", mapDomainError(domain.ErrNotFound).Message)
+	assert.Equal(t, "AI service is temporarily unavailable, please try again", mapDomainError(domain.ErrAIUnavailable).Message)
 
 	generic := mapDomainError(errors.New("boom"))
 	assert.Equal(t, "internal error", generic.Message, "unexpected errors must never leak internal details")
@@ -347,6 +348,7 @@ func TestPresentErrorPassesSafeMessages(t *testing.T) {
 		{domain.ErrUnauthorized, "unauthorized"},
 		{domain.ErrForbidden, "forbidden"},
 		{domain.ErrNotFound, "not found"},
+		{domain.ErrAIUnavailable, "AI service is temporarily unavailable, please try again"},
 	} {
 		out := PresentError(ctx, mapDomainError(tc.err))
 		assert.Equal(t, tc.message, out.Message)
