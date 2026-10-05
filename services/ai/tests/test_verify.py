@@ -1,5 +1,6 @@
 from src.domain.verify import (
     MAX_POST_ATTEMPTS,
+    issue_rule,
     repair_user_prompt,
     section_count,
     soft_check_post,
@@ -82,3 +83,11 @@ def test_repair_prompt_names_shape_and_issues() -> None:
 
 def test_max_post_attempts_is_bounded() -> None:
     assert MAX_POST_ATTEMPTS == 3
+
+
+def test_issue_rule_never_leaks_values() -> None:
+    assert issue_rule("sections=6 want 3-4") == "section_count"
+    assert issue_rule("markdown-fence-in-body") == "markdown_fence"
+    assert issue_rule("forbidden-structural-tag") == "forbidden_tag"
+    assert issue_rule("unparseable post JSON (2 errors)") == "unparseable"
+    assert issue_rule("something new") == "other"

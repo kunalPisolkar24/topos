@@ -84,3 +84,19 @@ def repair_user_prompt(
         f"conclusion are plain paragraphs, not sections). Return the FULL "
         f"post JSON again with the same keys."
     )
+
+
+_ISSUE_RULES = (
+    ("sections=", "section_count"),
+    ("markdown-fence", "markdown_fence"),
+    ("forbidden-structural-tag", "forbidden_tag"),
+    ("unparseable", "unparseable"),
+)
+
+
+def issue_rule(issue: str) -> str:
+    """Metric label for an issue string; values never become labels."""
+    for prefix, rule in _ISSUE_RULES:
+        if issue.startswith(prefix):
+            return rule
+    return "other"

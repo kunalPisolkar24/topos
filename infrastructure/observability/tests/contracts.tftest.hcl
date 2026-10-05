@@ -141,4 +141,29 @@ run "production_dashboard_and_alerts" {
     condition     = newrelic_nrql_alert_condition.log_silence.enabled == false
     error_message = "The log-silence alert must stay disabled until logs are confirmed flowing."
   }
+
+  assert {
+    condition     = length(jsondecode(newrelic_one_dashboard_json.ai.json).pages) == 2
+    error_message = "The AI dashboard must have the overview and verification pages."
+  }
+
+  assert {
+    condition     = length(jsondecode(newrelic_one_dashboard_json.ai.json).pages[1].widgets) == 6
+    error_message = "The AI verification page must retain its six widgets."
+  }
+
+  assert {
+    condition     = newrelic_nrql_alert_condition.post_best_effort.critical[0].threshold == var.post_best_effort_critical_percent
+    error_message = "The best-effort alert must use the configurable critical threshold."
+  }
+
+  assert {
+    condition     = newrelic_nrql_alert_condition.llm_error_share.critical[0].threshold == var.llm_error_critical_percent
+    error_message = "The LLM error-share alert must use the configurable critical threshold."
+  }
+
+  assert {
+    condition     = strcontains(newrelic_nrql_alert_condition.post_best_effort.nrql[0].query, "deployment.environment = 'prod'")
+    error_message = "Verification alert NRQL must be scoped to its deployment environment."
+  }
 }

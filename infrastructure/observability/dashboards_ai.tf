@@ -223,6 +223,94 @@ resource "newrelic_one_dashboard_json" "ai" {
           },
         ]
       },
+      {
+        name        = "Post generation verification"
+        description = "Agentic verify-and-repair loop: outcomes, issues and latency"
+        widgets = [
+          {
+            title  = "First-pass %"
+            layout = { column = 1, row = 1, width = 3, height = 3 }
+            rawConfiguration = {
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT filter(sum(post_generation_verifications_total), WHERE outcome = 'first-pass') / sum(post_generation_verifications_total) * 100 AS `first-pass %` FROM ${local.metric_source} ${local.lookback}"
+                }
+              ]
+            }
+            visualization = { id = "viz.billboard" }
+          },
+          {
+            title  = "Best-effort %"
+            layout = { column = 4, row = 1, width = 3, height = 3 }
+            rawConfiguration = {
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT filter(sum(post_generation_verifications_total), WHERE outcome = 'best-effort') / sum(post_generation_verifications_total) * 100 AS `best-effort %` FROM ${local.metric_source} ${local.lookback}"
+                }
+              ]
+            }
+            visualization = { id = "viz.billboard" }
+          },
+          {
+            title  = "Generation P95 (s)"
+            layout = { column = 7, row = 1, width = 3, height = 3 }
+            rawConfiguration = {
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT percentile(post_generation_duration_seconds, 95) AS `p95 s` FROM ${local.metric_source} FACET outcome ${local.lookback}"
+                }
+              ]
+            }
+            visualization = { id = "viz.billboard" }
+          },
+          {
+            title  = "LLM error %"
+            layout = { column = 10, row = 1, width = 3, height = 3 }
+            rawConfiguration = {
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT filter(sum(llm_requests_total), WHERE status = 'error') / sum(llm_requests_total) * 100 AS `llm error %` FROM ${local.metric_source} ${local.lookback}"
+                }
+              ]
+            }
+            visualization = { id = "viz.billboard" }
+          },
+          {
+            title  = "Verification outcomes/min by tone and length"
+            layout = { column = 1, row = 4, width = 6, height = 3 }
+            rawConfiguration = {
+              legend = { enabled = true }
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT rate(sum(post_generation_verifications_total), 1 minute) AS `outcomes/min` FROM ${local.metric_source} FACET outcome, tone, length TIMESERIES AUTO ${local.lookback}"
+                }
+              ]
+              yAxisLeft = { zero = true }
+            }
+            visualization = { id = "viz.bar" }
+          },
+          {
+            title  = "Verification issues/min by rule"
+            layout = { column = 7, row = 4, width = 6, height = 3 }
+            rawConfiguration = {
+              legend = { enabled = true }
+              nrqlQueries = [
+                {
+                  accountId = var.newrelic_account_id
+                  query     = "SELECT rate(sum(post_generation_issues_total), 1 minute) AS `issues/min` FROM ${local.metric_source} FACET rule TIMESERIES AUTO ${local.lookback}"
+                }
+              ]
+              yAxisLeft = { zero = true }
+            }
+            visualization = { id = "viz.bar" }
+          },
+        ]
+      },
     ]
   })
 }
