@@ -198,7 +198,7 @@ describe("useWritingStudio", () => {
     expect(result.current.sections).toEqual([]);
   });
 
-  it("edits section bodies and returns to the brief without losing sections", async () => {
+  it("edits headings and returns to the brief without losing sections", async () => {
     mockGenerate({});
     const { result } = renderStudio();
     fillTopic(result);
@@ -211,8 +211,8 @@ describe("useWritingStudio", () => {
     });
 
     const targetId = result.current.sections[1].id;
-    act(() => result.current.updateSectionBody(targetId, "<p>Hand-edited.</p>"));
-    expect(result.current.sections[1].bodyHtml).toBe("<p>Hand-edited.</p>");
+    act(() => result.current.updateSectionHeading(targetId, "Reframed"));
+    expect(result.current.sections[1].heading).toBe("Reframed");
 
     act(() => result.current.editBrief());
     expect(result.current.step).toBe("brief");

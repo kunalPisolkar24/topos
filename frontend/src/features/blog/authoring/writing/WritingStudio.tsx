@@ -265,7 +265,7 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                     >
                       Regenerate instruction (optional)
                     </label>
-                    <Input
+                    <Textarea
                       id={`regen-${section.id}`}
                       value={instructions[section.id] ?? ""}
                       placeholder="Try: shorter, more code, friendlier..."
@@ -275,22 +275,7 @@ export const WritingStudio: React.FC<WritingStudioProps> = ({ studio }) => {
                           [section.id]: event.target.value,
                         }))
                       }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor={`body-${section.id}`}
-                      className={fieldLabelClassName}
-                    >
-                      Section body (HTML)
-                    </label>
-                    <Textarea
-                      id={`body-${section.id}`}
-                      value={section.bodyHtml}
-                      onChange={(event) =>
-                        studio.updateSectionBody(section.id, event.target.value)
-                      }
-                      className="min-h-20 max-h-64 resize-y overflow-auto bg-surface-lowest font-mono text-xs leading-6"
+                      className="min-h-16 max-h-40 resize-y overflow-auto bg-surface-lowest leading-6"
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">

@@ -41,7 +41,6 @@ export interface UseWritingStudioResult {
   regenerateSection: (id: string, instruction?: string) => Promise<void>;
   moveSection: (id: string, direction: -1 | 1) => void;
   updateSectionHeading: (id: string, heading: string) => void;
-  updateSectionBody: (id: string, bodyHtml: string) => void;
   removeSection: (id: string) => void;
   applyToEditor: () => void;
   editBrief: () => void;
@@ -145,14 +144,6 @@ export const useWritingStudio = ({
     setSections((current) =>
       current.map((section) =>
         section.id === id ? { ...section, heading } : section,
-      ),
-    );
-  };
-
-  const updateSectionBody = (id: string, bodyHtml: string) => {
-    setSections((current) =>
-      current.map((section) =>
-        section.id === id ? { ...section, bodyHtml } : section,
       ),
     );
   };
@@ -270,7 +261,6 @@ export const useWritingStudio = ({
     regenerateSection,
     moveSection,
     updateSectionHeading,
-    updateSectionBody,
     removeSection,
     applyToEditor,
     editBrief,
