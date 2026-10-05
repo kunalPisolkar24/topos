@@ -142,6 +142,46 @@ async def test_generate_post_invalid_schema(stub, fake_llm: FakeLLM) -> None:
     assert exc_info.value.code() == grpc.StatusCode.INTERNAL
 
 
+def _sections_json(n: int) -> str:
+    body = "<p>intro</p>"
+    for i in range(n):
+        body += f"<h2>Section {i}</h2><p>text</p>"
+    body += "<p>conclusion</p>"
+    return json.dumps(
+        {"title": "My Post", "body": body, "summary": "short", "tags": ["ai"]}
+    )
+
+
+async def test_generate_post_repairs_section_count(stub, fake_llm: FakeLLM) -> None:
+    fake_llm.responses = [_sections_json(5), _sections_json(2)]
+
+    response = await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="topic", length=ai_service_pb2.WRITING_LENGTH_QUICK
+        )
+    )
+
+    assert response.title == "My Post"
+    assert response.body.count("<h2>") == 2
+    assert len(fake_llm.calls) == 2
+    assert "exactly 2 <h2> sections" in fake_llm.calls[1][1]
+
+
+async def test_generate_post_best_effort_after_repairs_exhausted(
+    stub, fake_llm: FakeLLM
+) -> None:
+    fake_llm.responses = [_sections_json(5)] * 3
+
+    response = await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="topic", length=ai_service_pb2.WRITING_LENGTH_QUICK
+        )
+    )
+
+    assert response.body.count("<h2>") == 5
+    assert len(fake_llm.calls) == 3
+
+
 async def test_generate_post_too_long_rejected(stub, fake_llm: FakeLLM) -> None:
     with pytest.raises(grpc.aio.AioRpcError) as exc_info:
         await stub.GeneratePost(ai_service_pb2.PostGenerationRequest(prompt="x" * 5001))

@@ -150,3 +150,9 @@ POST_WORKFLOW_TRANSITIONS = Counter(
     "Post generation workflow transitions by terminal action",
     ["transition"],
 )
+
+POST_GENERATION_VERIFICATIONS = Counter(
+    "post_generation_verifications_total",
+    "Single-turn post generation verification outcomes",
+    ["outcome"],
+)

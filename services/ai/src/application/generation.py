@@ -6,9 +6,11 @@ State: self._llm (provided by AIService).
 """
 
 import json
+import logging
 import re
 
 import grpc
+from pydantic import ValidationError
 
 from src.application.support import TooLargeError, rpc_metrics
 from src.config import settings
@@ -22,7 +24,17 @@ from src.domain.prompts import (
 )
 from src.domain.sanitize import sanitize_post_html
 from src.domain.text import clean_html, extract_json
+from src.domain.verify import (
+    MAX_POST_ATTEMPTS,
+    repair_user_prompt,
+    soft_check_post,
+    spec_for_length,
+    verify_post,
+)
 from src.generated import ai_service_pb2
+from src.observability import metrics
+
+logger = logging.getLogger(__name__)
 
 
 def _enum_name(enum_type, value: int) -> str:
@@ -113,9 +125,52 @@ class GenerationMixin:
             )
         else:
             user_prompt = post_user_prompt(request.prompt)
+        spec = spec_for_length(_enum_name(ai_service_pb2.WritingLength, request.length))
         raw = await self._llm.generate_completion(POST_PROMPT, user_prompt)
-        post = GeneratedPost.model_validate_json(extract_json(raw))
-        post.body = sanitize_post_html(post.body)
+        post: GeneratedPost | None = None
+        last_error: ValidationError | None = None
+        for attempt in range(1, MAX_POST_ATTEMPTS + 1):
+            try:
+                candidate = GeneratedPost.model_validate_json(extract_json(raw))
+            except ValidationError as exc:
+                last_error = exc
+                issues = [f"unparseable post JSON ({exc.error_count()} errors)"]
+            else:
+                last_error = None
+                candidate.body = sanitize_post_html(candidate.body)
+                issues = verify_post(
+                    candidate.title,
+                    candidate.body,
+                    candidate.summary,
+                    candidate.tags,
+                    spec,
+                )
+                for note in soft_check_post(
+                    candidate.title, candidate.summary, candidate.tags
+                ):
+                    logger.warning("generated post cosmetic gap: %s", note)
+                if not issues:
+                    post = candidate
+                    metrics.POST_GENERATION_VERIFICATIONS.labels(
+                        outcome="first-pass" if attempt == 1 else "repaired"
+                    ).inc()
+                    break
+                post = candidate
+            logger.warning(
+                "generated post failed verification (attempt %s/%s): %s",
+                attempt,
+                MAX_POST_ATTEMPTS,
+                "; ".join(issues),
+            )
+            if attempt < MAX_POST_ATTEMPTS:
+                raw = await self._llm.generate_completion(
+                    POST_PROMPT, repair_user_prompt(user_prompt, spec, issues)
+                )
+        if post is None:
+            assert last_error is not None  # unparseable on every attempt
+            raise last_error
+        if verify_post(post.title, post.body, post.summary, post.tags, spec):
+            metrics.POST_GENERATION_VERIFICATIONS.labels(outcome="best-effort").inc()
         return ai_service_pb2.PostGenerationResponse(
             title=post.title,
             body=post.body,
