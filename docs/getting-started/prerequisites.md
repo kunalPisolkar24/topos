@@ -13,6 +13,14 @@ Install the following before using the root quick start:
 Make sure Docker is running and that your account can run `docker ps` without
 an error.
 
+## Optional: dev container
+
+Any containers.dev editor (VS Code, JetBrains Gateway, devpod, Codespaces)
+can open the repo via `.devcontainer/` (see its
+[README](../../.devcontainer/README.md)). The image ships the runtimes below
+preinstalled; infra still runs through the local Compose stack, so Docker
+above is still required.
+
 ## Needed when working on one service
 
 | Area | Runtime | Source |
