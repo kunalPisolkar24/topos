@@ -2,7 +2,7 @@
 
 Pulls DATABASE/REDIS/MONGO URLs and passwords from Secrets Manager
 (topos/user, topos/ai, topos/content secrets) and discovers the live
-MSK sidecar hostname via `docker ps`. JWT, Qdrant, LLM, and frontend
+MSK/DocDB sidecar hostnames via `docker ps`. JWT, Qdrant, LLM, and frontend
 keys are preserved.
 
 Logs only hostnames and change flags, never secret values.
@@ -52,12 +52,32 @@ def get_secret(name, endpoint_url, region):
 
 def msk_sidecar():
     names = run(["docker", "ps", "--format", "{{.Names}}"]).split()
-    found = sorted(n for n in names if n.startswith("floci-msk-"))
+    found = sorted(
+        n for n in names if n.startswith("floci-msk-") or n.startswith("floci-aws-msk-")
+    )
     if not found:
-        sys.exit("no floci-msk-* sidecar running (run make infra-up ENV=floci first)")
+        return None
     if len(found) > 1:
         sys.exit(f"ambiguous MSK sidecars: {', '.join(found)}")
     return f"{found[0]}:9092"
+
+
+def docdb_sidecar():
+    names = run(["docker", "ps", "--format", "{{.Names}}"]).split()
+    found = sorted(
+        n
+        for n in names
+        if n.startswith("floci-docdb-") or n.startswith("floci-aws-docdb-")
+    )
+    if not found:
+        return None
+    if len(found) > 1:
+        sys.exit(f"ambiguous DocDB sidecars: {', '.join(found)}")
+    return found[0]
+
+
+def with_host(value, host):
+    return re.sub(r"@[^/?]+", f"@{host}", value, count=1) if value else value
 
 
 def short_hash(value):
@@ -86,6 +106,29 @@ def main():
     ai_secrets = get_secret("topos/ai/secrets", args.endpoint_url, args.region)
     content_secrets = get_secret("topos/content/secrets", args.endpoint_url, args.region)
 
+    # Floci sidecar hostnames change on cluster recreate (MSK hash suffix)
+    # and carry the floci-aws- prefix live, while SM holds placeholders.
+    # Discover the live names; fall back to SM with a warning so secret
+    # rotation still syncs even when Docker is unreachable.
+    broker = msk_sidecar()
+    if broker is None:
+        print(
+            "warning: no live MSK sidecar found, keeping SM KAFKA_BROKERS "
+            "(run make infra-up ENV=floci first)",
+            file=sys.stderr,
+        )
+        broker = content_secrets["KAFKA_BROKERS"]
+    docdb_host = docdb_sidecar()
+    if docdb_host is None:
+        print(
+            "warning: no live DocDB sidecar found, keeping SM MONGO_URI "
+            "(run make infra-up ENV=floci first)",
+            file=sys.stderr,
+        )
+        mongo_uri = content_secrets["MONGO_URI"]
+    else:
+        mongo_uri = with_host(content_secrets["MONGO_URI"], f"{docdb_host}:27017")
+
     updates = {
         "USER_DATABASE_URL": user_secrets["DATABASE_URL"],
         "USER_DATABASE_URL_MIGRATE": user_secrets["DATABASE_URL_MIGRATE"],
@@ -93,9 +136,9 @@ def main():
         "USER_AI_CHECKPOINTER_PASSWORD": user_secrets["AI_CHECKPOINTER_PASSWORD"],
         "AI_CHECKPOINT_DB_URL": ai_secrets["CHECKPOINT_DB_URL"],
         "AI_CHECKPOINT_DB_URL_MIGRATE": ai_secrets["CHECKPOINT_DB_URL_MIGRATE"],
-        "CONTENT_MONGO_URI": content_secrets["MONGO_URI"],
+        "CONTENT_MONGO_URI": mongo_uri,
         "REDIS_PASSWORD": content_secrets.get("REDIS_PASSWORD", ""),
-        "KAFKA_BROKERS": msk_sidecar(),
+        "KAFKA_BROKERS": broker,
     }
 
     previous = {}

@@ -101,18 +101,17 @@ resource "aws_secretsmanager_secret_version" "content_secrets" {
   secret_string = jsonencode(
     var.environment == "floci" ? {
       # Floci data plane (real, Docker-backed): DocumentDB (Mongo 7) and
-      # MSK (Redpanda, Kafka protocol) run as Floci sidecars. DocDB is
-      # reached by its stable sidecar name; MSK advertises a random
-      # sidecar hostname per cluster, so the KAFKA_BROKERS value below is
-      # only a placeholder. The live broker comes from the synced
-      # infrastructure/docker/prod/.env (see `make prod-sync-env`),
+      # MSK (Redpanda, Kafka protocol) run as Floci sidecars with the
+      # floci-aws- prefix and a random MSK hash suffix per cluster, so both
+      # hostnames below are only placeholders. The live hosts come from the
+      # synced infrastructure/docker/prod/.env (see `make prod-sync-env`),
       # which wins over this secret via external injection.
       # Redis goes via the Floci proxy (plaintext + AUTH token). App
       # containers must share the `floci-apps` network with these sidecars
       # (see services/content/infra/compose.prod.yml). No docker
       # mongo/kafka/redis needed. Real AWS uses the cluster endpoints below.
-      MONGO_URI      = "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@floci-docdb-topos-content-floci-docdb:27017/blog_content?authSource=admin"
-      KAFKA_BROKERS  = "floci-msk-ecac64:9092"
+      MONGO_URI      = "mongodb://${var.docdb_master_username}:${module.content_database.master_password}@floci-aws-docdb-topos-content-floci-docdb:27017/blog_content?authSource=admin"
+      KAFKA_BROKERS  = "floci-aws-msk-ecac64:9092"
       REDIS_ADDR     = "floci:6379"
       REDIS_PASSWORD = module.user_cache.auth_token
       JWT_SECRET     = local.floci_jwt_secret

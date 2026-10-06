@@ -15,6 +15,8 @@ services:
     image: otel/opentelemetry-collector-contrib:0.122.1
     container_name: ${OTEL_COLLECTOR_CONTAINER:-prod-otel-collector}
     restart: unless-stopped
+    # No healthcheck: the image is scratch-based with no shell, so
+    # CMD-SHELL probes cannot run. Dependents use service_started.
     # Root is required to traverse /var/lib/docker (0700) for the filelog
     # receiver; the collector only reads container logs, config stays ro.
     user: "0:0"
@@ -54,10 +56,21 @@ services:
       - FRONTEND_PUBLIC_ORIGIN=${FRONTEND_PUBLIC_ORIGIN:-${VITE_BACKEND_URL:-}}
       - OTEL_TRACING_ENDPOINT=${OTEL_TRACING_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=gateway
+    # The router image ships no curl/wget, so probe the health listener
+    # with bash's /dev/tcp instead (same as gateway/compose.local.yml).
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088 && printf \"GET /health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -qm1 200 <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - user-service
-      - content-service
-      - otel-collector
+      user-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
     networks:
       - floci-bridge
 
@@ -84,6 +97,15 @@ services:
       VITE_CLOUDINARY_CLOUD_NAME: ${VITE_CLOUDINARY_CLOUD_NAME:-}
       VITE_CLOUDINARY_UPLOAD_PRESET: ${VITE_CLOUDINARY_UPLOAD_PRESET:-}
       VITE_ENABLE_MOCKS: ${VITE_ENABLE_MOCKS:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${FRONTEND_INT_PORT:-3000}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      gateway:
+        condition: service_healthy
     networks:
       - floci-bridge
 

@@ -116,6 +116,7 @@ prod-clean: $(PROD_ENV)
 	$(COMPOSE_PROD) down -v --remove-orphans
 
 prod-sync-env: $(PROD_ENV)
+	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-test} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-test} \
 	python3 $(PROD_DIR)/sync-env-from-floci.py --env-file $(PROD_ENV) --endpoint-url $${AWS_ENDPOINT_URL:-http://localhost:4566} --region $${AWS_REGION:-ap-south-1}
 
 prod-nuke: check-tfvars
@@ -149,7 +150,9 @@ infra-plan: check-tfvars
 infra-up: check-tfvars
 	@if [ "$(ENV)" = "floci" ]; then $(MAKE) --no-print-directory infra-floci-ensure; fi
 	terraform -chdir=$(TF_DIR) init -input=false
-	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/$(ENV).tfvars
+	@terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/$(ENV).tfvars || \
+	{ echo "first apply hit an emulator flake; retrying once"; \
+	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve -var-file=envs/$(ENV).tfvars; }
 
 infra-output:
 	terraform -chdir=$(TF_DIR) output
