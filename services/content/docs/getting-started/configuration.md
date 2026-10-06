@@ -205,6 +205,8 @@ Hard-coded constants you might expect to be configurable but are not:
 | Cache TTLs | `PostsTTL` … `RecommendTTL` | 1 min – 5 min (30 s for recents) | [`cache.go`](../../internal/cache/cache.go) |
 | Cache breaker | threshold / window | 3 failures / 10 s | [`cache.go`](../../internal/cache/cache.go) |
 | AI breaker | threshold / window | 5 failures / 30 s, 2 successes to close | [`client.go`](../../internal/infrastructure/ai/client.go) |
+| AI post timeout | `postTimeout` | 120 s (covers generation plus up to two repairs) | [`client.go`](../../internal/infrastructure/ai/client.go) |
+| AI index timeout | `indexTimeout` | 90 s (cold CPU embeds are slow) | [`client.go`](../../internal/infrastructure/ai/client.go) |
 | Redis timeouts | dial / command / retries | 2 s / 3 s / 3 | [`cache.go`](../../internal/cache/cache.go) |
 | Request coalescing | `batchSettle` | 5 ms | [`graph/batch.go`](../../graph/batch.go) |
 | Chat context | `chatHistoryTurns` / `chatTopK` | 6 / 5 | [`chat_service.go`](../../internal/service/chat_service.go) |

@@ -142,10 +142,98 @@ async def test_generate_post_invalid_schema(stub, fake_llm: FakeLLM) -> None:
     assert exc_info.value.code() == grpc.StatusCode.INTERNAL
 
 
+def _sections_json(n: int) -> str:
+    body = "<p>intro</p>"
+    for i in range(n):
+        body += f"<h2>Section {i}</h2><p>text</p>"
+    body += "<p>conclusion</p>"
+    return json.dumps(
+        {"title": "My Post", "body": body, "summary": "short", "tags": ["ai"]}
+    )
+
+
+async def test_generate_post_repairs_section_count(stub, fake_llm: FakeLLM) -> None:
+    fake_llm.responses = [_sections_json(5), _sections_json(2)]
+
+    response = await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="topic", length=ai_service_pb2.WRITING_LENGTH_QUICK
+        )
+    )
+
+    assert response.title == "My Post"
+    assert response.body.count("<h2>") == 2
+    assert len(fake_llm.calls) == 2
+    assert "exactly 2 <h2> sections" in fake_llm.calls[1][1]
+
+
+async def test_generate_post_best_effort_after_repairs_exhausted(
+    stub, fake_llm: FakeLLM
+) -> None:
+    fake_llm.responses = [_sections_json(5)] * 3
+
+    response = await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="topic", length=ai_service_pb2.WRITING_LENGTH_QUICK
+        )
+    )
+
+    assert response.body.count("<h2>") == 5
+    assert len(fake_llm.calls) == 3
+
+
 async def test_generate_post_too_long_rejected(stub, fake_llm: FakeLLM) -> None:
     with pytest.raises(grpc.aio.AioRpcError) as exc_info:
         await stub.GeneratePost(ai_service_pb2.PostGenerationRequest(prompt="x" * 5001))
 
+    assert exc_info.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    assert fake_llm.calls == []
+
+
+async def test_generate_post_with_brief_styles_user_prompt(
+    stub, fake_llm: FakeLLM
+) -> None:
+    fake_llm.response = json.dumps(
+        {
+            "title": "My Post",
+            "body": "<p>content</p>",
+            "summary": "short",
+            "tags": ["ai"],
+        }
+    )
+
+    response = await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="postgres indexing",
+            tone=ai_service_pb2.WRITING_TONE_WITTY,
+            audience=ai_service_pb2.WRITING_AUDIENCE_PRACTITIONER,
+            length=ai_service_pb2.WRITING_LENGTH_QUICK,
+            structure=ai_service_pb2.WRITING_STRUCTURE_COMPARISON,
+            keywords="postgres",
+            key_points="Covering indexes",
+        )
+    )
+
+    assert response.title == "My Post"
+    user_prompt = fake_llm.calls[0][1]
+    assert "postgres indexing" in user_prompt
+    assert "dry wit" in user_prompt
+    assert "Covering indexes" in user_prompt
+
+
+async def test_generate_post_oversized_brief_fields_rejected(
+    stub, fake_llm: FakeLLM
+) -> None:
+    with pytest.raises(grpc.aio.AioRpcError) as exc_info:
+        await stub.GeneratePost(
+            ai_service_pb2.PostGenerationRequest(prompt="topic", keywords="x" * 501)
+        )
+    assert exc_info.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+
+    with pytest.raises(grpc.aio.AioRpcError) as exc_info:
+        await stub.GeneratePost(
+            ai_service_pb2.PostGenerationRequest(prompt="topic", key_points="x" * 2001)
+        )
     assert exc_info.value.code() == grpc.StatusCode.INVALID_ARGUMENT
     assert fake_llm.calls == []
 

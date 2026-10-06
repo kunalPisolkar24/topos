@@ -77,9 +77,7 @@ async def test_generate_completion_sends_chat_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Legacy (non-GPT-5) models keep the tuned temperature/max_tokens pair.
-    monkeypatch.setattr(
-        "src.config.settings.LLM_MODEL", "lightning-ai/gpt-oss-20b"
-    )
+    monkeypatch.setattr("src.config.settings.LLM_MODEL", "lightning-ai/gpt-oss-20b")
     fake_http = FakeHTTPClient()
     client = make_client(monkeypatch, fake_http)
 
@@ -100,10 +98,64 @@ async def test_generate_completion_sends_chat_payload(
 async def test_unexpected_response_shape_raises_llm_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_http = FakeHTTPClient(responses=[FakeResponse(200, {"unexpected": True})])
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    fake_http = FakeHTTPClient(responses=[FakeResponse(200, {"unexpected": True})] * 3)
     client = make_client(monkeypatch, fake_http)
 
     with pytest.raises(LLMError):
+        await client.generate_completion("sys", "usr")
+
+    assert len(fake_http.posted_payloads) == 3
+
+
+async def test_empty_content_retried_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    fake_http = FakeHTTPClient(
+        responses=[
+            FakeResponse(200, {"choices": [{"message": {}}]}),
+            FakeResponse(
+                200,
+                {
+                    "choices": [
+                        {
+                            "message": {"content": ""},
+                            "finish_reason": "stop",
+                        }
+                    ]
+                },
+            ),
+            ok_response("recovered"),
+        ]
+    )
+    client = make_client(monkeypatch, fake_http)
+
+    assert await client.generate_completion("sys", "usr") == "recovered"
+    assert len(fake_http.posted_payloads) == 3
+
+
+async def test_content_filter_refusal_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_http = FakeHTTPClient(
+        responses=[
+            FakeResponse(
+                200,
+                {
+                    "choices": [
+                        {
+                            "message": {"content": None},
+                            "finish_reason": "content_filter",
+                        }
+                    ]
+                },
+            )
+        ]
+    )
+    client = make_client(monkeypatch, fake_http)
+
+    with pytest.raises(LLMError, match="content_filter"):
         await client.generate_completion("sys", "usr")
 
     assert len(fake_http.posted_payloads) == 1
@@ -128,13 +180,27 @@ async def test_generate_stream_yields_deltas_and_requests_usage(
 async def test_invalid_json_response_raises_llm_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_http = FakeHTTPClient(responses=[FakeResponse(200, {}, json_error=True)])
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    fake_http = FakeHTTPClient(responses=[FakeResponse(200, {}, json_error=True)] * 3)
     client = make_client(monkeypatch, fake_http)
 
     with pytest.raises(LLMError):
         await client.generate_completion("sys", "usr")
 
-    assert len(fake_http.posted_payloads) == 1
+    assert len(fake_http.posted_payloads) == 3
+
+
+async def test_non_json_body_retried_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    fake_http = FakeHTTPClient(
+        responses=[FakeResponse(200, {}, json_error=True), ok_response("hi")]
+    )
+    client = make_client(monkeypatch, fake_http)
+
+    assert await client.generate_completion("sys", "usr") == "hi"
+    assert len(fake_http.posted_payloads) == 2
 
 
 async def test_retries_transient_failures_then_succeeds(

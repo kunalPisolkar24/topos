@@ -15,6 +15,12 @@ supergraph:
   path: /graphql
   introspection: true
 
+# Single-turn generation plus a structural repair can take two slow LLM
+# calls; the default 30s request timeout 504s the second attempt.
+traffic_shaping:
+  router:
+    timeout: 120s
+
 health_check:
   path: /health
   listen: 0.0.0.0:8088
@@ -30,7 +36,10 @@ telemetry:
         listen: 0.0.0.0:8088
     tracing:
       otlp:
-        enabled: true
+        # Local has no collector; compose.local.yml sets
+        # OTEL_TRACING_ENABLED=false so the router keeps serving
+        # without spamming OTLP export errors.
+        enabled: ${env.OTEL_TRACING_ENABLED:-true}
         # Prod collector (gRPC). Local has no collector; export failures are
         # logged and dropped, router keeps serving.
         endpoint: ${env.OTEL_TRACING_ENDPOINT:-http://otel-collector:4317}

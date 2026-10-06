@@ -11,27 +11,27 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	EnvType              string
-	Port                 string
-	MongoURI             string
-	DbName               string
-	RedisAddr            string
-	RedisPassword        string
-	JwtSecret            string
-	JwtIssuer            string
-	JwtAudience          string
-	InternalToken        string
-	AIServiceURL         string
-	KafkaBrokers         []string
-	KafkaTopic           string
+	EnvType                          string
+	Port                             string
+	MongoURI                         string
+	DbName                           string
+	RedisAddr                        string
+	RedisPassword                    string
+	JwtSecret                        string
+	JwtIssuer                        string
+	JwtAudience                      string
+	InternalToken                    string
+	AIServiceURL                     string
+	KafkaBrokers                     []string
+	KafkaTopic                       string
 	KafkaUserInteractedTopic         string
 	KafkaConsumerGroupID             string
 	KafkaSearchConsumerGroupID       string

@@ -138,7 +138,7 @@ func (m *MockTagRepository) Search(ctx context.Context, query string, limit int)
 type MockAIService struct {
 	GenerateSummaryFn   func(ctx context.Context, text string) (string, error)
 	GenerateTagsFn      func(ctx context.Context, title, body string) ([]string, error)
-	GeneratePostFn      func(ctx context.Context, prompt string) (*domain.GeneratedPost, error)
+	GeneratePostFn      func(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error)
 	GenerateDraftFn     func(ctx context.Context, prompt string) (*domain.GeneratedDraft, error)
 	ApprovePostFn       func(ctx context.Context, approvalID string, review *domain.DraftReview) (*domain.GeneratedPost, error)
 	RejectPostFn        func(ctx context.Context, approvalID string, reason string) error
@@ -189,9 +189,9 @@ func (m *MockAIService) RejectPost(ctx context.Context, approvalID string, reaso
 	return nil
 }
 
-func (m *MockAIService) GeneratePost(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+func (m *MockAIService) GeneratePost(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
 	if m.GeneratePostFn != nil {
-		return m.GeneratePostFn(ctx, prompt)
+		return m.GeneratePostFn(ctx, prompt, brief)
 	}
 	return &domain.GeneratedPost{}, nil
 }

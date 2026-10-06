@@ -81,7 +81,7 @@ The authoring surface is `/create-blog`, built around
 | Part | Widget or component |
 | --- | --- |
 | Title | `BlogTitleSection` |
-| AI brief | `AIDraftGenerator` |
+| AI brief | `AIDraftGenerator` (quick) or `WritingStudio` (guided) in tabs |
 | Rich text body | `BlogEditor` (`react-quill-new`) |
 | Cover image | `FeaturedImageSection` + `useImageUpload` |
 | Tags | `BlogTagSection` |
@@ -92,14 +92,19 @@ The checklist reads `isTitleReady`, `isContentReady` and `isCoverImageReady`
 from controller state. Cover images upload to Cloudinary, except in preview
 mode where uploads are disabled and a `picsum` placeholder is used instead.
 
-There are two ways in:
+There are three ways in:
 
 1. **Write it yourself**, then submit. `createContentDraft` sends it to the
    queue.
-2. **Describe it** in `AIDraftGenerator` and press **Generate Draft**. The
-   `GeneratePostContent` mutation fills title, body and tags, after which you
-   either submit it for review directly (`onSubmitForReview` →
-   `useCreatePostDraft`) or keep editing.
+2. **Describe it** in `AIDraftGenerator` (the *Quick prompt* tab) and press
+   **Generate Draft**. The `GeneratePostContent` mutation fills title, body
+   and tags, which you then refine in the editor before submitting.
+3. **Guide it** in the `WritingStudio` (the *Guided studio* tab). You fill a
+   brief — audience, tone, length, structure, keywords, key points — and
+   generate a full draft. Each section can then be regenerated on its own
+   with adjusted instructions until it reads right. Submitting sends
+   `createContentDraft` with the studio's brief attached as `generation`,
+   so reviewers see the `GUIDED_STUDIO` origin and settings.
 
 Either way the result is `PENDING` in the review queue. See
 [Request flows](request-flows.md#2-publishing-a-post).

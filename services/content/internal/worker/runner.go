@@ -28,9 +28,9 @@ const (
 )
 
 var (
-	htmlTagRegex = regexp.MustCompile(`<[^>]+>`)
-	workerTracer = otel.Tracer("content-worker")
-	searchWorkerTracer = otel.Tracer("content-search-worker")
+	htmlTagRegex             = regexp.MustCompile(`<[^>]+>`)
+	workerTracer             = otel.Tracer("content-worker")
+	searchWorkerTracer       = otel.Tracer("content-search-worker")
 	personalizerWorkerTracer = otel.Tracer("content-personalizer")
 )
 
@@ -127,6 +127,7 @@ func (b *baseRunner) reportLag(ctx context.Context) {
 }
 
 func (b *baseRunner) processWithRetries(ctx context.Context, m kafka.Message, process func(context.Context, kafka.Message) error) error {
+	start := time.Now()
 	var processErr error
 	for attempt := 1; attempt <= b.maxRetries; attempt++ {
 		processErr = process(ctx, m)
@@ -140,6 +141,7 @@ func (b *baseRunner) processWithRetries(ctx context.Context, m kafka.Message, pr
 			"error", processErr,
 			"attempt", attempt,
 			"maxRetries", b.maxRetries,
+			"elapsed", time.Since(start).Round(time.Millisecond),
 			"offset", m.Offset,
 			"partition", m.Partition,
 		)
@@ -247,5 +249,3 @@ func (b *baseRunner) start(ctx context.Context, process func(context.Context, ka
 	}
 	wg.Wait()
 }
-
-

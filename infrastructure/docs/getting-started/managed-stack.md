@@ -130,8 +130,17 @@ Two traps in that table:
    token and the content service rejects it.
 2. **Passwords are not outputs.** Endpoints are; credentials live in Secrets
    Manager under `topos/user/secrets`, `topos/ai/secrets` and
-   `topos/content/secrets`. Retrieve them with the AWS CLI against the Floci
-   endpoint, or let Seed Secrets push them (next step).
+   `topos/content/secrets`. After every `infra-up` (passwords rotate, and
+   the MSK sidecar hostname changes on cluster recreate), refresh with:
+
+```bash
+make prod-sync-env   # pulls SM URLs + live MSK sidecar into prod .env
+```
+
+It prints only hosts and change flags, never secret values, and preserves
+JWT, Qdrant, LLM, and frontend keys. Seeding (`SEED_SECRETS=1`) is the
+opposite direction — `.env` into managed storage — and must not be used
+to fix a stale `.env`.
 
 ## Step 6: optional seeding
 
@@ -230,6 +239,13 @@ make prod-down     # containers only, keeps volumes
 make prod-clean    # containers and volumes
 ```
 
+For a full clean slate on Floci (containers, infra, emulator, network):
+
+```bash
+make prod-nuke ENV=floci
+# = prod-clean + infra-destroy + infra-floci-down
+```
+
 Destroying the **infrastructure** is a different and much larger action:
 
 ```bash
@@ -249,7 +265,7 @@ Read [Terraform workflow](../operations/terraform-workflow.md) before using it.
 | `dial tcp 127.0.0.1:4566: connect: connection refused` | The Floci emulator is not running | `make infra-floci-ensure` |
 | Application fails authentication against itself | `USER_JWT_SECRET` and `CONTENT_JWT_SECRET` differ | Make them identical |
 | `CHANGEME` in a connection error | `.env` never filled in | See step 5 above |
-| `KAFKA_BROKERS` points at a cluster that no longer exists | The sidecar hostname changes when the MSK cluster is recreated | Re-run `make infra-up`, refresh the value |
+| `KAFKA_BROKERS` points at a cluster that no longer exists | The sidecar hostname changes when the MSK cluster is recreated | `make prod-sync-env` |
 | Telemetry absent everywhere | No `NEW_RELIC_LICENSE_KEY`, or the collector has no endpoint | Check `docker logs prod-otel-collector` |
 | `terraform output` missing a new value | State lags config until the next apply | `make infra-up ENV=floci` |
 

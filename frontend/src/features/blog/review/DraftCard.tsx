@@ -54,6 +54,7 @@ export const DraftCard: React.FC<DraftCardProps> = ({
 }) => {
   const statusStyle = statusBadge[draft.status] ?? statusBadge.PENDING;
   const authorLabel = getDisplayName(draft.author, draft.authorId.slice(0, 8));
+  const originVerb = draft.generation ? "Prompted by" : "Written by";
   const showNote = draft.status === "REJECTED" && Boolean(draft.rejectionNote);
 
   return (
@@ -71,7 +72,7 @@ export const DraftCard: React.FC<DraftCardProps> = ({
               </Link>
             </CardTitle>
             <p className="mt-2 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Prompted by {authorLabel} ·{" "}
+              {originVerb} {authorLabel} ·{" "}
               {new Date(draft.createdAt).toLocaleDateString()}
             </p>
           </div>

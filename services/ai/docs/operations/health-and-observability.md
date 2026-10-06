@@ -149,6 +149,9 @@ before any dependency is touched. It answers while gRPC is still starting.
 | `retrieval_fetch_errors_total` | Counter | `source` | |
 | `chat_judge_verdicts_total` | Counter | `verdict` | `relevant` / `irrelevant` / `unavailable` |
 | `post_workflow_transitions_total` | Counter | `transition` | `drafted` / `approved` / `rejected` |
+| `post_generation_verifications_total` | Counter | `outcome`, `tone`, `length` | `first-pass` / `repaired` / `best-effort` per `GeneratePost` |
+| `post_generation_issues_total` | Counter | `rule` | Structural rule that triggered a repair |
+| `post_generation_duration_seconds` | Histogram | `outcome` | End-to-end `GeneratePost` time including repairs |
 
 ### `dependency_up` is not uniform
 

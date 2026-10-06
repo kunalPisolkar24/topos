@@ -27,7 +27,7 @@ service directly. Everything the UI shows comes back through the gateway.
 
 | Port | What it is |
 | --- | --- |
-| `5173` | Vite dev server (`npm run dev`, `dev:mock`, `dev:preview`) |
+| `5173` | Vite dev server (`npm run dev`, `dev:preview`) |
 | `3000` | nginx serving the built app in Docker (`docker/default.conf.template`) |
 | `4000` | The gateway's `/graphql` endpoint, which the app points at |
 
@@ -39,7 +39,6 @@ Run everything from this directory (`frontend/`).
 | --- | --- |
 | `npm ci` | Install dependencies exactly as locked |
 | `make dev` | Run against a real gateway on `localhost:4000` |
-| `make dev-mock` | Run against in-memory mock data, no back end needed |
 | `make dev-preview` | Run against seeded IndexedDB demo data, no back end needed |
 | `npm run codegen` | Regenerate `src/shared/graphql/generated/` from the sibling service schemas |
 | `npm run lint` | `eslint .` |

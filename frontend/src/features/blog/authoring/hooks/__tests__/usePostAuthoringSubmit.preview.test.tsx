@@ -7,6 +7,7 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient } from "@/shared/api";
 import { env } from "@/shared/config/env";
+import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
 vi.mock("@/shared/config/preview", async (importOriginal) => {
@@ -43,6 +44,7 @@ const baseArgs = {
   imageUrl: "https://x/cover.png",
   tags: ["alpha"],
   summary: "A summary",
+  generation: null as DraftGenerationInput | null,
   uploadCardImage: () => Promise.resolve<string | null>("https://x/cover.png"),
 };
 
@@ -92,6 +94,7 @@ describe("usePostAuthoringSubmit in preview", () => {
         tags: ["alpha"],
         imageUrl: "https://x/cover.png",
         postId: null,
+        generation: null,
       });
     });
     expect(createPostCalls).toBe(0);

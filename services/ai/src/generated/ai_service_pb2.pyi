@@ -10,6 +10,40 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class WritingAudience(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WRITING_AUDIENCE_UNSPECIFIED: _ClassVar[WritingAudience]
+    WRITING_AUDIENCE_BEGINNER: _ClassVar[WritingAudience]
+    WRITING_AUDIENCE_PRACTITIONER: _ClassVar[WritingAudience]
+    WRITING_AUDIENCE_EXPERT: _ClassVar[WritingAudience]
+
+class WritingTone(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WRITING_TONE_UNSPECIFIED: _ClassVar[WritingTone]
+    WRITING_TONE_PROFESSIONAL: _ClassVar[WritingTone]
+    WRITING_TONE_CONVERSATIONAL: _ClassVar[WritingTone]
+    WRITING_TONE_TECHNICAL: _ClassVar[WritingTone]
+    WRITING_TONE_STORYTELLING: _ClassVar[WritingTone]
+    WRITING_TONE_WITTY: _ClassVar[WritingTone]
+    WRITING_TONE_MINIMAL: _ClassVar[WritingTone]
+
+class WritingLength(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WRITING_LENGTH_UNSPECIFIED: _ClassVar[WritingLength]
+    WRITING_LENGTH_QUICK: _ClassVar[WritingLength]
+    WRITING_LENGTH_STANDARD: _ClassVar[WritingLength]
+    WRITING_LENGTH_DEEP_DIVE: _ClassVar[WritingLength]
+
+class WritingStructure(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WRITING_STRUCTURE_UNSPECIFIED: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_HOW_TO: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_LISTICLE: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_TUTORIAL: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_COMPARISON: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_OPINION: _ClassVar[WritingStructure]
+    WRITING_STRUCTURE_CASE_STUDY: _ClassVar[WritingStructure]
+
 class WorkflowStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     WORKFLOW_STATUS_UNSPECIFIED: _ClassVar[WorkflowStatus]
@@ -31,6 +65,28 @@ class RecommendMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     RECOMMEND_MODE_SURPRISE: _ClassVar[RecommendMode]
     RECOMMEND_MODE_FRESH: _ClassVar[RecommendMode]
     RECOMMEND_MODE_EXPLORER: _ClassVar[RecommendMode]
+WRITING_AUDIENCE_UNSPECIFIED: WritingAudience
+WRITING_AUDIENCE_BEGINNER: WritingAudience
+WRITING_AUDIENCE_PRACTITIONER: WritingAudience
+WRITING_AUDIENCE_EXPERT: WritingAudience
+WRITING_TONE_UNSPECIFIED: WritingTone
+WRITING_TONE_PROFESSIONAL: WritingTone
+WRITING_TONE_CONVERSATIONAL: WritingTone
+WRITING_TONE_TECHNICAL: WritingTone
+WRITING_TONE_STORYTELLING: WritingTone
+WRITING_TONE_WITTY: WritingTone
+WRITING_TONE_MINIMAL: WritingTone
+WRITING_LENGTH_UNSPECIFIED: WritingLength
+WRITING_LENGTH_QUICK: WritingLength
+WRITING_LENGTH_STANDARD: WritingLength
+WRITING_LENGTH_DEEP_DIVE: WritingLength
+WRITING_STRUCTURE_UNSPECIFIED: WritingStructure
+WRITING_STRUCTURE_HOW_TO: WritingStructure
+WRITING_STRUCTURE_LISTICLE: WritingStructure
+WRITING_STRUCTURE_TUTORIAL: WritingStructure
+WRITING_STRUCTURE_COMPARISON: WritingStructure
+WRITING_STRUCTURE_OPINION: WritingStructure
+WRITING_STRUCTURE_CASE_STUDY: WritingStructure
 WORKFLOW_STATUS_UNSPECIFIED: WorkflowStatus
 WORKFLOW_STATUS_PENDING: WorkflowStatus
 WORKFLOW_STATUS_APPROVED: WorkflowStatus
@@ -72,10 +128,22 @@ class TagsResponse(_message.Message):
     def __init__(self, tags: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class PostGenerationRequest(_message.Message):
-    __slots__ = ("prompt",)
+    __slots__ = ("prompt", "audience", "tone", "length", "structure", "keywords", "key_points")
     PROMPT_FIELD_NUMBER: _ClassVar[int]
+    AUDIENCE_FIELD_NUMBER: _ClassVar[int]
+    TONE_FIELD_NUMBER: _ClassVar[int]
+    LENGTH_FIELD_NUMBER: _ClassVar[int]
+    STRUCTURE_FIELD_NUMBER: _ClassVar[int]
+    KEYWORDS_FIELD_NUMBER: _ClassVar[int]
+    KEY_POINTS_FIELD_NUMBER: _ClassVar[int]
     prompt: str
-    def __init__(self, prompt: _Optional[str] = ...) -> None: ...
+    audience: WritingAudience
+    tone: WritingTone
+    length: WritingLength
+    structure: WritingStructure
+    keywords: str
+    key_points: str
+    def __init__(self, prompt: _Optional[str] = ..., audience: _Optional[_Union[WritingAudience, str]] = ..., tone: _Optional[_Union[WritingTone, str]] = ..., length: _Optional[_Union[WritingLength, str]] = ..., structure: _Optional[_Union[WritingStructure, str]] = ..., keywords: _Optional[str] = ..., key_points: _Optional[str] = ...) -> None: ...
 
 class PostGenerationResponse(_message.Message):
     __slots__ = ("title", "body", "summary", "tags")

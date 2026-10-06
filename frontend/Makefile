@@ -1,4 +1,4 @@
-.PHONY: help install build build-preview build-prod dev dev-mock dev-preview preview serve codegen lint test test-integration test-coverage clean
+.PHONY: help install build build-preview build-prod dev dev-preview preview serve codegen lint test test-integration test-coverage clean
 .PHONY: compose-up compose-down compose-logs compose-config compose-build compose-restart compose-ps compose-clean
 .PHONY: fetch-prod-env compose-config-prod compose-build-prod compose-up-prod compose-up-preview compose-restart-prod compose-down-prod compose-logs-prod compose-ps-prod
 
@@ -13,7 +13,6 @@ help:
 	@echo "Frontend — cd frontend && make <target> (e.g. make dev-preview)"
 	@echo ""
 	@echo "  make dev              - Run against real gateway (VITE_ENV_TYPE=dev)"
-	@echo "  make dev-mock         - Run with in-memory mock (VITE_ENABLE_MOCKS=true)"
 	@echo "  make dev-preview      - Run with IndexedDB preview (VITE_ENV_TYPE=preview)"
 	@echo "  make build            - Build (respects VITE_ENV_TYPE, default dev)"
 	@echo "  make build-preview    - Build for preview (VITE_ENV_TYPE=preview)"
@@ -56,9 +55,6 @@ build-prod:
 
 dev:
 	$(NPM) run dev
-
-dev-mock:
-	$(NPM) run dev:mock
 
 dev-preview:
 	$(NPM) run dev:preview

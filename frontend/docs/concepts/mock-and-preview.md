@@ -32,7 +32,7 @@ flowchart TD
 | Mode | Command | Data store | Survives reload? | Needs Docker? |
 | --- | --- | --- | --- | --- |
 | Real | `make dev` | The gateway | yes | yes |
-| Mock | `make dev-mock` | Module-level arrays in `src/mocks/data.ts` | no | no |
+| Mock | `VITE_ENABLE_MOCKS=true npm run dev` | Module-level arrays in `src/mocks/data.ts` | no | no |
 | Preview | `make dev-preview` | IndexedDB database `topos-preview` | yes | no |
 | Prod | `make build-prod` | the real gateway, mocks disabled | n/a | n/a |
 
@@ -134,7 +134,7 @@ crashing.
 That difference has a visible consequence: **chat only works in preview
 mode.** `resolveChatUser` resolves the token through
 `previewGetUserFromToken`, which requires the `preview-` prefix, and falls
-back to the first row of the preview `users` store. In `dev:mock` nothing
+back to the first row of the preview `users` store. With `VITE_ENABLE_MOCKS=true` nothing
 seeds that store, so chat handlers answer `unauthorized`.
 
 ## What is simulated
@@ -184,7 +184,7 @@ every test runs against handlers regardless of mode.
 | --- | --- | --- |
 | Mocks still active after `make build-prod` | A `config.js` overriding the build | Remove or edit `window.__APP_CONFIG__` in the browser |
 | Preview data looks stale | `PREVIEW_SEED_VERSION` unchanged | Bump the constant, or clear site data |
-| Sign-in works but chat says `unauthorized` | Running `dev:mock` | Use `make dev-preview` for chat |
+| Sign-in works but chat says `unauthorized` | Running with `VITE_ENABLE_MOCKS=true` instead of preview | Use `make dev-preview` for chat |
 | Requests reach the real gateway in mock mode | The URL is not `http://localhost:4000/graphql` | MSW only intercepts that exact link |
 | No data at all in preview | IndexedDB blocked by the browser | The `MemoryFallback` should take over; check the console |
 

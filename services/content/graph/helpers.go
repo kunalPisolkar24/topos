@@ -266,8 +266,25 @@ func mapDomainPostDraftToModel(dd *domain.PostDraft) *model.PostDraft {
 		ReviewedByID:  strOrNil(dd.ReviewedByID),
 		ReviewedAt:    timeOrNil(dd.ReviewedAt),
 		RejectionNote: strOrNil(dd.RejectionNote),
+		Generation:    mapDomainDraftGenerationToModel(dd.Generation),
 		CreatedAt:     dd.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:     dd.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+func mapDomainDraftGenerationToModel(g *domain.DraftGeneration) *model.DraftGeneration {
+	if g == nil {
+		return nil
+	}
+	return &model.DraftGeneration{
+		Source:    model.DraftSource(g.Source),
+		Prompt:    g.Prompt,
+		Audience:  strOrNil(g.Audience),
+		Tone:      strOrNil(g.Tone),
+		Length:    strOrNil(g.Length),
+		Structure: strOrNil(g.Structure),
+		Keywords:  strOrNil(g.Keywords),
+		KeyPoints: strOrNil(g.KeyPoints),
 	}
 }
 
@@ -280,13 +297,54 @@ func contentDraftParams(input model.ContentDraftInput) domain.ContentDraftParams
 		postID = *input.PostID
 	}
 	return domain.ContentDraftParams{
-		Title:    input.Title,
-		Body:     input.Body,
-		Summary:  derefStr(input.Summary),
-		Tags:     input.Tags,
-		ImageURL: input.ImageURL,
-		PostID:   postID,
+		Title:      input.Title,
+		Body:       input.Body,
+		Summary:    derefStr(input.Summary),
+		Tags:       input.Tags,
+		ImageURL:   input.ImageURL,
+		PostID:     postID,
+		Generation: draftGenerationParams(input.Generation),
 	}
+}
+
+func draftGenerationParams(input *model.DraftGenerationInput) *domain.DraftGeneration {
+	if input == nil {
+		return nil
+	}
+	return &domain.DraftGeneration{
+		Source:    domain.DraftSource(input.Source),
+		Prompt:    input.Prompt,
+		Audience:  derefStr(input.Audience),
+		Tone:      derefStr(input.Tone),
+		Length:    derefStr(input.Length),
+		Structure: derefStr(input.Structure),
+		Keywords:  derefStr(input.Keywords),
+		KeyPoints: derefStr(input.KeyPoints),
+	}
+}
+
+// writingBriefParams maps the optional generation brief onto the domain.
+// A nil input keeps the legacy single-prompt behavior.
+func writingBriefParams(input *model.WritingBriefInput) *domain.WritingBrief {
+	if input == nil {
+		return nil
+	}
+	brief := &domain.WritingBrief{}
+	if input.Audience != nil {
+		brief.Audience = string(*input.Audience)
+	}
+	if input.Tone != nil {
+		brief.Tone = string(*input.Tone)
+	}
+	if input.Length != nil {
+		brief.Length = string(*input.Length)
+	}
+	if input.Structure != nil {
+		brief.Structure = string(*input.Structure)
+	}
+	brief.Keywords = derefStr(input.Keywords)
+	brief.KeyPoints = derefStr(input.KeyPoints)
+	return brief
 }
 
 func strOrNil(value string) *string {

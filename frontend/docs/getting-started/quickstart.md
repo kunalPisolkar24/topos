@@ -32,7 +32,7 @@ from, not in what the code looks like.
 ```mermaid
 flowchart LR
   DEV["npm run dev<br/>VITE_ENV_TYPE=dev"]
-  MOCK["npm run dev:mock<br/>VITE_ENABLE_MOCKS=true"]
+  MOCK["VITE_ENABLE_MOCKS=true<br/>npm run dev"]
   PREV["npm run dev:preview<br/>VITE_ENV_TYPE=preview"]
   GW["Gateway at<br/>:4000/graphql"]
   MEM["In-memory<br/>mock data"]
@@ -45,7 +45,7 @@ flowchart LR
 | Mode | Command | Data source | Needs a back end? |
 | --- | --- | --- | --- |
 | Real | `make dev` | The gateway on `localhost:4000` | Yes |
-| Mock | `make dev-mock` | MSW handlers with in-memory data | No |
+| Mock | `VITE_ENABLE_MOCKS=true npm run dev` | MSW handlers with in-memory data | No |
 | Preview | `make dev-preview` | MSW handlers over IndexedDB | No |
 
 All three start Vite on <http://localhost:5173>.
@@ -122,7 +122,7 @@ More in [Testing overview](../testing/overview.md).
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Full-screen alert about configuration | `VITE_GRAPHQL_URL` is not set | Copy `.env.example` to `.env`, or use `make dev-mock` |
+| Full-screen alert about configuration | `VITE_GRAPHQL_URL` is not set | Copy `.env.example` to `.env`, or use `VITE_ENABLE_MOCKS=true npm run dev` |
 | Port 5173 already in use | Another Vite is running | Stop it, or run `npm run dev -- --port 5174` |
 | Blank page and a 404 for `/config.js` in dev | The dev server has no `config.js`; only Docker generates one | Harmless. The app falls back to `import.meta.env` |
 | `Cannot use import statement outside a module` | Dependencies out of sync | `npm ci` |

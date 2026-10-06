@@ -22,11 +22,13 @@ import (
 // under Mongo's 1024-byte index key limit; the body cap stays far below
 // the 16MB BSON document limit.
 const (
-	maxSlugRetries = 5
-	maxTitleLen    = 200
-	maxBodyLen     = 1 << 20 // 1 MiB
-	maxTagCount    = 20
-	maxTagLen      = 64
+	maxSlugRetries         = 5
+	maxTitleLen            = 200
+	maxBodyLen             = 1 << 20 // 1 MiB
+	maxTagCount            = 20
+	maxTagLen              = 64
+	maxBriefKeywordsChars  = 500
+	maxBriefKeyPointsChars = 2000
 )
 
 type PostService struct {
@@ -505,8 +507,26 @@ func (s *PostService) GenerateTags(ctx context.Context, title, body string) ([]s
 	return s.aiService.GenerateTags(ctx, title, body)
 }
 
-func (s *PostService) GeneratePostContent(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
-	return s.aiService.GeneratePost(ctx, prompt)
+func (s *PostService) GeneratePostContent(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
+	if err := normalizeWritingBrief(brief); err != nil {
+		return nil, err
+	}
+	return s.aiService.GeneratePost(ctx, prompt, brief)
+}
+
+// normalizeWritingBrief bounds the free-text brief fields, mirroring
+// the AI service caps so oversized input fails fast at this boundary.
+func normalizeWritingBrief(brief *domain.WritingBrief) error {
+	if brief == nil {
+		return nil
+	}
+	if len(brief.Keywords) > maxBriefKeywordsChars {
+		return fmt.Errorf("%w: keywords exceed %d characters", domain.ErrValidation, maxBriefKeywordsChars)
+	}
+	if len(brief.KeyPoints) > maxBriefKeyPointsChars {
+		return fmt.Errorf("%w: key points exceed %d characters", domain.ErrValidation, maxBriefKeyPointsChars)
+	}
+	return nil
 }
 
 func isDuplicateKey(err error) bool {

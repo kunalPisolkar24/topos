@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/kunalPisolkar24/topos/services/content/internal/domain"
 	pb "github.com/kunalPisolkar24/topos/services/content/proto/ai"
@@ -18,8 +19,10 @@ import (
 type fakeAIServiceServer struct {
 	pb.UnimplementedAIServiceServer
 	summaryErr         error
+	indexDelay         time.Duration
 	chatReq            *pb.ChatAnswerRequest
 	lastProfileRequest *pb.UserProfileUpdateRequest
+	lastPostRequest    *pb.PostGenerationRequest
 }
 
 func (f *fakeAIServiceServer) GenerateSummary(ctx context.Context, req *pb.ContentRequest) (*pb.ContentResponse, error) {
@@ -34,7 +37,19 @@ func (f *fakeAIServiceServer) GenerateTags(ctx context.Context, req *pb.ContextR
 }
 
 func (f *fakeAIServiceServer) GeneratePost(ctx context.Context, req *pb.PostGenerationRequest) (*pb.PostGenerationResponse, error) {
+	f.lastPostRequest = req
 	return &pb.PostGenerationResponse{Title: "t", Body: "b", Summary: "s", Tags: []string{"go"}}, nil
+}
+
+func (f *fakeAIServiceServer) IndexPost(ctx context.Context, req *pb.IndexRequest) (*pb.IndexResponse, error) {
+	if f.indexDelay > 0 {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(f.indexDelay):
+		}
+	}
+	return &pb.IndexResponse{}, nil
 }
 
 func (f *fakeAIServiceServer) ChatAnswer(
@@ -134,14 +149,59 @@ func TestGRPCClientGenerateTags(t *testing.T) {
 func TestGRPCClientGeneratePost(t *testing.T) {
 	client := newTestGRPCClient(t, &fakeAIServiceServer{})
 
-	post, err := client.GeneratePost(context.Background(), "prompt")
+	post, err := client.GeneratePost(context.Background(), "prompt", nil)
 	require.NoError(t, err)
 	assert.Equal(t, &domain.GeneratedPost{Title: "t", Body: "b", Summary: "s", Tags: []string{"go"}}, post)
+}
+
+func TestGRPCClientGeneratePostForwardsBrief(t *testing.T) {
+	server := &fakeAIServiceServer{}
+	client := newTestGRPCClient(t, server)
+
+	_, err := client.GeneratePost(context.Background(), "prompt", &domain.WritingBrief{
+		Audience:  "PRACTITIONER",
+		Tone:      "WITTY",
+		Length:    "QUICK",
+		Structure: "COMPARISON",
+		Keywords:  "go",
+		KeyPoints: "x",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, server.lastPostRequest)
+	assert.Equal(t, pb.WritingAudience_WRITING_AUDIENCE_PRACTITIONER, server.lastPostRequest.Audience)
+	assert.Equal(t, pb.WritingTone_WRITING_TONE_WITTY, server.lastPostRequest.Tone)
+	assert.Equal(t, pb.WritingLength_WRITING_LENGTH_QUICK, server.lastPostRequest.Length)
+	assert.Equal(t, pb.WritingStructure_WRITING_STRUCTURE_COMPARISON, server.lastPostRequest.Structure)
+	assert.Equal(t, "go", server.lastPostRequest.Keywords)
+	assert.Equal(t, "x", server.lastPostRequest.KeyPoints)
+}
+
+func TestGRPCClientGeneratePostUnknownBriefSelectorsStayUnspecified(t *testing.T) {
+	server := &fakeAIServiceServer{}
+	client := newTestGRPCClient(t, server)
+
+	_, err := client.GeneratePost(context.Background(), "prompt", &domain.WritingBrief{Tone: "NOPE"})
+	require.NoError(t, err)
+	require.NotNil(t, server.lastPostRequest)
+	assert.Equal(t, pb.WritingTone_WRITING_TONE_UNSPECIFIED, server.lastPostRequest.Tone)
 }
 
 func TestGRPCClientClose(t *testing.T) {
 	client := newTestGRPCClient(t, &fakeAIServiceServer{})
 	require.NoError(t, client.Close())
+}
+
+func TestGRPCClientIndexPostToleratesSlowEmbed(t *testing.T) {
+	client := newTestGRPCClient(t, &fakeAIServiceServer{indexDelay: 300 * time.Millisecond})
+
+	err := client.IndexPost(context.Background(), "p_1", "t", "b", "s", []string{"go"}, time.Now())
+
+	require.NoError(t, err, "cold CPU embeds take seconds; the index deadline must tolerate them")
+}
+
+func TestIndexTimeoutCoversServerSideBudget(t *testing.T) {
+	assert.GreaterOrEqual(t, indexTimeout, 60*time.Second,
+		"index embeds via Ollama (30s server budget) then writes Qdrant; shrinking this reintroduces e2e DeadlineExceeded flakes")
 }
 
 func TestGRPCClientRelatedPostsCarriesTotal(t *testing.T) {

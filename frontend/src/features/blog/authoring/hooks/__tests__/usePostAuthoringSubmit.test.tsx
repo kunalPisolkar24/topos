@@ -7,6 +7,7 @@ import type { ApolloClient } from "@apollo/client";
 import { server } from "@/test/server";
 import { createApolloClient } from "@/shared/api";
 import { env } from "@/shared/config/env";
+import type { DraftGenerationInput } from "@/shared/graphql/content-documents";
 import { usePostAuthoringSubmit } from "../usePostAuthoringSubmit";
 
 const noopUnauthorized = async () => {};
@@ -38,6 +39,7 @@ const baseArgs = {
   imageUrl: "https://x/y.png",
   tags: ["alpha"],
   summary: null as string | null,
+  generation: null as DraftGenerationInput | null,
   uploadCardImage: () => Promise.resolve<string | null>("https://x/y.png"),
 };
 
@@ -146,6 +148,46 @@ describe("usePostAuthoringSubmit", () => {
     });
     expect(createPostCalls).toBe(0);
     expect(result.current.submit).toEqual({ kind: "idle" });
+  });
+
+  it("forwards the generation origin in the draft input", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    let contentDraftInput: unknown;
+    server.use(
+      graphqlApi.mutation("CreateContentDraft", async ({ request }) => {
+        const body = (await request.json()) as unknown as {
+          variables?: { input?: unknown };
+        };
+        contentDraftInput = body.variables?.input;
+        return HttpResponse.json({
+          data: {
+            createContentDraft: { __typename: "PostDraft", id: "draft-9" },
+          },
+        });
+      }),
+    );
+
+    const { result } = renderHook(
+      () =>
+        usePostAuthoringSubmit({
+          ...baseArgs,
+          mode: "create",
+          generation: { source: "QUICK_PROMPT", prompt: "write about go" },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: () => {},
+      } as unknown as React.FormEvent);
+    });
+
+    await waitFor(() => {
+      expect(contentDraftInput).toMatchObject({
+        generation: { source: "QUICK_PROMPT", prompt: "write about go" },
+      });
+    });
   });
 
   it("submits the known image url in the draft input", async () => {
