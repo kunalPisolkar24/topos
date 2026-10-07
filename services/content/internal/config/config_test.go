@@ -28,6 +28,75 @@ func TestLoadConfigDefaults(t *testing.T) {
 	assert.Equal(t, "", cfg.OtelEndpoint)
 }
 
+func TestLoadConfigRateLimitDefaults(t *testing.T) {
+	cfg := LoadConfig()
+
+	assert.True(t, cfg.RateLimitEnabled)
+	assert.Equal(t, 120, cfg.RateLimitReadsPerMin)
+	assert.Equal(t, 30, cfg.RateLimitMutationsPerMin)
+	assert.Equal(t, 60, cfg.RateLimitInteractionsPerMin)
+	assert.Equal(t, 30, cfg.RateLimitSearchPerMin)
+	assert.Equal(t, 10, cfg.RateLimitAIPerMin)
+	assert.Equal(t, 60, cfg.RateLimitWindowSeconds)
+	assert.Equal(t, 2, cfg.RateLimitDegradedMultiplier)
+	assert.Equal(t, 1, cfg.RateLimitAIDegradedMultiplier)
+	assert.Equal(t, 5, cfg.RateLimitAIConcurrency)
+	assert.Equal(t, 150, cfg.RateLimitRedisTimeoutMs)
+	assert.Equal(t, 10000, cfg.RateLimitMemoryMaxEntries)
+}
+
+func TestLoadConfigRateLimitFromEnv(t *testing.T) {
+	t.Setenv("RATELIMIT_ENABLED", "false")
+	t.Setenv("RATELIMIT_READS_PER_MIN", "200")
+	t.Setenv("RATELIMIT_MUTATIONS_PER_MIN", "40")
+	t.Setenv("RATELIMIT_INTERACTIONS_PER_MIN", "80")
+	t.Setenv("RATELIMIT_SEARCH_PER_MIN", "50")
+	t.Setenv("RATELIMIT_AI_PER_MIN", "5")
+	t.Setenv("RATELIMIT_WINDOW_SECONDS", "30")
+	t.Setenv("RATELIMIT_DEGRADED_MULTIPLIER", "3")
+	t.Setenv("RATELIMIT_AI_DEGRADED_MULTIPLIER", "1")
+	t.Setenv("RATELIMIT_AI_CONCURRENCY", "3")
+	t.Setenv("RATELIMIT_REDIS_TIMEOUT_MS", "100")
+	t.Setenv("RATELIMIT_MEMORY_MAX_ENTRIES", "500")
+
+	cfg := LoadConfig()
+
+	assert.False(t, cfg.RateLimitEnabled)
+	assert.Equal(t, 200, cfg.RateLimitReadsPerMin)
+	assert.Equal(t, 40, cfg.RateLimitMutationsPerMin)
+	assert.Equal(t, 80, cfg.RateLimitInteractionsPerMin)
+	assert.Equal(t, 50, cfg.RateLimitSearchPerMin)
+	assert.Equal(t, 5, cfg.RateLimitAIPerMin)
+	assert.Equal(t, 30, cfg.RateLimitWindowSeconds)
+	assert.Equal(t, 3, cfg.RateLimitDegradedMultiplier)
+	assert.Equal(t, 1, cfg.RateLimitAIDegradedMultiplier)
+	assert.Equal(t, 3, cfg.RateLimitAIConcurrency)
+	assert.Equal(t, 100, cfg.RateLimitRedisTimeoutMs)
+	assert.Equal(t, 500, cfg.RateLimitMemoryMaxEntries)
+}
+
+func TestContentAliasForRateLimit(t *testing.T) {
+	t.Setenv("CONTENT_RATELIMIT_READS_PER_MIN", "77")
+
+	cfg := LoadConfig()
+
+	assert.Equal(t, 77, cfg.RateLimitReadsPerMin)
+}
+
+func TestGetEnvBool(t *testing.T) {
+	t.Setenv("FLAG", "false")
+	assert.False(t, getEnvBool("FLAG", true))
+
+	t.Setenv("FLAG", "0")
+	assert.False(t, getEnvBool("FLAG", true))
+
+	t.Setenv("FLAG", "true")
+	assert.True(t, getEnvBool("FLAG", false))
+
+	t.Setenv("FLAG", "bogus")
+	assert.True(t, getEnvBool("FLAG", true), "unparseable values keep the default")
+}
+
 func TestLoadConfigFromEnv(t *testing.T) {
 	t.Setenv("PORT", "5000")
 	t.Setenv("MONGO_URI", "mongodb://mongo:27017")

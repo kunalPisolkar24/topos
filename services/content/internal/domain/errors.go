@@ -1,6 +1,10 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 var (
 	ErrNotFound     = errors.New("not found")
@@ -21,4 +25,35 @@ var (
 	// malformed provider response after retries). Workers treat it as
 	// retryable; user-facing resolvers map it to a friendly message.
 	ErrAIUnavailable = errors.New("ai service unavailable")
+	// ErrRateLimited marks a rejected request that exceeded its
+	// Redis-backed quota. Use NewRateLimitedError to attach the policy
+	// and retry delay; errors.Is against ErrRateLimited still matches.
+	ErrRateLimited = errors.New("rate limited")
 )
+
+// RateLimitError carries machine-readable retry metadata for a
+// rate-limited request. Policy names the quota that tripped;
+// RetryAfter tells the caller how long to wait before retrying.
+type RateLimitError struct {
+	Policy     string
+	RetryAfter time.Duration
+}
+
+func (e *RateLimitError) Error() string {
+	secs := int(e.RetryAfter.Round(time.Second).Seconds())
+	if secs < 1 {
+		secs = 1
+	}
+	return fmt.Sprintf("rate limited, retry after %ds", secs)
+}
+
+func (e *RateLimitError) Unwrap() error { return ErrRateLimited }
+
+// NewRateLimitedError builds a RateLimitError that matches
+// errors.Is(err, ErrRateLimited).
+func NewRateLimitedError(policy string, retryAfter time.Duration) *RateLimitError {
+	if retryAfter < 0 {
+		retryAfter = 0
+	}
+	return &RateLimitError{Policy: policy, RetryAfter: retryAfter}
+}

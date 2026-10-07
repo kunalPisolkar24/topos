@@ -21,6 +21,7 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/metrics"
 	"github.com/kunalPisolkar24/topos/services/content/internal/middleware"
 	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
+	"github.com/kunalPisolkar24/topos/services/content/internal/ratelimit"
 	"github.com/kunalPisolkar24/topos/services/content/internal/repository"
 	"github.com/kunalPisolkar24/topos/services/content/internal/service"
 	"github.com/kunalPisolkar24/topos/services/content/internal/shutdown"
@@ -59,7 +60,7 @@ func run() error {
 	}
 	defer deps.Close(context.Background())
 
-	return serve(ctx, newServer(cfg, newResolver(cfg, deps), deps.Mongo, deps.Cache, deps.Producer))
+	return serve(ctx, newServer(cfg, newResolver(cfg, deps), deps.Mongo, deps.Cache, deps.Producer, deps.Limiter))
 }
 
 // validateConfig returns an error when required settings are missing.
@@ -94,10 +95,15 @@ func newResolver(cfg config.Config, deps *bootstrap.Dependencies) *graph.Resolve
 // newHandler wires the GraphQL endpoint, the playground, and the health
 // check. The /query handler is traced (span covers auth, resolution and
 // outbound calls); every request carries a request id in its context.
-func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) http.Handler {
+// Rate limiting runs as gqlgen field middleware (one quota unit per
+// top-level operation, before resolvers and AI calls) plus an HTTP
+// middleware that records the client IP and carries the writer for the
+// Retry-After header.
+func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer, limiter *ratelimit.Limiter) http.Handler {
 	gql := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
 	gql.SetErrorPresenter(graph.PresentError)
 	gql.SetRecoverFunc(graph.RecoverError)
+	gql.AroundFields(graph.FieldRateLimit(limiter))
 
 	var gqlHandler http.Handler = gql
 	if resolver != nil && resolver.PostService != nil {
@@ -114,7 +120,7 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 
 	mux := http.NewServeMux()
 	mux.Handle(queryPath, otelhttp.NewHandler(
-		middleware.RecoverMiddleware(middleware.MetricsMiddleware(middleware.AuthMiddleware(cfg)(gqlHandler))),
+		middleware.RecoverMiddleware(middleware.MetricsMiddleware(middleware.AuthMiddleware(cfg)(ratelimit.Middleware(gqlHandler)))),
 		"graphql",
 	))
 	mux.Handle("/", playground.Handler("GraphQL playground", queryPath))
@@ -136,10 +142,10 @@ func newHandler(cfg config.Config, resolver *graph.Resolver, mongoClient pinger,
 type pinger = health.Pinger
 
 // newServer builds the HTTP server with routes attached.
-func newServer(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer) *http.Server {
+func newServer(cfg config.Config, resolver *graph.Resolver, mongoClient pinger, cacheClient *cache.Cache, producer domain.EventProducer, limiter *ratelimit.Limiter) *http.Server {
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           newHandler(cfg, resolver, mongoClient, cacheClient, producer),
+		Handler:           newHandler(cfg, resolver, mongoClient, cacheClient, producer, limiter),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 }
