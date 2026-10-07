@@ -112,3 +112,63 @@ resource "newrelic_nrql_alert_condition" "log_silence" {
 
   violation_time_limit_seconds = var.alert_violation_time_limit_seconds
 }
+
+# Agentic-writing alerts: best-effort fallback share (the verify loop could
+# not fix the model output) and LLM provider error share. Both ride the
+# same golden-signals policy.
+
+resource "newrelic_nrql_alert_condition" "post_best_effort" {
+  account_id = var.newrelic_account_id
+  policy_id  = newrelic_alert_policy.topos.id
+  type       = "static"
+  name       = "Topos ${var.environment} high best-effort generation share"
+  enabled    = true
+
+  nrql {
+    query = "SELECT filter(sum(post_generation_verifications_total), WHERE outcome = 'best-effort') / sum(post_generation_verifications_total) * 100 AS `best-effort %` FROM ${local.metric_source}"
+  }
+
+  warning {
+    operator              = "above"
+    threshold             = var.post_best_effort_warning_percent
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  critical {
+    operator              = "above"
+    threshold             = var.post_best_effort_critical_percent
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  violation_time_limit_seconds = var.alert_violation_time_limit_seconds
+}
+
+resource "newrelic_nrql_alert_condition" "llm_error_share" {
+  account_id = var.newrelic_account_id
+  policy_id  = newrelic_alert_policy.topos.id
+  type       = "static"
+  name       = "Topos ${var.environment} high LLM error share"
+  enabled    = true
+
+  nrql {
+    query = "SELECT filter(sum(llm_requests_total), WHERE status = 'error') / sum(llm_requests_total) * 100 AS `llm error %` FROM ${local.metric_source}"
+  }
+
+  warning {
+    operator              = "above"
+    threshold             = var.llm_error_warning_percent
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  critical {
+    operator              = "above"
+    threshold             = var.llm_error_critical_percent
+    threshold_duration    = var.alert_threshold_duration_seconds
+    threshold_occurrences = "AT_LEAST_ONCE"
+  }
+
+  violation_time_limit_seconds = var.alert_violation_time_limit_seconds
+}

@@ -35,6 +35,73 @@ def post_user_prompt(topic: str) -> str:
     )
 
 
+AUDIENCE_GUIDANCE = {
+    "BEGINNER": "written for beginners: explain jargon on first use, prefer concrete examples over abstractions.",
+    "PRACTITIONER": "written for working practitioners: dense and practical, skip the basics.",
+    "EXPERT": "written for experts: assume deep background, focus on trade-offs and edge cases.",
+}
+
+TONE_GUIDANCE = {
+    "PROFESSIONAL": "professional yet accessible.",
+    "CONVERSATIONAL": "conversational and direct, second person where natural.",
+    "TECHNICAL": "precise and technical, exact terminology, no dumbing down.",
+    "STORYTELLING": "narrative voice with concrete scenes and characters.",
+    "WITTY": "dry wit, sharp sentences, no fluff.",
+    "MINIMAL": "terse voice, short sentences, no filler.",
+}
+
+LENGTH_GUIDANCE = {
+    "QUICK": "a compact post: engaging introduction, 2 short subsections (use <h2>), conclusion.",
+    "STANDARD": "3-4 detailed subsections (use <h2>) between introduction and conclusion.",
+    "DEEP_DIVE": "5-6 thorough subsections (use <h2>) with examples between introduction and conclusion.",
+}
+
+STRUCTURE_GUIDANCE = {
+    "HOW_TO": "a how-to: setup, step-by-step walkthrough, common pitfalls.",
+    "LISTICLE": "a listicle: why it matters, the key ideas, putting it together.",
+    "TUTORIAL": "a tutorial: prerequisites, build it end to end, verify and debug.",
+    "COMPARISON": "a comparison: each option in practice, then a verdict on which to pick.",
+    "OPINION": "an opinion piece: the argument, the counterpoints, where this lands.",
+    "CASE_STUDY": "a case study: starting point, what changed, results and takeaways.",
+}
+
+
+def styled_post_user_prompt(
+    topic: str,
+    audience: str = "",
+    tone: str = "",
+    length: str = "",
+    structure: str = "",
+    keywords: str = "",
+    key_points: str = "",
+) -> str:
+    """Build the user prompt for a brief-driven post.
+
+    Empty/unknown selectors fall back to the legacy defaults so a
+    partially-filled brief still reads naturally.
+    """
+    lines = [f"Write a comprehensive blog post about: '{topic}'."]
+    if audience in AUDIENCE_GUIDANCE:
+        lines.append(f"Audience: {AUDIENCE_GUIDANCE[audience]}")
+    lines.append("Structure:")
+    lines.append("- Catchy, SEO-optimized title.")
+    lines.append("- Engaging introduction.")
+    if structure in STRUCTURE_GUIDANCE:
+        lines.append(f"- {STRUCTURE_GUIDANCE[structure]}")
+    lines.append(f"- {LENGTH_GUIDANCE.get(length, LENGTH_GUIDANCE['STANDARD'])}")
+    lines.append("- Conclusion.")
+    if key_points.strip():
+        lines.append(
+            f"Cover these key points across the middle sections:\n{key_points.strip()}"
+        )
+    if keywords.strip():
+        lines.append(f"Weave in these keywords naturally: {keywords.strip()}.")
+    lines.append(
+        f"Keep the tone {TONE_GUIDANCE.get(tone, TONE_GUIDANCE['PROFESSIONAL'])}"
+    )
+    return "\n".join(lines)
+
+
 CHAT_SYSTEM_PROMPT = (
     "You are the Topos blog assistant. Answer the user's question using ONLY "
     "the provided blog post excerpts, and cite the source of each claim with "

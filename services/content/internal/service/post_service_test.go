@@ -604,14 +604,41 @@ func TestGenerateTags(t *testing.T) {
 }
 
 func TestGeneratePostContent(t *testing.T) {
-	ai := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string) (*domain.GeneratedPost, error) {
+	ai := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
 		return &domain.GeneratedPost{Title: "t"}, nil
 	}}
 	s := NewPostService(nil, nil, ai, nil, nil)
 
-	post, err := s.GeneratePostContent(context.Background(), "prompt")
+	post, err := s.GeneratePostContent(context.Background(), "prompt", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "t", post.Title)
+}
+
+func TestGeneratePostContentForwardsBrief(t *testing.T) {
+	var captured *domain.WritingBrief
+	ai := &testutil.MockAIService{GeneratePostFn: func(ctx context.Context, prompt string, brief *domain.WritingBrief) (*domain.GeneratedPost, error) {
+		captured = brief
+		return &domain.GeneratedPost{Title: "t"}, nil
+	}}
+	s := NewPostService(nil, nil, ai, nil, nil)
+
+	brief := &domain.WritingBrief{Tone: "WITTY", Keywords: "go"}
+	_, err := s.GeneratePostContent(context.Background(), "prompt", brief)
+	require.NoError(t, err)
+	require.NotNil(t, captured)
+	assert.Equal(t, "WITTY", captured.Tone)
+	assert.Equal(t, "go", captured.Keywords)
+}
+
+func TestGeneratePostContentRejectsOversizedBrief(t *testing.T) {
+	ai := &testutil.MockAIService{}
+	s := NewPostService(nil, nil, ai, nil, nil)
+
+	_, err := s.GeneratePostContent(context.Background(), "prompt", &domain.WritingBrief{Keywords: strings.Repeat("x", 501)})
+	require.ErrorIs(t, err, domain.ErrValidation)
+
+	_, err = s.GeneratePostContent(context.Background(), "prompt", &domain.WritingBrief{KeyPoints: strings.Repeat("x", 2001)})
+	require.ErrorIs(t, err, domain.ErrValidation)
 }
 
 func TestPostServiceClock(t *testing.T) {

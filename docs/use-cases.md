@@ -49,8 +49,10 @@ write posts, review another person's draft, and receive recommendations.
 ## Publish and review content
 
 An author can create a post directly or submit a draft for community review.
-A draft may originate from an AI prompt or from author-supplied content. A
-reviewer other than the author can approve or reject it. Approval creates or
+A draft may originate from a quick AI prompt, a guided writing-studio brief
+(audience, tone, length, structure, keywords, key points), or from
+author-supplied content. Reviewers see which one it was before deciding.
+A reviewer other than the author can approve or reject it. Approval creates or
 updates the related post; rejection retains the draft so the author can revise
 and resubmit it.
 

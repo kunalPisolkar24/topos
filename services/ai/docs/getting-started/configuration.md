@@ -172,6 +172,8 @@ and `Retry-After` honoured up to 30 s. See [Providers](../components/providers.m
 | --- | --- | --- |
 | `MAX_INPUT_CHARS` | `5000` | `GenerateSummary`, `GenerateTags`, each chat history message |
 | `MAX_POST_CHARS` | `5000` | `GeneratePost`, `GeneratePostDraft` |
+| `MAX_KEYWORDS_CHARS` | `500` | `GeneratePost` keywords (steer titles and tags) |
+| `MAX_KEY_POINTS_CHARS` | `2000` | `GeneratePost` key points (shape the middle sections) |
 | `MAX_BODY_CHARS` | `3000` | Body truncation inside `GenerateTags` |
 | `MAX_TITLE_CHARS` | `200` | Title truncation inside `GenerateTags` |
 | `SEARCH_MAX_QUERY_CHARS` | `512` | `SearchPosts`, `ChatAnswer`, `Embed` |

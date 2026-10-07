@@ -14,6 +14,40 @@ const (
 	DraftStatusRejected DraftStatus = "REJECTED"
 )
 
+// DraftSource names how a draft's content was produced. Empty means the
+// author typed it by hand.
+type DraftSource string
+
+const (
+	DraftSourceQuickPrompt  DraftSource = "QUICK_PROMPT"
+	DraftSourceGuidedStudio DraftSource = "GUIDED_STUDIO"
+)
+
+// DraftGeneration records the AI assistance behind a draft so reviewers
+// can see what produced it. Nil means the author typed it by hand.
+type DraftGeneration struct {
+	Source    DraftSource `bson:"source" json:"source"`
+	Prompt    string      `bson:"prompt" json:"prompt"`
+	Audience  string      `bson:"audience,omitempty" json:"audience,omitempty"`
+	Tone      string      `bson:"tone,omitempty" json:"tone,omitempty"`
+	Length    string      `bson:"length,omitempty" json:"length,omitempty"`
+	Structure string      `bson:"structure,omitempty" json:"structure,omitempty"`
+	Keywords  string      `bson:"keywords,omitempty" json:"keywords,omitempty"`
+	KeyPoints string      `bson:"keyPoints,omitempty" json:"keyPoints,omitempty"`
+}
+
+// Valid reports whether the generation record names a known source with
+// a non-empty prompt.
+func (g *DraftGeneration) Valid() bool {
+	if g == nil {
+		return true
+	}
+	if g.Source != DraftSourceQuickPrompt && g.Source != DraftSourceGuidedStudio {
+		return false
+	}
+	return g.Prompt != ""
+}
+
 type PostDraft struct {
 	ID         string   `bson:"_id,omitempty" json:"id,omitempty"`
 	ApprovalID string   `bson:"approvalId" json:"approvalId"`
@@ -41,18 +75,22 @@ type PostDraft struct {
 	PostID    string    `bson:"postId,omitempty" json:"postId,omitempty"`
 	CreatedAt time.Time `bson:"createdAt" json:"createdAt"`
 	UpdatedAt time.Time `bson:"updatedAt" json:"updatedAt"`
+	// Generation records the AI assistance behind the draft; nil for
+	// hand-typed content. Reviewers see it, authors don't edit it.
+	Generation *DraftGeneration `bson:"generation,omitempty" json:"generation,omitempty"`
 }
 
 // ContentDraftParams carries human-authored content entering review.
 // PostID empty means a brand-new post; set means a revision proposal
 // for that live post.
 type ContentDraftParams struct {
-	Title    string
-	Body     string
-	Summary  string
-	Tags     []string
-	ImageURL *string
-	PostID   string
+	Title      string
+	Body       string
+	Summary    string
+	Tags       []string
+	ImageURL   *string
+	PostID     string
+	Generation *DraftGeneration
 }
 
 // DraftReview carries optional reviewer edits applied before an approval

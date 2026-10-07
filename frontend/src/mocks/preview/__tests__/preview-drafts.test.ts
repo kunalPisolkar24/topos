@@ -222,4 +222,33 @@ describe("preview content drafts", () => {
     await previewApprovePostDraft(approved.id, peer.id, null);
     await expect(previewDeletePostDraft(approved.id, author.id)).rejects.toThrow();
   });
+
+  it("echoes generation on create and preserves it on resubmit when omitted", async () => {
+    const author = buildUser();
+    const peer = buildUser();
+    await previewDB.put("users", author);
+    await previewDB.put("users", peer);
+
+    const draft = await previewCreateContentDraft(author.id, {
+      ...newPostInput(),
+      generation: {
+        source: "GUIDED_STUDIO",
+        prompt: "Postgres indexing",
+        audience: "practitioner",
+        tone: "technical",
+        length: "standard",
+        structure: "how-to",
+        keywords: "postgres",
+      },
+    });
+    expect(draft.generation?.source).toBe("GUIDED_STUDIO");
+    expect(draft.generation?.tone).toBe("technical");
+
+    await previewRejectPostDraft(draft.id, peer.id, "Needs a stronger example — the current draft is too abstract. Provide a runnable snippet.");
+    const resubmitted = await previewResubmitContentDraft(draft.id, author.id, {
+      ...newPostInput(),
+      title: "Fixed title",
+    });
+    expect(resubmitted.generation?.source).toBe("GUIDED_STUDIO");
+  });
 });

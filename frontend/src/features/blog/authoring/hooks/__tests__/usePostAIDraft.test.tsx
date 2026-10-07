@@ -31,7 +31,7 @@ function makeApolloWrapper() {
   return { wrapper, _clientRef: clientRef };
 }
 
-function renderDraftHook() {
+function renderDraftHook(onGenerated?: (prompt: string) => void) {
   const onTitleChange = vi.fn();
   const onContentChange = vi.fn();
   const onTagsChange = vi.fn();
@@ -42,6 +42,7 @@ function renderDraftHook() {
         onTitleChange,
         onContentChange,
         onTagsChange,
+        onGenerated,
       }),
     { wrapper },
   );
@@ -113,6 +114,37 @@ describe("usePostAIDraft", () => {
     expect(onTagsChange).toHaveBeenCalledWith(["alpha", "beta"]);
     expect(result.current.summary).toBe("A generated summary");
     expect(result.current.isSummaryVisible).toBe(false);
+  });
+
+  it("reports the used prompt through onGenerated", async () => {
+    const graphqlApi = graphql.link("http://localhost:4000/graphql");
+    server.use(
+      graphqlApi.mutation("GeneratePostContent", () =>
+        HttpResponse.json({
+          data: {
+            generatePostContent: {
+              __typename: "GeneratedPost",
+              title: "Generated Title",
+              body: "<p>Generated body</p>",
+              summary: null,
+              tags: [],
+            },
+          },
+        }),
+      ),
+    );
+
+    const onGenerated = vi.fn();
+    const { result } = renderDraftHook(onGenerated);
+
+    act(() => result.current.setPrompt("a".repeat(MIN_PROMPT_LENGTH + 1)));
+    await act(async () => {
+      await result.current.generate();
+    });
+
+    expect(onGenerated).toHaveBeenCalledWith(
+      "a".repeat(MIN_PROMPT_LENGTH + 1),
+    );
   });
 
   it("ignores empty title or body returned by the server", async () => {

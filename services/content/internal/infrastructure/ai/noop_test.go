@@ -27,7 +27,7 @@ func TestNoopGenerateTagsUnavailable(t *testing.T) {
 func TestNoopGeneratePostUnavailable(t *testing.T) {
 	a := NewNoopAI()
 
-	_, err := a.GeneratePost(context.Background(), "A prompt about Go")
+	_, err := a.GeneratePost(context.Background(), "A prompt about Go", nil)
 	assert.ErrorIs(t, err, domain.ErrAICircuitOpen)
 }
 

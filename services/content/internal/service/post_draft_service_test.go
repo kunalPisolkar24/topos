@@ -84,6 +84,22 @@ func TestCreateDraftValidatesInput(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrUnauthorized)
 }
 
+func TestCreateDraftRecordsQuickPromptGeneration(t *testing.T) {
+	ai := &testutil.MockAIService{GenerateDraftFn: func(ctx context.Context, prompt string) (*domain.GeneratedDraft, error) {
+		return &domain.GeneratedDraft{
+			GeneratedPost: domain.GeneratedPost{Title: "T", Body: "B"},
+			ApprovalID:    "ap-1",
+		}, nil
+	}}
+	s := newDraftService(t, nil, ai, nil)
+
+	draft, err := s.CreateDraft(context.Background(), "write about kafka", draftAuthorID)
+	require.NoError(t, err)
+	require.NotNil(t, draft.Generation)
+	assert.Equal(t, domain.DraftSourceQuickPrompt, draft.Generation.Source)
+	assert.Equal(t, "write about kafka", draft.Generation.Prompt)
+}
+
 func TestApproveDraftForbiddenForAuthor(t *testing.T) {
 	draftRepo := &testutil.MockPostDraftRepository{FindByIDFn: func(ctx context.Context, id string) (*domain.PostDraft, error) {
 		return pendingDraft("d1"), nil
@@ -274,6 +290,73 @@ func TestCreateContentDraftValidatesInput(t *testing.T) {
 
 	_, err = s.CreateContentDraft(context.Background(), "", humanParams())
 	require.ErrorIs(t, err, domain.ErrUnauthorized)
+}
+
+func TestCreateContentDraftPersistsGeneration(t *testing.T) {
+	var created *domain.PostDraft
+	repo := &testutil.MockPostDraftRepository{CreateFn: func(ctx context.Context, draft *domain.PostDraft) (*domain.PostDraft, error) {
+		created = draft
+		return draft, nil
+	}}
+	s := newDraftService(t, repo, nil, nil)
+
+	params := humanParams()
+	params.Generation = &domain.DraftGeneration{
+		Source:    domain.DraftSourceGuidedStudio,
+		Prompt:    "Postgres indexing",
+		Audience:  "practitioner",
+		Tone:      "technical",
+		Length:    "standard",
+		Structure: "how-to",
+		Keywords:  "postgres",
+	}
+	_, err := s.CreateContentDraft(context.Background(), draftAuthorID, params)
+	require.NoError(t, err)
+	require.NotNil(t, created.Generation)
+	assert.Equal(t, domain.DraftSourceGuidedStudio, created.Generation.Source)
+	assert.Equal(t, "technical", created.Generation.Tone)
+}
+
+func TestCreateContentDraftRejectsUnknownGenerationSource(t *testing.T) {
+	s := newDraftService(t, nil, nil, nil)
+
+	params := humanParams()
+	params.Generation = &domain.DraftGeneration{Source: "NOPE", Prompt: "x"}
+	_, err := s.CreateContentDraft(context.Background(), draftAuthorID, params)
+	require.ErrorIs(t, err, domain.ErrValidation)
+
+	empty := humanParams()
+	empty.Generation = &domain.DraftGeneration{Source: domain.DraftSourceQuickPrompt}
+	_, err = s.CreateContentDraft(context.Background(), draftAuthorID, empty)
+	require.ErrorIs(t, err, domain.ErrValidation)
+}
+
+func TestResubmitContentDraftReplacesGeneration(t *testing.T) {
+	rejected := humanDraft("d1")
+	rejected.Status = domain.DraftStatusRejected
+	rejected.Generation = &domain.DraftGeneration{Source: domain.DraftSourceQuickPrompt, Prompt: "old"}
+	repo := &testutil.MockPostDraftRepository{
+		FindByIDFn: func(ctx context.Context, id string) (*domain.PostDraft, error) {
+			return rejected, nil
+		},
+	}
+	s := newDraftService(t, repo, nil, nil)
+
+	params := humanParams()
+	params.Title = "Fixed title"
+	params.Generation = &domain.DraftGeneration{Source: domain.DraftSourceGuidedStudio, Prompt: "new"}
+	draft, err := s.ResubmitContentDraft(context.Background(), "d1", draftAuthorID, params)
+	require.NoError(t, err)
+	require.NotNil(t, draft.Generation)
+	assert.Equal(t, domain.DraftSourceGuidedStudio, draft.Generation.Source)
+
+	retyped := humanParams()
+	retyped.Title = "Retyped title"
+	rejected.Status = domain.DraftStatusRejected
+	preserved, err := s.ResubmitContentDraft(context.Background(), "d1", draftAuthorID, retyped)
+	require.NoError(t, err)
+	require.NotNil(t, preserved.Generation, "omitted generation preserves the original record")
+	assert.Equal(t, domain.DraftSourceGuidedStudio, preserved.Generation.Source)
 }
 
 func TestCreateContentDraftMergesIntoPendingRevision(t *testing.T) {

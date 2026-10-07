@@ -84,6 +84,11 @@ Errors that *are* retryable but exhaust all five attempts also go to the
 DLQ — a non-permanent classification only means "try again", not
 "retry forever".
 
+Search indexing is asynchronous: a newly created post reaches Qdrant via the
+`content-search-worker`, and cold embedding backends can take a minute or more
+per post. A fresh post may not appear in `searchPosts` right away; check the
+DLQ and worker logs before assuming it was lost.
+
 ## What each worker treats as permanent
 
 | Worker | Topic | Permanent failures |

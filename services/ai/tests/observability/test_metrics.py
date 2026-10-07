@@ -541,3 +541,76 @@ async def test_metrics_judge_records_verdicts() -> None:
     out = await judge(state)
     assert _judge_verdicts("irrelevant") == irrelevant_before + 1
     assert out["judge"].relevant is False
+
+
+def _post_json(sections: int) -> str:
+    import json as _json
+
+    body = "<p>intro</p>"
+    for i in range(sections):
+        body += f"<h2>Section {i}</h2><p>text</p>"
+    body += "<p>conclusion</p>"
+    return _json.dumps({"title": "t", "body": body, "summary": "s", "tags": ["ai"]})
+
+
+def _verification(outcome: str, tone: str, length: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "post_generation_verifications_total",
+            {"outcome": outcome, "tone": tone, "length": length},
+        )
+        or 0.0
+    )
+
+
+def _issues(rule: str) -> float:
+    return (
+        REGISTRY.get_sample_value("post_generation_issues_total", {"rule": rule}) or 0.0
+    )
+
+
+def _gen_duration_count(outcome: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "post_generation_duration_seconds_count", {"outcome": outcome}
+        )
+        or 0.0
+    )
+
+
+async def test_metrics_post_verification_first_pass(running_server, fake_llm) -> None:
+    channel, _ = running_server
+    stub = ai_stubs.AIServiceStub(channel)
+    fake_llm.response = _post_json(3)
+    before = _verification("first-pass", "", "")
+    duration_before = _gen_duration_count("first-pass")
+    issues_before = _issues("section_count")
+
+    await stub.GeneratePost(ai_service_pb2.PostGenerationRequest(prompt="topic"))
+
+    assert _verification("first-pass", "", "") == before + 1
+    assert _gen_duration_count("first-pass") == duration_before + 1
+    assert _issues("section_count") == issues_before
+
+
+async def test_metrics_post_verification_repaired_with_tone_length(
+    running_server, fake_llm
+) -> None:
+    channel, _ = running_server
+    stub = ai_stubs.AIServiceStub(channel)
+    fake_llm.responses = [_post_json(6), _post_json(2)]
+    before = _verification("repaired", "TECHNICAL", "QUICK")
+    issues_before = _issues("section_count")
+    duration_before = _gen_duration_count("repaired")
+
+    await stub.GeneratePost(
+        ai_service_pb2.PostGenerationRequest(
+            prompt="topic",
+            tone=ai_service_pb2.WRITING_TONE_TECHNICAL,
+            length=ai_service_pb2.WRITING_LENGTH_QUICK,
+        )
+    )
+
+    assert _verification("repaired", "TECHNICAL", "QUICK") == before + 1
+    assert _issues("section_count") == issues_before + 1
+    assert _gen_duration_count("repaired") == duration_before + 1

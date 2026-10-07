@@ -8,6 +8,7 @@ export interface UsePostAIDraftArgs {
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
   onTagsChange: (tags: string[]) => void;
+  onGenerated?: (prompt: string) => void;
 }
 
 export interface UsePostAIDraftResult {
@@ -28,6 +29,7 @@ export const usePostAIDraft = ({
   onTitleChange,
   onContentChange,
   onTagsChange,
+  onGenerated,
 }: UsePostAIDraftArgs): UsePostAIDraftResult => {
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
@@ -64,6 +66,7 @@ export const usePostAIDraft = ({
       onTitleChange(generated.title);
       onContentChange(generated.body);
       onTagsChange(normalizeTags(generated.tags ?? []));
+      onGenerated?.(trimmedPrompt);
       setSummary(generated.summary ?? null);
       setIsSummaryVisible(false);
       toast({

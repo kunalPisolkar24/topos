@@ -29,6 +29,9 @@ services:
       context: ..
       dockerfile: Dockerfile
     restart: unless-stopped
+    # The Dockerfile's final stage defaults to the personalizer binary;
+    # pin the server binary like the worker entries below do.
+    command: ["./content-service"]
     ports:
       - "${CONTENT_SERVICE_EXT_PORT:-4002}:${CONTENT_SERVICE_INT_PORT:-4002}"
     environment:
@@ -198,16 +201,16 @@ services:
 
   init-kafka:
     # Creates topics on Floci MSK (Redpanda does not auto-create for the
-    # content producer path). Broker default must match SM KAFKA_BROKERS
-    # (terraform content secrets Floci branch); override KAFKA_BROKERS to
-    # change both.
+    # content producer path). KAFKA_BROKERS must be set (run
+    # `make prod-sync-env` after infra changes); there is no safe default
+    # because the Floci MSK sidecar hostname changes on cluster recreate.
     image: redpandadata/redpanda:latest
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
     command: |
-      "rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_TOPIC:-posts} -p 3 -r 1;
-       rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_DLQ_TOPIC:-posts-dlq} -p 1 -r 1;
-       rpk -X brokers=${KAFKA_BROKERS:-floci-msk-6eb9bc:9092} topic create --if-not-exists ${KAFKA_USER_INTERACTED_TOPIC:-user-interacted} -p 3 -r 1"
+      "rpk -X brokers=${KAFKA_BROKERS:?KAFKA_BROKERS must be set (run make prod-sync-env)} topic create --if-not-exists ${KAFKA_TOPIC:-posts} -p 3 -r 1;
+       rpk -X brokers=${KAFKA_BROKERS:?KAFKA_BROKERS must be set (run make prod-sync-env)} topic create --if-not-exists ${KAFKA_DLQ_TOPIC:-posts-dlq} -p 1 -r 1;
+       rpk -X brokers=${KAFKA_BROKERS:?KAFKA_BROKERS must be set (run make prod-sync-env)} topic create --if-not-exists ${KAFKA_USER_INTERACTED_TOPIC:-user-interacted} -p 3 -r 1"
     networks:
       - floci-bridge
 

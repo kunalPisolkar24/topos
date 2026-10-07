@@ -152,4 +152,48 @@ describe("DraftDetail identity surfaces", () => {
     expect(await screen.findByText(/Peer Reviewer/)).toBeInTheDocument();
     expect(screen.getByText(/Approved \/\/ Peer review/)).toBeInTheDocument();
   });
+
+  it("shows how a quick-prompt draft was made", async () => {
+    setupDetailHandlers(
+      buildDetailDraft({
+        generation: { source: "QUICK_PROMPT", prompt: "write about go" },
+      }),
+    );
+    renderDetail();
+
+    expect(await screen.findByText("How this was made")).toBeInTheDocument();
+    expect(screen.getByText("Quick prompt")).toBeInTheDocument();
+    expect(screen.getByText("write about go")).toBeInTheDocument();
+    expect(screen.getByText(/Prompted by/)).toBeInTheDocument();
+  });
+
+  it("shows guided-studio settings as chips", async () => {
+    setupDetailHandlers(
+      buildDetailDraft({
+        generation: {
+          source: "GUIDED_STUDIO",
+          prompt: "Postgres indexing",
+          audience: "practitioner",
+          tone: "technical",
+          length: "standard",
+          structure: "how-to",
+          keywords: "postgres",
+        },
+      }),
+    );
+    renderDetail();
+
+    expect(await screen.findByText("Guided studio")).toBeInTheDocument();
+    expect(screen.getByText("#technical")).toBeInTheDocument();
+    expect(screen.getByText("#how-to")).toBeInTheDocument();
+  });
+
+  it("hides generation details for hand-typed drafts", async () => {
+    setupDetailHandlers(buildDetailDraft({ generation: null }));
+    renderDetail();
+
+    expect(await screen.findByText("Detail draft title")).toBeInTheDocument();
+    expect(screen.queryByText("How this was made")).not.toBeInTheDocument();
+    expect(screen.getByText(/Written by/)).toBeInTheDocument();
+  });
 });

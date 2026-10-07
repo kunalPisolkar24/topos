@@ -27,7 +27,7 @@ func (a *NoopAI) GenerateTags(_ context.Context, _, _ string) ([]string, error) 
 	return nil, domain.ErrAICircuitOpen
 }
 
-func (a *NoopAI) GeneratePost(_ context.Context, _ string) (*domain.GeneratedPost, error) {
+func (a *NoopAI) GeneratePost(_ context.Context, _ string, _ *domain.WritingBrief) (*domain.GeneratedPost, error) {
 	return nil, domain.ErrAICircuitOpen
 }
 

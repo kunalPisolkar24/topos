@@ -231,11 +231,22 @@ see [Error handling](../components/error-handling.md#recognising-a-validation-me
 | Mutation | Arguments | Notes |
 | --- | --- | --- |
 | `generateTags(title: String!, body: String!)` | — | Returns `[String!]!`; auth checked, identity value ignored |
-| `generatePostContent(prompt: String!)` | — | Returns `GeneratedPost!` |
+| `generatePostContent(prompt: String!, brief: WritingBriefInput)` | `brief` optional | Returns `GeneratedPost!`; without `brief` behaves as a single prompt |
 
 Both require a valid token purely to stop this service becoming a public
 proxy for the AI service. Neither has a fallback — an AI outage means an
-error.
+error (`AI service is temporarily unavailable, please try again`).
+
+`WritingBriefInput` carries the author's style choices into generation —
+audience (`BEGINNER`, `PRACTITIONER`, `EXPERT`), tone (`PROFESSIONAL`,
+`CONVERSATIONAL`, `TECHNICAL`, `STORYTELLING`, `WITTY`, `MINIMAL`),
+length (`QUICK`, `STANDARD`, `DEEP_DIVE`), structure (`HOW_TO`,
+`LISTICLE`, `TUTORIAL`, `COMPARISON`, `OPINION`, `CASE_STUDY`), plus
+free-text `keywords` and `keyPoints`. Every field is optional; omitting
+`brief` entirely keeps the legacy single-prompt behavior. Allow up to
+~2 minutes for a guided draft — generation plus a possible repair pass
+is two slow LLM calls, and both the gateway router and the content AI
+client budget 120 s for it.
 
 ### Chats
 
@@ -273,8 +284,8 @@ call, so calling `likePost` twice unlikes.
 
 | Mutation | Arguments | Allowed for |
 | --- | --- | --- |
-| `createPostDraft(prompt: String!)` | ≤ 5000 chars | Any authenticated user |
-| `createContentDraft(input: ContentDraftInput!)` | title, body, summary, tags, imageUrl, postId | Any authenticated user |
+| `createPostDraft(prompt: String!)` | ≤ 5000 chars | Any authenticated user; stamped `QUICK_PROMPT` origin |
+| `createContentDraft(input: ContentDraftInput!)` | title, body, summary, tags, imageUrl, postId, `generation` | Any authenticated user; pass `generation` to record AI assistance |
 | `resubmitContentDraft(id: ID!, input: ContentDraftInput!)` | must differ | Author, `REJECTED` only |
 | `approvePostDraft(id: ID!, input: DraftEditsInput)` | edits optional | A **different** user |
 | `rejectPostDraft(id: ID!, reason: String)` | reason strongly advised | A **different** user |
@@ -336,8 +347,16 @@ peer reviewer when one exists, and `null` for directly published posts.
 | --- | --- |
 | `SummaryStatus` | `PENDING`, `COMPLETED`, `FAILED` |
 | `DraftStatus` | `PENDING`, `APPROVED`, `REJECTED` |
+| `DraftSource` | `QUICK_PROMPT`, `GUIDED_STUDIO` |
 | `RecommendMode` | `DEFAULT`, `SURPRISE`, `FRESH`, `EXPLORER` |
 | `MessageRole` | `USER`, `ASSISTANT` |
+
+`PostDraft.generation` records the AI assistance behind a draft — `source`,
+the original `prompt`, and any brief fields (`audience`, `tone`, `length`,
+`structure`, `keywords`, `keyPoints`) — so reviewers can see what produced
+it. It is `null` for hand-typed drafts. `createPostDraft` always stamps
+`QUICK_PROMPT`; the writing studio sends `GUIDED_STUDIO` with its brief
+through `ContentDraftInput.generation`.
 
 MongoDB stores the interaction and message roles **lowercase**; only the
 GraphQL layer is uppercase.
@@ -347,7 +366,7 @@ GraphQL layer is uppercase.
 ```graphql
 input CreatePostInput { title: String!  body: String!  summary: String  tags: [String!]  imageUrl: String }
 input UpdatePostInput { title: String   body: String   tags: [String!]  imageUrl: String }
-input ContentDraftInput { title: String!  body: String!  summary: String  tags: [String!]  imageUrl: String  postId: ID }
+input ContentDraftInput { title: String!  body: String!  summary: String  tags: [String!]  imageUrl: String  postId: ID  generation: DraftGenerationInput }
 input DraftEditsInput { title: String  body: String  summary: String  tags: [String!] }
 ```
 
@@ -435,6 +454,7 @@ if (json.errors?.length) {
   if (message === "unauthorized") await refreshToken();
   else if (message === "not found") showMissing();
   else if (message.startsWith("validation error:")) showValidationError(message);
+  else if (message.startsWith("AI service is temporarily unavailable")) showRetryLater();
   else reportServerIssue(message, requestId);   // includes "internal error"
 }
 ```

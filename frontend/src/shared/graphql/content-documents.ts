@@ -196,6 +196,7 @@ export interface GenerateTagsMutation {
 
 export interface GeneratePostContentMutationVariables {
   prompt: string;
+  brief?: WritingBriefInput | null;
 }
 
 export interface GeneratePostContentMutation {
@@ -396,9 +397,38 @@ export const GenerateTagsDocument = gql`
   }
 ` as DocumentNode<GenerateTagsMutation, GenerateTagsMutationVariables>;
 
+export type WritingAudience = "BEGINNER" | "PRACTITIONER" | "EXPERT";
+
+export type WritingTone =
+  | "PROFESSIONAL"
+  | "CONVERSATIONAL"
+  | "TECHNICAL"
+  | "STORYTELLING"
+  | "WITTY"
+  | "MINIMAL";
+
+export type WritingLength = "QUICK" | "STANDARD" | "DEEP_DIVE";
+
+export type WritingStructure =
+  | "HOW_TO"
+  | "LISTICLE"
+  | "TUTORIAL"
+  | "COMPARISON"
+  | "OPINION"
+  | "CASE_STUDY";
+
+export interface WritingBriefInput {
+  audience?: WritingAudience | null;
+  tone?: WritingTone | null;
+  length?: WritingLength | null;
+  structure?: WritingStructure | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
 export const GeneratePostContentDocument = gql`
-  mutation GeneratePostContent($prompt: String!) {
-    generatePostContent(prompt: $prompt) {
+  mutation GeneratePostContent($prompt: String!, $brief: WritingBriefInput) {
+    generatePostContent(prompt: $prompt, brief: $brief) {
       title
       body
       summary
@@ -454,6 +484,31 @@ export const RecommendedPostsDocument = gql`
 
 export type DraftStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export type DraftSource = "QUICK_PROMPT" | "GUIDED_STUDIO";
+
+export interface DraftGeneration {
+  __typename?: "DraftGeneration";
+  source: DraftSource;
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
+export interface DraftGenerationInput {
+  source: DraftSource;
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
 export interface PostDraft {
   __typename?: "PostDraft";
   id: string;
@@ -471,6 +526,7 @@ export interface PostDraft {
   reviewedById?: string | null;
   reviewedAt?: string | null;
   rejectionNote?: string | null;
+  generation?: DraftGeneration | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -497,6 +553,7 @@ export interface ContentDraftInput {
   tags?: string[] | null;
   imageUrl?: string | null;
   postId?: string | null;
+  generation?: DraftGenerationInput | null;
 }
 
 export interface PostDraftsQueryVariables {
@@ -598,6 +655,16 @@ const POST_DRAFT_FIELDS = gql`
     reviewedById
     reviewedAt
     rejectionNote
+    generation {
+      source
+      prompt
+      audience
+      tone
+      length
+      structure
+      keywords
+      keyPoints
+    }
     createdAt
     updatedAt
   }

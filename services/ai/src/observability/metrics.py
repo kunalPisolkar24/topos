@@ -150,3 +150,21 @@ POST_WORKFLOW_TRANSITIONS = Counter(
     "Post generation workflow transitions by terminal action",
     ["transition"],
 )
+
+POST_GENERATION_VERIFICATIONS = Counter(
+    "post_generation_verifications_total",
+    "Single-turn post generation verification outcomes by brief",
+    ["outcome", "tone", "length"],
+)
+
+POST_GENERATION_ISSUES = Counter(
+    "post_generation_issues_total",
+    "Structural issues found per verification attempt by rule",
+    ["rule"],
+)
+
+POST_GENERATION_DURATION = Histogram(
+    "post_generation_duration_seconds",
+    "End-to-end single-turn post generation time by outcome",
+    ["outcome"],
+)

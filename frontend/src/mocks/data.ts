@@ -822,14 +822,59 @@ export const generateTags = (title: string, body: string) => {
   return unique.length > 0 ? unique.slice(0, 4) : ["Architecture", "Distributed Systems", "Go"];
 };
 
-export const generatePostContent = (prompt: string) => {
+let generatePostContentCalls = 0;
+
+export interface MockWritingBrief {
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
+const describeBrief = (brief?: MockWritingBrief | null): string | null => {
+  if (!brief) return null;
+  const parts: string[] = [];
+  if (brief.audience) parts.push(`audience ${brief.audience}`);
+  if (brief.tone) parts.push(`${brief.tone} tone`);
+  if (brief.length) parts.push(`${brief.length} length`);
+  if (brief.structure) parts.push(`${brief.structure} structure`);
+  if (brief.keywords) parts.push(`keywords ${brief.keywords}`);
+  return parts.length > 0 ? parts.join(", ") : null;
+};
+
+export const generatePostContent = (prompt: string, brief?: MockWritingBrief | null) => {
+  generatePostContentCalls += 1;
+  const revision = generatePostContentCalls > 1 ? ` Revision ${generatePostContentCalls}.` : "";
+  const briefLine = describeBrief(brief);
+  const rewriteMatch = prompt.match(/Rewrite section "([^"]+)"([\s\S]*)/);
+  const instructionMatch = prompt.match(/Instruction:\s*([^\n]+)/);
+  const instruction = instructionMatch?.[1]?.trim() ?? "";
+  if (rewriteMatch) {
+    const heading = rewriteMatch[1] ?? "Section";
+    const detail = instruction ? ` ${instruction}.` : " Rewritten with a fresh angle.";
+    const style = briefLine ? ` Written with ${briefLine}.` : "";
+    return {
+      __typename: "GeneratedPost",
+      title: titleCase(prompt.trim().split(/\s+/).slice(0, 10).join(" ")) || "Untitled Draft",
+      body: [
+        `<p>This draft was generated from your prompt: "${prompt.trim()}". It provides a starting point you can edit into a full post.${revision}</p>`,
+        `<h2>${heading}</h2>`,
+        `<p>Regenerated "${heading}".${detail}${style}${revision}</p>`,
+      ].join(""),
+      summary: `A regenerated section exploring ${heading.toLowerCase()}.${revision}`,
+      tags: generateTags(prompt, ""),
+    };
+  }
   const titleWords = prompt.trim().split(/\s+/).slice(0, 10).join(" ");
   const title = titleCase(titleWords) || "Untitled Draft";
+  const styleSuffix = briefLine ? ` Written with ${briefLine}.` : "";
   return {
     __typename: "GeneratedPost",
     title,
     body: buildBody(
-      `This draft was generated from your prompt: "${prompt.trim()}". It provides a starting point you can edit into a full post.`,
+      `This draft was generated from your prompt: "${prompt.trim()}".${styleSuffix}${revision} It provides a starting point you can edit into a full post.`,
       [
         "Start with the concrete problem your readers face before introducing your approach.",
         "Include a real example with numbers; abstract advice is hard to evaluate.",
@@ -842,6 +887,17 @@ export const generatePostContent = (prompt: string) => {
   };
 };
 
+export interface MockDraftGeneration {
+  source: "QUICK_PROMPT" | "GUIDED_STUDIO";
+  prompt: string;
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+}
+
 export interface MockDraft {
   id: string;
   approvalId: string;
@@ -853,6 +909,9 @@ export interface MockDraft {
   // Cover proposed with the draft. Optional so older seeds stay valid;
   // preview responses normalize it to null.
   imageUrl?: string | null;
+  // How the draft content was produced. Absent for hand-typed drafts;
+  // responses normalize it to null.
+  generation?: MockDraftGeneration | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   authorId: string;
   postId: string | null;
@@ -871,6 +930,10 @@ const drafts: MockDraft[] = [
     id: "draft-1",
     approvalId: "approval-1",
     prompt: "Write about connection pooling for Postgres at scale",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Write about connection pooling for Postgres at scale",
+    },
     title: "Postgres Connection Pooling at Scale",
     body: buildBody(
       "Pooling Postgres connections behind a proxy lets many app instances share a bounded set of backend sessions.",
@@ -893,6 +956,10 @@ const drafts: MockDraft[] = [
     id: "draft-2",
     approvalId: "approval-2",
     prompt: "Explain hybrid dense and sparse search with Qdrant",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Explain hybrid dense and sparse search with Qdrant",
+    },
     title: "Hybrid Search with Dense and Sparse Vectors",
     body: buildBody(
       "Hybrid retrieval combines semantic recall from dense embeddings with lexical precision from sparse vectors.",
@@ -915,6 +982,10 @@ const drafts: MockDraft[] = [
     id: "draft-3",
     approvalId: "approval-3",
     prompt: "Design idempotent APIs with client-generated keys",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Design idempotent APIs with client-generated keys",
+    },
     title: "Designing Idempotent APIs for Retries",
     body: buildBody(
       "At-least-once retries are the normal path in distributed systems; APIs must tolerate safe replay.",
@@ -937,6 +1008,10 @@ const drafts: MockDraft[] = [
     id: "draft-4",
     approvalId: "approval-4",
     prompt: "Guide to rolling out zero-trust mTLS between services",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Guide to rolling out zero-trust mTLS between services",
+    },
     title: "Zero-Trust mTLS Between Services",
     body: buildBody(
       "Zero-trust replaces implicit network trust with short-lived cryptographic identity per service.",
@@ -961,6 +1036,10 @@ const drafts: MockDraft[] = [
     id: "draft-5",
     approvalId: "approval-5",
     prompt: "Compare TypeScript conditional types to generics",
+    generation: {
+      source: "QUICK_PROMPT",
+      prompt: "Compare TypeScript conditional types to generics",
+    },
     title: "Conditional Types Versus Generics in TypeScript",
     body: buildBody(
       "Conditional types turn generics from placeholders into type-level programs.",
@@ -1041,6 +1120,7 @@ const toDraftResponse = (draft: MockDraft) => ({
   reviewedById: draft.reviewedById ?? null,
   reviewedAt: draft.reviewedAt ?? null,
   rejectionNote: draft.rejectionNote ?? null,
+  generation: draft.generation ?? null,
 });
 
 const toPaginatedDraftsResponse = (items: MockDraft[], page: number, limit: number) => {
@@ -1111,6 +1191,7 @@ export const createPostDraft = (prompt: string) => {
     body: generated.body,
     summary: generated.summary,
     tags: generated.tags,
+    generation: { source: "QUICK_PROMPT", prompt },
     status: "PENDING",
     authorId,
     postId: null,
