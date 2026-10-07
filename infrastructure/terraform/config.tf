@@ -57,6 +57,18 @@ resource "aws_ssm_parameter" "content_config" {
     KAFKA_SEARCH_CONSUMER_GROUP_ID       = "content-search-worker-group"
     KAFKA_PERSONALIZER_CONSUMER_GROUP_ID = "content-personalizer-worker-group"
     WORKER_CONCURRENCY                   = "3"
+    RATELIMIT_ENABLED                    = "true"
+    RATELIMIT_READS_PER_MIN              = "120"
+    RATELIMIT_MUTATIONS_PER_MIN          = "30"
+    RATELIMIT_INTERACTIONS_PER_MIN       = "60"
+    RATELIMIT_SEARCH_PER_MIN             = "30"
+    RATELIMIT_AI_PER_MIN                 = "10"
+    RATELIMIT_WINDOW_SECONDS             = "60"
+    RATELIMIT_DEGRADED_MULTIPLIER        = "2"
+    RATELIMIT_AI_DEGRADED_MULTIPLIER     = "1"
+    RATELIMIT_AI_CONCURRENCY             = "5"
+    RATELIMIT_REDIS_TIMEOUT_MS           = "150"
+    RATELIMIT_MEMORY_MAX_ENTRIES         = "10000"
   })
   description = "Content service non-secret config"
   tags        = local.content_tags

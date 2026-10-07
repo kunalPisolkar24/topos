@@ -14,15 +14,19 @@ import (
 	"github.com/kunalPisolkar24/topos/services/content/internal/infrastructure/ai"
 	"github.com/kunalPisolkar24/topos/services/content/internal/infrastructure/messaging"
 	"github.com/kunalPisolkar24/topos/services/content/internal/observability"
+	"github.com/kunalPisolkar24/topos/services/content/internal/ratelimit"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Dependencies holds the shared infrastructure used by the services.
 // Cache is always non-nil; when redis is unavailable it operates in
-// degraded mode and falls through to MongoDB.
+// degraded mode and falls through to MongoDB. Limiter shares the
+// cache's Redis pool and falls back to process-local quotas while
+// Redis is unreachable.
 type Dependencies struct {
 	Mongo           *mongo.Client
 	Cache           *cache.Cache
+	Limiter         *ratelimit.Limiter
 	AI              domain.AIService
 	Producer        domain.EventProducer
 	ShutdownTracing func(context.Context) error
@@ -69,6 +73,11 @@ func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependenc
 		slog.Info("connected to redis", "addr", cfg.RedisAddr)
 	}
 
+	limiter := ratelimit.New(ratelimit.LimitsFromConfig(cfg), cacheClient.RedisClient())
+	if cacheClient.Degraded() {
+		slog.Warn("redis degraded, rate limiting in memory fallback mode", "addr", cfg.RedisAddr)
+	}
+
 	aiClient := ai.NewResilientClient(cfg.AIServiceURL)
 	slog.Info("ai client configured", "addr", cfg.AIServiceURL)
 
@@ -77,6 +86,7 @@ func New(ctx context.Context, cfg config.Config, serviceName string) (*Dependenc
 	return &Dependencies{
 		Mongo:           mongoClient,
 		Cache:           cacheClient,
+		Limiter:         limiter,
 		AI:              aiClient,
 		Producer:        producer,
 		ShutdownTracing: shutdownTracing,

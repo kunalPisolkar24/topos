@@ -214,6 +214,17 @@ func (c *Cache) Degraded() bool {
 	return c.breaker.getState() != stateClosed
 }
 
+// RedisClient shares the underlying go-redis client so the rate limiter
+// can reuse the same connection pool to the shared user-redis instance
+// instead of opening a second pool. The limiter keeps its own breaker
+// and timeouts; the returned client must not be closed by the caller.
+func (c *Cache) RedisClient() *redis.Client {
+	if c == nil || c.client == nil {
+		return nil
+	}
+	return c.client
+}
+
 // Healthy reports whether the cache can serve requests (breaker closed and
 // a recent ping succeeded).
 func (c *Cache) Healthy() bool {

@@ -241,6 +241,37 @@ var (
 		Name:      "consumer_lag",
 		Help:      "Uncommitted messages per reader, from kafka-go stats.",
 	}, []string{"reader"})
+
+	// RatelimitDecisionsTotal counts rate limiter outcomes by policy,
+	// decision and serving mode. Mode is redis while Redis is
+	// authoritative and memory while the process-local fallback serves.
+	// Decision is allowed or rejected. The subject (user id or IP) is
+	// never a label.
+	RatelimitDecisionsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "content",
+		Subsystem: "ratelimit",
+		Name:      "decisions_total",
+		Help:      "Rate limiter decisions by policy, decision and mode.",
+	}, []string{"policy", "decision", "mode"})
+
+	// RatelimitBreakerState reports the rate limiter breaker state:
+	// 0 = closed (Redis authoritative), 1 = open (memory fallback),
+	// 2 = half-open (probing Redis).
+	RatelimitBreakerState = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "content",
+		Subsystem: "ratelimit",
+		Name:      "breaker_state",
+		Help:      "Rate limiter breaker state (0 closed, 1 open, 2 half-open).",
+	})
+
+	// RatelimitAIInFlight reports concurrent AI-triggering calls
+	// currently holding the limiter semaphore.
+	RatelimitAIInFlight = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "content",
+		Subsystem: "ratelimit",
+		Name:      "ai_in_flight",
+		Help:      "AI-triggering calls currently holding the concurrency semaphore.",
+	})
 )
 
 func ObserveDBQuery(operation string, start time.Time, err error) {
