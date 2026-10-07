@@ -83,8 +83,8 @@ docker compose --env-file infrastructure/docker/local/.env.local \
 
 | Container | Published | Health check |
 | --- | --- | --- |
-| `frontend` | `3000` | none |
-| `gateway` | `4000` | none (health is on `8088`, not published) |
+| `frontend` | `3000` | `GET /` (waits for `gateway` healthy) |
+| `gateway` | `4000` | `/health` on `8088` via a `/dev/tcp` probe (router ships no `curl`); waits for both subgraphs healthy |
 | `user-service` | `4001` | `GET /health` |
 | `content-service` | `4002` | `GET /healthz` |
 | `content-worker` | none | `GET /healthz` |

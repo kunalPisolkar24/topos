@@ -84,15 +84,35 @@ Non-string entries are dropped rather than rejected, so a model that returns
 ### `GeneratePost`
 
 ```text
-len(prompt) > MAX_POST_CHARS (5000)?  → INVALID_ARGUMENT
-POST_PROMPT + post_user_prompt(prompt) → LLM
-extract_json(raw)                     → GeneratedPost.model_validate_json(...)
-sanitize_post_html(post.body)         → bleach allowlist clean
+len(prompt) > MAX_POST_CHARS (5000)?        → INVALID_ARGUMENT
+len(keywords) > MAX_KEYWORDS_CHARS (500)?   → INVALID_ARGUMENT
+len(key_points) > MAX_KEY_POINTS_CHARS (2000)? → INVALID_ARGUMENT
+brief fields set? styled_post_user_prompt   : post_user_prompt(prompt) → LLM
+extract_json(raw)                           → GeneratedPost.model_validate_json(...)
+sanitize_post_html(post.body)               → bleach allowlist clean
+verify_post(...) vs length spec             → repair prompt → LLM (≤ 3 attempts)
 ```
 
 `GeneratedPost` is a pydantic model requiring all four fields, so a reply
 missing `title`, `summary`, or `tags` raises pydantic's own `ValidationError` —
 again an unmapped exception, again `INTERNAL`.
+
+When the caller sends a writing brief (audience, tone, length, structure,
+keywords, key points), the user prompt is built by
+`styled_post_user_prompt`: the brief steers the outline and voice, keywords
+guide titles and tags, and key points shape the middle sections. With no
+brief the legacy `post_user_prompt` runs unchanged.
+
+After parsing, every draft goes through structural verification against
+the length spec (`QUICK` wants 2 `<h2>` sections, `STANDARD` 3–4,
+`DEEP_DIVE` 5–6; no markdown fences, no page-structure tags). A failing
+draft is re-asked with a repair prompt naming the issues, up to
+`MAX_POST_ATTEMPTS = 3` LLM calls in total. Cosmetic gaps — an empty
+title or summary, or a tag count outside 5–7 — are logged, never
+repaired. If nothing parses on any attempt the last error raises;
+otherwise the best-effort draft is returned. Each run is timed in
+`POST_GENERATION_DURATION` and counted as `first-pass`, `repaired`, or
+`best-effort` in `POST_GENERATION_VERIFICATIONS`.
 
 Unlike the other two, `GeneratePost` does **not** reject an empty prompt.
 

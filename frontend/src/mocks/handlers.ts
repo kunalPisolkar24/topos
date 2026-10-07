@@ -368,11 +368,11 @@ export const handlers = [
   gql.mutation("GeneratePostContent", async ({ variables }) => {
     if (isPreviewEnv) {
       return HttpResponse.json({
-        data: { generatePostContent: previewGeneratePostContent(variables?.prompt) },
+        data: { generatePostContent: previewGeneratePostContent(variables?.prompt, variables?.brief) },
       });
     }
     return HttpResponse.json({
-      data: { generatePostContent: generatePostContent(variables?.prompt) },
+      data: { generatePostContent: generatePostContent(variables?.prompt, variables?.brief) },
     });
   }),
 

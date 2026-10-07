@@ -3,6 +3,12 @@
 import type React from "react";
 import { FileText, ImageIcon, Sparkles, Tags } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/shared/ui/primitives/tabs";
 import { StickyNavbar, BlogEditor } from "@/widgets";
 import {
   usePostAuthoringController,
@@ -10,16 +16,14 @@ import {
   AIDraftGenerator,
   FeaturedImageSection,
   BlogTagSection,
+  WritingStudio,
 } from "@/features/blog";
 import { PublishChecklistItem } from "@/features/blog/components/PublishChecklistItem";
-import { useCreatePostDraft } from "@/features/blog/review";
 
 const CreateNewBlog: React.FC = () => {
-  const { state, setters, handlers, refs } = usePostAuthoringController({
+  const { state, setters, handlers, refs, studio } = usePostAuthoringController({
     mode: "create",
   });
-  const { submitForReview, isSubmitting: isSubmittingForReview } =
-    useCreatePostDraft();
   const {
     contentText,
     isTitleReady: titleReady,
@@ -65,19 +69,28 @@ const CreateNewBlog: React.FC = () => {
                 onChange={setters.setTitle}
               />
 
-              <AIDraftGenerator
-                prompt={state.postPrompt}
-                onPromptChange={setters.setPostPrompt}
-                onGenerate={handlers.handleGeneratePost}
-                isGenerating={state.isGeneratingPost}
-                canGenerate={state.canGeneratePost}
-                onClear={handlers.clearAIDraft}
-                onSubmitForReview={() => void submitForReview(state.postPrompt)}
-                isSubmittingForReview={isSubmittingForReview}
-                summary={state.generatedSummary}
-                isSummaryVisible={state.isSummaryVisible}
-                onToggleSummary={handlers.toggleSummary}
-              />
+              <Tabs defaultValue="quick">
+                <TabsList aria-label="Draft mode">
+                  <TabsTrigger value="quick">Quick prompt</TabsTrigger>
+                  <TabsTrigger value="studio">Guided studio</TabsTrigger>
+                </TabsList>
+                <TabsContent value="quick" className="mt-4">
+                  <AIDraftGenerator
+                    prompt={state.postPrompt}
+                    onPromptChange={setters.setPostPrompt}
+                    onGenerate={handlers.handleGeneratePost}
+                    isGenerating={state.isGeneratingPost}
+                    canGenerate={state.canGeneratePost}
+                    onClear={handlers.clearAIDraft}
+                    summary={state.generatedSummary}
+                    isSummaryVisible={state.isSummaryVisible}
+                    onToggleSummary={handlers.toggleSummary}
+                  />
+                </TabsContent>
+                <TabsContent value="studio" className="mt-4">
+                  <WritingStudio studio={studio} />
+                </TabsContent>
+              </Tabs>
 
               <FeaturedImageSection
                 preview={state.cardImagePreview}

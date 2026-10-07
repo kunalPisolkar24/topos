@@ -37,6 +37,8 @@ func mapDomainError(err error) *gqlerror.Error {
 		kind, message = "validation", err.Error()
 	case errors.Is(err, domain.ErrConflict):
 		kind, message = "conflict", "already reviewed by someone else"
+	case errors.Is(err, domain.ErrAIUnavailable):
+		kind, message = "unavailable", "AI service is temporarily unavailable, please try again"
 	}
 
 	return &gqlerror.Error{

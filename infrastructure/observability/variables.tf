@@ -112,3 +112,27 @@ variable "log_silence_threshold_duration_seconds" {
     error_message = "log_silence_threshold_duration_seconds must be at least 120 seconds."
   }
 }
+
+variable "post_best_effort_warning_percent" {
+  description = "Warning share of generations falling back to best-effort."
+  type        = number
+  default     = 10
+}
+
+variable "post_best_effort_critical_percent" {
+  description = "Critical share of generations falling back to best-effort."
+  type        = number
+  default     = 25
+}
+
+variable "llm_error_warning_percent" {
+  description = "Warning share of errored LLM provider calls."
+  type        = number
+  default     = 5
+}
+
+variable "llm_error_critical_percent" {
+  description = "Critical share of errored LLM provider calls."
+  type        = number
+  default     = 15
+}

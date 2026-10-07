@@ -1,0 +1,54 @@
+{
+  "name": "Topos",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  // All toolchains come from containers.dev features (open spec: VS Code,
+  // JetBrains Gateway, devpod, Codespaces) so no editor-specific setup lives
+  // here. Versions track CI (.github/workflows) and the service Dockerfiles.
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.25"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "remoteUser": "vscode",
+  // Host socket: `make local-up` and testcontainers reuse the host daemon.
+  // Infra itself is never baked into this image.
+  "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
+  // Lets native runs reach published infra ports via host.docker.internal.
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  // Apps (top) then infra stores (bottom). Native runs (5173/4001/4002/50051)
+  // and `make local-up` (3000/4000/...) cannot share a host port at once:
+  // pick one flow or shift the *_EXT_PORT vars in .env.local.
+  "forwardPorts": [3000, 5173, 4000, 4001, 4002, 4003, 4004, 4005, 50051, 12666, 8088, 5432, 5433, 27017, 6379, 6380, 6333, 9092, 8080, 11434],
+  "portsAttributes": {
+    "3000": { "label": "Frontend (compose)", "onAutoForward": "notify" },
+    "5173": { "label": "Frontend (vite dev)", "onAutoForward": "notify" },
+    "4000": { "label": "Gateway GraphQL", "onAutoForward": "notify" },
+    "4001": { "label": "User subgraph", "onAutoForward": "silent" },
+    "4002": { "label": "Content API", "onAutoForward": "silent" },
+    "50051": { "label": "AI gRPC", "onAutoForward": "silent" },
+    "12666": { "label": "AI metrics", "onAutoForward": "silent" },
+    "5432": { "label": "Postgres (user)", "onAutoForward": "silent" },
+    "5433": { "label": "Postgres (ai)", "onAutoForward": "silent" },
+    "27017": { "label": "Mongo (content)", "onAutoForward": "silent" },
+    "6379": { "label": "Redis", "onAutoForward": "silent" },
+    "6333": { "label": "Qdrant", "onAutoForward": "silent" },
+    "9092": { "label": "Kafka", "onAutoForward": "silent" },
+    "8080": { "label": "Kafka UI", "onAutoForward": "silent" },
+    "11434": { "label": "Embedding service", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go", "ms-python.python", "charliermarsh.ruff", "dbaeumer.vscode-eslint", "prisma.prisma", "graphql.vscode-graphql", "ms-azuretools.vscode-docker"]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}

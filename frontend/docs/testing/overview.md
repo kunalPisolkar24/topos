@@ -146,7 +146,7 @@ consequences:
 
 ### What the handlers cover
 
-The same 35 GraphQL handlers used by `dev:mock` and `dev:preview` serve the
+The same 35 GraphQL handlers used by mock and preview runs serve the
 tests, plus the Cloudinary stub. See
 [Mock and preview modes](../concepts/mock-and-preview.md).
 

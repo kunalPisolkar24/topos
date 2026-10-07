@@ -48,4 +48,17 @@ describe("content schema contract", () => {
     expect(schema).toContain("likePost(postId: ID!, mode: RecommendMode)");
     expect(schema).toContain("savePost(postId: ID!, mode: RecommendMode)");
   });
+
+  it("accepts an optional writing brief on post generation", () => {
+    const schema = readFileSync(
+      resolve(process.cwd(), "../services/content/graph/schema.graphqls"),
+      "utf8",
+    );
+
+    expect(schema).toContain(
+      "generatePostContent(prompt: String!, brief: WritingBriefInput)",
+    );
+    expect(schema).toContain("input WritingBriefInput");
+    expect(schema).toContain("generation: DraftGeneration");
+  });
 });

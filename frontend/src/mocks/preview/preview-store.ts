@@ -3,6 +3,7 @@ import {
   type MockChat,
   type MockChatMessage,
   type MockDraft,
+  type MockDraftGeneration,
   type MockPost,
   type MockTag,
   type MockUser,
@@ -611,6 +612,7 @@ const toPreviewDraftResponse = (d: MockDraft) => ({
   reviewedById: d.reviewedById ?? null,
   reviewedAt: d.reviewedAt ?? null,
   rejectionNote: d.rejectionNote ?? null,
+  generation: d.generation ?? null,
 });
 
 const toDraftAuthorResponse = (user: MockUser | null | undefined) =>
@@ -678,6 +680,7 @@ export async function previewCreatePostDraft(authorId: string, prompt: string) {
     body: generated.body,
     summary: generated.summary,
     tags: generated.tags,
+    generation: { source: "QUICK_PROMPT", prompt },
     status: "PENDING",
     authorId,
     postId: null,
@@ -695,6 +698,7 @@ export interface PreviewContentDraftInput {
   tags?: string[] | null;
   imageUrl?: string | null;
   postId?: string | null;
+  generation?: MockDraftGeneration | null;
 }
 
 // Human-authored content entering review. postId null = brand-new post,
@@ -714,6 +718,7 @@ export async function previewCreateContentDraft(authorId: string, input: Preview
       existing.body = input.body;
       existing.summary = input.summary ?? "";
       existing.tags = input.tags ?? [];
+      existing.generation = input.generation ?? null;
       if (input.imageUrl !== undefined) existing.imageUrl = input.imageUrl;
       existing.updatedAt = now;
       await previewDB.put("drafts", existing);
@@ -729,6 +734,7 @@ export async function previewCreateContentDraft(authorId: string, input: Preview
     summary: input.summary ?? "",
     tags: input.tags ?? [],
     imageUrl: input.imageUrl ?? null,
+    generation: input.generation ?? null,
     status: "PENDING",
     authorId,
     postId,
@@ -763,6 +769,7 @@ export async function previewResubmitContentDraft(
   draft.summary = input.summary ?? "";
   draft.tags = input.tags ?? [];
   if (input.imageUrl !== undefined) draft.imageUrl = input.imageUrl;
+  if (input.generation !== undefined) draft.generation = input.generation;
   draft.status = "PENDING";
   draft.reviewedById = null;
   draft.reviewedAt = null;
@@ -1070,6 +1077,13 @@ export function previewGenerateTags(title: string, body: string) {
   return generateTags(title, body);
 }
 
-export function previewGeneratePostContent(prompt: string) {
-  return generatePostContent(prompt);
+export function previewGeneratePostContent(prompt: string, brief?: {
+  audience?: string | null;
+  tone?: string | null;
+  length?: string | null;
+  structure?: string | null;
+  keywords?: string | null;
+  keyPoints?: string | null;
+} | null) {
+  return generatePostContent(prompt, brief);
 }

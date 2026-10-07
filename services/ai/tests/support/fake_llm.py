@@ -6,10 +6,12 @@ class FakeLLM:
         response: str = "",
         error: Exception | None = None,
         chunks: list[str] | None = None,
+        responses: list[str] | None = None,
     ) -> None:
         self.response = response
         self.error = error
         self.chunks = chunks
+        self.responses = list(responses) if responses is not None else None
         self.calls: list[tuple[str, str]] = []
         self.stream_calls: list[tuple[str, str]] = []
 
@@ -17,6 +19,8 @@ class FakeLLM:
         self.calls.append((system, user))
         if self.error is not None:
             raise self.error
+        if self.responses is not None:
+            return self.responses.pop(0)
         return self.response
 
     async def generate_tool_completion(self, messages, tools):

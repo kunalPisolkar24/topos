@@ -33,6 +33,14 @@ class LLMError(Exception):
     """Raised when the LLM provider fails or returns an unexpected shape."""
 
 
+class EmptyCompletionError(LLMError):
+    """Provider answered 200 without usable content; safe to retry."""
+
+
+class ContentFilteredError(LLMError):
+    """Provider refused the prompt; retrying cannot help."""
+
+
 @dataclass(frozen=True)
 class TokenUsage:
     """Token counts reported by the provider for one completion call."""
@@ -131,6 +139,51 @@ def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in RETRYABLE_STATUSES
     return False
+
+
+def _describe_body(data: object) -> str:
+    """Summarize a malformed body for logs without echoing user content."""
+    if not isinstance(data, dict):
+        return f"type={type(data).__name__}"
+    try:
+        choice = (data.get("choices") or [{}])[0]
+        finish = choice.get("finish_reason") if isinstance(choice, dict) else None
+    except (IndexError, TypeError, AttributeError):
+        finish = None
+    keys = sorted(str(k) for k in data)
+    return f"keys={keys} finish_reason={finish}"
+
+
+def _parse_completion(data: object) -> str:
+    """Extract content from a chat-completion body or raise a typed error.
+
+    A deterministic content-filter refusal fails fast; anything else
+    malformed is an EmptyCompletionError so the caller can retry it like
+    a 5xx (the observed failure was a content-less 200 between healthy
+    responses).
+    """
+    try:
+        choices = data["choices"]  # type: ignore[index]
+        choice = choices[0]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise EmptyCompletionError(
+            f"malformed completion body ({_describe_body(data)})"
+        ) from exc
+    if not isinstance(choice, dict):
+        raise EmptyCompletionError(
+            f"malformed completion choice ({_describe_body(data)})"
+        )
+    if choice.get("finish_reason") == "content_filter":
+        raise ContentFilteredError("provider refused the prompt (content_filter)")
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        raise EmptyCompletionError(
+            f"malformed completion message ({_describe_body(data)})"
+        )
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise EmptyCompletionError(f"empty completion ({_describe_body(data)})")
+    return content
 
 
 class _StreamUsage:
@@ -240,11 +293,10 @@ class LLMClient:
         start = time.perf_counter()
         status = "error"
         try:
-            data = await self._post(payload, headers)
-            result = data["choices"][0]["message"]["content"]
+            result, usage = await self._complete_with_retries(payload, headers)
             status = "success"
             _record_tokens(
-                _parse_usage(data.get("usage")),
+                _parse_usage(usage),
                 method="completion",
                 prompt_chars=len(system) + len(user),
                 completion_chars=len(result),
@@ -379,6 +431,33 @@ class LLMClient:
         )
         response.raise_for_status()
         return response.json()
+
+    @retry(
+        stop=stop_after_attempt(MAX_ATTEMPTS),
+        wait=_wait_for_retry,
+        retry=retry_if_exception(lambda exc: isinstance(exc, EmptyCompletionError)),
+        before_sleep=_before_retry,
+        reraise=True,
+    )
+    async def _complete_with_retries(
+        self, payload: dict, headers: dict
+    ) -> tuple[str, dict | None]:
+        """Fetch one completion, retrying transient proxy anomalies.
+
+        A 200 without usable content (or without JSON at all) is retried
+        like a 5xx; deterministic refusals fail fast via _parse_completion.
+        """
+        try:
+            data = await self._post(payload, headers)
+        except ValueError as exc:
+            raise EmptyCompletionError("provider returned a non-JSON body") from exc
+        if not isinstance(data, dict):
+            raise EmptyCompletionError(
+                f"non-object completion body ({_describe_body(data)})"
+            )
+        content = _parse_completion(data)
+        usage = data.get("usage")
+        return content, usage if isinstance(usage, dict) else None
 
     async def close(self) -> None:
         await self._client.aclose()
