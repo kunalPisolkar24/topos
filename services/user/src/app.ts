@@ -17,7 +17,7 @@ import { logger } from './observability/logger.js';
 import { requestLogging, requestMetrics } from './observability/middleware.js';
 
 export async function buildApp(): Promise<Hono> {
-  const { metrics, userService } = createServices();
+  const { metrics, userService, rateLimiter } = createServices();
   const apollo = await createApolloServer();
 
   const app = new Hono();
@@ -35,7 +35,7 @@ export async function buildApp(): Promise<Hono> {
     return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500);
   });
 
-  app.post('/graphql', graphqlHandler({ apollo, userService, metrics }));
+  app.post('/graphql', graphqlHandler({ apollo, userService, metrics, rateLimiter }));
   app.get('/metrics', metricsHandler(metrics));
   app.get('/', (c) => c.text('user service running'));
   app.get('/health', healthHandler({ pingDb, pingRedis, metrics }));

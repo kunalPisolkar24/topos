@@ -5,7 +5,7 @@ import { Metrics } from '../observability/metrics.js';
 import { UserService } from '../user.service.js';
 
 const mocks = vi.hoisted(() => ({
-  env: { NODE_ENV: 'test', REDIS_CACHE_TTL_MS: 3600000 },
+  env: { NODE_ENV: 'test', LOG_LEVEL: 'info', REDIS_CACHE_TTL_MS: 3600000 },
 }));
 
 vi.mock('../config/env.js', () => ({ env: mocks.env }));

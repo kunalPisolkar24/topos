@@ -107,6 +107,24 @@ describe('Metrics', () => {
     );
   });
 
+  it('records rate limit decisions without identity labels', async () => {
+    const metrics = new Metrics();
+    metrics.recordRateLimitDecision('signin', 'allowed', 'redis');
+    metrics.recordRateLimitDecision('signin', 'rejected', 'memory');
+    metrics.setRateLimitBreakerState(1);
+    metrics.authInFlightInc();
+
+    const output = await metrics.getMetrics();
+    expect(output).toContain(
+      'ratelimit_decisions_total{policy="signin",decision="allowed",mode="redis"} 1',
+    );
+    expect(output).toContain(
+      'ratelimit_decisions_total{policy="signin",decision="rejected",mode="memory"} 1',
+    );
+    expect(output).toContain('ratelimit_breaker_state 1');
+    expect(output).toContain('ratelimit_auth_in_flight 1');
+  });
+
   it('exposes db pool connections from registered pools on scrape', async () => {
     const metrics = new Metrics();
     metrics.registerDbPools([{ node: 'primary', pool: fakePool({ total: 5, idle: 3, waiting: 1 }) }]);

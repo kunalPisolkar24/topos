@@ -4,10 +4,12 @@ import { createContext } from '../context.js';
 import { GraphqlTimeoutError, PayloadTooLargeError, ValidationError } from '../errors.js';
 import {
   extractErrorCodes,
+  extractRateLimitRetryAfter,
   hasErrors,
   operationName,
   sanitizeOperationName,
 } from '../graphql/formatError.js';
+import type { RateLimiter } from '../lib/rateLimit.js';
 import { type Metrics } from '../observability/metrics.js';
 import { isShuttingDown } from '../lib/shutdownState.js';
 import type { UserService } from '../user.service.js';
@@ -83,6 +85,7 @@ export interface GraphqlHandlerDeps {
   apollo: ApolloServer;
   userService: UserService;
   metrics: Metrics;
+  rateLimiter?: RateLimiter | null;
   timeoutMs?: number;
 }
 
@@ -90,6 +93,7 @@ export function graphqlHandler({
   apollo,
   userService,
   metrics,
+  rateLimiter = null,
   timeoutMs = GRAPHQL_OPERATION_TIMEOUT_MS,
 }: GraphqlHandlerDeps): MiddlewareHandler {
   return async (c) => {
@@ -105,7 +109,7 @@ export function graphqlHandler({
             search: new URL(c.req.url).search,
             body,
           },
-          context: () => createContext(c, userService),
+          context: () => createContext(c, userService, rateLimiter),
         }),
         timeoutMs,
       );
@@ -119,6 +123,14 @@ export function graphqlHandler({
       if (response.body.kind === 'complete' && hasBodyErrors) {
         for (const code of extractErrorCodes(response.body.string)) {
           metrics.recordGraphqlError(operation, code);
+        }
+        // Quota rejections leave Apollo as HTTP 200; surface the real
+        // 429 with Retry-After so clients can back off correctly.
+        const retryAfterMs = extractRateLimitRetryAfter(response.body.string);
+        if (retryAfterMs !== null) {
+          const headers = Object.fromEntries(response.headers);
+          headers['retry-after'] = String(Math.max(1, Math.ceil(retryAfterMs / 1000)));
+          return new Response(response.body.string, { status: 429, headers });
         }
       }
 

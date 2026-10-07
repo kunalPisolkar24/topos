@@ -98,6 +98,37 @@ with the same value at the same time.
 See [Caching and resilience](../concepts/caching-and-resilience.md) for what is
 and is not cached.
 
+## Rate limiting
+
+GraphQL operations are quota-checked against the same Redis before
+resolvers run. Every bucket is per `RATELIMIT_WINDOW_SECONDS` and keyed
+`rl:user:<policy>:<subject>`, where the subject is `u:<userID>` for
+authenticated requests and `ip:<clientIP>` otherwise.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `RATELIMIT_ENABLED` | `true` | `false` disables all quota checks |
+| `RATELIMIT_SIGNUP_PER_MIN` | `5` | Anonymous, IP-keyed — guards account farming |
+| `RATELIMIT_SIGNIN_PER_MIN` | `10` | Anonymous, IP-keyed — brute-force protection |
+| `RATELIMIT_MUTATIONS_PER_MIN` | `30` | `updateProfile`, user-keyed |
+| `RATELIMIT_READS_PER_MIN` | `120` | `me`, `user`, `users` |
+| `RATELIMIT_WINDOW_SECONDS` | `60` | Fixed window for every policy |
+| `RATELIMIT_DEGRADED_MULTIPLIER` | `2` | Memory-fallback headroom for ordinary policies |
+| `RATELIMIT_AUTH_DEGRADED_MULTIPLIER` | `1` | Memory-fallback multiplier for signup/signin (no headroom) |
+| `RATELIMIT_AUTH_CONCURRENCY` | `5` | Max concurrent signup/signin calls per replica (bcrypt bound) |
+| `RATELIMIT_REDIS_TIMEOUT_MS` | `150` | Per-call Redis budget; excess falls back to memory |
+| `RATELIMIT_MEMORY_MAX_ENTRIES` | `10000` | Bound on the process-local fallback table |
+
+While Redis is unreachable, ordinary quotas scale by
+`RATELIMIT_DEGRADED_MULTIPLIER` while signup/signin keep
+`RATELIMIT_AUTH_DEGRADED_MULTIPLIER` (same or lower, never higher) so
+an outage cannot weaken brute-force protection. Rejections return
+HTTP `429` with `Retry-After` and a `RATE_LIMITED` GraphQL error
+carrying `retryAfterMs` and `policy`. Federation `__resolveReference`
+calls are exempt — they are gateway-internal fan-in already gated by
+the content service. See [Caching and
+resilience](../concepts/caching-and-resilience.md#rate-limiting).
+
 ## Observability
 
 | Variable | Default | Notes |
@@ -161,6 +192,17 @@ at startup:
 | `USER_PG_POOL_MAX` | `PG_POOL_MAX` |
 | `USER_PG_POOL_IDLE_TIMEOUT_MS` | `PG_POOL_IDLE_TIMEOUT_MS` |
 | `USER_PG_POOL_CONNECTION_TIMEOUT_MS` | `PG_POOL_CONNECTION_TIMEOUT_MS` |
+| `USER_RATELIMIT_ENABLED` | `RATELIMIT_ENABLED` |
+| `USER_RATELIMIT_SIGNUP_PER_MIN` | `RATELIMIT_SIGNUP_PER_MIN` |
+| `USER_RATELIMIT_SIGNIN_PER_MIN` | `RATELIMIT_SIGNIN_PER_MIN` |
+| `USER_RATELIMIT_MUTATIONS_PER_MIN` | `RATELIMIT_MUTATIONS_PER_MIN` |
+| `USER_RATELIMIT_READS_PER_MIN` | `RATELIMIT_READS_PER_MIN` |
+| `USER_RATELIMIT_WINDOW_SECONDS` | `RATELIMIT_WINDOW_SECONDS` |
+| `USER_RATELIMIT_DEGRADED_MULTIPLIER` | `RATELIMIT_DEGRADED_MULTIPLIER` |
+| `USER_RATELIMIT_AUTH_DEGRADED_MULTIPLIER` | `RATELIMIT_AUTH_DEGRADED_MULTIPLIER` |
+| `USER_RATELIMIT_AUTH_CONCURRENCY` | `RATELIMIT_AUTH_CONCURRENCY` |
+| `USER_RATELIMIT_REDIS_TIMEOUT_MS` | `RATELIMIT_REDIS_TIMEOUT_MS` |
+| `USER_RATELIMIT_MEMORY_MAX_ENTRIES` | `RATELIMIT_MEMORY_MAX_ENTRIES` |
 
 > The alias is only applied when the canonical name is **not** already set. If
 > both `DATABASE_URL` and `USER_DATABASE_URL` exist, `DATABASE_URL` wins.
@@ -203,7 +245,6 @@ REDIS_URL=redis://user-redis:6379
 REDIS_CACHE_TTL_MS=3600000
 REDIS_MISSING_CACHE_TTL_MS=60000
 ```
-
 For host development, point `DATABASE_URL` and `REDIS_URL` at `localhost` (and
 `REDIS_URL` at port `6380`) instead of the compose hostnames — see
 [Quick start, path B](quickstart.md#path-b-run-on-the-host).
