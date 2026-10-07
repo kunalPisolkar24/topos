@@ -210,12 +210,15 @@ copy** — see [Error handling](../components/error-handling.md).
 | `mongo ping failed, retrying` | warn | Startup database retries |
 | `mongo unavailable, running in degraded mode` | warn | Booted with a lazy client |
 | `ai <op> failed, using fallback` | warn | Read path degraded |
+| `ratelimit: redis failed, using memory fallback` | warn | Limiter on process-local quotas; includes `policy`, never identity |
+| `ratelimit: rejected` | info | Quota exhausted; includes `policy` and `degraded` |
+| `ratelimit: ai concurrency exhausted` | info | AI semaphore full; retry shortly |
 | `recommend feed failed, serving recency fallback` | warn | Personalisation off |
 | `circuit breaker opened: <domain>` | — | (not logged; visible only as `content_ai_breaker_state`) |
 
 ## Metrics
 
-`GET /metrics` on every binary. There are **29 metrics**, all under the
+`GET /metrics` on every binary. There are **32 metrics**, all under the
 `content_` namespace. They are defined in
 [`internal/metrics/metrics.go`](../../internal/metrics/metrics.go).
 
@@ -264,9 +267,22 @@ distorts your traffic graphs.
 > `content_http_request_duration_seconds{route="/query"}` for latency.
 
 `content_graphql_errors_total{kind}` values: `unauthorized`,
-`forbidden`, `not_found`, `validation`, `conflict`, `client`,
-`internal`. Because GraphQL responses ride on HTTP 200, **this is the
+`forbidden`, `not_found`, `validation`, `conflict`, `rate_limited`,
+`client`, `internal`. Because GraphQL responses ride on HTTP 200, **this is the
 only signal that resolver failures are happening.**
+
+### Rate limiting
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `content_ratelimit_decisions_total` | counter | `policy` ∈ `reads`,`mutations`,`interactions`,`search`,`ai_expensive`; `decision` ∈ `allowed`,`rejected`; `mode` ∈ `redis`,`memory` |
+| `content_ratelimit_breaker_state` | gauge | — (0 closed, 1 open, 2 half-open) |
+| `content_ratelimit_ai_in_flight` | gauge | — (concurrent AI calls holding the semaphore) |
+
+`mode="memory"` means Redis was unreachable and the process-local
+fallback served the decision — the subject (user id or IP) is never a
+label. A rejected AI call never reaches the AI service: the quota is
+checked before the resolver runs.
 
 ### Cache
 
@@ -378,6 +394,8 @@ rate(content_posts_created_total[5m])
 | API not ready | `content_dependency_up{dep="db"} == 0` for 2 m | `/readyz` would be 503 |
 | Resolver failures | `sum(rate(content_graphql_errors_total{kind="internal"}[5m])) > 0.1` | Real bugs |
 | Cache breaker open | `content_cache_breaker_state == 1` for 5 m | Redis down; load shifting to Mongo |
+| Rate limiter degraded | `content_ratelimit_breaker_state == 1` for 5 m | Redis down; serving memory quotas |
+| Rate limit rejections | `sum(rate(content_ratelimit_decisions_total{decision="rejected"}[5m])) > 1` | Clients bursting; may need quota tuning |
 | AI breaker open | `content_ai_breaker_state == 1` for 10 m | AI outage |
 | Dead letters | `increase(content_worker_messages_total{result="dlq"}[15m]) > 0` | Background work failing |
 | Consumer falling behind | `content_worker_consumer_lag > 1000` | Backlog |

@@ -218,6 +218,54 @@ describe('graphqlHandler', () => {
     expect(output).toContain('graphql_operations_total{operation="unknown",status="error"} 1');
     expect(output).not.toContain('randomName-12345');
   });
+
+  it('rewrites rate-limited responses to 429 with a Retry-After header', async () => {
+    const metrics = new Metrics();
+    const app = buildApp(
+      fakeApollo({
+        body: {
+          kind: 'complete',
+          string:
+            '{"data":null,"errors":[{"message":"Rate limited, retry after 3s","extensions":{"code":"RATE_LIMITED","retryAfterMs":2500,"policy":"signin"}}]}',
+        },
+      }),
+      metrics,
+    );
+
+    const res = await app.request('/graphql', {
+      method: 'POST',
+      body: JSON.stringify({ query: 'mutation { signin }', operationName: 'signin' }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('3');
+    const output = await metrics.getMetrics();
+    expect(output).toContain('graphql_errors_total{operation="signin",code="RATE_LIMITED"} 1');
+  });
+
+  it('leaves non-rate-limited errors on HTTP 200', async () => {
+    const metrics = new Metrics();
+    const app = buildApp(
+      fakeApollo({
+        body: {
+          kind: 'complete',
+          string:
+            '{"data":null,"errors":[{"message":"bad creds","extensions":{"code":"INVALID_CREDENTIALS"}}]}',
+        },
+      }),
+      metrics,
+    );
+
+    const res = await app.request('/graphql', {
+      method: 'POST',
+      body: JSON.stringify({ query: 'mutation { signin }', operationName: 'signin' }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('retry-after')).toBeNull();
+  });
 });
 
 describe('healthHandler', () => {

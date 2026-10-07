@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GraphQLError, type GraphQLFormattedError } from 'graphql';
-import { formatError, hasErrors, operationName, sanitizeOperationName } from '../formatError.js';
-import { ValidationError } from '../../errors.js';
+import {
+  extractRateLimitRetryAfter,
+  formatError,
+  hasErrors,
+  operationName,
+  sanitizeOperationName,
+} from '../formatError.js';
+import { RateLimitedError, ValidationError } from '../../errors.js';
 
 const mocks = vi.hoisted(() => ({
   env: { NODE_ENV: 'test', LOG_LEVEL: 'info' },
@@ -43,6 +49,41 @@ describe('formatError', () => {
       message: 'Internal server error',
       extensions: { code: 'INTERNAL_ERROR' },
     });
+  });
+
+  it('exposes rate limit metadata for backoff', () => {
+    const domain = new RateLimitedError('signin', 2500);
+    const error = new GraphQLError('unused', { originalError: domain });
+
+    const formatted = formatError({ message: 'unused', path: ['signin'] }, error);
+
+    expect(formatted).toEqual({
+      message: 'Rate limited, retry after 3s',
+      path: ['signin'],
+      extensions: { code: 'RATE_LIMITED', retryAfterMs: 2500, policy: 'signin' },
+    });
+  });
+});
+
+describe('extractRateLimitRetryAfter', () => {
+  it('returns the longest retry delay across rate-limited errors', () => {
+    const body = JSON.stringify({
+      errors: [
+        { extensions: { code: 'RATE_LIMITED', retryAfterMs: 1000 } },
+        { extensions: { code: 'RATE_LIMITED', retryAfterMs: 2500 } },
+        { extensions: { code: 'INVALID_CREDENTIALS' } },
+      ],
+    });
+
+    expect(extractRateLimitRetryAfter(body)).toBe(2500);
+  });
+
+  it('returns null when nothing is rate limited', () => {
+    expect(extractRateLimitRetryAfter('{"data":{}}')).toBeNull();
+    expect(
+      extractRateLimitRetryAfter('{"errors":[{"extensions":{"code":"INVALID_CREDENTIALS"}}]}'),
+    ).toBeNull();
+    expect(extractRateLimitRetryAfter('not-json')).toBeNull();
   });
 });
 

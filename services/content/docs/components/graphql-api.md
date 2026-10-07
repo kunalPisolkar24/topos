@@ -47,10 +47,17 @@ response with what you sent. See
 `not found` **error**, not `null`. The schema's nullability reflects Go's
 `*domain.Post`, not the runtime behaviour.
 
-### 3. Errors carry no code
+### 3. Errors carry no code — except rate limits
 
 Only `message`, `path`, and `extensions.request_id` reach the client.
 See [Error handling](error-handling.md).
+
+Quota rejection is the exception: it returns
+`extensions.code: "RATE_LIMITED"` with `retryAfterMs` and the tripped
+`policy`, plus a `Retry-After` response header. Per-minute quotas are
+120 reads, 30 mutations, 60 interactions, 30 search, 10 expensive-AI
+(drafting, generation, chat) — see
+[Configuration](../getting-started/configuration.md#rate-limiting).
 
 ### 4. AI-backed fields degrade rather than fail
 
@@ -455,7 +462,10 @@ if (json.errors?.length) {
   else if (message === "not found") showMissing();
   else if (message.startsWith("validation error:")) showValidationError(message);
   else if (message.startsWith("AI service is temporarily unavailable")) showRetryLater();
-  else reportServerIssue(message, requestId);   // includes "internal error"
+  else if (json.errors[0].extensions?.code === "RATE_LIMITED") {
+    const waitMs = json.errors[0].extensions.retryAfterMs ?? 1000;
+    await sleep(waitMs); // then retry the same operation
+  } else reportServerIssue(message, requestId);   // includes "internal error"
 }
 ```
 
