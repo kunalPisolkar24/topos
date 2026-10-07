@@ -4,13 +4,18 @@ import type { UserService } from '../user.service.js';
 
 const mocks = vi.hoisted(() => ({
   verifyToken: vi.fn(),
+  env: { NODE_ENV: 'test', LOG_LEVEL: 'info' },
 }));
 
 vi.mock('../utils/token.js', () => ({ verifyToken: mocks.verifyToken }));
+vi.mock('../config/env.js', () => ({ env: mocks.env }));
 
 const makeHonoContext = (header: string | undefined) =>
   ({
-    req: { header: vi.fn().mockReturnValue(header) },
+    req: {
+      header: vi.fn((name: string) => (name === 'authorization' ? header : undefined)),
+      raw: {},
+    },
   }) as unknown as Parameters<typeof createContext>[0];
 
 const userService = {} as UserService;
@@ -27,6 +32,8 @@ describe('createContext', () => {
     expect(ctx.userService).toBe(userService);
     expect(ctx.visibleEmails).toBeInstanceOf(Set);
     expect(ctx.visibleEmails.size).toBe(0);
+    expect(ctx.rateLimiter).toBeNull();
+    expect(ctx.clientIp).toBe('unknown');
     expect(mocks.verifyToken).not.toHaveBeenCalled();
   });
 

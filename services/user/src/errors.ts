@@ -70,6 +70,17 @@ export class GraphqlTimeoutError extends DomainError {
   }
 }
 
+export class RateLimitedError extends DomainError {
+  readonly code = 'RATE_LIMITED';
+  readonly httpStatus = 429;
+  constructor(
+    readonly policy: string,
+    readonly retryAfterMs: number,
+  ) {
+    super(`Rate limited, retry after ${Math.max(1, Math.ceil(Math.max(0, retryAfterMs) / 1000))}s`);
+  }
+}
+
 const CONNECTION_ESTABLISHMENT_PATTERN =
   /ECONNREFUSED|ETIMEDOUT|Connection pool timeout|connect ECONNREFUSED/i;
 

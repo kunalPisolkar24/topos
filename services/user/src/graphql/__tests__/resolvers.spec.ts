@@ -1,7 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { resolvers } from '../resolvers.js';
-import { UnauthorizedError, UserNotFoundError, ValidationError } from '../../errors.js';
+import {
+  RateLimitedError,
+  UnauthorizedError,
+  UserNotFoundError,
+  ValidationError,
+} from '../../errors.js';
 import type { GraphQLContext } from '../../context.js';
+import type { RateLimiter } from '../../lib/rateLimit.js';
+
+const mocks = vi.hoisted(() => ({
+  env: { NODE_ENV: 'test', LOG_LEVEL: 'info' },
+}));
+
+vi.mock('../../config/env.js', () => ({ env: mocks.env }));
 
 type UserServiceLike = GraphQLContext['userService'];
 
@@ -15,15 +27,17 @@ const makeContext = (overrides: Partial<GraphQLContext> = {}): GraphQLContext =>
     signin: vi.fn(),
     updateProfile: vi.fn(),
   } as unknown as UserServiceLike,
+  rateLimiter: null,
+  clientIp: 'test-client',
   visibleEmails: new Set<string>(),
   ...overrides,
 });
 
 describe('Query.me', () => {
-  it('returns null when unauthenticated', () => {
+  it('returns null when unauthenticated', async () => {
     const ctx = makeContext();
 
-    expect(resolvers.Query.me(null, {}, ctx)).toBeNull();
+    await expect(resolvers.Query.me(null, {}, ctx)).resolves.toBeNull();
     expect(ctx.userService.findById).not.toHaveBeenCalled();
   });
 
@@ -95,12 +109,12 @@ describe('Query.users', () => {
     expect(ctx.userService.findAll).toHaveBeenCalledWith({ limit: 20, cursor });
   });
 
-  it('rejects a malformed cursor with a validation error', () => {
+  it('rejects a malformed cursor with a validation error', async () => {
     const ctx = makeContext();
 
-    expect(() =>
+    await expect(
       resolvers.Query.users(null, { limit: 20, cursor: 'not-a-uuid' }, ctx),
-    ).toThrow(ValidationError);
+    ).rejects.toBeInstanceOf(ValidationError);
     expect(ctx.userService.findAll).not.toHaveBeenCalled();
   });
 });
@@ -193,10 +207,10 @@ describe('User.email visibility', () => {
 });
 
 describe('Mutation.updateProfile', () => {
-  it('throws UnauthorizedError when unauthenticated', () => {
+  it('throws UnauthorizedError when unauthenticated', async () => {
     const ctx = makeContext();
 
-    expect(() => resolvers.Mutation.updateProfile(null, { name: 'Alice' }, ctx)).toThrow(
+    await expect(resolvers.Mutation.updateProfile(null, { name: 'Alice' }, ctx)).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
     expect(ctx.userService.updateProfile).not.toHaveBeenCalled();
@@ -256,5 +270,109 @@ describe('User.email', () => {
 
   it('returns null to other users', () => {
     expect(resolvers.User.email(user, {}, makeContext({ user: { id: 'u2' } }))).toBeNull();
+  });
+});
+
+function stubLimiter(
+  overrides: Partial<Pick<RateLimiter, 'check' | 'guardAuth'>> = {},
+): RateLimiter {
+  return {
+    check: vi.fn(async () => ({ allowed: true, retryAfterMs: 0, degraded: false })),
+    guardAuth: vi.fn(async () => ({
+      decision: { allowed: true, retryAfterMs: 0, degraded: false },
+      release: vi.fn(),
+    })),
+    ...overrides,
+  } as unknown as RateLimiter;
+}
+
+describe('rate limiting', () => {
+  it('rejects reads before touching the service when the quota is exhausted', async () => {
+    const rateLimiter = stubLimiter({
+      check: vi.fn(async () => ({ allowed: false, retryAfterMs: 2500, degraded: false })),
+    });
+    const ctx = makeContext({ rateLimiter, clientIp: '9.9.9.9' });
+
+    const error = await resolvers.Query.me(null, {}, ctx).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RateLimitedError);
+    expect((error as RateLimitedError).retryAfterMs).toBe(2500);
+    expect(ctx.userService.findById).not.toHaveBeenCalled();
+    expect(rateLimiter.check).toHaveBeenCalledWith('reads', 'ip:9.9.9.9');
+  });
+
+  it('keys authenticated reads by user id', async () => {
+    const rateLimiter = stubLimiter();
+    const ctx = makeContext({ user: { id: 'u1' }, rateLimiter, clientIp: '9.9.9.9' });
+    vi.mocked(ctx.userService.findById).mockResolvedValue({ id: 'u1' } as never);
+
+    await resolvers.Query.me(null, {}, ctx);
+
+    expect(rateLimiter.check).toHaveBeenCalledWith('reads', 'u:u1');
+  });
+
+  it('rejects signup before validation and bcrypt when exhausted', async () => {
+    const rateLimiter = stubLimiter({
+      guardAuth: vi.fn(async () => ({
+        decision: { allowed: false, retryAfterMs: 1000, degraded: false },
+        release: null,
+      })),
+    });
+    const ctx = makeContext({ rateLimiter, clientIp: '1.2.3.4' });
+
+    await expect(
+      resolvers.Mutation.signup(null, { email: 'not-an-email' }, ctx),
+    ).rejects.toBeInstanceOf(RateLimitedError);
+    expect(ctx.userService.signup).not.toHaveBeenCalled();
+    expect(rateLimiter.guardAuth).toHaveBeenCalledWith('signup', 'ip:1.2.3.4');
+  });
+
+  it('releases the auth slot after signup completes', async () => {
+    const release = vi.fn();
+    const rateLimiter = stubLimiter({
+      guardAuth: vi.fn(async () => ({
+        decision: { allowed: true, retryAfterMs: 0, degraded: false },
+        release,
+      })),
+    });
+    const ctx = makeContext({ rateLimiter, clientIp: '1.2.3.4' });
+    vi.mocked(ctx.userService.signup).mockResolvedValue({ token: 't', user: null } as never);
+
+    await resolvers.Mutation.signup(
+      null,
+      { email: 'alice@example.com', username: 'alice', password: 'password-1234' },
+      ctx,
+    );
+
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the auth slot when signin fails', async () => {
+    const release = vi.fn();
+    const rateLimiter = stubLimiter({
+      guardAuth: vi.fn(async () => ({
+        decision: { allowed: true, retryAfterMs: 0, degraded: false },
+        release,
+      })),
+    });
+    const ctx = makeContext({ rateLimiter, clientIp: '1.2.3.4' });
+    vi.mocked(ctx.userService.signin).mockRejectedValue(new Error('db down'));
+
+    await expect(
+      resolvers.Mutation.signin(null, { email: 'a@b.co', password: 'password-1234' }, ctx),
+    ).rejects.toThrow('db down');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks the mutations quota for updateProfile after auth', async () => {
+    const rateLimiter = stubLimiter({
+      check: vi.fn(async () => ({ allowed: false, retryAfterMs: 500, degraded: false })),
+    });
+    const ctx = makeContext({ user: { id: 'u1' }, rateLimiter, clientIp: '9.9.9.9' });
+
+    await expect(resolvers.Mutation.updateProfile(null, { name: 'x' }, ctx)).rejects.toBeInstanceOf(
+      RateLimitedError,
+    );
+    expect(rateLimiter.check).toHaveBeenCalledWith('mutations', 'u:u1');
+    expect(ctx.userService.updateProfile).not.toHaveBeenCalled();
   });
 });

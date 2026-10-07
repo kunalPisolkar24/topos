@@ -129,6 +129,17 @@ const USER_ALIASES: Record<string, string> = {
   USER_PG_POOL_MAX: 'PG_POOL_MAX',
   USER_PG_POOL_IDLE_TIMEOUT_MS: 'PG_POOL_IDLE_TIMEOUT_MS',
   USER_PG_POOL_CONNECTION_TIMEOUT_MS: 'PG_POOL_CONNECTION_TIMEOUT_MS',
+  USER_RATELIMIT_ENABLED: 'RATELIMIT_ENABLED',
+  USER_RATELIMIT_SIGNUP_PER_MIN: 'RATELIMIT_SIGNUP_PER_MIN',
+  USER_RATELIMIT_SIGNIN_PER_MIN: 'RATELIMIT_SIGNIN_PER_MIN',
+  USER_RATELIMIT_MUTATIONS_PER_MIN: 'RATELIMIT_MUTATIONS_PER_MIN',
+  USER_RATELIMIT_READS_PER_MIN: 'RATELIMIT_READS_PER_MIN',
+  USER_RATELIMIT_WINDOW_SECONDS: 'RATELIMIT_WINDOW_SECONDS',
+  USER_RATELIMIT_DEGRADED_MULTIPLIER: 'RATELIMIT_DEGRADED_MULTIPLIER',
+  USER_RATELIMIT_AUTH_DEGRADED_MULTIPLIER: 'RATELIMIT_AUTH_DEGRADED_MULTIPLIER',
+  USER_RATELIMIT_AUTH_CONCURRENCY: 'RATELIMIT_AUTH_CONCURRENCY',
+  USER_RATELIMIT_REDIS_TIMEOUT_MS: 'RATELIMIT_REDIS_TIMEOUT_MS',
+  USER_RATELIMIT_MEMORY_MAX_ENTRIES: 'RATELIMIT_MEMORY_MAX_ENTRIES',
 };
 for (const [aliased, canonical] of Object.entries(USER_ALIASES)) {
   if (process.env[aliased] && !process.env[canonical]) {
@@ -161,6 +172,23 @@ const envSchema = z.object({
     .preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   REDIS_CACHE_TTL_MS: z.coerce.number().int().positive().default(3600000),
   REDIS_MISSING_CACHE_TTL_MS: z.coerce.number().int().positive().default(60000),
+  // Rate limiting quotas (SSM /topos/user/config in prod). Per-operation
+  // policies share one fixed window; keys expire via PEXPIRE. Signup and
+  // signin stay strict because they guard bcrypt and brute-force abuse.
+  RATELIMIT_ENABLED: z.preprocess(
+    (v) => (v === undefined || v === '' ? true : v === 'false' || v === '0' || v === false ? false : true),
+    z.boolean(),
+  ),
+  RATELIMIT_SIGNUP_PER_MIN: z.coerce.number().int().positive().default(5),
+  RATELIMIT_SIGNIN_PER_MIN: z.coerce.number().int().positive().default(10),
+  RATELIMIT_MUTATIONS_PER_MIN: z.coerce.number().int().positive().default(30),
+  RATELIMIT_READS_PER_MIN: z.coerce.number().int().positive().default(120),
+  RATELIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+  RATELIMIT_DEGRADED_MULTIPLIER: z.coerce.number().int().min(1).default(2),
+  RATELIMIT_AUTH_DEGRADED_MULTIPLIER: z.coerce.number().int().min(1).default(1),
+  RATELIMIT_AUTH_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  RATELIMIT_REDIS_TIMEOUT_MS: z.coerce.number().int().positive().default(150),
+  RATELIMIT_MEMORY_MAX_ENTRIES: z.coerce.number().int().positive().default(10000),
   AWS_REGION: z.string().default('ap-south-1'),
   AWS_ENDPOINT_URL: z
     .preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),

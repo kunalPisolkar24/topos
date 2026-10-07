@@ -85,6 +85,67 @@ during the sweep is not.
 > `SCAN`, not `KEYS`: `KEYS` blocks Redis for the duration of a full-keyspace
 > scan. `SCAN` iterates incrementally and stays safe on a shared instance.
 
+## Rate limiting
+
+Unlike the cache, the rate limiter treats Redis as **authoritative**:
+quotas must hold across replicas, so counting happens in Redis with an
+atomic Lua fixed-window counter (`INCR` + `PEXPIRE` in one script).
+Every GraphQL operation costs one unit from its policy bucket before
+the resolver — and therefore before bcrypt — runs.
+
+```mermaid
+graph TD
+    A[operation arrives] --> B{limiter enabled?}
+    B -->|no| C[run resolver]
+    B -->|yes| D{breaker open?}
+    D -->|no| E[Lua INCR + PEXPIRE<br/>150ms budget]
+    E -->|ok| F{under quota?}
+    F -->|yes| C
+    F -->|no| G[429 RATE_LIMITED + Retry-After]
+    E -->|redis down| H[memory fallback]
+    D -->|yes| H
+    H --> I{under fallback quota?}
+    I -->|yes| C
+    I -->|no| G
+```
+
+### Policies and keys
+
+| Policy | Operations | Default/min | Subject |
+| --- | --- | --- | --- |
+| `signup` | `signup` | 5 | `ip:<clientIP>` |
+| `signin` | `signin` | 10 | `ip:<clientIP>` |
+| `mutations` | `updateProfile` | 30 | `u:<userID>` |
+| `reads` | `me`, `user`, `users` | 120 | `u:<userID>` or `ip:<clientIP>` |
+
+Keys look like `rl:user:signin:ip:203.0.113.7` and expire via `PEXPIRE`,
+so they cannot grow unbounded. The `rl:user:` prefix never collides
+with cache keys (`user:*`, `users:*`). Federation `__resolveReference`
+calls are exempt: they are gateway-internal fan-in from content list
+pages, already gated by the content service's own limits.
+
+Signup and signin additionally hold one of 5 per-replica concurrency
+slots for the bcrypt call, bounding CPU burn during a flood even when
+quotas have headroom elsewhere.
+
+### Redis outage: strict fallback for auth
+
+The limiter keeps its own breaker (3 failures / 10 s, request-driven
+recovery — no background loop). While open, a bounded process-local
+table (default 10 000 entries, expiry eviction, fail-open when full)
+serves quotas:
+
+| Traffic | Fallback quota | Why |
+| --- | --- | --- |
+| Reads, `updateProfile` | Base × `RATELIMIT_DEGRADED_MULTIPLIER` (default 2×) | Preserve availability, still damp bursts |
+| `signup`, `signin` | Base × `RATELIMIT_AUTH_DEGRADED_MULTIPLIER` (default 1×) | An outage must not weaken brute-force protection |
+
+Fallback decisions are counted as
+`ratelimit_decisions_total{mode="memory"}` and the breaker state is
+exported as `ratelimit_breaker_state` (0 closed, 1 open, 2 half-open),
+so degraded mode is observable without ever logging emails, user IDs,
+or IPs.
+
 ## Resilience to Postgres
 
 The repository wraps **every** operation with three independent defences

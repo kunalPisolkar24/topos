@@ -21,6 +21,7 @@ Defined in [`src/errors.ts`](../../src/errors.ts):
 | `PayloadTooLargeError` | `PAYLOAD_TOO_LARGE` | 413 | Request body exceeds 256 KB |
 | `ServiceUnavailableError` | `SERVICE_UNAVAILABLE` | 503 | Postgres unreachable, pool timeout, or a query exceeded 7 s |
 | `GraphqlTimeoutError` | `GRAPHQL_TIMEOUT` | 504 | The whole operation exceeded 10 s |
+| `RateLimitedError` | `RATE_LIMITED` | 429 | Quota exhausted; `extensions` also carries `retryAfterMs` and `policy`, and the response sets `Retry-After` |
 | `DomainError` (base) | — | — | Abstract; never instantiated directly |
 
 Anything else becomes `INTERNAL_ERROR`. The message for those is always the
@@ -31,6 +32,11 @@ but never sent to the client.
 > GraphQL, the response body is still `200` with an `errors[]` array; the code
 > travels in `errors[].extensions.code`. Non-GraphQL routes return real status
 > codes (see [HTTP errors](#http-errors-outside-graphql)).
+>
+> The one exception is quota rejection: when every error in the response is
+> `RATE_LIMITED`, the handler rewrites the response to a real HTTP `429` with
+> a `Retry-After` header (seconds, from the longest `retryAfterMs`), so
+> clients can back off without parsing the body.
 
 ## Where an error surfaces
 

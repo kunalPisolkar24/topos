@@ -21,6 +21,8 @@ function makeContext(overrides: Partial<GraphQLContext> = {}): GraphQLContext {
       signin: vi.fn(),
       updateProfile: vi.fn(),
     } as unknown as UserServiceLike,
+    rateLimiter: null,
+    clientIp: 'test-client',
     visibleEmails: new Set<string>(),
     ...overrides,
   };
