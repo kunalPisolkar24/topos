@@ -105,6 +105,9 @@ label cardinality stays bounded regardless of what clients send.
 | `redis_connected` | gauge | — | `1` connected, `0` not (or no client configured) |
 | `dependency_up` | gauge | `dep` | `db` / `redis` reachability from the last ping |
 | `dependency_ping_duration_seconds` | histogram | `dep` | Probe latency |
+| `ratelimit_decisions_total` | counter | `policy`, `decision`, `mode` | Quota verdicts: `signup`/`signin`/`mutations`/`reads` × `allowed`/`rejected` × `redis`/`memory` |
+| `ratelimit_breaker_state` | gauge | — | `0` redis authoritative, `1` memory fallback, `2` probing |
+| `ratelimit_auth_in_flight` | gauge | — | Signup/signin calls currently holding a bcrypt slot |
 
 ### Business level
 
@@ -200,6 +203,8 @@ you can jump from a slow request log entry to its trace.
 | Dependency down | `dependency_up == 0` for > 2 m | DB or Redis outage |
 | Elevated error rate | `rate(graphql_errors_total[5m])` above baseline | User-visible failures |
 | Signin failure spike | `rate(user_signin_failures_total[5m])` | Credential-stuffing attempt |
+| Rate limiter degraded | `ratelimit_breaker_state == 1` for > 5 m | Redis down; serving memory quotas |
+| Auth rate rejections | `rate(ratelimit_decisions_total{decision="rejected"}[5m])` sustained | Flood or quotas too tight; correlate with signin failures |
 | Cache degrading | `cache_operations_total{result="read_error"}` climbing | Redis failing; load shifting to Postgres |
 | Pool saturation | `db_pool_connections{state="waiting"} > 0` sustained | `PG_POOL_MAX` too low or queries too slow |
 | Latency | `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))` | Regression in user experience |

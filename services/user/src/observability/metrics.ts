@@ -6,6 +6,8 @@ import { env } from '../config/env.js';
 export type CacheReadResult = 'hit' | 'miss' | 'read_error' | 'write_error';
 export type CacheInvalidationResult = 'ok' | 'error';
 export type DbQueryStatus = 'success' | 'error';
+export type RateLimitDecision = 'allowed' | 'rejected';
+export type RateLimitMode = 'redis' | 'memory';
 
 const HTTP_DURATION_BUCKETS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5];
 
@@ -125,6 +127,22 @@ export class Metrics {
     help: 'Total number of failed signin attempts',
   });
 
+  private readonly ratelimitDecisions = new client.Counter({
+    name: 'ratelimit_decisions_total',
+    help: 'Rate limiter decisions by policy, decision and mode (redis authoritative, memory fallback)',
+    labelNames: ['policy', 'decision', 'mode'],
+  });
+
+  private readonly ratelimitBreakerState = new client.Gauge({
+    name: 'ratelimit_breaker_state',
+    help: 'Rate limiter breaker state (0 closed/redis, 1 open/memory fallback, 2 half-open/probing)',
+  });
+
+  private readonly ratelimitAuthInFlight = new client.Gauge({
+    name: 'ratelimit_auth_in_flight',
+    help: 'Signup/signin operations currently holding the bcrypt concurrency slot',
+  });
+
   constructor() {
     if (env.NODE_ENV !== 'test') {
       client.collectDefaultMetrics();
@@ -228,6 +246,22 @@ export class Metrics {
 
   recordSigninFailure(): void {
     this.signinFailures.inc();
+  }
+
+  recordRateLimitDecision(policy: string, decision: RateLimitDecision, mode: RateLimitMode): void {
+    this.ratelimitDecisions.inc({ policy, decision, mode });
+  }
+
+  setRateLimitBreakerState(state: 0 | 1 | 2): void {
+    this.ratelimitBreakerState.set(state);
+  }
+
+  authInFlightInc(): void {
+    this.ratelimitAuthInFlight.inc();
+  }
+
+  authInFlightDec(): void {
+    this.ratelimitAuthInFlight.dec();
   }
 
   getContentType(): string {

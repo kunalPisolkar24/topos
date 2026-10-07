@@ -102,6 +102,36 @@ construct no cache client — in practice that means `WITH_REDIS=0` in
 Compose, or simply an unreachable `REDIS_ADDR` (the breaker opens and
 reads fall through to Mongo).
 
+## Rate limiting
+
+GraphQL operations are quota-checked against the same shared Redis
+before resolvers run. Every bucket is per `RATELIMIT_WINDOW_SECONDS`
+and keyed `rl:content:<policy>:<subject>`, where the subject is
+`u:<userID>` for authenticated requests and `ip:<clientIP>` otherwise.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `RATELIMIT_ENABLED` | `true` | `false` disables all quota checks |
+| `RATELIMIT_READS_PER_MIN` | `120` | `posts`, `post`, `tags`, `postsByTag`, chats, draft queues, `User.posts`, federation `_entities` |
+| `RATELIMIT_MUTATIONS_PER_MIN` | `30` | `create/update/deletePost`, chat CRUD, human-authored drafts |
+| `RATELIMIT_INTERACTIONS_PER_MIN` | `60` | `recordPostView`, `likePost`, `savePost` |
+| `RATELIMIT_SEARCH_PER_MIN` | `30` | `searchPosts`, `recommendedPosts` |
+| `RATELIMIT_AI_PER_MIN` | `10` | `generateTags`, `generatePostContent`, `createPostDraft`, `approve/rejectPostDraft`, `askChat` |
+| `RATELIMIT_WINDOW_SECONDS` | `60` | Fixed window for every policy |
+| `RATELIMIT_DEGRADED_MULTIPLIER` | `2` | Memory-fallback headroom for ordinary policies |
+| `RATELIMIT_AI_DEGRADED_MULTIPLIER` | `1` | Memory-fallback multiplier for AI (no headroom by default) |
+| `RATELIMIT_AI_CONCURRENCY` | `5` | Max concurrent AI calls per replica, always enforced |
+| `RATELIMIT_REDIS_TIMEOUT_MS` | `150` | Per-call Redis budget; excess falls back to memory |
+| `RATELIMIT_MEMORY_MAX_ENTRIES` | `10000` | Bound on the process-local fallback table |
+
+While Redis is unreachable, ordinary quotas scale by
+`RATELIMIT_DEGRADED_MULTIPLIER` and AI keeps
+`RATELIMIT_AI_DEGRADED_MULTIPLIER` (same or lower, never higher), plus
+the concurrency cap. Rejections return a `RATE_LIMITED` GraphQL error
+with `retryAfterMs` and a `Retry-After` header. See [Caching and
+resilience](../concepts/caching-and-resilience.md#rate-limiting) for
+the fallback design.
+
 ## Kafka
 
 | Variable | Default | Used by |
@@ -170,7 +200,8 @@ failure rather than silently weak auth.
 
 ## `CONTENT_*` aliases
 
-Only these nine are recognised:
+Only these aliases are recognised (rate limiting included so the
+full local stack can keep its own prefixed names):
 
 | Alias | Canonical |
 | --- | --- |
@@ -183,6 +214,18 @@ Only these nine are recognised:
 | `CONTENT_AI_SERVICE_URL` | `AI_SERVICE_URL` |
 | `CONTENT_KAFKA_BROKERS` | `KAFKA_BROKERS` |
 | `CONTENT_KAFKA_TOPIC` | `KAFKA_TOPIC` |
+| `CONTENT_RATELIMIT_ENABLED` | `RATELIMIT_ENABLED` |
+| `CONTENT_RATELIMIT_READS_PER_MIN` | `RATELIMIT_READS_PER_MIN` |
+| `CONTENT_RATELIMIT_MUT_PER_MIN` | `RATELIMIT_MUTATIONS_PER_MIN` |
+| `CONTENT_RATELIMIT_INTERACT_PER_MIN` | `RATELIMIT_INTERACTIONS_PER_MIN` |
+| `CONTENT_RATELIMIT_SEARCH_PER_MIN` | `RATELIMIT_SEARCH_PER_MIN` |
+| `CONTENT_RATELIMIT_AI_PER_MIN` | `RATELIMIT_AI_PER_MIN` |
+| `CONTENT_RATELIMIT_WINDOW_SECONDS` | `RATELIMIT_WINDOW_SECONDS` |
+| `CONTENT_RATELIMIT_DEGRADED_MULT` | `RATELIMIT_DEGRADED_MULTIPLIER` |
+| `CONTENT_RATELIMIT_AI_DEGRADED_MULT` | `RATELIMIT_AI_DEGRADED_MULTIPLIER` |
+| `CONTENT_RATELIMIT_AI_CONCURRENCY` | `RATELIMIT_AI_CONCURRENCY` |
+| `CONTENT_RATELIMIT_REDIS_TIMEOUT_MS` | `RATELIMIT_REDIS_TIMEOUT_MS` |
+| `CONTENT_RATELIMIT_MEMORY_MAX` | `RATELIMIT_MEMORY_MAX_ENTRIES` |
 
 There is **no** alias for `KAFKA_DLQ_TOPIC`, the consumer group IDs,
 `KAFKA_USER_INTERACTED_TOPIC`, `LOG_*`, `WORKER_CONCURRENCY`, or
@@ -240,6 +283,18 @@ KAFKA_SEARCH_CONSUMER_GROUP_ID=content-search-worker-group
 KAFKA_PERSONALIZER_CONSUMER_GROUP_ID=content-personalizer-worker-group
 KAFKA_DLQ_TOPIC=posts-dlq
 WORKER_CONCURRENCY=3
+RATELIMIT_ENABLED=true
+RATELIMIT_READS_PER_MIN=120
+RATELIMIT_MUTATIONS_PER_MIN=30
+RATELIMIT_INTERACTIONS_PER_MIN=60
+RATELIMIT_SEARCH_PER_MIN=30
+RATELIMIT_AI_PER_MIN=10
+RATELIMIT_WINDOW_SECONDS=60
+RATELIMIT_DEGRADED_MULTIPLIER=2
+RATELIMIT_AI_DEGRADED_MULTIPLIER=1
+RATELIMIT_AI_CONCURRENCY=5
+RATELIMIT_REDIS_TIMEOUT_MS=150
+RATELIMIT_MEMORY_MAX_ENTRIES=10000
 ```
 
 Notice it omits `JWT_ISSUER`, `JWT_AUDIENCE`, `LOG_*`,

@@ -99,7 +99,7 @@ func TestReadyKafkaDownStillReady(t *testing.T) {
 
 func TestHandlerRoutes(t *testing.T) {
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name       string
@@ -125,7 +125,7 @@ func TestHandlerRoutes(t *testing.T) {
 func TestHandlerQueryExecutesResolver(t *testing.T) {
 	resolver := newResolverWithMocks(t)
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, resolver, nil, nil, nil)
+	h := newHandler(cfg, resolver, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/query",
 		bytes.NewBufferString(`{"query":"{ posts { posts { id } } }"}`))
@@ -139,7 +139,7 @@ func TestHandlerQueryExecutesResolver(t *testing.T) {
 
 func TestHandlerSetsRequestID(t *testing.T) {
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestMetricsExposeInteractionCounter(t *testing.T) {
 	metrics.InteractionsTotal.WithLabelValues("view", "published").Inc()
 
 	cfg := config.Config{JwtSecret: "test-secret"}
-	h := newHandler(cfg, nil, nil, nil, nil)
+	h := newHandler(cfg, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()

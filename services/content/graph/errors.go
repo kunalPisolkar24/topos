@@ -16,6 +16,16 @@ import (
 // the error presenter can classify them without string matching.
 const errorKindExtension = "kind"
 
+// rateLimitExtensions are the machine-readable fields a rate-limited
+// response carries. kind stays rate_limited for metrics; code is the
+// stable wire contract clients branch on.
+const (
+	rateLimitCodeExtension       = "code"
+	rateLimitRetryAfterExtension = "retryAfterMs"
+	rateLimitPolicyExtension     = "policy"
+	rateLimitCodeValue           = "RATE_LIMITED"
+)
+
 // mapDomainError converts a service error into a client-safe GraphQL
 // error. Unexpected errors keep a generic message and the original error
 // is preserved (wrapped) so the presenter can log it.
@@ -26,6 +36,7 @@ func mapDomainError(err error) *gqlerror.Error {
 	}
 
 	kind, message := "internal", "internal error"
+	extensions := map[string]any{errorKindExtension: kind}
 	switch {
 	case errors.Is(err, domain.ErrUnauthorized):
 		kind, message = "unauthorized", "unauthorized"
@@ -39,11 +50,34 @@ func mapDomainError(err error) *gqlerror.Error {
 		kind, message = "conflict", "already reviewed by someone else"
 	case errors.Is(err, domain.ErrAIUnavailable):
 		kind, message = "unavailable", "AI service is temporarily unavailable, please try again"
+	case errors.Is(err, domain.ErrRateLimited):
+		kind = "rate_limited"
+		var rlErr *domain.RateLimitError
+		retryMs := int64(1000)
+		policy := ""
+		if errors.As(err, &rlErr) && rlErr != nil {
+			retryMs = rlErr.RetryAfter.Milliseconds()
+			if retryMs < 1 {
+				retryMs = 1
+			}
+			policy = rlErr.Policy
+			message = rlErr.Error()
+		} else {
+			message = "rate limited, retry after 1s"
+		}
+		extensions = map[string]any{
+			errorKindExtension:           kind,
+			rateLimitCodeExtension:       rateLimitCodeValue,
+			rateLimitRetryAfterExtension: retryMs,
+			rateLimitPolicyExtension:     policy,
+		}
+		return &gqlerror.Error{Message: message, Extensions: extensions}
 	}
+	extensions[errorKindExtension] = kind
 
 	return &gqlerror.Error{
 		Message:    message,
-		Extensions: map[string]any{errorKindExtension: kind},
+		Extensions: extensions,
 	}
 }
 
@@ -84,8 +118,23 @@ func PresentError(ctx context.Context, err error) *gqlerror.Error {
 	if gqlErr != nil {
 		out.Path = gqlErr.Path
 	}
+	extensions := map[string]any{}
 	if rid, ok := middleware.RequestIDFromContext(ctx); ok {
-		out.Extensions = map[string]any{"request_id": rid}
+		extensions["request_id"] = rid
+	}
+	if gqlErr != nil && gqlErr.Extensions != nil {
+		if code, ok := gqlErr.Extensions[rateLimitCodeExtension]; ok {
+			extensions[rateLimitCodeExtension] = code
+		}
+		if retry, ok := gqlErr.Extensions[rateLimitRetryAfterExtension]; ok {
+			extensions[rateLimitRetryAfterExtension] = retry
+		}
+		if policy, ok := gqlErr.Extensions[rateLimitPolicyExtension]; ok {
+			extensions[rateLimitPolicyExtension] = policy
+		}
+	}
+	if len(extensions) > 0 {
+		out.Extensions = extensions
 	}
 	return out
 }

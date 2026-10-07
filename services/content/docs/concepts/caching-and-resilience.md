@@ -116,6 +116,68 @@ are best-effort too — if the flush fails, the TTL eventually catches up.
 > service has no invalidation signal for a user's interest profile**.
 > Freshness is bounded by the TTL alone.
 
+## Rate limiting
+
+Unlike the cache, the rate limiter treats Redis as **authoritative**:
+quotas must be correct across replicas, so counting happens in Redis
+with an atomic Lua fixed-window counter (`INCR` + `PEXPIRE` in one
+script). Every GraphQL operation costs one unit from its policy bucket
+before the resolver — and therefore before any AI call — runs.
+
+```mermaid
+graph TD
+    A["operation arrives"] --> B{limiter enabled?}
+    B -->|no| C[run resolver]
+    B -->|yes| D{breaker open?}
+    D -->|no| E["Lua INCR + PEXPIRE<br/>150ms budget"]
+    E -->|ok| F{under quota?}
+    F -->|yes| C
+    F -->|no| G["RATE_LIMITED + Retry-After"]
+    E -->|redis down| H[memory fallback]
+    D -->|yes| H
+    H --> I{under fallback quota?}
+    I -->|yes| C
+    I -->|no| G
+```
+
+### Key inventory
+
+| Key | Window | Notes |
+| --- | --- | --- |
+| `rl:content:reads:<subject>` | 60 s | Normal reads |
+| `rl:content:mutations:<subject>` | 60 s | Normal writes |
+| `rl:content:interactions:<subject>` | 60 s | Views, likes, saves |
+| `rl:content:search:<subject>` | 60 s | Search and recommendations |
+| `rl:content:ai_expensive:<subject>` | 60 s | Drafting, generation, chat |
+
+`<subject>` is `u:<userID>` when authenticated, `ip:<clientIP>`
+otherwise. The `rl:content:` prefix never collides with cache keys
+(`post:*`, `posts:*`, …) or the user service's keys (`user:*`).
+Windows are fixed; keys expire via `PEXPIRE` so they cannot grow
+unbounded.
+
+Nested fields (`Post.related`, `likedByMe`) are not counted
+separately — the parent operation already paid, and batching collapses
+them into one AI call per request.
+
+### Redis outage: split fallback
+
+The limiter keeps its own breaker (3 failures / 10 s, no background
+goroutine — the next request probes recovery). While open, a bounded
+process-local table (default 10 000 entries, window-expiry eviction,
+fail-open when full) serves quotas:
+
+| Traffic | Fallback quota | Why |
+| --- | --- | --- |
+| Ordinary reads, mutations, interactions, search | Base × `RATELIMIT_DEGRADED_MULTIPLIER` (default 2×) | Preserve availability, still damp bursts |
+| Expensive AI | Base × `RATELIMIT_AI_DEGRADED_MULTIPLIER` (default 1×) **plus** max 5 concurrent AI calls per replica | An outage must never produce unbounded LLM cost |
+
+The concurrency cap applies always, not just while degraded. Fallback
+decisions are counted as `content_ratelimit_decisions_total{mode="memory"}`
+and the breaker state is exported as
+`content_ratelimit_breaker_state` (0 closed, 1 open, 2 half-open), so
+degraded mode is observable without ever logging user IDs or IPs.
+
 ## The AI service: six breaker domains
 
 The AI client groups its 17 RPCs into six independent failure domains so
@@ -292,6 +354,26 @@ curl -s localhost:4002/metrics | grep -E 'cache_breaker_state|ai_fallback_engage
 docker stop topos-content-ai-1
 curl -s localhost:4002/query -H 'Content-Type: application/json' \
   -d '{"query":"{ posts(limit:1) { posts { id } } }"}'   # still works
+```
+
+## Verifying rate limiting
+
+```bash
+# burst past the 120/min reads quota and watch the rejection
+for i in $(seq 1 130); do
+  curl -s localhost:4002/query -H 'Content-Type: application/json' \
+    -d '{"query":"{ posts(limit:1) { posts { id } } }"}' | grep -o RATE_LIMITED
+done | sort | uniq -c
+
+# decisions by policy, decision and mode (redis vs memory fallback)
+curl -s localhost:4002/metrics | grep '^content_ratelimit_decisions_total'
+curl -s localhost:4002/metrics | grep -E 'ratelimit_breaker_state|ai_in_flight'
+
+# Redis down: quotas degrade instead of failing (ordinary 2x, AI 1x)
+make up WITH_REDIS=0
+curl -s localhost:4002/query -H 'Content-Type: application/json' \
+  -d '{"query":"{ posts(limit:1) { posts { id } } }"}'   # still works
+curl -s localhost:4002/metrics | grep 'mode="memory"'
 ```
 
 ## Design principles

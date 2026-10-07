@@ -273,6 +273,7 @@ Every error carries a stable `extensions.code`:
 | `PAYLOAD_TOO_LARGE` | 413 | Request body over 256 KB |
 | `SERVICE_UNAVAILABLE` | 503 | Postgres unreachable, pool timeout, or query over 7 s |
 | `GRAPHQL_TIMEOUT` | 504 | Operation exceeded 10 s |
+| `RATE_LIMITED` | 429 | Quota exhausted — wait `extensions.retryAfterMs` (or `Retry-After`), then retry |
 | `INTERNAL_ERROR` | 500 | Unexpected failure — details are logged, never returned |
 
 Full mapping and what the client should do:

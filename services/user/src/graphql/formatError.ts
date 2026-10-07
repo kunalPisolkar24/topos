@@ -1,5 +1,5 @@
 import { GraphQLError, type GraphQLFormattedError } from 'graphql';
-import { DomainError } from '../errors.js';
+import { DomainError, RateLimitedError } from '../errors.js';
 import { logger } from '../observability/logger.js';
 
 export function hasErrors(body: string): boolean {
@@ -49,11 +49,45 @@ export function extractErrorCodes(body: string): string[] {
   }
 }
 
+// Returns the longest retry delay across rate-limited errors in a
+// GraphQL response body, or null when no error is rate limited.
+export function extractRateLimitRetryAfter(body: string): number | null {
+  try {
+    const parsed = JSON.parse(body) as {
+      errors?: Array<{ extensions?: { code?: string; retryAfterMs?: unknown } }>;
+    };
+    if (!Array.isArray(parsed.errors)) {
+      return null;
+    }
+    let longest: number | null = null;
+    for (const error of parsed.errors) {
+      if (error?.extensions?.code === 'RATE_LIMITED') {
+        const retryAfterMs = Number(error.extensions.retryAfterMs);
+        if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+          longest = longest === null ? retryAfterMs : Math.max(longest, retryAfterMs);
+        } else if (longest === null) {
+          longest = 1000;
+        }
+      }
+    }
+    return longest;
+  } catch {
+    return null;
+  }
+}
+
 export function formatError(
   formatted: GraphQLFormattedError,
   error: unknown,
 ): GraphQLFormattedError {
   const domain = unwrapDomain(error);
+  if (domain instanceof RateLimitedError) {
+    return {
+      message: domain.message,
+      path: formatted.path,
+      extensions: { code: domain.code, retryAfterMs: domain.retryAfterMs, policy: domain.policy },
+    };
+  }
   if (domain) {
     return {
       message: domain.message,

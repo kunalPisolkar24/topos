@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"net/http"
 	"net/http/httptest"
@@ -323,6 +324,27 @@ func TestMapDomainError(t *testing.T) {
 
 	generic := mapDomainError(errors.New("boom"))
 	assert.Equal(t, "internal error", generic.Message, "unexpected errors must never leak internal details")
+}
+
+func TestMapDomainErrorRateLimited(t *testing.T) {
+	err := mapDomainError(domain.NewRateLimitedError("search", 1500*time.Millisecond))
+	assert.Contains(t, err.Message, "rate limited")
+	assert.Equal(t, "rate_limited", err.Extensions[errorKindExtension])
+	assert.Equal(t, "RATE_LIMITED", err.Extensions[rateLimitCodeExtension])
+	assert.Equal(t, int64(1500), err.Extensions[rateLimitRetryAfterExtension])
+	assert.Equal(t, "search", err.Extensions[rateLimitPolicyExtension])
+
+	bare := mapDomainError(domain.ErrRateLimited)
+	assert.Equal(t, "RATE_LIMITED", bare.Extensions[rateLimitCodeExtension])
+}
+
+func TestPresentErrorPreservesRateLimitExtensions(t *testing.T) {
+	ctx := presentCtx()
+	out := PresentError(ctx, mapDomainError(domain.NewRateLimitedError("ai_expensive", 2*time.Second)))
+	assert.Contains(t, out.Message, "rate limited")
+	assert.Equal(t, "RATE_LIMITED", out.Extensions[rateLimitCodeExtension])
+	assert.Equal(t, int64(2000), out.Extensions[rateLimitRetryAfterExtension])
+	assert.Equal(t, "ai_expensive", out.Extensions[rateLimitPolicyExtension])
 }
 
 func presentCtx() context.Context {

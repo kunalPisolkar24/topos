@@ -38,6 +38,18 @@ type Config struct {
 	KafkaPersonalizerConsumerGroupID string
 	KafkaDLQTopic                    string
 	WorkerConcurrency                int
+	RateLimitEnabled                 bool
+	RateLimitReadsPerMin             int
+	RateLimitMutationsPerMin         int
+	RateLimitInteractionsPerMin      int
+	RateLimitSearchPerMin            int
+	RateLimitAIPerMin                int
+	RateLimitWindowSeconds           int
+	RateLimitDegradedMultiplier      int
+	RateLimitAIDegradedMultiplier    int
+	RateLimitAIConcurrency           int
+	RateLimitRedisTimeoutMs          int
+	RateLimitMemoryMaxEntries        int
 	LogFormat                        string
 	LogLevel                         string
 	OtelEndpoint                     string
@@ -50,15 +62,27 @@ type Config struct {
 var loadOnce sync.Once
 
 var contentAliases = map[string]string{
-	"CONTENT_MONGO_URI":      "MONGO_URI",
-	"CONTENT_DB_NAME":        "DB_NAME",
-	"CONTENT_REDIS_ADDR":     "REDIS_ADDR",
-	"CONTENT_REDIS_PASSWORD": "REDIS_PASSWORD",
-	"CONTENT_JWT_SECRET":     "JWT_SECRET",
-	"CONTENT_INTERNAL_TOKEN": "INTERNAL_TOKEN",
-	"CONTENT_AI_SERVICE_URL": "AI_SERVICE_URL",
-	"CONTENT_KAFKA_BROKERS":  "KAFKA_BROKERS",
-	"CONTENT_KAFKA_TOPIC":    "KAFKA_TOPIC",
+	"CONTENT_MONGO_URI":                  "MONGO_URI",
+	"CONTENT_DB_NAME":                    "DB_NAME",
+	"CONTENT_REDIS_ADDR":                 "REDIS_ADDR",
+	"CONTENT_REDIS_PASSWORD":             "REDIS_PASSWORD",
+	"CONTENT_JWT_SECRET":                 "JWT_SECRET",
+	"CONTENT_INTERNAL_TOKEN":             "INTERNAL_TOKEN",
+	"CONTENT_AI_SERVICE_URL":             "AI_SERVICE_URL",
+	"CONTENT_KAFKA_BROKERS":              "KAFKA_BROKERS",
+	"CONTENT_KAFKA_TOPIC":                "KAFKA_TOPIC",
+	"CONTENT_RATELIMIT_ENABLED":          "RATELIMIT_ENABLED",
+	"CONTENT_RATELIMIT_READS_PER_MIN":    "RATELIMIT_READS_PER_MIN",
+	"CONTENT_RATELIMIT_MUT_PER_MIN":      "RATELIMIT_MUTATIONS_PER_MIN",
+	"CONTENT_RATELIMIT_INTERACT_PER_MIN": "RATELIMIT_INTERACTIONS_PER_MIN",
+	"CONTENT_RATELIMIT_SEARCH_PER_MIN":   "RATELIMIT_SEARCH_PER_MIN",
+	"CONTENT_RATELIMIT_AI_PER_MIN":       "RATELIMIT_AI_PER_MIN",
+	"CONTENT_RATELIMIT_WINDOW_SECONDS":   "RATELIMIT_WINDOW_SECONDS",
+	"CONTENT_RATELIMIT_DEGRADED_MULT":    "RATELIMIT_DEGRADED_MULTIPLIER",
+	"CONTENT_RATELIMIT_AI_DEGRADED_MULT": "RATELIMIT_AI_DEGRADED_MULTIPLIER",
+	"CONTENT_RATELIMIT_AI_CONCURRENCY":   "RATELIMIT_AI_CONCURRENCY",
+	"CONTENT_RATELIMIT_REDIS_TIMEOUT_MS": "RATELIMIT_REDIS_TIMEOUT_MS",
+	"CONTENT_RATELIMIT_MEMORY_MAX":       "RATELIMIT_MEMORY_MAX_ENTRIES",
 }
 
 // LoadConfig reads configuration from the environment, falling back to a
@@ -96,6 +120,18 @@ func LoadConfig() Config {
 		KafkaPersonalizerConsumerGroupID: getEnv("KAFKA_PERSONALIZER_CONSUMER_GROUP_ID", "content-personalizer-worker-group"),
 		KafkaDLQTopic:                    getEnv("KAFKA_DLQ_TOPIC", "posts-dlq"),
 		WorkerConcurrency:                getEnvInt("WORKER_CONCURRENCY", 3),
+		RateLimitEnabled:                 getEnvBool("RATELIMIT_ENABLED", true),
+		RateLimitReadsPerMin:             getEnvInt("RATELIMIT_READS_PER_MIN", 120),
+		RateLimitMutationsPerMin:         getEnvInt("RATELIMIT_MUTATIONS_PER_MIN", 30),
+		RateLimitInteractionsPerMin:      getEnvInt("RATELIMIT_INTERACTIONS_PER_MIN", 60),
+		RateLimitSearchPerMin:            getEnvInt("RATELIMIT_SEARCH_PER_MIN", 30),
+		RateLimitAIPerMin:                getEnvInt("RATELIMIT_AI_PER_MIN", 10),
+		RateLimitWindowSeconds:           getEnvInt("RATELIMIT_WINDOW_SECONDS", 60),
+		RateLimitDegradedMultiplier:      getEnvInt("RATELIMIT_DEGRADED_MULTIPLIER", 2),
+		RateLimitAIDegradedMultiplier:    getEnvInt("RATELIMIT_AI_DEGRADED_MULTIPLIER", 1),
+		RateLimitAIConcurrency:           getEnvInt("RATELIMIT_AI_CONCURRENCY", 5),
+		RateLimitRedisTimeoutMs:          getEnvInt("RATELIMIT_REDIS_TIMEOUT_MS", 150),
+		RateLimitMemoryMaxEntries:        getEnvInt("RATELIMIT_MEMORY_MAX_ENTRIES", 10000),
 		LogFormat:                        getEnv("LOG_FORMAT", "json"),
 		LogLevel:                         getEnv("LOG_LEVEL", "info"),
 		OtelEndpoint:                     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
@@ -228,6 +264,21 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	raw, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return fallback
+	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func splitAndTrim(value string) []string {

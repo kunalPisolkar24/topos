@@ -43,15 +43,16 @@ Three fields, no more:
 
 | Field | Always present? | Notes |
 | --- | --- | --- |
-| `message` | yes | The only thing you can reliably branch on |
+| `message` | yes | The only thing you can reliably branch on — except rate limits (below) |
 | `path` | when the failure is in a field | Which field failed |
 | `extensions.request_id` | when a request ID was set | Correlate with server logs |
+| `extensions.code`, `extensions.retryAfterMs`, `extensions.policy` | only for rate limits | Machine-readable quota rejection |
 
-> ### The `kind` extension never reaches you
+> ### The `kind` extension never reaches you — except for rate limits
 >
 > Internally every error is tagged with a `kind` — `unauthorized`,
 > `forbidden`, `not_found`, `validation`, `conflict`, `unavailable`,
-> `internal`, `client`. It is attached in `mapDomainError` and used to pick the
+> `rate_limited`, `internal`, `client`. It is attached in `mapDomainError` and used to pick the
 > message and increment a metric.
 >
 > But `PresentError` in [`graph/errors.go`](../../graph/errors.go)
@@ -60,6 +61,11 @@ Three fields, no more:
 >
 > **Consequence: you must branch on the message string.** There is no
 > machine-readable code in the response.
+>
+> The one exception is quota rejection: a rate-limited operation
+> returns `extensions.code: "RATE_LIMITED"` with `retryAfterMs` and the
+> `policy` that tripped, plus a `Retry-After` response header. Branch on
+> `extensions.code`, wait `retryAfterMs`, then retry.
 
 ## The message catalogue
 
@@ -73,6 +79,7 @@ Produced by `mapDomainError`. This is the complete set:
 | `domain.ErrValidation` | `validation` | the full wrapped text, e.g. `validation error: title is required` |
 | `domain.ErrConflict` | `conflict` | `already reviewed by someone else` |
 | `domain.ErrAIUnavailable` | `unavailable` | `AI service is temporarily unavailable, please try again` |
+| rate limited (any policy) | `rate_limited` | `rate limited, retry after Ns` + `extensions.code: RATE_LIMITED`, `retryAfterMs`, `policy`, and a `Retry-After` header |
 | anything unclassified | `internal` | `internal error` |
 | gqlgen validation/protocol | `client` | gqlgen's own message |
 
@@ -228,6 +235,7 @@ graph TD
 | `not found` | Resource missing | No — including `post(id)` for a missing post |
 | `validation error: …` | Bad input, with details | No — fix the input |
 | `already reviewed by someone else` | Lost a race on a draft | Optionally, by re-reading |
+| `rate limited, retry after Ns` | Quota exhausted (`extensions.policy`) | Yes — after `extensions.retryAfterMs` / `Retry-After` |
 | `internal error` | Unclassified failure | Maybe — check the server log |
 | gqlgen message | Query syntax or validation problem | No |
 
@@ -252,6 +260,7 @@ sum by (operation) (
 | `client` | No — malformed queries from a caller |
 | `unauthorized`, `forbidden` | Watch for spikes (token misconfiguration) |
 | `validation` | Watch — a client may be sending bad data in a loop |
+| `rate_limited` | Watch — a client is bursting; sustained spikes may need quota tuning |
 | `not_found` | Usually benign |
 | `conflict` | Low volume; expected under concurrent review |
 
